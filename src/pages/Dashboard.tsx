@@ -11,8 +11,11 @@ import {
   TrendingUp, Award, Briefcase, BellRing, Bookmark, ScrollText,
   Home, User, Settings, ChevronRight, LogOut, Lock, CreditCard,
   Megaphone, BarChart3, Sun, Moon, ArrowRight, Crown, Mail,
-  Receipt, Shield, FileText, RefreshCw
+  Receipt, Shield, FileText, RefreshCw, Sparkles, Stethoscope, PieChart, Info, Star
 } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
+} from '@/components/ui/dialog';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { LeaderboardPreview } from '@/components/dashboard/LeaderboardPreview';
@@ -35,6 +38,10 @@ const Dashboard = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('home');
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(true);
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
+  const [showTermOfDay, setShowTermOfDay] = useState(false);
+  const [showCaseOfDay, setShowCaseOfDay] = useState(false);
   const [isNavigating, setIsNavigating] = useState(true);
 
   type Profile = {
@@ -146,6 +153,16 @@ const Dashboard = () => {
     { title: 'Collaborate', description: 'Apply for Medmacs!', icon: Briefcase, link: '/summerinternship2025', gradient: 'from-rose-500 to-pink-600', iconColor: 'text-rose-100', tag: 'Open now!', tagColor: 'bg-white/90 text-rose-600 animate-pulse' },
   ];
 
+  const termOfDay = {
+    term: "Hemoglobin",
+    definition: "Hemoglobin is a protein in red blood cells that carries oxygen from the lungs to the rest of the body and returns carbon dioxide from the body to the lungs. It consists of four subunits, each containing a heme group with an iron atom that binds oxygen. Normal hemoglobin levels range from 12-16 g/dL in females and 14-18 g/dL in males."
+  };
+
+  const caseOfDay = {
+    headline: "25-Year-Old Male with Acute Chest Pain",
+    details: "A 25-year-old male presents to the emergency department with acute onset chest pain radiating to the left arm, accompanied by diaphoresis and shortness of breath. He has no significant past medical history. ECG shows ST elevation in leads II, III, and aVF. Troponin levels are elevated. The patient is hemodynamically stable with BP 130/80 mmHg and HR 92 bpm. What is the most likely diagnosis and immediate management plan?"
+  };
+
   const premiumPerks = [
     { title: 'AI Test Generator', description: 'Custom tests with AI', icon: Brain, link: '/ai/test-generator', gradient: 'from-cyan-500 to-blue-600', iconColor: 'text-cyan-100' },
     { title: 'AI Chatbot', description: 'Instant AI tutor', icon: Zap, link: '/ai/chatbot', gradient: 'from-amber-400 to-orange-500', iconColor: 'text-yellow-100' },
@@ -174,7 +191,7 @@ const Dashboard = () => {
 
   const ActionCard = ({ action, isExternal = false, fixedHeight = false }: any) => {
     const content = (
-      <div className={`relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br ${action.gradient} shadow-lg shadow-black/5 dark:shadow-black/20 active:scale-[0.97] transition-all duration-150 ${fixedHeight ? 'h-[100px]' : ''}`}>
+      <div className={`relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br ${action.gradient} shadow-lg shadow-black/5 dark:shadow-black/20 active:scale-[0.97] transition-all duration-150 ${fixedHeight ? 'h-[120px]' : ''}`}>
         <div className="absolute -right-3 -bottom-3 opacity-10">
           <action.icon className={`w-20 h-20 ${action.iconColor}`} />
         </div>
@@ -335,6 +352,16 @@ const Dashboard = () => {
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
                   </Link>
                 ))}
+                {/* What's New button */}
+                <button onClick={() => setShowWhatsNew(true)} className="flex items-center justify-between p-4 hover:bg-accent/50 active:bg-accent transition-colors w-full">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center">
+                      <Info className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                    <span className="text-sm font-medium text-foreground">What's New</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                </button>
               </CardContent>
             </Card>
 
@@ -363,8 +390,8 @@ const Dashboard = () => {
             </Button>
 
             <div className="text-center pt-4 pb-2">
-              <p className="text-[10px] text-muted-foreground">© HMACS Studios 2026</p>
-              <p className="text-[10px] text-muted-foreground">All rights reserved</p>
+              <p className="text-[10px] text-muted-foreground font-medium">A Project by Hmacs Studios.</p>
+              <p className="text-[10px] text-muted-foreground mt-1">© 2026 Hmacs Studios. All rights reserved</p>
             </div>
           </div>
         );
@@ -406,6 +433,56 @@ const Dashboard = () => {
               {quickActions.map((action, i) => <ActionCard key={i} action={action} fixedHeight />)}
             </div>
 
+            {/* Plan Status & Term of Day - side by side */}
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              {/* Plan Pie Chart */}
+              <div className="rounded-2xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 flex flex-col items-center justify-center">
+                {rawUserPlan === 'free' ? (
+                  <>
+                    <div className="relative w-20 h-20 mb-2">
+                      <svg viewBox="0 0 36 36" className="w-full h-full">
+                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="hsl(var(--muted))" strokeWidth="3" />
+                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="hsl(var(--primary))" strokeWidth="3" strokeDasharray={`${Math.min(((userStats?.totalQuestions || 0) / 50) * 100, 100)}, 100`} strokeLinecap="round" />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-sm font-black text-foreground">{Math.min(userStats?.totalQuestions || 0, 50)}/50</span>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider text-center">Daily Limit</p>
+                    <p className="text-[9px] text-muted-foreground text-center mt-0.5">Free Plan</p>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-center">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-2 ${rawUserPlan === 'iconic' ? 'bg-gradient-to-br from-rose-500 to-orange-500' : 'bg-gradient-to-br from-blue-500 to-violet-600'}`}>
+                      {rawUserPlan === 'iconic' ? <Crown className="w-6 h-6 text-white" /> : <Star className="w-6 h-6 text-white" />}
+                    </div>
+                    <p className="text-xs font-black text-foreground uppercase">{rawUserPlan === 'iconic' ? 'Iconic' : 'Premium'}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Unlimited access</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Term of the Day */}
+              <button onClick={() => setShowTermOfDay(true)} className="rounded-2xl border border-border/40 bg-gradient-to-br from-emerald-500/10 to-teal-500/5 backdrop-blur-sm p-4 text-left active:scale-[0.97] transition-all">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Term of the Day</span>
+                </div>
+                <h4 className="text-sm font-black text-foreground mb-1">{termOfDay.term}</h4>
+                <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{termOfDay.definition}</p>
+              </button>
+            </div>
+
+            {/* Case of the Day */}
+            <button onClick={() => setShowCaseOfDay(true)} className="w-full rounded-2xl border border-border/40 bg-gradient-to-br from-blue-500/10 to-indigo-500/5 backdrop-blur-sm p-4 text-left mb-6 active:scale-[0.97] transition-all">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Stethoscope className="w-3.5 h-3.5 text-blue-500" />
+                <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Case of the Day</span>
+              </div>
+              <h4 className="text-sm font-black text-foreground mb-1">{caseOfDay.headline}</h4>
+              <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{caseOfDay.details}</p>
+            </button>
+
             {/* Premium Perks with animated crown */}
             <div className="flex items-center gap-2 mb-3">
               <Crown className="w-4 h-4 text-amber-500 animate-bounce-gentle" />
@@ -415,13 +492,13 @@ const Dashboard = () => {
               {premiumPerks.map((action, i) => <ActionCard key={i} action={action} />)}
             </div>
 
-            {/* Medistics - visually separate */}
+            {/* Medistics - purple */}
             <div className="mb-6 pt-4 border-t border-border/30">
               <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-1.5">
-                <TrendingUp className="w-3.5 h-3.5 text-primary" /> Explore
+                <TrendingUp className="w-3.5 h-3.5 text-violet-500" /> Explore
               </h2>
               <a href="https://medistics.app" target="_blank" rel="noopener noreferrer">
-                <div className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-primary to-emerald-600 shadow-lg shadow-primary/10 active:scale-[0.97] transition-all">
+                <div className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-violet-600 to-purple-700 shadow-lg shadow-violet-500/10 active:scale-[0.97] transition-all">
                   <div className="relative z-10 flex items-center gap-3">
                     <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs" className="w-8 h-8" />
                     <div>
@@ -436,8 +513,8 @@ const Dashboard = () => {
 
             {/* Footer */}
             <div className="text-center pt-2 pb-4">
-              <p className="text-[10px] text-muted-foreground">© HMACS Studios 2026</p>
-              <p className="text-[10px] text-muted-foreground">All rights reserved</p>
+              <p className="text-[10px] text-muted-foreground font-medium">A Project by Hmacs Studios.</p>
+              <p className="text-[10px] text-muted-foreground mt-1">© 2026 Hmacs Studios. All rights reserved</p>
             </div>
           </div>
         );
@@ -477,6 +554,57 @@ const Dashboard = () => {
       </div>
 
       <AppExitConfirmation showExitConfirm={showExitConfirm} setShowExitConfirm={setShowExitConfirm} />
+
+      {/* What's New Dialog */}
+      <Dialog open={showWhatsNew} onOpenChange={setShowWhatsNew}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black">What's New</DialogTitle>
+            <DialogDescription>Release history</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            {[
+              { version: 'v6.1', title: 'First Public Release', desc: 'Updated UI, bug fixes and optimizations' },
+              { version: 'v6.0', title: 'Beta Release', desc: 'Major feature additions and improvements' },
+              { version: 'v5.0', title: 'Alpha Release', desc: 'Initial internal testing build' },
+            ].map((r, i) => (
+              <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-muted/50">
+                <Badge className="bg-primary/15 text-primary border-0 text-xs font-bold shrink-0">{r.version}</Badge>
+                <div>
+                  <p className="text-sm font-bold text-foreground">{r.title}</p>
+                  <p className="text-xs text-muted-foreground">{r.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Term of Day Dialog */}
+      <Dialog open={showTermOfDay} onOpenChange={setShowTermOfDay}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black flex items-center gap-2"><Sparkles className="w-5 h-5 text-emerald-500" /> Term of the Day</DialogTitle>
+          </DialogHeader>
+          <div className="mt-2">
+            <h3 className="text-lg font-black text-foreground mb-2">{termOfDay.term}</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">{termOfDay.definition}</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Case of Day Dialog */}
+      <Dialog open={showCaseOfDay} onOpenChange={setShowCaseOfDay}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black flex items-center gap-2"><Stethoscope className="w-5 h-5 text-blue-500" /> Case of the Day</DialogTitle>
+          </DialogHeader>
+          <div className="mt-2">
+            <h3 className="text-base font-black text-foreground mb-2">{caseOfDay.headline}</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">{caseOfDay.details}</p>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Premium bottom tab bar */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 pb-[env(safe-area-inset-bottom)]">
