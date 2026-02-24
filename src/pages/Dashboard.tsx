@@ -10,7 +10,7 @@ import {
   BookOpen, Zap, Trophy, Target, Users, Brain, Swords, Flame,
   TrendingUp, Award, Briefcase, BellRing, Bookmark, ScrollText,
   Home, User, Settings, ChevronRight, LogOut, Lock, CreditCard,
-  Megaphone, BarChart3, Sun, Moon, ArrowRight
+  Megaphone, BarChart3, Sun, Moon, ArrowRight, Crown
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
@@ -56,11 +56,7 @@ const Dashboard = () => {
     queryKey: ['profile', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
       if (error) return null;
       return data;
     },
@@ -71,56 +67,37 @@ const Dashboard = () => {
     queryKey: ['user-stats', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data: answers, error: answersError } = await supabase
-        .from('user_answers')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (answersError) {
-        return { totalQuestions: 0, correctAnswers: 0, accuracy: 0, currentStreak: 0, rankPoints: 0, battlesWon: 0, totalBattles: 0 };
-      }
-
+      const { data: answers, error: answersError } = await supabase.from('user_answers').select('*').eq('user_id', user.id);
+      if (answersError) return { totalQuestions: 0, correctAnswers: 0, accuracy: 0, currentStreak: 0, rankPoints: 0, battlesWon: 0, totalBattles: 0 };
       const totalQuestions = answers?.length || 0;
       const correctAnswers = answers?.filter(a => a.is_correct)?.length || 0;
       const accuracy = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
       const answerDates = answers?.map(a => new Date(a.created_at).toDateString()) || [];
       const uniqueDates = [...new Set(answerDates)].sort().reverse();
-
       let currentStreak = 0;
       const today = new Date().toDateString();
       const yesterday = new Date(Date.now() - 86400000).toDateString();
-
       if (uniqueDates.includes(today) || uniqueDates.includes(yesterday)) {
         for (let i = 0; i < uniqueDates.length; i++) {
           const date = new Date(uniqueDates[i]);
           const expectedDate = new Date();
           expectedDate.setDate(expectedDate.getDate() - i);
-          if (date.toDateString() === expectedDate.toDateString()) {
-            currentStreak++;
-          } else {
-            break;
-          }
+          if (date.toDateString() === expectedDate.toDateString()) currentStreak++;
+          else break;
         }
       }
-
       const { data: battles } = await supabase.from('battle_results').select('*').eq('user_id', user.id);
       const battlesWon = battles?.filter(b => b.rank === 1)?.length || 0;
       const rankPoints = correctAnswers * 10 + currentStreak * 5 + accuracy;
-
       return { totalQuestions, correctAnswers, accuracy, currentStreak, rankPoints, battlesWon, totalBattles: battles?.length || 0 };
     },
     enabled: !!user?.id
   });
 
-  // Announcements data
   const { data: announcements, isLoading: announcementsLoading } = useQuery({
     queryKey: ['announcements'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('announcements')
-        .select('*')
-        .eq('is_published', true)
-        .order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('announcements').select('*').eq('is_published', true).order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -130,10 +107,7 @@ const Dashboard = () => {
     queryKey: ['readAnnouncements', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const { data, error } = await supabase
-        .from('user_announcements')
-        .select('announcement_id')
-        .eq('user_id', user.id);
+      const { data, error } = await supabase.from('user_announcements').select('announcement_id').eq('user_id', user.id);
       if (error) return [];
       return data.map(item => item.announcement_id);
     },
@@ -146,15 +120,12 @@ const Dashboard = () => {
       const records = announcementIds.map(id => ({ user_id: user.id, announcement_id: id }));
       await supabase.from('user_announcements').upsert(records, { onConflict: 'user_id, announcement_id' });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['readAnnouncements', user?.id] });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['readAnnouncements', user?.id] }); },
   });
 
   useEffect(() => {
     if (activeTab === 'announcements' && user && announcements?.length) {
-      const ids = announcements.map(a => a.id);
-      markAsReadMutation.mutate(ids);
+      markAsReadMutation.mutate(announcements.map(a => a.id));
     }
   }, [activeTab, announcements, user]);
 
@@ -175,9 +146,9 @@ const Dashboard = () => {
   ];
 
   const premiumPerks = [
-    { title: 'AI Test Generator', description: 'Custom tests with AI', icon: Brain, link: '/ai/test-generator', gradient: 'from-cyan-500 to-blue-600', iconColor: 'text-cyan-100', tag: <img src="/lovable-uploads/star.gif" alt="premium" width={18} /> },
-    { title: 'AI Chatbot', description: 'Instant AI tutor', icon: Zap, link: '/ai/chatbot', gradient: 'from-amber-400 to-orange-500', iconColor: 'text-yellow-100', tag: <img src="/lovable-uploads/star.gif" alt="premium" width={18} /> },
-    { title: 'Full-Length Paper', description: 'Timed mixed exams', icon: ScrollText, link: '/flp', gradient: 'from-violet-600 to-purple-700', iconColor: 'text-violet-200', tag: <img src="/lovable-uploads/star.gif" alt="premium" width={18} /> },
+    { title: 'AI Test Generator', description: 'Custom tests with AI', icon: Brain, link: '/ai/test-generator', gradient: 'from-cyan-500 to-blue-600', iconColor: 'text-cyan-100' },
+    { title: 'AI Chatbot', description: 'Instant AI tutor', icon: Zap, link: '/ai/chatbot', gradient: 'from-amber-400 to-orange-500', iconColor: 'text-yellow-100' },
+    { title: 'Full-Length Paper', description: 'Timed mixed exams', icon: ScrollText, link: '/flp', gradient: 'from-teal-500 to-emerald-600', iconColor: 'text-teal-200' },
   ];
 
   const displayName = profile?.full_name || profile?.username || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Medmacs User';
@@ -200,9 +171,9 @@ const Dashboard = () => {
     );
   }
 
-  const ActionCard = ({ action, isExternal = false }: any) => {
+  const ActionCard = ({ action, isExternal = false, fixedHeight = false }: any) => {
     const content = (
-      <div className={`relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br ${action.gradient} shadow-lg shadow-black/5 dark:shadow-black/20 active:scale-[0.97] transition-all duration-150`}>
+      <div className={`relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br ${action.gradient} shadow-lg shadow-black/5 dark:shadow-black/20 active:scale-[0.97] transition-all duration-150 ${fixedHeight ? 'h-[100px]' : ''}`}>
         <div className="absolute -right-3 -bottom-3 opacity-10">
           <action.icon className={`w-20 h-20 ${action.iconColor}`} />
         </div>
@@ -217,7 +188,6 @@ const Dashboard = () => {
         </div>
       </div>
     );
-
     if (isExternal) return <a href={action.link} target="_blank" rel="noopener noreferrer">{content}</a>;
     return <Link to={action.disabled ? '#' : action.link} className={action.disabled ? 'opacity-50 pointer-events-none' : ''}>{content}</Link>;
   };
@@ -313,7 +283,6 @@ const Dashboard = () => {
       case 'profile':
         return (
           <div className="animate-in fade-in slide-in-from-right-4 duration-300 space-y-4">
-            {/* User info card */}
             <div className="flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-br from-primary/10 to-accent border border-border/40 shadow-sm">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center overflow-hidden shrink-0 shadow-md">
                 {profile?.avatar_url ? (
@@ -329,7 +298,6 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Theme toggle */}
             <Card className="border border-border/40 shadow-sm bg-card/80">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
@@ -340,15 +308,11 @@ const Dashboard = () => {
                       <p className="text-[11px] text-muted-foreground">Toggle app theme</p>
                     </div>
                   </div>
-                  <Switch
-                    checked={theme === 'dark'}
-                    onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
-                  />
+                  <Switch checked={theme === 'dark'} onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')} />
                 </div>
               </CardContent>
             </Card>
 
-            {/* Settings links */}
             <Card className="border border-border/40 shadow-sm overflow-hidden bg-card/80">
               <CardContent className="p-0 divide-y divide-border/30">
                 {[
@@ -370,15 +334,15 @@ const Dashboard = () => {
               </CardContent>
             </Card>
 
-            {/* Logout */}
             <Button variant="outline" className="w-full text-destructive border-destructive/20 hover:bg-destructive/5" onClick={handleLogout}>
               <LogOut className="w-4 h-4 mr-2" />
               Sign Out
             </Button>
 
-            <p className="text-center text-[10px] text-muted-foreground pt-4">
-              A Project by Hmacs Studios. © 2026
-            </p>
+            <div className="text-center pt-4 pb-2">
+              <p className="text-[10px] text-muted-foreground">© HMACS Studios 2026</p>
+              <p className="text-[10px] text-muted-foreground">All rights reserved</p>
+            </div>
           </div>
         );
 
@@ -386,7 +350,7 @@ const Dashboard = () => {
       default:
         return (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-            {/* Greeting with avatar */}
+            {/* Greeting */}
             <div className="flex items-center justify-between mb-5">
               <div>
                 <h1 className="text-xl font-black text-foreground leading-tight">
@@ -427,48 +391,71 @@ const Dashboard = () => {
               <Zap className="text-amber-500 fill-amber-500 w-3.5 h-3.5" /> Quick Actions
             </h2>
             <div className="grid grid-cols-2 gap-3 mb-6">
-              {quickActions.map((action, i) => <ActionCard key={i} action={action} />)}
+              {quickActions.map((action, i) => <ActionCard key={i} action={action} fixedHeight />)}
             </div>
 
-            {/* Premium */}
-            <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-1.5">
-              <Award className="text-violet-500 w-3.5 h-3.5" /> Premium
-            </h2>
+            {/* Premium Perks with animated crown */}
+            <div className="flex items-center gap-2 mb-3">
+              <Crown className="w-4 h-4 text-amber-500 animate-bounce-gentle" />
+              <h2 className="text-sm font-bold text-foreground">Premium Perks</h2>
+            </div>
             <div className="grid grid-cols-1 gap-3 mb-6">
               {premiumPerks.map((action, i) => <ActionCard key={i} action={action} />)}
             </div>
 
-            {/* Medistics link */}
-            <Link to="https://medistics.app" target="_blank" rel="noopener noreferrer">
-              <div className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-violet-600 to-purple-700 shadow-lg shadow-violet-500/10 active:scale-[0.97] transition-all">
-                <div className="relative z-10 flex items-center gap-3">
-                  <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs" className="w-8 h-8" />
-                  <div>
-                    <h3 className="text-sm font-bold text-white">Medistics App</h3>
-                    <p className="text-white/60 text-[11px] font-medium">The Best AI for MDCAT</p>
+            {/* Medistics - separate section */}
+            <div className="mb-6">
+              <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5 text-primary" /> Explore
+              </h2>
+              <a href="https://medistics.app" target="_blank" rel="noopener noreferrer">
+                <div className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-primary to-emerald-600 shadow-lg shadow-primary/10 active:scale-[0.97] transition-all">
+                  <div className="relative z-10 flex items-center gap-3">
+                    <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs" className="w-8 h-8" />
+                    <div>
+                      <h3 className="text-sm font-bold text-white">Medistics App</h3>
+                      <p className="text-white/60 text-[11px] font-medium">The Best AI for MDCAT</p>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-white/40 ml-auto" />
                   </div>
-                  <ArrowRight className="w-4 h-4 text-white/40 ml-auto" />
                 </div>
-              </div>
-            </Link>
+              </a>
+            </div>
+
+            {/* Footer */}
+            <div className="text-center pt-2 pb-4">
+              <p className="text-[10px] text-muted-foreground">© HMACS Studios 2026</p>
+              <p className="text-[10px] text-muted-foreground">All rights reserved</p>
+            </div>
           </div>
         );
     }
   };
 
   return (
-    <div className="min-h-screen w-full bg-background pb-28">
+    <div className="min-h-screen w-full bg-background pb-28 overflow-x-hidden">
       <Seo title="Dashboard" description="Your personalized Medmacs App dashboard." canonical="https://medmacs.app/dashboard" />
       <VersionGuard />
 
-      {/* Minimal top bar */}
+      {/* Minimal top bar with avatar */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-2xl border-b border-border/30 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between px-5 h-12">
           <div className="flex items-center gap-2.5">
             <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-6 h-6" />
             <span className="text-sm font-extrabold text-foreground tracking-tight">Medmacs</span>
           </div>
-          <Badge className="text-[10px] font-bold bg-primary/10 text-primary border-0 px-2.5">{userPlanDisplayName}</Badge>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setActiveTab('profile')} className="shrink-0">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center overflow-hidden ring-1 ring-primary/20">
+                {profile?.avatar_url ? (
+                  <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-primary-foreground font-bold text-[10px]">{displayName.substring(0, 2).toUpperCase()}</span>
+                )}
+              </div>
+            </button>
+            <Badge className="text-[10px] font-bold bg-primary/10 text-primary border-0 px-2.5">{userPlanDisplayName}</Badge>
+          </div>
         </div>
       </header>
 
