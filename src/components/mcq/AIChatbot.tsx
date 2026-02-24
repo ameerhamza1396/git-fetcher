@@ -65,12 +65,12 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({ currentQuestion, userPlan,
     <>
       {/* FAB */}
       <motion.div className="fixed bottom-6 right-4 z-50" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-        <Button onClick={() => setIsOpen(true)} className="w-14 h-14 rounded-full bg-primary hover:bg-primary/90 shadow-xl">
+        <Button onClick={() => setIsOpen(true)} className="w-14 h-14 rounded-full bg-primary/80 backdrop-blur-xl hover:bg-primary/90 shadow-xl border border-primary-foreground/10">
           <Bot className="w-6 h-6 text-primary-foreground" />
         </Button>
       </motion.div>
 
-      {/* Chat panel - full screen on mobile */}
+      {/* Chat panel - translucent overlay */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -78,10 +78,10 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({ currentQuestion, userPlan,
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed inset-0 z-50 sm:inset-auto sm:bottom-4 sm:right-4 sm:w-96 sm:h-[500px] sm:rounded-2xl overflow-hidden shadow-2xl border border-border bg-background flex flex-col"
+            className="fixed inset-0 z-50 sm:inset-auto sm:bottom-4 sm:right-4 sm:w-96 sm:h-[500px] sm:rounded-2xl overflow-hidden shadow-2xl border border-border/30 bg-background/60 backdrop-blur-2xl flex flex-col"
           >
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-primary text-primary-foreground flex-shrink-0">
+            {/* Header - translucent */}
+            <div className="flex items-center justify-between px-4 py-3 bg-primary/80 backdrop-blur-xl text-primary-foreground flex-shrink-0 border-b border-primary-foreground/10">
               <div className="flex items-center space-x-2">
                 <Bot className="w-5 h-5" />
                 <span className="text-base font-bold">Dr. Ahroid</span>
@@ -97,7 +97,7 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({ currentQuestion, userPlan,
                 <ScrollArea className="flex-1 px-4 py-4">
                   {messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                      <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                      <div className="w-16 h-16 rounded-full bg-primary/10 backdrop-blur-lg flex items-center justify-center mb-4">
                         <Bot className="w-8 h-8 text-primary opacity-60" />
                       </div>
                       <p className="text-sm font-medium text-foreground">Ask me anything!</p>
@@ -107,10 +107,10 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({ currentQuestion, userPlan,
                     <div className="space-y-3">
                       {messages.map((message, index) => (
                         <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm ${
+                          <div className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm backdrop-blur-lg ${
                             message.role === 'user'
-                              ? 'bg-primary text-primary-foreground rounded-br-md'
-                              : 'bg-muted text-foreground rounded-bl-md'
+                              ? 'bg-primary/80 text-primary-foreground rounded-br-md'
+                              : 'bg-muted/60 text-foreground rounded-bl-md'
                           }`}>
                             <p className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
                             <p className={`text-[10px] mt-1 ${message.role === 'user' ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}>
@@ -121,7 +121,7 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({ currentQuestion, userPlan,
                       ))}
                       {isLoading && (
                         <div className="flex justify-start">
-                          <div className="bg-muted px-4 py-3 rounded-2xl rounded-bl-md">
+                          <div className="bg-muted/60 backdrop-blur-lg px-4 py-3 rounded-2xl rounded-bl-md">
                             <div className="flex space-x-1">
                               <div className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                               <div className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -137,24 +137,24 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({ currentQuestion, userPlan,
 
                 {/* Help button */}
                 {currentQuestion && (
-                  <div className="px-3 py-2 border-t border-border flex-shrink-0">
-                    <Button variant="outline" size="sm" onClick={handleQuestionHelp} className="w-full text-xs rounded-xl h-9">
+                  <div className="px-3 py-2 border-t border-border/30 flex-shrink-0">
+                    <Button variant="outline" size="sm" onClick={handleQuestionHelp} className="w-full text-xs rounded-xl h-9 bg-background/40 backdrop-blur-lg border-border/30">
                       Help with current question
                     </Button>
                   </div>
                 )}
 
                 {/* Input */}
-                <div className="px-3 py-3 border-t border-border flex-shrink-0 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:pb-3">
+                <div className="px-3 py-3 border-t border-border/30 flex-shrink-0 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:pb-3">
                   <form onSubmit={handleSubmit} className="flex space-x-2">
                     <Input
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       placeholder="Type your question..."
                       disabled={isLoading}
-                      className="flex-1 rounded-xl h-10 text-sm bg-muted border-border"
+                      className="flex-1 rounded-xl h-10 text-sm bg-muted/40 backdrop-blur-lg border-border/30"
                     />
-                    <Button type="submit" disabled={isLoading || !input.trim()} size="sm" className="bg-primary hover:bg-primary/90 rounded-xl h-10 w-10 p-0">
+                    <Button type="submit" disabled={isLoading || !input.trim()} size="sm" className="bg-primary/80 backdrop-blur-lg hover:bg-primary/90 rounded-xl h-10 w-10 p-0">
                       {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     </Button>
                   </form>
@@ -162,12 +162,12 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({ currentQuestion, userPlan,
               </>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <div className="w-16 h-16 rounded-full bg-primary/10 backdrop-blur-lg flex items-center justify-center mb-4">
                   <Lock className="w-8 h-8 text-primary opacity-60" />
                 </div>
                 <h3 className="text-lg font-bold text-foreground mb-2">Premium Feature</h3>
                 <p className="text-sm text-muted-foreground mb-6">Unlock Dr. Ahroid AI Chatbot with a Premium plan.</p>
-                <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl px-6">
+                <Button asChild className="bg-primary/80 backdrop-blur-lg hover:bg-primary/90 text-primary-foreground font-bold rounded-xl px-6">
                   <a href="/pricing">Upgrade to Premium</a>
                 </Button>
               </div>
