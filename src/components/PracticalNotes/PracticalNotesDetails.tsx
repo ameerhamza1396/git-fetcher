@@ -50,7 +50,7 @@ export default function SubjectPracticalDetails() {
     const { data: subject, isLoading: subjectLoading } = useQuery({
         queryKey: ["practicalSubject", id],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await (supabase as any)
                 .from("practical_subjects")
                 .select("id, name, practical_components")
                 .eq("id", id)
@@ -65,7 +65,7 @@ export default function SubjectPracticalDetails() {
     const { data: contentList, isLoading: contentLoading } = useQuery<PracticalContent[]>({
         queryKey: ["practicalNotesContent", id],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await (supabase as any)
                 .from("practical_notes_content")
                 .select("id, title, content_html, component_slug")
                 .eq("practical_subject_id", id);

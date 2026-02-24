@@ -55,7 +55,7 @@ const FLPResultDetail = () => {
       if (!testResultId) {
         throw new Error("Test Result ID is missing in the URL. Cannot fetch detailed report.");
       }
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('flp_user_attempts')
         .select('*')
         .eq('id', testResultId)
@@ -64,7 +64,7 @@ const FLPResultDetail = () => {
       if (error) {
         throw new Error(`Error fetching FLP result: ${error.message}`);
       }
-      return data;
+      return data as FLPAttempt;
     },
     enabled: !!testResultId,
     staleTime: 5 * 60 * 1000,
@@ -83,7 +83,7 @@ const FLPResultDetail = () => {
       if (mcqIds.length === 0) {
         return [];
       }
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('mcqs')
         .select('*')
         .in('id', mcqIds);
@@ -91,7 +91,7 @@ const FLPResultDetail = () => {
       if (error) {
         throw new Error(`Error fetching MCQs: ${error.message}`);
       }
-      return data;
+      return data as MCQ[];
     },
     enabled: !!flpResult && flpResult.question_attempts.length > 0 && mcqIds.length > 0,
     staleTime: Infinity,

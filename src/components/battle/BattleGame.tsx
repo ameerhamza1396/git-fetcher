@@ -290,10 +290,10 @@ export const BattleGame = ({ roomData, userId, onGameComplete }: BattleGameProps
         }
       }
 
-      const existingAnswers = participantData?.answers || [];
+      const existingAnswers = (participantData?.answers as any[]) || [];
       const updatedScore = (participantData?.score || 0) + questionScore;
 
-      console.log('Attempting to update participant with score:', updatedScore, 'and answers:', existingAnswers.length + 1);
+      console.log('Attempting to update participant with score:', updatedScore, 'and answers:', (existingAnswers as any[]).length + 1);
       const { error: updateError } = await supabase
         .from('battle_participants')
         .update({

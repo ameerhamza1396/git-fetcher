@@ -23,13 +23,9 @@ export const ThemeStatusBarSync = () => {
                     await StatusBar.setBackgroundColor({ color: bgColor });
 
                     // 2. Handle Navigation Bar (Bottom)
-                    await NavigationBar.setStatusBarColor({ color: bgColor }); // Some versions use this method
-
-                    // To change the color of the navigation bar background:
-                    await NavigationBar.setBackgroundColor({ color: bgColor });
-
-                    // This makes the navigation buttons (Back, Home) dark or light
-                    await NavigationBar.setButtonsColor({ dark: !isDark });
+                    await (NavigationBar as any).setStatusBarColor?.({ color: bgColor });
+                    await (NavigationBar as any).setBackgroundColor?.({ color: bgColor });
+                    await (NavigationBar as any).setButtonsColor?.({ dark: !isDark });
 
                 } catch (e) {
                     console.error("Native UI bars not supported yet", e);

@@ -51,14 +51,14 @@ const SignInPrompt = ({
           {description}
         </p>
         {/* Using an anchor tag for Link to ensure it works in canvas preview without react-router-dom */}
-        <a href={redirectPath} className="block max-w-sm mx-auto mb-4"> {/* Centered button and restricted its max width, added margin-bottom */}
-          <Button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white w-full py-4 text-xl font-bold rounded-lg shadow-xl transform transition-transform hover:-translate-y-1"> {/* Increased button size and font weight */}
+        <a href={redirectPath} className="block max-w-sm mx-auto mb-4">
+          <Button onClick={() => {}} className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white w-full py-4 text-xl font-bold rounded-lg shadow-xl transform transition-transform hover:-translate-y-1">
             {buttonText}
           </Button>
         </a>
         {/* New "Go to Homepage" button */}
-        <a href="/" className="block max-w-sm mx-auto"> {/* Centered button and restricted its max width */}
-          <Button className="bg-gray-200 hover:bg-gray-300 text-gray-800 w-full py-4 text-xl font-bold rounded-lg shadow-md transform transition-transform hover:-translate-y-1">
+        <a href="/" className="block max-w-sm mx-auto">
+          <Button onClick={() => {}} className="bg-gray-200 hover:bg-gray-300 text-gray-800 w-full py-4 text-xl font-bold rounded-lg shadow-md transform transition-transform hover:-translate-y-1">
             Go to Homepage
           </Button>
         </a>

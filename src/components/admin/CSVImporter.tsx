@@ -159,7 +159,7 @@ export const CSVImporter = () => {
         toast({
           title: "File Validation Alert",
           description: `Found ${totalErrors} potential issues in your file. Please check the preview table for details.`,
-          variant: "warning",
+          variant: "destructive" as const,
         });
       }
     } catch (error) {
@@ -215,7 +215,7 @@ export const CSVImporter = () => {
 
         for (const q of questions) {
           try {
-            const { error } = await supabase
+            const { error } = await (supabase as any)
               .from('mcqs')
               .insert({
                 chapter_id: chapter.id,

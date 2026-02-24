@@ -23,8 +23,8 @@ const IndexHeader: React.FC = () => {
 
     useEffect(() => {
         async function loadPricing() {
-            const { data, error } = await supabase
-                .from<PricingPlan>("pricing_plans")
+            const { data, error } = await (supabase as any)
+                .from("pricing_plans")
                 .select("id,display_name,price,currency,billing_cycle")
                 .eq("currency", "PKR")
                 .eq("billing_cycle", "monthly")

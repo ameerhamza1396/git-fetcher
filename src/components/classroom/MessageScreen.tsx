@@ -165,7 +165,7 @@ export const MessageScreen: React.FC<MessageScreenProps> = ({
       if (!selectedClassroom) return;
 
       try {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('classroom_settings')
           .select('setting_value')
           .eq('classroom_id', selectedClassroom.id)
@@ -201,7 +201,7 @@ export const MessageScreen: React.FC<MessageScreenProps> = ({
     }
     setIsSearchingUsers(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('profiles')
         .select('id, full_name, email, avatar_url')
         .or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
@@ -209,9 +209,9 @@ export const MessageScreen: React.FC<MessageScreenProps> = ({
       if (error) throw error;
 
       const currentMemberIds = new Set(members.map(m => m.user_id));
-      const filteredResults = data.filter(profile => !currentMemberIds.has(profile.id));
+      const filteredResults = (data as any[]).filter((profile: any) => !currentMemberIds.has(profile.id));
 
-      setSearchResults(filteredResults);
+      setSearchResults(filteredResults as any);
     } catch (error: any) {
       console.error('Error searching users:', error.message);
       toast({
@@ -421,7 +421,7 @@ export const MessageScreen: React.FC<MessageScreenProps> = ({
     }
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('classroom_settings')
         .upsert(
           {
@@ -554,7 +554,9 @@ export const MessageScreen: React.FC<MessageScreenProps> = ({
         onOpenChange={setShowManageInviteCodeModal}
         selectedClassroom={selectedClassroom}
         isHost={isHost}
-        handleGenerateRevokeInviteCode={handleGenerateRevokeInviteCode}
+        handleGenerateRevokeInviteLink={handleGenerateRevokeInviteCode}
+        appDomain={window.location.origin}
+        handleCopyInviteLink={(link: string) => navigator.clipboard.writeText(link)}
       />
     </div>
   );

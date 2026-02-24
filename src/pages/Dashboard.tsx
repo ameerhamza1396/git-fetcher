@@ -27,7 +27,7 @@ import VersionGuard from '@/components/VersionControl';
 import ProfileAvatar from '@/components/profile/ProfileAvatar';
 
 const Dashboard = () => {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const queryClient = useQueryClient();
@@ -146,7 +146,7 @@ const Dashboard = () => {
       await supabase.from('user_announcements').upsert(records, { onConflict: 'user_id, announcement_id' });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['readAnnouncements', user?.id]);
+      queryClient.invalidateQueries({ queryKey: ['readAnnouncements', user?.id] });
     },
   });
 

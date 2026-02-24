@@ -25,7 +25,7 @@ const VersionGuard = () => {
     useEffect(() => {
         const checkVersion = async () => {
             try {
-                const { data, error } = await supabase
+                const { data, error } = await (supabase as any)
                     .from('app_config')
                     .select('value')
                     .eq('key', 'min_required_version')
