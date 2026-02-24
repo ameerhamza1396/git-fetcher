@@ -1,17 +1,16 @@
 // @ts-nocheck
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Clock, CheckCircle, XCircle, Timer, Bot, MessageSquare, X, Bookmark, BookmarkCheck, Crown } from 'lucide-react'; // Added Crown icon for premium
+import { Clock, CheckCircle, XCircle, Timer, Bot, MessageSquare, X, Bookmark, BookmarkCheck, Crown, LogOut, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { fetchMCQsByChapter, MCQ } from '@/utils/mcqData';
 import { supabase } from '@/integrations/supabase/client';
 import { AIChatbot } from './AIChatbot';
 import { useQuery } from '@tanstack/react-query';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'; // Import Dialog components
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 interface MCQDisplayProps {
   subject: string;
@@ -26,7 +25,6 @@ interface ShuffledMCQ extends Omit<MCQ, 'options'> {
   originalCorrectIndex: number;
 }
 
-// Fisher-Yates shuffle algorithm
 const shuffleArray = <T,>(array: T[]): T[] => {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -36,48 +34,49 @@ const shuffleArray = <T,>(array: T[]): T[] => {
   return shuffled;
 };
 
-// --- Constants for Local Storage Keys ---
 const LAST_ATTEMPTED_MCQ_KEY = 'lastAttemptedMCQIndex';
 const LAST_ATTEMPTED_SUBJECT_KEY = 'lastAttemptedMCQSubject';
 const LAST_ATTEMPTED_CHAPTER_KEY = 'lastAttemptedMCQChapter';
 
-// --- Upgrade Account Modal Component ---
-interface UpgradeAccountModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onUpgradeClick: () => void;
-}
+// --- Upgrade Account Modal ---
+const UpgradeAccountModal = ({ isOpen, onClose, onUpgradeClick }) => (
+  <Dialog open={isOpen} onOpenChange={onClose}>
+    <DialogContent className="sm:max-w-[425px] bg-background border-border rounded-2xl">
+      <DialogHeader className="text-center">
+        <Crown className="w-12 h-12 mx-auto text-yellow-500 mb-3" />
+        <DialogTitle className="text-2xl font-bold">Upgrade Your Account</DialogTitle>
+        <DialogDescription className="text-muted-foreground mt-2">
+          You've reached the daily limit of 50 free MCQ submissions. Upgrade to a premium plan for unlimited practice!
+        </DialogDescription>
+      </DialogHeader>
+      <DialogFooter className="flex flex-col sm:flex-row gap-3 mt-6">
+        <Button onClick={onClose} variant="outline" className="w-full sm:w-auto">Maybe Later</Button>
+        <Button onClick={onUpgradeClick} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground font-bold">Upgrade Now</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+);
 
-const UpgradeAccountModal: React.FC<UpgradeAccountModalProps> = ({ isOpen, onClose, onUpgradeClick }) => {
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] p-6 bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-purple-200 dark:border-purple-800">
-        <DialogHeader className="text-center">
-          <Crown className="w-12 h-12 mx-auto text-yellow-500 dark:text-yellow-400 mb-3" />
-          <DialogTitle className="text-2xl font-bold text-gray-900 dark:text-white">Upgrade Your Account</DialogTitle>
-          <DialogDescription className="text-gray-600 dark:text-gray-400 mt-2">
-            You've reached the daily limit of 50 free MCQ submissions. Upgrade to a premium plan for unlimited practice and more features!
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="flex flex-col sm:flex-row gap-3 mt-6">
-          <Button
-            onClick={onClose}
-            variant="outline"
-            className="w-full sm:w-auto border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/30"
-          >
-            Maybe Later
-          </Button>
-          <Button
-            onClick={onUpgradeClick}
-            className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold"
-          >
-            Upgrade Now
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
+// --- Leave Test Confirmation Modal ---
+const LeaveTestModal = ({ isOpen, onClose, onConfirm }) => (
+  <Dialog open={isOpen} onOpenChange={onClose}>
+    <DialogContent className="sm:max-w-[400px] bg-background border-border rounded-2xl">
+      <DialogHeader className="text-center">
+        <div className="mx-auto mb-3 w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center">
+          <AlertTriangle className="w-7 h-7 text-destructive" />
+        </div>
+        <DialogTitle className="text-xl font-bold">Leave Test?</DialogTitle>
+        <DialogDescription className="text-muted-foreground mt-2">
+          Your progress has been saved. You can resume from where you left off next time.
+        </DialogDescription>
+      </DialogHeader>
+      <DialogFooter className="flex flex-col sm:flex-row gap-3 mt-4">
+        <Button onClick={onClose} variant="outline" className="w-full sm:w-auto">Continue Test</Button>
+        <Button onClick={onConfirm} variant="destructive" className="w-full sm:w-auto font-bold">Leave Test</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+);
 
 
 export const MCQDisplay = ({
@@ -97,23 +96,15 @@ export const MCQDisplay = ({
   const [timeLeft, setTimeLeft] = useState(timePerQuestion);
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [score, setScore] = useState(0);
-
-  // States for AIChatbot visibility
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
-
-  // States for Dr. Sultan's help toast
   const [showHelpToast, setShowHelpToast] = useState(false);
   const [helpToastMessage, setHelpToastMessage] = useState('');
   const helpToastTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // State for saved MCQ status
   const [isCurrentMCQSaved, setIsCurrentMCQSaved] = useState(false);
-
-  // States for daily submission limit
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [dailySubmissionsCount, setDailySubmissionsCount] = useState(0);
   const [lastSubmissionResetDate, setLastSubmissionResetDate] = useState<string | null>(null);
-
 
   const helpMessages = [
     "Hey, you look stuck. May I help you?",
@@ -126,33 +117,25 @@ export const MCQDisplay = ({
     "I can explain this question further. Just tap me!"
   ];
 
-  // Derive username for the good luck message
   const username = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
 
-  // Fetch user profile data to get the plan and new submission fields
   const { data: profile, isLoading: profileLoading, refetch: refetchProfile } = useQuery({
-    queryKey: ['profileForChatbot', user?.id], // Unique query key
+    queryKey: ['profileForChatbot', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
       const { data, error } = await supabase
         .from('profiles')
-        .select('plan, daily_mcq_submissions, last_submission_reset_date') // Fetch new fields
+        .select('plan, daily_mcq_submissions, last_submission_reset_date')
         .eq('id', user.id)
         .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching profile for chatbot:', error);
-        return null;
-      }
+      if (error) { console.error('Error fetching profile for chatbot:', error); return null; }
       return data;
     },
-    enabled: !!user?.id // Only run query if user ID exists
+    enabled: !!user?.id
   });
 
-  // Determine the user's plan for the chatbot
   const userPlanForChatbot = profile?.plan?.toLowerCase() || 'free';
 
-  // Effect to set initial daily submission states from profile
   useEffect(() => {
     if (profile && !profileLoading) {
       setDailySubmissionsCount(profile.daily_mcq_submissions || 0);
@@ -160,79 +143,49 @@ export const MCQDisplay = ({
     }
   }, [profile, profileLoading]);
 
-  // Function to check if it's a new day (12 AM PKT)
   const isNewDayPKT = (lastResetDateStr: string | null): boolean => {
-    if (!lastResetDateStr) {
-      return true; // If no reset date, assume it's a new day
-    }
-
+    if (!lastResetDateStr) return true;
     const now = new Date();
-    // Convert current time to PKT
-    const nowPKT = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Karachi" })); // Changed to Asia/Karachi
-
-    // Get today's 12 AM PKT
+    const nowPKT = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Karachi" }));
     const today12AMPKT = new Date(nowPKT);
     today12AMPKT.setHours(0, 0, 0, 0);
-
     const lastResetDateTime = new Date(lastResetDateStr);
-    // Convert last reset date to PKT for comparison
-    const lastResetDateTimePKT = new Date(lastResetDateTime.toLocaleString("en-US", { timeZone: "Asia/Karachi" })); // Changed to Asia/Karachi
-
+    const lastResetDateTimePKT = new Date(lastResetDateTime.toLocaleString("en-US", { timeZone: "Asia/Karachi" }));
     return lastResetDateTimePKT < today12AMPKT;
   };
 
-  // --- Effect to load last attempted question from local storage ---
   useEffect(() => {
-    if (typeof window !== 'undefined') { // Ensure localStorage is available
+    if (typeof window !== 'undefined') {
       const lastSubject = localStorage.getItem(LAST_ATTEMPTED_SUBJECT_KEY);
       const lastChapter = localStorage.getItem(LAST_ATTEMPTED_CHAPTER_KEY);
       const lastIndex = localStorage.getItem(LAST_ATTEMPTED_MCQ_KEY);
-
       if (lastSubject === subject && lastChapter === chapter && lastIndex !== null) {
         const parsedIndex = parseInt(lastIndex, 10);
-        // Only set if the parsed index is a valid number
-        if (!isNaN(parsedIndex) && parsedIndex >= 0) {
-          setCurrentQuestionIndex(parsedIndex);
-          // console.log(`Resuming from question index: ${parsedIndex}`); // For debugging
-        }
+        if (!isNaN(parsedIndex) && parsedIndex >= 0) setCurrentQuestionIndex(parsedIndex);
       } else {
-        // If subject/chapter doesn't match or no saved index, clear previous if any and start fresh
         localStorage.removeItem(LAST_ATTEMPTED_MCQ_KEY);
         localStorage.removeItem(LAST_ATTEMPTED_SUBJECT_KEY);
         localStorage.removeItem(LAST_ATTEMPTED_CHAPTER_KEY);
-        setCurrentQuestionIndex(0); // Start from the beginning for a new subject/chapter
-        // console.log("Starting a new quiz or saved state not found/matched."); // For debugging
+        setCurrentQuestionIndex(0);
       }
     }
-  }, [subject, chapter]); // Rerun if subject or chapter changes
+  }, [subject, chapter]);
 
-  // Effect to load MCQs and shuffle options
   useEffect(() => {
     const loadMCQs = async () => {
       setLoading(true);
       const data = await fetchMCQsByChapter(chapter);
-
-      // Shuffle options for each MCQ
       const shuffledMCQs = data.map(mcq => {
-        const correctAnswerIndex = mcq.options.indexOf(mcq.correct_answer);
         const shuffledOptions = shuffleArray(mcq.options);
         const newCorrectIndex = shuffledOptions.indexOf(mcq.correct_answer);
-
-        return {
-          ...mcq,
-          shuffledOptions,
-          originalCorrectIndex: newCorrectIndex
-        };
+        return { ...mcq, shuffledOptions, originalCorrectIndex: newCorrectIndex };
       });
-
       setMcqs(shuffledMCQs);
       setLoading(false);
     };
-
     loadMCQs();
-  }, [chapter]); // This useEffect loads MCQs based on chapter.
+  }, [chapter]);
 
-  // --- Effect to save current question index to local storage ---
   useEffect(() => {
     if (!loading && mcqs.length > 0 && typeof window !== 'undefined') {
       localStorage.setItem(LAST_ATTEMPTED_MCQ_KEY, currentQuestionIndex.toString());
@@ -241,156 +194,68 @@ export const MCQDisplay = ({
     }
   }, [currentQuestionIndex, subject, chapter, loading, mcqs.length]);
 
-
-  // Effect to check if the current MCQ is saved
   useEffect(() => {
     const checkSavedStatus = async () => {
-      if (!user || !mcqs[currentQuestionIndex]?.id) { // Use mcqs[currentQuestionIndex]?.id for safety
-        setIsCurrentMCQSaved(false);
-        return;
-      }
+      if (!user || !mcqs[currentQuestionIndex]?.id) { setIsCurrentMCQSaved(false); return; }
       try {
-        const { data, error } = await supabase
-          .from('saved_mcqs')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('mcq_id', mcqs[currentQuestionIndex].id) // Use mcqs[currentQuestionIndex].id
-          .single();
-
-        setIsCurrentMCQSaved(!!data); // Set to true if data exists, false otherwise
-        if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found (expected for unsaved)
-          console.error('Error checking saved status:', error);
-        }
-      } catch (error) {
-        console.error('Error checking saved status:', error);
-        setIsCurrentMCQSaved(false);
-      }
+        const { data, error } = await supabase.from('saved_mcqs').select('id').eq('user_id', user.id).eq('mcq_id', mcqs[currentQuestionIndex].id).single();
+        setIsCurrentMCQSaved(!!data);
+        if (error && error.code !== 'PGRST116') console.error('Error checking saved status:', error);
+      } catch (error) { console.error('Error checking saved status:', error); setIsCurrentMCQSaved(false); }
     };
+    if (!loading && mcqs.length > 0) checkSavedStatus();
+  }, [mcqs, currentQuestionIndex, user, loading]);
 
-    // Only run if mcqs has loaded and current question is available
-    if (!loading && mcqs.length > 0) {
-      checkSavedStatus();
-    }
-  }, [mcqs, currentQuestionIndex, user, loading]); // Depend on mcqs, currentQuestionIndex, user, and loading
-
-  // Timer for Dr. Sultan's help toast
   useEffect(() => {
-    // Clear any existing timer when question changes or component unmounts
-    if (helpToastTimerRef.current) {
-      clearTimeout(helpToastTimerRef.current);
-    }
-    setShowHelpToast(false); // Hide toast for new question
-
-    // Set a new timer if no answer selected yet and chatbot is not open
-    // and user is authenticated (chatbot is a premium feature)
+    if (helpToastTimerRef.current) clearTimeout(helpToastTimerRef.current);
+    setShowHelpToast(false);
     if (user && userPlanForChatbot === 'premium' && !selectedAnswer && !isChatbotOpen) {
       helpToastTimerRef.current = setTimeout(() => {
-        if (!selectedAnswer && !isChatbotOpen) { // Double check if still no answer and chatbot is closed
+        if (!selectedAnswer && !isChatbotOpen) {
           setHelpToastMessage(helpMessages[Math.floor(Math.random() * helpMessages.length)]);
           setShowHelpToast(true);
         }
-      }, 10000); // 10 seconds
+      }, 10000);
     }
+    return () => { if (helpToastTimerRef.current) clearTimeout(helpToastTimerRef.current); };
+  }, [currentQuestionIndex, selectedAnswer, isChatbotOpen, user, userPlanForChatbot]);
 
-    // Cleanup function for the effect
-    return () => {
-      if (helpToastTimerRef.current) {
-        clearTimeout(helpToastTimerRef.current);
-      }
-    };
-  }, [currentQuestionIndex, selectedAnswer, isChatbotOpen, user, userPlanForChatbot]); // Depend on selectedAnswer and isChatbotOpen
-
-  // Define currentMCQ after loading and empty checks
-  // This ensures currentMCQ is only accessed when mcqs has data
   const currentMCQ = mcqs[currentQuestionIndex];
   const totalQuestions = mcqs.length;
   const progressPercentage = totalQuestions > 0 ? ((currentQuestionIndex + 1) / totalQuestions) * 100 : 0;
 
-  const handleTimeUp = () => {
-    if (!showExplanation) {
-      handleSubmitAnswer(true);
-    }
-  };
+  const handleTimeUp = () => { if (!showExplanation) handleSubmitAnswer(true); };
 
   const handleAnswerSelect = (answer: string) => {
     if (showExplanation) return;
     setSelectedAnswer(answer);
-    setShowHelpToast(false); // Hide help toast if user selects an answer
-    if (helpToastTimerRef.current) {
-      clearTimeout(helpToastTimerRef.current); // Clear timer if user acts
-    }
+    setShowHelpToast(false);
+    if (helpToastTimerRef.current) clearTimeout(helpToastTimerRef.current);
   };
 
   const handleSubmitAnswer = async (timeUp = false) => {
     if (!currentMCQ || !user) return;
-
-    // --- NEW: Daily submission limit check for free users ---
     if (userPlanForChatbot === 'free') {
-      const isNewDay = isNewDayPKT(lastSubmissionResetDate); // Changed to PKT function
-
+      const isNewDay = isNewDayPKT(lastSubmissionResetDate);
       let currentSubmissions = dailySubmissionsCount;
       let currentResetDate = lastSubmissionResetDate;
-
-      if (isNewDay) {
-        currentSubmissions = 0; // Reset for new day
-        currentResetDate = new Date().toISOString(); // Set new reset date (UTC)
-      }
-
-      if (currentSubmissions >= 50) {
-        setShowUpgradeModal(true);
-        return; // Prevent submission
-      }
-
-      // Increment submission count and update reset date in Supabase
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          daily_mcq_submissions: currentSubmissions + 1,
-          last_submission_reset_date: currentResetDate
-        })
-        .eq('id', user.id);
-
-      if (updateError) {
-        console.error('Error updating daily submissions:', updateError);
-        toast({
-          title: "Error",
-          description: "Failed to update daily submission count. Please try again.",
-          variant: "destructive",
-        });
-        return; // Prevent submission if update fails
-      }
-      setDailySubmissionsCount(currentSubmissions + 1); // Update local state
-      setLastSubmissionResetDate(currentResetDate); // Update local state
+      if (isNewDay) { currentSubmissions = 0; currentResetDate = new Date().toISOString(); }
+      if (currentSubmissions >= 50) { setShowUpgradeModal(true); return; }
+      const { error: updateError } = await supabase.from('profiles').update({ daily_mcq_submissions: currentSubmissions + 1, last_submission_reset_date: currentResetDate }).eq('id', user.id);
+      if (updateError) { console.error('Error updating daily submissions:', updateError); toast({ title: "Error", description: "Failed to update daily submission count.", variant: "destructive" }); return; }
+      setDailySubmissionsCount(currentSubmissions + 1);
+      setLastSubmissionResetDate(currentResetDate);
     }
-    // --- END NEW: Daily submission limit check ---
-
-
     const answer = timeUp ? '' : selectedAnswer;
     const timeTaken = Math.floor((Date.now() - startTime) / 1000);
     const isCorrect = answer === currentMCQ.correct_answer;
-
-    if (isCorrect && !timeUp) {
-      setScore(prev => prev + 1);
-    }
-
-    // Save answer to database
+    if (isCorrect && !timeUp) setScore(prev => prev + 1);
     try {
-      await supabase.from('user_answers').insert({
-        user_id: user.id,
-        mcq_id: currentMCQ.id,
-        selected_answer: answer || 'No answer',
-        is_correct: isCorrect,
-        time_taken: timeTaken
-      });
-    } catch (error) {
-      console.error('Error saving answer:', error);
-    }
-
+      await supabase.from('user_answers').insert({ user_id: user.id, mcq_id: currentMCQ.id, selected_answer: answer || 'No answer', is_correct: isCorrect, time_taken: timeTaken });
+    } catch (error) { console.error('Error saving answer:', error); }
     setShowExplanation(true);
-    setShowHelpToast(false); // Hide help toast after submitting answer
-    if (helpToastTimerRef.current) {
-      clearTimeout(helpToastTimerRef.current); // Clear timer
-    }
+    setShowHelpToast(false);
+    if (helpToastTimerRef.current) clearTimeout(helpToastTimerRef.current);
   };
 
   const handleNextQuestion = () => {
@@ -399,276 +264,171 @@ export const MCQDisplay = ({
       setSelectedAnswer(null);
       setShowExplanation(false);
       setTimeLeft(timePerQuestion);
-      setStartTime(Date.now()); // Reset start time for next question
-      // Timer for help toast will be reset by useEffect due to currentQuestionIndex change
+      setStartTime(Date.now());
     } else {
-      // Quiz completed
-      toast({
-        title: "Quiz Completed!",
-        description: `You scored ${score}/${totalQuestions} (${Math.round((score / totalQuestions) * 100)}%)`,
-      });
-
-      // --- Clear local storage upon quiz completion ---
+      toast({ title: "Quiz Completed!", description: `You scored ${score}/${totalQuestions} (${Math.round((score / totalQuestions) * 100)}%)` });
       if (typeof window !== 'undefined') {
         localStorage.removeItem(LAST_ATTEMPTED_MCQ_KEY);
         localStorage.removeItem(LAST_ATTEMPTED_SUBJECT_KEY);
         localStorage.removeItem(LAST_ATTEMPTED_CHAPTER_KEY);
-        // console.log("Quiz completed. Local storage cleared."); // For debugging
       }
-
       onBack();
     }
   };
 
-  // Function to handle clicking the help toast
-  const handleHelpToastClick = () => {
-    setShowHelpToast(false); // Dismiss the toast
-    setIsChatbotOpen(true); // Open the chatbot
-    // The AIChatbot component itself will handle showing the welcome/help message
-  };
+  const handleHelpToastClick = () => { setShowHelpToast(false); setIsChatbotOpen(true); };
 
-  // Function to handle saving/unsaving an MCQ
   const handleSaveMCQ = async () => {
-    if (!user || !currentMCQ?.id) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to save MCQs.",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    if (!user || !currentMCQ?.id) { toast({ title: "Authentication Required", description: "Please log in to save MCQs.", variant: "destructive" }); return; }
     try {
       if (isCurrentMCQSaved) {
-        // Unsave MCQ
-        const { error } = await supabase
-          .from('saved_mcqs')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('mcq_id', currentMCQ.id);
-
+        const { error } = await supabase.from('saved_mcqs').delete().eq('user_id', user.id).eq('mcq_id', currentMCQ.id);
         if (error) throw error;
         setIsCurrentMCQSaved(false);
-        toast({
-          title: "MCQ Unsaved",
-          description: (
-            <div className="flex items-center">
-              <Bookmark className="w-4 h-4 mr-2" />
-              <span>This question has been removed from your saved list.</span>
-            </div>
-          ),
-        });
+        toast({ title: "MCQ Unsaved", description: "Removed from your saved list." });
       } else {
-        // Save MCQ
-        const { error } = await supabase
-          .from('saved_mcqs')
-          .insert({
-            user_id: user.id,
-            mcq_id: currentMCQ.id,
-          });
-
+        const { error } = await supabase.from('saved_mcqs').insert({ user_id: user.id, mcq_id: currentMCQ.id });
         if (error) throw error;
         setIsCurrentMCQSaved(true);
-        toast({
-          title: "MCQ Saved!",
-          description: (
-            <div className="flex items-center">
-              <BookmarkCheck className="w-4 h-4 mr-2" />
-              <span>This question has been added to your saved list.</span>
-            </div>
-          ),
-        });
+        toast({ title: "MCQ Saved!", description: "Added to your saved list." });
       }
     } catch (error: any) {
       console.error('Error saving/unsaving MCQ:', error);
-      toast({
-        title: "Error",
-        description: `Failed to save/unsave MCQ: ${error.message || 'Unknown error'}`,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: `Failed: ${error.message || 'Unknown error'}`, variant: "destructive" });
     }
   };
 
-  const handleUpgradeClick = () => {
-    setShowUpgradeModal(false);
-    console.log("Navigating to upgrade page..."); // Placeholder
-  };
+  const handleUpgradeClick = () => { setShowUpgradeModal(false); };
 
-  // ----- REPLACED LOADING STATE: Facebook-style skeleton (only this block changed) -----
-  if (loading || profileLoading) { // Added profileLoading to the loading state
+  // --- Loading skeleton ---
+  if (loading || profileLoading) {
     return (
-      <Card className="bg-gradient-to-br from-purple-100/70 via-purple-50/50 to-pink-50/30 dark:from-purple-900/30 dark:via-purple-800/20 dark:to-pink-900/10 border-purple-200 dark:border-purple-800 backdrop-blur-sm mx-2 sm:mx-0">
-        <CardContent className="p-6">
-          {/* Skeleton container */}
-          <div className="space-y-4">
-            {/* Question title skeleton */}
-            <div className="mx-auto w-3/4 h-6 rounded-md bg-gray-200 dark:bg-gray-800 animate-pulse" />
-
-            {/* Short description skeleton */}
-            <div className="mx-auto w-5/6 h-4 rounded-md bg-gray-200 dark:bg-gray-800 animate-pulse" />
-
-            {/* Options skeletons (Facebook-like) */}
-            <div className="mt-4 space-y-3">
+      <div className="max-w-3xl mx-auto px-3">
+        <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary/80 via-primary to-primary/90 text-primary-foreground shadow-2xl p-2">
+          <div className="bg-primary-foreground/10 backdrop-blur-xl rounded-[1.5rem] p-6 space-y-4">
+            <div className="w-3/4 h-6 rounded-md bg-primary-foreground/20 animate-pulse mx-auto" />
+            <div className="w-5/6 h-4 rounded-md bg-primary-foreground/20 animate-pulse mx-auto" />
+            <div className="space-y-3 mt-4">
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="w-full h-12 rounded-lg bg-gray-200 dark:bg-gray-800 animate-pulse" />
+                <div key={i} className="w-full h-14 rounded-xl bg-primary-foreground/20 animate-pulse" />
               ))}
             </div>
-
-            {/* Action buttons skeleton */}
-            <div className="mt-4 flex justify-between items-center">
-              <div className="w-28 h-8 rounded-md bg-gray-200 dark:bg-gray-800 animate-pulse" />
-              <div className="w-28 h-8 rounded-md bg-gray-200 dark:bg-gray-800 animate-pulse" />
-            </div>
-
-            {/* Small footer skeleton */}
-            <div className="mt-4 flex justify-center">
-              <div className="w-40 h-4 rounded-md bg-gray-200 dark:bg-gray-800 animate-pulse" />
-            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
-  // ----- END LOADING STATE -----
 
   if (!mcqs || mcqs.length === 0) {
     return (
-      <Card className="bg-gradient-to-br from-purple-100/70 via-purple-50/50 to-pink-50/30 dark:from-purple-900/30 dark:via-purple-800/20 dark:to-pink-900/10 border-purple-200 dark:border-purple-800 backdrop-blur-sm mx-2 sm:mx-0">
-        <CardContent className="text-center py-6 sm:py-8">
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">No questions available for this chapter.</p>
-          <Button onClick={onBack} className="mt-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-sm sm:text-base">
-            <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
-            Back to Chapters
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="max-w-3xl mx-auto px-3">
+        <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary/80 via-primary to-primary/90 text-primary-foreground shadow-2xl p-2">
+          <div className="bg-primary-foreground/10 backdrop-blur-xl rounded-[1.5rem] p-8 text-center">
+            <img src="/images/mascots/doctor-reading.png" alt="No questions" className="w-24 h-24 mx-auto mb-4 object-contain opacity-80" />
+            <p className="text-primary-foreground/80 mb-4">No questions available for this chapter.</p>
+            <Button onClick={onBack} variant="secondary" className="rounded-xl">
+              Leave Test
+            </Button>
+          </div>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-2 sm:px-0">
-      <Button
-        variant="outline"
-        onClick={onBack}
-        className="mb-4 sm:mb-6 flex items-center space-x-2 border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-sm sm:text-base"
-      >
-        <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
-        <span>Back to Chapters</span>
-      </Button>
+    <div className="max-w-3xl mx-auto px-3">
+      {/* Main quiz card - pricing page style */}
+      <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary/80 via-primary to-primary/90 text-primary-foreground shadow-2xl p-2">
+        {/* Pattern overlay */}
+        <div className="absolute inset-0 opacity-10" style={{
+          backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`,
+          maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
+        }} />
 
-      {/* Progress Header */}
-      <Card className="mb-4 sm:mb-6 bg-gradient-to-br from-purple-100/70 via-purple-50/50 to-pink-50/30 dark:from-purple-900/30 dark:via-purple-800/20 dark:to-pink-900/10 border-purple-200 dark:border-purple-800 backdrop-blur-sm">
-        <CardHeader className="px-4 sm:px-6 py-4 sm:py-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-            <CardTitle className="text-base sm:text-lg text-gray-900 dark:text-white">
-              Question {currentQuestionIndex + 1} of {totalQuestions}
-            </CardTitle>
-            <div className="flex items-center space-x-3 sm:space-x-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-              {timerEnabled && (
-                <div className={`flex items-center space-x-1 ${timeLeft <= 10 ? 'text-red-500' : ''}`}>
-                  <Timer className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span>{timeLeft}s</span>
-                </div>
-              )}
-              <div className="flex items-center space-x-1">
-                <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span>Score: {score}/{currentQuestionIndex}</span>
+        {/* Inner glass container */}
+        <div className="relative z-10 bg-primary-foreground/10 backdrop-blur-xl rounded-[1.5rem] border border-primary-foreground/10 shadow-inner">
+          
+          {/* Quiz header inside card */}
+          <div className="px-4 sm:px-6 py-4 border-b border-primary-foreground/10">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center space-x-3">
+                <span className="text-sm font-bold uppercase tracking-wider text-primary-foreground/70">
+                  Q{currentQuestionIndex + 1}/{totalQuestions}
+                </span>
+                {timerEnabled && (
+                  <div className={`flex items-center space-x-1 text-sm font-mono font-bold px-2 py-1 rounded-lg ${timeLeft <= 10 ? 'bg-red-500/20 text-red-200' : 'bg-primary-foreground/10 text-primary-foreground/80'}`}>
+                    <Timer className="w-3.5 h-3.5" />
+                    <span>{timeLeft}s</span>
+                  </div>
+                )}
               </div>
-              {/* Display daily submissions count for free users */}
-              {userPlanForChatbot === 'free' && (
-                <div className="flex items-center space-x-1">
-                  <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span>{dailySubmissionsCount}/50 Daily</span>
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-1 text-xs font-semibold text-primary-foreground/60">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  <span>{score}/{currentQuestionIndex}</span>
                 </div>
-              )}
-            </div>
-          </div>
-          <Progress value={progressPercentage} className="w-full" />
-          {timerEnabled && (
-            <Progress
-              value={(timeLeft / timePerQuestion) * 100}
-              className="w-full h-2 mt-2"
-              style={{
-                background: timeLeft <= 10 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(147, 51, 234, 0.2)'
-              }}
-            />
-          )}
-        </CardHeader>
-      </Card>
-
-      {/* Question Card */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentQuestionIndex}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          transition={{ duration: 0.3 }}
-        >
-          <Card className="bg-gradient-to-br from-purple-100/70 via-purple-50/50 to-pink-50/30 dark:from-purple-900/30 dark:via-purple-800/20 dark:to-pink-900/10 border-purple-200 dark:border-purple-800 backdrop-blur-sm">
-            <CardHeader className="px-4 sm:px-6 py-4 sm:py-6">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base sm:text-lg leading-relaxed text-gray-900 dark:text-white flex-1">
-                  {currentMCQ?.question}
-                </CardTitle>
-
+                {userPlanForChatbot === 'free' && (
+                  <div className="flex items-center space-x-1 text-xs text-primary-foreground/50">
+                    <span>{dailySubmissionsCount}/50</span>
+                  </div>
+                )}
                 {user && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleSaveMCQ}
-                    className="ml-2 text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400"
-                    title={isCurrentMCQSaved ? "Unsave Question" : "Save Question"}
-                  >
-                    {isCurrentMCQSaved ? (
-                      <BookmarkCheck className="w-5 h-5 fill-purple-600 text-purple-600 dark:fill-purple-400 dark:text-purple-400" />
-                    ) : (
-                      <Bookmark className="w-5 h-5" />
-                    )}
+                  <Button variant="ghost" size="icon" onClick={handleSaveMCQ} className="w-8 h-8 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10" title={isCurrentMCQSaved ? "Unsave" : "Save"}>
+                    {isCurrentMCQSaved ? <BookmarkCheck className="w-4 h-4 fill-current" /> : <Bookmark className="w-4 h-4" />}
                   </Button>
                 )}
               </div>
-            </CardHeader>
+            </div>
+            <Progress value={progressPercentage} className="w-full h-1.5" />
+            {timerEnabled && (
+              <Progress value={(timeLeft / timePerQuestion) * 100} className="w-full h-1 mt-1.5" />
+            )}
+          </div>
 
+          {/* Question */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentQuestionIndex}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="px-4 sm:px-6 py-5"
+            >
+              <h2 className="text-base sm:text-lg font-bold leading-relaxed text-primary-foreground mb-5">
+                {currentMCQ?.question}
+              </h2>
 
-            <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
-              <div className="space-y-2 sm:space-y-3">
+              {/* Options */}
+              <div className="space-y-2.5">
                 {currentMCQ?.shuffledOptions.map((option, index) => {
                   const isSelected = selectedAnswer === option;
                   const isCorrect = option === currentMCQ.correct_answer;
                   const showResult = showExplanation;
 
-                  let buttonClass = "w-full p-3 sm:p-4 text-left border-2 rounded-lg transition-all duration-200 text-sm sm:text-base ";
-
+                  let optionClass = "w-full p-3.5 text-left rounded-xl transition-all duration-200 text-sm sm:text-base border ";
                   if (showResult) {
-                    if (isCorrect) {
-                      buttonClass += "bg-green-50 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-400";
-                    } else if (isSelected && !isCorrect) {
-                      buttonClass += "bg-red-50 dark:bg-red-900/30 border-red-500 text-red-700 dark:text-red-400";
-                    } else {
-                      buttonClass += "bg-gray-50 dark:bg-gray-800/50 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400";
-                    }
+                    if (isCorrect) optionClass += "bg-green-500/20 border-green-400/50 text-green-100";
+                    else if (isSelected && !isCorrect) optionClass += "bg-red-500/20 border-red-400/50 text-red-100";
+                    else optionClass += "bg-primary-foreground/5 border-primary-foreground/10 text-primary-foreground/50";
                   } else {
-                    if (isSelected) {
-                      buttonClass += "bg-purple-50 dark:bg-purple-900/50 border-purple-500 text-purple-700 dark:text-purple-300";
-                    } else {
-                      buttonClass += "bg-white dark:bg-gray-800/50 border-gray-300 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/30";
-                    }
+                    if (isSelected) optionClass += "bg-primary-foreground/20 border-primary-foreground/40 text-primary-foreground";
+                    else optionClass += "bg-primary-foreground/5 border-primary-foreground/10 text-primary-foreground/80 hover:bg-primary-foreground/15 hover:border-primary-foreground/25";
                   }
 
                   return (
                     <motion.button
                       key={index}
-                      className={buttonClass}
+                      className={optionClass}
                       onClick={() => handleAnswerSelect(option)}
                       disabled={showExplanation}
                       whileHover={!showExplanation ? { scale: 1.01 } : {}}
                       whileTap={!showExplanation ? { scale: 0.99 } : {}}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-gray-900 dark:text-white flex-1">{String.fromCharCode(65 + index)}. {option}</span>
-                        {showResult && isCorrect && <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 ml-2" />}
-                        {showResult && isSelected && !isCorrect && <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600 ml-2" />}
+                        <span className="flex-1 font-medium">{String.fromCharCode(65 + index)}. {option}</span>
+                        {showResult && isCorrect && <CheckCircle className="w-4 h-4 text-green-300 ml-2 flex-shrink-0" />}
+                        {showResult && isSelected && !isCorrect && <XCircle className="w-4 h-4 text-red-300 ml-2 flex-shrink-0" />}
                       </div>
                     </motion.button>
                   );
@@ -680,67 +440,55 @@ export const MCQDisplay = ({
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
-                  className="mt-4 sm:mt-6 p-3 sm:p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border border-blue-200 dark:border-blue-800 rounded-lg"
+                  className="mt-5 p-4 bg-primary-foreground/10 border border-primary-foreground/15 rounded-xl"
                 >
-                  <h4 className="font-semibold text-blue-900 dark:text-blue-200 mb-2 text-sm sm:text-base">Explanation:</h4>
-                  <p className="text-blue-800 dark:text-blue-300 text-sm sm:text-base">{currentMCQ.explanation}</p>
+                  <h4 className="font-bold text-primary-foreground/90 mb-2 text-sm uppercase tracking-wider">Explanation</h4>
+                  <p className="text-primary-foreground/80 text-sm leading-relaxed">{currentMCQ.explanation}</p>
                 </motion.div>
               )}
 
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row justify-between items-center sm:items-end mt-4 sm:mt-6 space-y-2 sm:space-y-0 sm:space-x-3">
-                {/* Previous Button - Hidden on first question */}
-                {currentQuestionIndex > 0 && (
+              {/* Actions */}
+              <div className="flex items-center justify-between mt-5 gap-3">
+                {currentQuestionIndex > 0 ? (
                   <Button
-                    onClick={() => {
-                      setCurrentQuestionIndex(prev => prev - 1);
-                      setSelectedAnswer(null);
-                      setShowExplanation(false);
-                      setTimeLeft(timePerQuestion);
-                      setStartTime(Date.now());
-                    }}
-                    variant="outline"
-                    className="w-full sm:w-auto border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-sm sm:text-base"
+                    onClick={() => { setCurrentQuestionIndex(prev => prev - 1); setSelectedAnswer(null); setShowExplanation(false); setTimeLeft(timePerQuestion); setStartTime(Date.now()); }}
+                    variant="ghost"
+                    className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 text-sm"
                   >
-                    Previous Question
+                    Previous
                   </Button>
-                )}
+                ) : <div />}
 
-                <div className="flex w-full sm:w-auto justify-end space-x-2 sm:space-x-3">
+                <div className="flex space-x-2">
                   {!showExplanation && selectedAnswer && (
                     <Button
                       onClick={() => handleSubmitAnswer()}
-                      className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-sm sm:text-base px-4 sm:px-6"
+                      className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 rounded-xl font-bold text-sm px-6"
                     >
-                      Submit Answer
+                      Submit
                     </Button>
                   )}
-
                   {showExplanation && (
                     <Button
                       onClick={handleNextQuestion}
-                      className="w-full sm:w-auto bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-sm sm:text-base px-4 sm:px-6"
+                      className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 rounded-xl font-bold text-sm px-6"
                     >
-                      {currentQuestionIndex < totalQuestions - 1 ? 'Next Question' : 'Finish Quiz'}
+                      {currentQuestionIndex < totalQuestions - 1 ? 'Next' : 'Finish'}
                     </Button>
                   )}
                 </div>
               </div>
 
-              {/* Best of luck message */}
-              {user && ( // Only show if a user is logged in
-                <div className="mt-6 text-center text-gray-700 dark:text-gray-300 text-base sm:text-lg">
-                  Best of luck,{' '}
-                  <span className="bg-gradient-to-r from-purple-600 to-pink-600 text-transparent bg-clip-text font-bold">
-                    {username}
-                  </span>
-                  !
+              {/* Good luck message */}
+              {user && (
+                <div className="mt-5 text-center text-primary-foreground/50 text-xs uppercase tracking-widest font-medium">
+                  Best of luck, <span className="text-primary-foreground font-bold">{username}</span>
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </motion.div>
-      </AnimatePresence>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
 
       {/* Dr. Sultan's Help Toast */}
       <AnimatePresence>
@@ -749,18 +497,12 @@ export const MCQDisplay = ({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.3 }}
-            className="fixed bottom-24 right-6 z-50 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-purple-200 dark:border-purple-700 flex items-center space-x-2 cursor-pointer max-w-[calc(100vw-48px)] sm:max-w-xs"
+            className="fixed bottom-24 right-4 z-50 p-3 bg-background/90 backdrop-blur-lg rounded-xl shadow-lg border border-border flex items-center space-x-2 cursor-pointer max-w-[calc(100vw-32px)] sm:max-w-xs"
             onClick={handleHelpToastClick}
           >
-            <Bot className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
-            <span className="text-sm text-gray-800 dark:text-gray-200 flex-grow">{helpToastMessage}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => { e.stopPropagation(); setShowHelpToast(false); }}
-              className="w-6 h-6 p-0 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            >
+            <Bot className="w-5 h-5 text-primary flex-shrink-0" />
+            <span className="text-sm text-foreground flex-grow">{helpToastMessage}</span>
+            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setShowHelpToast(false); }} className="w-6 h-6 p-0">
               <X className="w-3 h-3" />
             </Button>
           </motion.div>
@@ -768,18 +510,11 @@ export const MCQDisplay = ({
       </AnimatePresence>
 
       {/* AI Chatbot */}
-      <AIChatbot
-        currentQuestion={currentMCQ?.question}
-        options={(currentMCQ as any)?.options} 
-        userPlan={userPlanForChatbot}
-      />
+      <AIChatbot currentQuestion={currentMCQ?.question} options={(currentMCQ as any)?.options} userPlan={userPlanForChatbot} />
 
-      {/* Upgrade Account Modal */}
-      <UpgradeAccountModal
-        isOpen={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        onUpgradeClick={handleUpgradeClick}
-      />
+      {/* Modals */}
+      <UpgradeAccountModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} onUpgradeClick={handleUpgradeClick} />
+      <LeaveTestModal isOpen={showLeaveModal} onClose={() => setShowLeaveModal(false)} onConfirm={onBack} />
     </div>
   );
 };

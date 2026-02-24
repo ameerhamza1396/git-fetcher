@@ -49,17 +49,14 @@ const GoogleSignin: React.FC<GoogleSigninProps> = ({
     };
 
     return (
-        <Button
+        <button
             type="button"
-            variant="outline"
-            className="w-full bg-gray-100 dark:bg-gray-800"
             onClick={handleSignIn}
+            className="w-full flex items-center justify-center space-x-2 h-14 rounded-2xl border-2 border-white/20 bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 transition-all duration-300 font-bold text-xs uppercase tracking-widest"
         >
-            <div className="flex items-center space-x-2">
-                <img src="/googlelogo.svg" alt="Google" className="w-4 h-4" />
-                <span>{buttonText}</span>
-            </div>
-        </Button>
+            <img src="/googlelogo.svg" alt="Google" className="w-4 h-4" />
+            <span>{buttonText}</span>
+        </button>
     );
 };
 
