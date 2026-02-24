@@ -304,13 +304,13 @@ export const MCQDisplay = ({
   if (loading || profileLoading) {
     return (
       <div className="max-w-3xl mx-auto px-3">
-        <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary/80 via-primary to-primary/90 text-primary-foreground shadow-2xl p-2">
-          <div className="bg-primary-foreground/10 backdrop-blur-xl rounded-[1.5rem] p-6 space-y-4">
-            <div className="w-3/4 h-6 rounded-md bg-primary-foreground/20 animate-pulse mx-auto" />
-            <div className="w-5/6 h-4 rounded-md bg-primary-foreground/20 animate-pulse mx-auto" />
+        <div className="relative overflow-hidden rounded-[2rem] bg-card/60 backdrop-blur-2xl border border-border/40 shadow-2xl p-2">
+          <div className="bg-background/30 backdrop-blur-xl rounded-[1.5rem] p-6 space-y-4">
+            <div className="w-3/4 h-6 rounded-md bg-muted animate-pulse mx-auto" />
+            <div className="w-5/6 h-4 rounded-md bg-muted animate-pulse mx-auto" />
             <div className="space-y-3 mt-4">
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="w-full h-14 rounded-xl bg-primary-foreground/20 animate-pulse" />
+                <div key={i} className="w-full h-14 rounded-xl bg-muted animate-pulse" />
               ))}
             </div>
           </div>
@@ -322,10 +322,10 @@ export const MCQDisplay = ({
   if (!mcqs || mcqs.length === 0) {
     return (
       <div className="max-w-3xl mx-auto px-3">
-        <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary/80 via-primary to-primary/90 text-primary-foreground shadow-2xl p-2">
-          <div className="bg-primary-foreground/10 backdrop-blur-xl rounded-[1.5rem] p-8 text-center">
+        <div className="relative overflow-hidden rounded-[2rem] bg-card/60 backdrop-blur-2xl border border-border/40 shadow-2xl p-2">
+          <div className="bg-background/30 backdrop-blur-xl rounded-[1.5rem] p-8 text-center">
             <img src="/images/mascots/doctor-reading.png" alt="No questions" className="w-24 h-24 mx-auto mb-4 object-contain opacity-80" />
-            <p className="text-primary-foreground/80 mb-4">No questions available for this chapter.</p>
+            <p className="text-muted-foreground mb-4">No questions available for this chapter.</p>
             <Button onClick={onBack} variant="secondary" className="rounded-xl">
               Leave Test
             </Button>
@@ -338,42 +338,42 @@ export const MCQDisplay = ({
   return (
     <div className="max-w-3xl mx-auto px-3">
       {/* Main quiz card - pricing page style */}
-      <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary/80 via-primary to-primary/90 text-primary-foreground shadow-2xl p-2">
-        {/* Pattern overlay */}
-        <div className="absolute inset-0 opacity-10" style={{
-          backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`,
+      <div className="relative overflow-hidden rounded-[2rem] bg-card/60 backdrop-blur-2xl border border-border/40 shadow-2xl p-2">
+        {/* Subtle pattern overlay */}
+        <div className="absolute inset-0 opacity-5" style={{
+          backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, hsl(var(--foreground) / 0.15) 20px, hsl(var(--foreground) / 0.15) 40px)`,
           maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
         }} />
 
         {/* Inner glass container */}
-        <div className="relative z-10 bg-primary-foreground/10 backdrop-blur-xl rounded-[1.5rem] border border-primary-foreground/10 shadow-inner">
+        <div className="relative z-10 bg-background/30 backdrop-blur-xl rounded-[1.5rem] border border-border/30 shadow-inner">
           
           {/* Quiz header inside card */}
-          <div className="px-4 sm:px-6 py-4 border-b border-primary-foreground/10">
+          <div className="px-4 sm:px-6 py-4 border-b border-border/30">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-3">
-                <span className="text-sm font-bold uppercase tracking-wider text-primary-foreground/70">
+                <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
                   Q{currentQuestionIndex + 1}/{totalQuestions}
                 </span>
                 {timerEnabled && (
-                  <div className={`flex items-center space-x-1 text-sm font-mono font-bold px-2 py-1 rounded-lg ${timeLeft <= 10 ? 'bg-red-500/20 text-red-200' : 'bg-primary-foreground/10 text-primary-foreground/80'}`}>
+                  <div className={`flex items-center space-x-1 text-sm font-mono font-bold px-2 py-1 rounded-lg ${timeLeft <= 10 ? 'bg-destructive/15 text-destructive' : 'bg-muted/50 text-muted-foreground'}`}>
                     <Timer className="w-3.5 h-3.5" />
                     <span>{timeLeft}s</span>
                   </div>
                 )}
               </div>
               <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-1 text-xs font-semibold text-primary-foreground/60">
+                <div className="flex items-center space-x-1 text-xs font-semibold text-muted-foreground">
                   <CheckCircle className="w-3.5 h-3.5" />
                   <span>{score}/{currentQuestionIndex}</span>
                 </div>
                 {userPlanForChatbot === 'free' && (
-                  <div className="flex items-center space-x-1 text-xs text-primary-foreground/50">
+                  <div className="flex items-center space-x-1 text-xs text-muted-foreground/70">
                     <span>{dailySubmissionsCount}/50</span>
                   </div>
                 )}
                 {user && (
-                  <Button variant="ghost" size="icon" onClick={handleSaveMCQ} className="w-8 h-8 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10" title={isCurrentMCQSaved ? "Unsave" : "Save"}>
+                  <Button variant="ghost" size="icon" onClick={handleSaveMCQ} className="w-8 h-8 text-muted-foreground hover:text-foreground hover:bg-muted/50" title={isCurrentMCQSaved ? "Unsave" : "Save"}>
                     {isCurrentMCQSaved ? <BookmarkCheck className="w-4 h-4 fill-current" /> : <Bookmark className="w-4 h-4" />}
                   </Button>
                 )}
@@ -395,7 +395,7 @@ export const MCQDisplay = ({
               transition={{ duration: 0.3 }}
               className="px-4 sm:px-6 py-5"
             >
-              <h2 className="text-base sm:text-lg font-bold leading-relaxed text-primary-foreground mb-5">
+              <h2 className="text-base sm:text-lg font-bold leading-relaxed text-foreground mb-5">
                 {currentMCQ?.question}
               </h2>
 
@@ -408,12 +408,12 @@ export const MCQDisplay = ({
 
                   let optionClass = "w-full p-3.5 text-left rounded-xl transition-all duration-200 text-sm sm:text-base border ";
                   if (showResult) {
-                    if (isCorrect) optionClass += "bg-green-500/20 border-green-400/50 text-green-100";
-                    else if (isSelected && !isCorrect) optionClass += "bg-red-500/20 border-red-400/50 text-red-100";
-                    else optionClass += "bg-primary-foreground/5 border-primary-foreground/10 text-primary-foreground/50";
+                    if (isCorrect) optionClass += "bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300";
+                    else if (isSelected && !isCorrect) optionClass += "bg-destructive/10 border-destructive/30 text-destructive";
+                    else optionClass += "bg-muted/30 border-border/30 text-muted-foreground/50";
                   } else {
-                    if (isSelected) optionClass += "bg-primary-foreground/20 border-primary-foreground/40 text-primary-foreground";
-                    else optionClass += "bg-primary-foreground/5 border-primary-foreground/10 text-primary-foreground/80 hover:bg-primary-foreground/15 hover:border-primary-foreground/25";
+                    if (isSelected) optionClass += "bg-primary/10 border-primary/30 text-foreground";
+                    else optionClass += "bg-muted/20 border-border/30 text-foreground/80 hover:bg-muted/40 hover:border-border/50";
                   }
 
                   return (
@@ -427,8 +427,8 @@ export const MCQDisplay = ({
                     >
                       <div className="flex items-center justify-between">
                         <span className="flex-1 font-medium">{String.fromCharCode(65 + index)}. {option}</span>
-                        {showResult && isCorrect && <CheckCircle className="w-4 h-4 text-green-300 ml-2 flex-shrink-0" />}
-                        {showResult && isSelected && !isCorrect && <XCircle className="w-4 h-4 text-red-300 ml-2 flex-shrink-0" />}
+                        {showResult && isCorrect && <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 ml-2 flex-shrink-0" />}
+                        {showResult && isSelected && !isCorrect && <XCircle className="w-4 h-4 text-destructive ml-2 flex-shrink-0" />}
                       </div>
                     </motion.button>
                   );
@@ -440,10 +440,10 @@ export const MCQDisplay = ({
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
-                  className="mt-5 p-4 bg-primary-foreground/10 border border-primary-foreground/15 rounded-xl"
+                  className="mt-5 p-4 bg-muted/40 border border-border/30 rounded-xl"
                 >
-                  <h4 className="font-bold text-primary-foreground/90 mb-2 text-sm uppercase tracking-wider">Explanation</h4>
-                  <p className="text-primary-foreground/80 text-sm leading-relaxed">{currentMCQ.explanation}</p>
+                  <h4 className="font-bold text-foreground/90 mb-2 text-sm uppercase tracking-wider">Explanation</h4>
+                  <p className="text-muted-foreground text-sm leading-relaxed">{currentMCQ.explanation}</p>
                 </motion.div>
               )}
 
@@ -453,7 +453,7 @@ export const MCQDisplay = ({
                   <Button
                     onClick={() => { setCurrentQuestionIndex(prev => prev - 1); setSelectedAnswer(null); setShowExplanation(false); setTimeLeft(timePerQuestion); setStartTime(Date.now()); }}
                     variant="ghost"
-                    className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 text-sm"
+                    className="text-muted-foreground hover:text-foreground hover:bg-muted/50 text-sm"
                   >
                     Previous
                   </Button>
@@ -463,7 +463,7 @@ export const MCQDisplay = ({
                   {!showExplanation && selectedAnswer && (
                     <Button
                       onClick={() => handleSubmitAnswer()}
-                      className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 rounded-xl font-bold text-sm px-6"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-bold text-sm px-6"
                     >
                       Submit
                     </Button>
@@ -471,7 +471,7 @@ export const MCQDisplay = ({
                   {showExplanation && (
                     <Button
                       onClick={handleNextQuestion}
-                      className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 rounded-xl font-bold text-sm px-6"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-bold text-sm px-6"
                     >
                       {currentQuestionIndex < totalQuestions - 1 ? 'Next' : 'Finish'}
                     </Button>
@@ -481,8 +481,8 @@ export const MCQDisplay = ({
 
               {/* Good luck message */}
               {user && (
-                <div className="mt-5 text-center text-primary-foreground/50 text-xs uppercase tracking-widest font-medium">
-                  Best of luck, <span className="text-primary-foreground font-bold">{username}</span>
+                <div className="mt-5 text-center text-muted-foreground/60 text-xs uppercase tracking-widest font-medium">
+                  Best of luck, <span className="text-foreground font-bold">{username}</span>
                 </div>
               )}
             </motion.div>
