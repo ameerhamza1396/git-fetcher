@@ -52,6 +52,7 @@ import InstallApp from '@/pages/InstallApp';
 import Practicals from '@/pages/Practicals';
 import PracticalNotesDetails from "@/components/PracticalNotes/PracticalNotesDetails";
 import RedeemCode from '@/pages/RedeemCode';
+import PurchaseHistory from '@/pages/PurchaseHistory';
 import { VideoCallProvider } from '@/video-sdk/VideoCallProvider';
 
 const queryClient = new QueryClient();
@@ -139,6 +140,7 @@ function App() {
                 <Route path="/practical-notes" element={<Practicals />} />
                 <Route path="/practical-notes/subject/:id" element={<PracticalNotesDetails />} />
                 <Route path="/redeem" element={<RedeemCode />} />
+                <Route path="/purchase-history" element={<PurchaseHistory />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </VideoCallProvider>
