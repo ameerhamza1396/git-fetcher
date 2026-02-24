@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, BookOpen, Target, Trophy, Clock } from 'lucide-react';
+import { ArrowLeft, BookOpen, Target, Trophy, Clock, AlertTriangle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { SubjectSelectionScreen } from '@/components/mcq/SubjectSelectionScreen';
 import { ChapterSelectionScreen } from '@/components/mcq/ChapterSelectionScreen';
 import { QuizSettingsScreen } from '@/components/mcq/QuizSettingsScreen';
@@ -25,6 +26,7 @@ const MCQs = () => {
   const [timerEnabled, setTimerEnabled] = useState(false);
   const [timePerQuestion, setTimePerQuestion] = useState(30);
   const [headerVisible, setHeaderVisible] = useState(true);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const lastScrollY = useRef(0);
   const [userStats, setUserStats] = useState({
     totalQuestions: 0, correctAnswers: 0, accuracy: 0, averageTime: 0, bestStreak: 0
@@ -105,7 +107,7 @@ const MCQs = () => {
     switch (currentScreen) {
       case 'chapters': return { label: 'Back to Subjects', action: handleBackToSubjects };
       case 'settings': return { label: 'Back to Chapters', action: handleBackToChapters };
-      case 'quiz': return { label: 'Back to Settings', action: handleBackToSettings };
+      case 'quiz': return { label: 'Leave Test', action: () => setShowLeaveConfirm(true) };
       default: return { label: 'Dashboard', action: () => {} };
     }
   };
@@ -255,6 +257,25 @@ const MCQs = () => {
         )}
 
         {renderContent()}
+
+        {/* Leave Test Confirmation */}
+        <Dialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
+          <DialogContent className="sm:max-w-[400px] bg-background border-border rounded-2xl">
+            <DialogHeader className="text-center">
+              <div className="mx-auto mb-3 w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center">
+                <AlertTriangle className="w-7 h-7 text-destructive" />
+              </div>
+              <DialogTitle className="text-xl font-bold">Leave Test?</DialogTitle>
+              <DialogDescription className="text-muted-foreground mt-2">
+                Your progress has been saved. You can resume from where you left off next time.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex flex-col sm:flex-row gap-3 mt-4">
+              <Button onClick={() => setShowLeaveConfirm(false)} variant="outline" className="w-full sm:w-auto">Continue Test</Button>
+              <Button onClick={() => { setShowLeaveConfirm(false); handleBackToSettings(); }} variant="destructive" className="w-full sm:w-auto font-bold">Leave Test</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
