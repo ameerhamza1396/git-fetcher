@@ -112,7 +112,7 @@ export default function Welcome() {
           {/* ─── FOOTER QUOTE ─── */}
           {!loading && (
             <p className="mt-10 text-[10px] text-teal-100/40 uppercase tracking-[0.2em]">
-              Precision Learning for Future Doctors
+              © 2026, HMACS Studios. All Rights Reserved.
             </p>
           )}
         </div>

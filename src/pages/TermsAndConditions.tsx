@@ -1,15 +1,7 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Moon, Sun } from 'lucide-react';
-import { useTheme } from 'next-themes';
-// If you are using react-markdown
-// import ReactMarkdown from 'react-markdown';
-import Seo from '@/components/Seo'; // Import the Seo component
-
+import { ArrowLeft } from 'lucide-react';
+import Seo from '@/components/Seo';
 
 const TermsAndConditions = () => {
-  const { theme, setTheme } = useTheme();
 
   // Markdown content for the Terms and Conditions (replace with the content above)
   const termsAndConditionsContent = `
@@ -152,46 +144,34 @@ If you have any questions about these Terms and Conditions, you can contact us:
 `;
 
   return (
-    <div className="min-h-screen w-full bg-white dark:bg-gray-900">
+    <div className="min-h-screen w-full bg-background">
       <Seo
         title="Terms and Conditions"
         description="Read the terms and conditions for using Medistics App services. Your agreement to these terms is required for usage."
         canonical="https://medistics.app/terms"
       />
       {/* Header */}
-    <header className="absolute top-0 left-0 right-0 z-50 bg-white/30 dark:bg-gray-900/30 
-    backdrop-blur-md border-b border-purple-200/50 dark:border-purple-800/50 
-    pt-[env(safe-area-inset-top)]">  
-            <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
-          <Link to="/" className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors">
+      <header className="absolute top-0 left-0 right-0 z-50 bg-background/30 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)]">
+        <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
+          <button onClick={() => window.history.back()} className="flex items-center space-x-2 text-primary hover:text-primary/80 transition-colors">
             <ArrowLeft className="w-4 h-4" />
-          </Link>
+          </button>
 
           <div className="flex items-center space-x-3">
-            <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medistics Logo" className="w-8 h-8 object-contain" />
-            <span className="text-xl font-bold text-gray-900 dark:text-white">MedisticsApp</span>
+            <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs Logo" className="w-8 h-8 object-contain" />
+            <span className="text-xl font-bold text-foreground">Medmacs</span>
           </div>
 
-          <div className="flex items-center space-x-3">
-            <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-9 h-9 p-0 hover:scale-110 transition-transform duration-200">
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-          </div>
+          <div className="w-8" />
         </div>
       </header>
 
-      <div className="container mx-auto px-4 lg:px-8 py-8 max-w-4xl">
-        {/* Terms and Conditions Content */}
+      <div className="container mx-auto px-4 lg:px-8 py-8 max-w-4xl mt-[calc(env(safe-area-inset-top)+60px)]">
         <div className="mb-8 animate-fade-in">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4 text-center pt-[calc(45px+env(safe-area-inset-top))] overscroll-y-contain">
+          <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4 text-center">
             Terms and Conditions
           </h1>
-          <div className="text-gray-700 dark:text-gray-300 leading-relaxed space-y-4">
-            {/* The raw markdown content is inserted here. For proper rendering (headings, lists, bold text, etc.),
-              you would typically use a library like 'react-markdown'.
-              Example: <ReactMarkdown>{termsAndConditionsContent}</ReactMarkdown>
-              For now, it will appear as plain text unless parsed.
-            */}
+          <div className="text-muted-foreground leading-relaxed space-y-4">
             <pre className="whitespace-pre-wrap text-sm">{termsAndConditionsContent}</pre>
           </div>
         </div>

@@ -19,7 +19,7 @@ interface LeaderboardEntry {
 export const LeaderboardPreview = () => {
   const { user } = useAuth();
 
-  const { data: topUsers = [], isLoading } = useQuery({
+  const { data: leaderboardData, isLoading } = useQuery({
     queryKey: ['leaderboard-preview'],
     queryFn: async () => {
       try {
@@ -27,13 +27,13 @@ export const LeaderboardPreview = () => {
           .from('user_answers')
           .select('user_id, is_correct, time_taken, created_at');
         
-        if (answersError) return [];
+        if (answersError) return { allEntries: [], topUsers: [] };
 
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('id, username, full_name');
         
-        if (profilesError) return [];
+        if (profilesError) return { allEntries: [], topUsers: [] };
 
         const userStats: Record<string, any> = {};
         
@@ -47,7 +47,7 @@ export const LeaderboardPreview = () => {
           userStats[answer.user_id].answers.push(answer);
         });
 
-        const leaderboardEntries = profiles
+        const allEntries = profiles
           ?.filter(profile => userStats[profile.id]?.totalQuestions > 0)
           .map(profile => {
             const stats = userStats[profile.id];
@@ -70,14 +70,19 @@ export const LeaderboardPreview = () => {
             };
           }) || [];
 
-        return leaderboardEntries.sort((a, b) => b.total_score - a.total_score).slice(0, 10);
-      } catch (error) { return []; }
+        const sorted = allEntries.sort((a, b) => b.total_score - a.total_score);
+        return { allEntries: sorted, topUsers: sorted.slice(0, 10) };
+      } catch (error) { return { allEntries: [], topUsers: [] }; }
     }
   });
 
-  // Calculate user rank
-  const userRank = topUsers.findIndex(u => u.user_id === user?.id) + 1;
-  const currentUserData = topUsers.find(u => u.user_id === user?.id);
+  const topUsers = leaderboardData?.topUsers || [];
+  const allEntries = leaderboardData?.allEntries || [];
+
+  // Calculate user rank from ALL entries, not just top 10
+  const userRankIndex = allEntries.findIndex(u => u.user_id === user?.id);
+  const userRank = userRankIndex >= 0 ? userRankIndex + 1 : -1;
+  const currentUserData = userRank > 0 ? allEntries[userRankIndex] : null;
 
   const getRankIcon = (rank: number) => {
     switch (rank) {
@@ -124,7 +129,9 @@ export const LeaderboardPreview = () => {
           <div className="flex items-center justify-between p-3 mb-3 rounded-xl bg-muted/50 border border-border/30">
             <div className="flex items-center gap-2">
               <Target className="w-4 h-4 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">Start practicing to get ranked!</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                Keep practicing — you could be in the Top 10! 🚀
+              </span>
             </div>
           </div>
         )}
@@ -150,9 +157,9 @@ export const LeaderboardPreview = () => {
           </div>
         ) : (
           <div className="space-y-2">
-            {topUsers.map((user, index) => (
+            {topUsers.map((entry, index) => (
               <div 
-                key={user.id}
+                key={entry.id}
                 className="flex items-center space-x-3 p-2 rounded-lg bg-card/60 hover:bg-accent/50 transition-all duration-200"
               >
                 <div className="flex items-center space-x-2 flex-1 min-w-0">
@@ -164,15 +171,15 @@ export const LeaderboardPreview = () => {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-foreground text-sm truncate">
-                      {user.username}
+                      {entry.username}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {user.accuracy}% • {user.total_questions} questions
+                      {entry.accuracy}% • {entry.total_questions} questions
                     </p>
                   </div>
                 </div>
                 <Badge variant="secondary" className="text-xs bg-primary/10 text-primary">
-                  {user.total_score}
+                  {entry.total_score}
                 </Badge>
               </div>
             ))}
