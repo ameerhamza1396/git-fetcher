@@ -9,6 +9,7 @@ import { Capacitor } from '@capacitor/core';
 
 // Internal Components & Pages
 import BackHandler from "@/components/backhandler";
+import ScrollToTop from "@/components/ScrollToTop";
 import Index from '@/pages/Index';
 import Login from '@/pages/Login';
 import Signup from '@/pages/Signup';
@@ -94,6 +95,7 @@ function App() {
           */}
           <div className="App min-h-screen w-full bg-background text-foreground transition-colors duration-300">
             <VideoCallProvider>
+              <ScrollToTop />
               <BackHandler />
               <Routes>
                 <Route path="/" element={<Index />} />

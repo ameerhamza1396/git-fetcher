@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, BookOpen } from 'lucide-react';
+import { ArrowRight, BookOpen } from 'lucide-react';
 import { fetchChaptersBySubject, Chapter, Subject } from '@/utils/mcqData';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -14,24 +14,24 @@ interface ChapterSelectionScreenProps {
 }
 
 const ChapterCardSkeleton = () => (
-  <Card className="border-2 h-full animate-pulse overflow-hidden relative border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900">
-    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-gray-300/30 to-transparent dark:via-gray-700/30 animate-shimmer"
+  <Card className="border-2 h-full animate-pulse overflow-hidden relative border-border bg-muted/50">
+    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-muted-foreground/10 to-transparent animate-shimmer"
       style={{ animationDuration: '1.5s', animationIterationCount: 'infinite', animationTimingFunction: 'linear' }}></div>
     <CardHeader className="px-4 py-4">
       <div className="flex justify-between items-center">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-200 dark:bg-gray-700"></div>
+          <div className="w-8 h-8 rounded-lg bg-muted"></div>
           <div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-1"></div>
-            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+            <div className="h-4 bg-muted rounded w-24 mb-1"></div>
+            <div className="h-3 bg-muted rounded w-16"></div>
           </div>
         </div>
-        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-10"></div>
+        <div className="h-3 bg-muted rounded w-10"></div>
       </div>
     </CardHeader>
     <CardContent className="px-4 pb-4">
-      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full mb-1"></div>
-      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-5/6"></div>
+      <div className="h-3 bg-muted rounded w-full mb-1"></div>
+      <div className="h-3 bg-muted rounded w-5/6"></div>
     </CardContent>
   </Card>
 );
@@ -44,6 +44,7 @@ export const ChapterSelectionScreen = ({
 }: ChapterSelectionScreenProps) => {
   const [allChapters, setAllChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -56,28 +57,19 @@ export const ChapterSelectionScreen = ({
     loadChapters();
   }, [subject, userProfile]);
 
-  const handleChapterClick = (chapter: Chapter) => {
-    onChapterSelect(chapter);
+  const handleContinue = () => {
+    if (selectedChapter) onChapterSelect(selectedChapter);
   };
 
   const numberOfSkeletons = 6;
 
   return (
-    <div className="max-w-6xl mx-auto px-2 sm:px-4">
-      <Button
-        onClick={onBack}
-        variant="outline"
-        className="mb-4 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-700 dark:hover:text-purple-300"
-      >
-        <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
-        <span>Back to Subjects</span>
-      </Button>
-
+    <div className="max-w-6xl mx-auto px-2 sm:px-4 pb-24">
       <div className="text-center mb-6">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2">
           Select Test – {subject.name}
-        </h1>
-        <p className="text-base sm:text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+        </h2>
+        <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
           {userProfile?.plan === 'free'
             ? 'All tests are unlocked. Free users have a daily limit of MCQ submissions.'
             : 'You have unlimited access to all tests and MCQs.'}
@@ -98,35 +90,37 @@ export const ChapterSelectionScreen = ({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               className="w-full cursor-pointer"
-              onClick={() => handleChapterClick(ch)}
+              onClick={() => setSelectedChapter(ch)}
             >
               <Card
                 className={`border-2 h-full transition duration-300 ease-in-out
-                    border-gray-200 dark:border-gray-800 hover:border-purple-300 dark:hover:border-purple-700
-                    bg-gradient-to-br from-green-50/70 via-blue-50/50 to-indigo-50/30 dark:from-green-900/30 dark:via-blue-900/20 dark:to-indigo-900/10 backdrop-blur-sm`}
+                  ${selectedChapter?.id === ch.id
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border hover:border-primary/50'
+                  } bg-card/80 backdrop-blur-sm`}
               >
                 <CardHeader className="px-4 py-4">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-r from-green-200 to-blue-200 dark:from-green-800 dark:to-blue-800">
-                        <BookOpen className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary/10">
+                        <BookOpen className="w-5 h-5 text-primary" />
                       </div>
                       <div>
-                        <CardTitle className="text-lg text-gray-900 dark:text-white">
+                        <CardTitle className="text-lg text-foreground">
                           Practice test {ch.chapter_number}
                         </CardTitle>
-                        <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
+                        <CardDescription className="text-sm text-muted-foreground">
                           {ch.name}
                         </CardDescription>
                       </div>
                     </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                    <span className="text-xs text-muted-foreground">
                       {ch.mcq_count || 0} Qs
                     </span>
                   </div>
                 </CardHeader>
                 <CardContent className="px-4 pb-4">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-muted-foreground">
                     {ch.description}
                   </p>
                 </CardContent>
@@ -134,6 +128,24 @@ export const ChapterSelectionScreen = ({
             </motion.div>
           ))}
       </div>
+
+      {/* Fixed bottom continue button */}
+      {selectedChapter && (
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-xl border-t border-border/40 z-40 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+        >
+          <Button
+            onClick={handleContinue}
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg hover:scale-[1.01] transition-all duration-300"
+            size="lg"
+          >
+            Continue with {selectedChapter.name}
+            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
+          </Button>
+        </motion.div>
+      )}
     </div>
   );
 };
