@@ -10,7 +10,8 @@ import {
   BookOpen, Zap, Trophy, Target, Users, Brain, Swords, Flame,
   TrendingUp, Award, Briefcase, BellRing, Bookmark, ScrollText,
   Home, User, Settings, ChevronRight, LogOut, Lock, CreditCard,
-  Megaphone, BarChart3, Sun, Moon, ArrowRight, Crown
+  Megaphone, BarChart3, Sun, Moon, ArrowRight, Crown, Mail,
+  Receipt, Shield, FileText, RefreshCw
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
@@ -313,6 +314,7 @@ const Dashboard = () => {
               </CardContent>
             </Card>
 
+            {/* Main settings */}
             <Card className="border border-border/40 shadow-sm overflow-hidden bg-card/80">
               <CardContent className="p-0 divide-y divide-border/30">
                 {[
@@ -320,6 +322,8 @@ const Dashboard = () => {
                   { label: 'Change Password', icon: Lock, link: '/profile/password' },
                   { label: 'Subscription', icon: CreditCard, link: '/pricing' },
                   { label: 'Redeem Code', icon: Award, link: '/redeem' },
+                  { label: 'Purchase History', icon: Receipt, link: '/purchase-history' },
+                  { label: 'Contact Us', icon: Mail, link: '/contact-us' },
                 ].map((item, i) => (
                   <Link key={i} to={item.link} className="flex items-center justify-between p-4 hover:bg-accent/50 active:bg-accent transition-colors">
                     <div className="flex items-center gap-3">
@@ -329,6 +333,25 @@ const Dashboard = () => {
                       <span className="text-sm font-medium text-foreground">{item.label}</span>
                     </div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  </Link>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* Legal links - lighter style */}
+            <Card className="border border-border/20 shadow-none bg-muted/30">
+              <CardContent className="p-0 divide-y divide-border/20">
+                {[
+                  { label: 'Privacy Policy', icon: Shield, link: '/privacypolicy' },
+                  { label: 'Terms & Conditions', icon: FileText, link: '/terms' },
+                  { label: 'Refund Policy', icon: RefreshCw, link: '/terms' },
+                ].map((item, i) => (
+                  <Link key={i} to={item.link} className="flex items-center justify-between p-3.5 hover:bg-accent/30 active:bg-accent/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <item.icon className="w-3.5 h-3.5 text-muted-foreground/60" />
+                      <span className="text-xs font-medium text-muted-foreground">{item.label}</span>
+                    </div>
+                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40" />
                   </Link>
                 ))}
               </CardContent>
@@ -350,27 +373,16 @@ const Dashboard = () => {
       default:
         return (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-            {/* Greeting */}
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h1 className="text-xl font-black text-foreground leading-tight">
-                  Hi, <span className="text-primary">{displayName}</span> ✨
-                </h1>
-                <p className="text-xs text-muted-foreground mt-0.5 font-medium">Ready to dominate your exams?</p>
-              </div>
-              <button onClick={() => setActiveTab('profile')} className="shrink-0">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center overflow-hidden shadow-md shadow-primary/20 ring-2 ring-primary/20">
-                  {profile?.avatar_url ? (
-                    <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-primary-foreground font-bold text-sm">{displayName.substring(0, 2).toUpperCase()}</span>
-                  )}
-                </div>
-              </button>
+            {/* Greeting - no avatar here */}
+            <div className="mb-5">
+              <h1 className="text-xl font-black text-foreground leading-tight">
+                Hi, <span className="text-primary">{displayName}</span> ✨
+              </h1>
+              <p className="text-xs text-muted-foreground mt-0.5 font-medium">Ready to dominate your exams?</p>
             </div>
 
-            {/* Streak bar */}
-            <div className="bg-gradient-to-r from-primary/8 to-accent border border-primary/15 rounded-2xl p-4 mb-6 shadow-sm">
+            {/* Streak bar - elevated */}
+            <div className="bg-gradient-to-r from-primary/12 to-accent border border-primary/20 rounded-2xl p-4 mb-6 shadow-md shadow-primary/5">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
                   <Flame className="w-4 h-4 text-orange-500" /> {userStats?.currentStreak || 0} day streak
@@ -379,14 +391,14 @@ const Dashboard = () => {
                   {(userStats?.currentStreak || 0) > 0 ? '🔥 On Fire!' : 'Start!'}
                 </Badge>
               </div>
-              <Progress value={userStats?.accuracy || 0} className="h-2 mb-2" />
+              <Progress value={userStats?.accuracy || 0} className="h-2.5 mb-2" />
               <div className="flex justify-between text-[11px] font-semibold">
                 <span className="text-primary">{userStats?.accuracy || 0}% accuracy</span>
                 <span className="text-muted-foreground">{userStats?.totalQuestions || 0} solved</span>
               </div>
             </div>
 
-            {/* Quick Actions */}
+            {/* Quick Actions - elevated cards */}
             <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-1.5">
               <Zap className="text-amber-500 fill-amber-500 w-3.5 h-3.5" /> Quick Actions
             </h2>
@@ -399,12 +411,12 @@ const Dashboard = () => {
               <Crown className="w-4 h-4 text-amber-500 animate-bounce-gentle" />
               <h2 className="text-sm font-bold text-foreground">Premium Perks</h2>
             </div>
-            <div className="grid grid-cols-1 gap-3 mb-6">
+            <div className="grid grid-cols-1 gap-3 mb-8">
               {premiumPerks.map((action, i) => <ActionCard key={i} action={action} />)}
             </div>
 
-            {/* Medistics - separate section */}
-            <div className="mb-6">
+            {/* Medistics - visually separate */}
+            <div className="mb-6 pt-4 border-t border-border/30">
               <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-1.5">
                 <TrendingUp className="w-3.5 h-3.5 text-primary" /> Explore
               </h2>
@@ -445,6 +457,7 @@ const Dashboard = () => {
             <span className="text-sm font-extrabold text-foreground tracking-tight">Medmacs</span>
           </div>
           <div className="flex items-center gap-2">
+            <Badge className="text-[10px] font-bold bg-primary/10 text-primary border-0 px-2.5">{userPlanDisplayName}</Badge>
             <button onClick={() => setActiveTab('profile')} className="shrink-0">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center overflow-hidden ring-1 ring-primary/20">
                 {profile?.avatar_url ? (
@@ -454,7 +467,6 @@ const Dashboard = () => {
                 )}
               </div>
             </button>
-            <Badge className="text-[10px] font-bold bg-primary/10 text-primary border-0 px-2.5">{userPlanDisplayName}</Badge>
           </div>
         </div>
       </header>
