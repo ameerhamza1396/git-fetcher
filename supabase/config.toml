@@ -1,0 +1,49 @@
+project_id = "xpxupanivlugsleqnvbr"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://localhost:3000"]
+jwt_expiry = 3600
+# The following keys caused errors and have been removed/commented out:
+# port = 54324
+# refresh_token_rotation_enabled = true
+# security_update_password_require_reauthentication = true
+# security_manual_linking_enabled = false
+
+[db]
+port = 54322
+
+# Specific function configurations (like verify_jwt) go under this section.
+# The 'enabled = true' and 'port = 54323' lines have been removed from here
+# as they were causing the "expected a map" error.
+[functions]
+
+# Specific function configurations (these already seemed fine, but ensure they are under the general [functions] section)
+[functions.generate-ai-test]
+verify_jwt = true
+
+[functions.ai-study-chat]
+verify_jwt = true
+
+[studio]
+enabled = true
+port = 54323
+
+[functions.imagekit-auth]
+enabled = true
+verify_jwt = true
+import_map = "./functions/imagekit-auth/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/imagekit-auth/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/imagekit-auth/*.html" ]
