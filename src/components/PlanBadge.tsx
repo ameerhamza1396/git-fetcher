@@ -6,39 +6,22 @@ export type PlanBadgeProps = {
 };
 
 const PlanBadge = ({ plan, className = '' }: PlanBadgeProps) => {
-    // Define plan color schemes
-    const planColors: Record<string, { light: string; dark: string }> = {
-        'free': {
-            light: 'bg-purple-100 text-purple-800 border-purple-300',
-            dark: 'dark:bg-purple-900/30 dark:text-purple-200 dark:border-purple-700'
-        },
-        'premium': {
-            light: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-            dark: 'dark:bg-yellow-900/30 dark:text-yellow-200 dark:border-yellow-700'
-        },
-        'iconic': {
-            light: 'bg-green-100 text-green-800 border-green-300',
-            dark: 'dark:bg-green-900/30 dark:text-green-200 dark:border-green-700'
-        },
-        'default': {
-            light: 'bg-gray-100 text-gray-800 border-gray-300',
-            dark: 'dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600'
-        }
+    const planColors: Record<string, string> = {
+        'free': 'bg-primary/10 text-primary border-primary/20',
+        'premium': 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-200 dark:border-yellow-700',
+        'iconic': 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-700',
+        'default': 'bg-muted text-muted-foreground border-border',
     };
 
     const rawUserPlan = plan?.toLowerCase() || 'Loading';
     const userPlanDisplayName = rawUserPlan.charAt(0).toUpperCase() + rawUserPlan.slice(1) + ' Plan';
-    const currentPlanColorClasses = planColors[rawUserPlan] || planColors['default'];
+    const colorClass = planColors[rawUserPlan] || planColors['default'];
 
     return (
-        <Badge
-      variant= "secondary"
-    className = {`${currentPlanColorClasses.light} ${currentPlanColorClasses.dark} ${className}`
-}
-    >
-    { userPlanDisplayName }
-    </Badge>
-  );
+        <Badge variant="secondary" className={`${colorClass} ${className}`}>
+            {userPlanDisplayName}
+        </Badge>
+    );
 };
 
 export default PlanBadge;

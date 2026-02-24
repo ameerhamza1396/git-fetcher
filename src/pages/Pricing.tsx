@@ -158,9 +158,7 @@ const Pricing = () => {
         <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950">
             <Seo title="Pricing Plans" />
 
-    <header className="absolute top-0 left-0 right-0 z-50 bg-white/30 dark:bg-gray-900/30 
-    backdrop-blur-md border-b border-purple-200/50 dark:border-purple-800/50 
-    pt-[env(safe-area-inset-top)]">  
+    <header className="absolute top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)]">  
                 <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
                     <div className="flex items-center space-x-3">
                         <Link to="/dashboard">

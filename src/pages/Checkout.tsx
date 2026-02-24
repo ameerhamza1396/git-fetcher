@@ -2,8 +2,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
-    Moon,
-    Sun,
     CheckCircle,
     XCircle,
     BadgePercent,
@@ -14,7 +12,6 @@ import {
     RefreshCw
 } from 'lucide-react';
 import { Link, useLocation, Navigate } from 'react-router-dom';
-import { useTheme } from 'next-themes';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
 import React, { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
@@ -34,7 +31,6 @@ const EASYPAISA_API_URL = "https://mobile-payment-medmacs.vercel.app/paypaisa";
 
 const Checkout = () => {
     const { user } = useAuth();
-    const { theme, setTheme } = useTheme();
     const location = useLocation();
 
     const [isLoading, setIsLoading] = useState(false);
@@ -52,10 +48,8 @@ const Checkout = () => {
     const [isPromoApplied, setIsPromoApplied] = useState(false);
     const [promoDiscountDisplay, setPromoDiscountDisplay] = useState<string | null>(null);
 
-    // Manual status check for fallback
     const checkPaymentStatus = async () => {
         if (!user) return;
-
         try {
             const { data, error: fetchError } = await supabase
                 .from('pending_payments')
@@ -64,96 +58,44 @@ const Checkout = () => {
                 .order('created_at', { ascending: false })
                 .limit(1)
                 .single();
-
             if (data) {
-                if (data.status === 'success') {
-                    setModalState('success');
-                    setIsLoading(false);
-                    return true;
-                } else if (data.status === 'failed') {
-                    setError(data.error_message || "Transaction failed.");
-                    setModalState('failure');
-                    setIsLoading(false);
-                    return true;
-                }
+                if (data.status === 'success') { setModalState('success'); setIsLoading(false); return true; }
+                else if (data.status === 'failed') { setError(data.error_message || "Transaction failed."); setModalState('failure'); setIsLoading(false); return true; }
             }
-        } catch (e) {
-            console.error("Status check failed", e);
-        }
+        } catch (e) { console.error("Status check failed", e); }
         return false;
     };
 
     useEffect(() => {
         if (!user) return;
-
-        // 1. Setup Realtime Channel
         const channel = supabase
             .channel('payment-tracking')
-            .on(
-                'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'pending_payments',
-                    filter: `user_id=eq.${user.id}`,
-                },
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pending_payments', filter: `user_id=eq.${user.id}` },
                 (payload) => {
-                    console.log("Realtime Update Received:", payload.new.status);
-                    if (payload.new.status === 'success') {
-                        setModalState('success');
-                        setIsLoading(false);
-                    } else if (payload.new.status === 'failed') {
-                        setError(payload.new.error_message || "Transaction failed.");
-                        setModalState('failure');
-                        setIsLoading(false);
-                    }
+                    if (payload.new.status === 'success') { setModalState('success'); setIsLoading(false); }
+                    else if (payload.new.status === 'failed') { setError(payload.new.error_message || "Transaction failed."); setModalState('failure'); setIsLoading(false); }
                 }
-            )
-            .subscribe((status) => {
-                console.log("Realtime Subscription Status:", status);
-            });
+            ).subscribe();
 
-        // 2. Setup Polling Fallback (Crucial since your logs show WebSockets are failing)
         let pollInterval: NodeJS.Timeout;
         if (modalState === 'processing') {
-            pollInterval = setInterval(() => {
-                console.log("Polling for status update...");
-                checkPaymentStatus();
-            }, 4000);
+            pollInterval = setInterval(() => { checkPaymentStatus(); }, 4000);
         }
-
-        return () => {
-            supabase.removeChannel(channel);
-            if (pollInterval) clearInterval(pollInterval);
-        };
+        return () => { supabase.removeChannel(channel); if (pollInterval) clearInterval(pollInterval); };
     }, [user, modalState]);
 
-    if (!location.state) {
-        return <Navigate to="/pricing" replace />;
-    }
+    if (!location.state) return <Navigate to="/pricing" replace />;
 
-    const {
-        planName = 'Premium',
-        price: basePriceStr,
-        duration = 'Monthly',
-        currency = 'PKR',
-        validity = 'monthly'
-    } = location.state;
-
+    const { planName = 'Premium', price: basePriceStr, duration = 'Monthly', currency = 'PKR', validity = 'monthly' } = location.state;
     const basePrice = basePriceStr ? parseFloat(basePriceStr) : 0;
     const validityDisplay = validity.toLowerCase() === 'yearly' ? 'Validity: 365 Days' : 'Validity: 30 Days';
     const priceAfterPromo = discountedPrice !== null ? discountedPrice : basePrice;
-
     const mdrTax = paymentMethod === 'payfast' ? priceAfterPromo * MDR_RATE : 0;
     const grandTotal = priceAfterPromo + mdrTax;
-
-    // PayFast lockout logic: Disabled if total is below 25 PKR
     const isPayFastDisabled = grandTotal < 20;
 
     useEffect(() => {
-        if (isPayFastDisabled && paymentMethod === 'payfast') {
-            setPaymentMethod('easypaisa');
-        }
+        if (isPayFastDisabled && paymentMethod === 'payfast') setPaymentMethod('easypaisa');
     }, [isPayFastDisabled, paymentMethod]);
 
     const handleApplyPromoCode = async () => {
@@ -162,215 +104,103 @@ const Checkout = () => {
         setIsLoading(true);
         try {
             const { data, error: rpcError } = await supabase.rpc('validate_promo_code', {
-                p_code: promoCode,
-                p_plan_name: planName,
-                p_duration: duration,
-                p_currency: currency,
-                p_current_price: basePrice,
+                p_code: promoCode, p_plan_name: planName, p_duration: duration, p_currency: currency, p_current_price: basePrice,
             });
             if (rpcError) throw rpcError;
             const result = data[0];
             if (result.valid) {
-                setDiscountedPrice(result.adjusted_price);
-                setIsPromoApplied(true);
+                setDiscountedPrice(result.adjusted_price); setIsPromoApplied(true);
                 setPromoDiscountDisplay(result.discount_type === 'percentage' ? `${result.discount_value}% OFF` : `Discount Applied`);
-            } else {
-                setPromoCodeError(result.error_message || 'Invalid code');
-            }
-        } catch (err: any) {
-            setPromoCodeError('Failed to validate promo code.');
-        } finally {
-            setIsLoading(false);
-        }
+            } else { setPromoCodeError(result.error_message || 'Invalid code'); }
+        } catch (err: any) { setPromoCodeError('Failed to validate promo code.'); }
+        finally { setIsLoading(false); }
     };
 
     const handleEasypaisaPayment = async () => {
         if (!mobileNumber || mobileNumber.length !== 11 || !mobileNumber.startsWith('03')) {
-            setError("Please enter a valid 11-digit Easypaisa number starting with 03.");
-            return;
+            setError("Please enter a valid 11-digit Easypaisa number starting with 03."); return;
         }
-
-        setError(null);
-        setIsLoading(true);
-        setModalState('processing');
-
+        setError(null); setIsLoading(true); setModalState('processing');
         const orderRefNum = `EP-${Date.now()}`;
         const amountFormatted = grandTotal.toFixed(2);
-
         const { data: { session } } = await supabase.auth.getSession();
-
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
-
         try {
             const response = await fetch(EASYPAISA_API_URL, {
-                method: 'POST',
-                signal: controller.signal,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session?.access_token}`
-                },
-                body: JSON.stringify({
-                    amount: amountFormatted,
-                    mobileNo: mobileNumber,
-                    orderRefNum: orderRefNum,
-                    email: user?.email || 'customer@medmacs.app',
-                    userId: user?.id,
-                    validity: validity,
-                    planName: planName
-                })
+                method: 'POST', signal: controller.signal,
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+                body: JSON.stringify({ amount: amountFormatted, mobileNo: mobileNumber, orderRefNum, email: user?.email || 'customer@medmacs.app', userId: user?.id, validity, planName })
             });
-
             clearTimeout(timeoutId);
-
-            if (response.ok || response.status === 202) {
-                console.log("Payment request submitted successfully.");
-            } else {
+            if (!response.ok && response.status !== 202) {
                 const errorData = await response.json().catch(() => ({ message: "Server error occurred." }));
                 throw new Error(errorData.message || "Gateway unreachable.");
             }
         } catch (err: any) {
-            console.error("Payment Error:", err);
-            if (err.name === 'AbortError') {
-                console.warn("Request timed out, waiting for Realtime update...");
-                return;
-            }
-            setError(err.message || "An unexpected error occurred.");
-            setModalState('failure');
-            setIsLoading(false);
+            if (err.name === 'AbortError') return;
+            setError(err.message || "An unexpected error occurred."); setModalState('failure'); setIsLoading(false);
         }
     };
 
     const handlePayFastPayment = async () => {
-        setIsLoading(true);
-        setError(null);
+        setIsLoading(true); setError(null);
         const basketId = `ORD-${Date.now()}`;
         const finalAmount = grandTotal.toFixed(2);
-
         try {
-            // 1. Pre-insert the payment record
-            const { error: insertError } = await supabase
-                .from('pending_payments')
-                .insert([{
-                    user_id: user?.id,
-                    amount: finalAmount,
-                    order_id: basketId,
-                    status: 'initiated',
-                    validity,
-                    email: user?.email,
-                    plan_name: planName
-                }]);
-
-            if (insertError) {
-                console.error("DB Insert Error:", insertError);
-                throw new Error("Could not initialize transaction. Check your internet connection.");
-            }
-
-            // 2. Call Vercel API for token
+            const { error: insertError } = await supabase.from('pending_payments').insert([{
+                user_id: user?.id, amount: finalAmount, order_id: basketId, status: 'initiated', validity, email: user?.email, plan_name: planName
+            }]);
+            if (insertError) throw new Error("Could not initialize transaction.");
             const response = await fetch('https://mobile-payment-medmacs.vercel.app/checkout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }, // Tell the server this is Case 1
-                body: JSON.stringify({ amount: finalAmount, basketId })
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: finalAmount, basketId })
             });
-
-
-            let data;
-
             const text = await response.text();
-
-            try {
-                data = text ? JSON.parse(text) : null;
-            } catch (e) {
-                console.error("Invalid JSON response:", text);
-                throw new Error("Payment server returned invalid response.");
-            }
-
-            if (!response.ok || !data?.ACCESS_TOKEN) {
-                throw new Error(data?.message || "Failed to get payment token.");
-            }
-
-
-
+            let data;
+            try { data = text ? JSON.parse(text) : null; } catch (e) { throw new Error("Payment server returned invalid response."); }
+            if (!response.ok || !data?.ACCESS_TOKEN) throw new Error(data?.message || "Failed to get payment token.");
             setIsRedirecting(true);
-
-            // 3. Form Redirection
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = "https://ipg1.apps.net.pk/Ecommerce/api/Transaction/PostTransaction";
-
             const fields = {
-                MERCHANT_ID: "248744",
-                Merchant_Name: "MEMACS Pakistan",
-                MERCHANT_USERAGENT: navigator.userAgent,
-                TOKEN: data.ACCESS_TOKEN,
-                PROCCODE: "00",
-                TXNAMT: finalAmount,
-                CUSTOMER_MOBILE_NO: mobileNumber || "03000000000",
+                MERCHANT_ID: "248744", Merchant_Name: "MEMACS Pakistan", MERCHANT_USERAGENT: navigator.userAgent,
+                TOKEN: data.ACCESS_TOKEN, PROCCODE: "00", TXNAMT: finalAmount, CUSTOMER_MOBILE_NO: mobileNumber || "03000000000",
                 CUSTOMER_EMAIL_ADDRESS: user?.email || "",
                 SUCCESS_URL: `${window.location.origin}/payment-success?plan=${planName}&validity=${validity}`,
                 FAILURE_URL: `${window.location.origin}/payment-failure`,
                 CHECKOUT_URL: `https://mobile-payment-medmacs.vercel.app/pqyment-webhook`,
-                BASKET_ID: basketId,
-                ORDER_DATE: new Date().toISOString().slice(0, 10),
-                SIGNATURE: "PAYMENT_REQ",
-                VERSION: "V1.2",
-                TXNDESC: `Upgrade to ${planName} (${duration})`,
-                CURRENCY_CODE: "PKR",
-                P1: user?.id || "",
-                P2: planName,
-                P3: duration
+                BASKET_ID: basketId, ORDER_DATE: new Date().toISOString().slice(0, 10),
+                SIGNATURE: "PAYMENT_REQ", VERSION: "V1.2", TXNDESC: `Upgrade to ${planName} (${duration})`,
+                CURRENCY_CODE: "PKR", P1: user?.id || "", P2: planName, P3: duration
             };
-
             Object.entries(fields).forEach(([key, value]) => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = key;
-                input.value = value as string;
-                form.appendChild(input);
+                const input = document.createElement('input'); input.type = 'hidden'; input.name = key; input.value = value as string; form.appendChild(input);
             });
-
-            document.body.appendChild(form);
-            form.submit();
-        } catch (err: any) {
-            console.error("PayFast Error Detail:", err);
-            setError(err.message || "An error occurred while starting PayFast.");
-            setIsLoading(false);
-        }
+            document.body.appendChild(form); form.submit();
+        } catch (err: any) { setError(err.message || "An error occurred."); setIsLoading(false); }
     };
 
     const processPayment = () => {
         if (isLoading || isRedirecting) return;
-        if (!user) {
-            setError("Please sign in to continue.");
-            return;
-        }
-        if (!agreedToTerms) {
-            setError("You must agree to the Terms, Privacy, and Refund policies to continue.");
-            return;
-        }
+        if (!user) { setError("Please sign in to continue."); return; }
+        if (!agreedToTerms) { setError("You must agree to the Terms, Privacy, and Refund policies to continue."); return; }
         paymentMethod === 'easypaisa' ? handleEasypaisaPayment() : handlePayFastPayment();
     };
 
     return (
-        <div className="absolute top-0 left-0 right-0 z-50 bg-white/30 dark:bg-gray-900/30 
-    backdrop-blur-md border-b border-purple-200/50 dark:border-purple-800/50 
-    pt-[env(safe-area-inset-top)]">
+        <div className="min-h-screen w-full bg-background overflow-hidden">
             <Seo title="Checkout | Medmacs" />
 
-            <header className="absolute top-0 left-0 right-0 z-50 bg-white/30 dark:bg-gray-900/30 
-    backdrop-blur-md border-b border-purple-200/50 dark:border-purple-800/50 
-    pt-[env(safe-area-inset-top)]">  
+            <header className="absolute top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)]">
                 <div className="container mx-auto px-4 py-4 flex justify-between items-center">
                     <div className="flex items-center space-x-3">
-                        <Link to="/pricing" className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full">
-                            <ArrowLeft className="h-5 w-5" />
+                        <Link to="/pricing" className="p-2 hover:bg-accent rounded-full transition-colors">
+                            <ArrowLeft className="h-5 w-5 text-foreground" />
                         </Link>
-                        <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-blue-600">Checkout</span>
+                        <span className="text-xl font-bold text-primary">Checkout</span>
                     </div>
                     <div className="flex items-center space-x-4">
-                        <Button variant="ghost" size="icon" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-                            {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-                        </Button>
                         <ProfileDropdown />
                     </div>
                 </div>
@@ -378,114 +208,103 @@ const Checkout = () => {
 
             <main className="container mx-auto px-4 py-12 max-w-5xl grid md:grid-cols-2 gap-12 mt-[calc(env(safe-area-inset-top)+40px)]">
                 <div className="space-y-8">
-                    <h2 className="text-2xl font-bold dark:text-white">Order Summary</h2>
-                    <Card className="border-purple-100 dark:border-slate-800 shadow-md dark:bg-slate-900">
+                    <h2 className="text-2xl font-bold text-foreground">Order Summary</h2>
+                    <Card className="border-border shadow-md bg-card">
                         <CardContent className="p-6 space-y-4">
                             <div className="flex justify-between items-start">
                                 <div className="flex flex-col">
-                                    <span className="text-muted-foreground font-medium dark:text-slate-400">{planName} Plan</span>
-                                    <span className="text-[11px] mt-1 px-2 py-0.5 bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 rounded font-bold uppercase">
+                                    <span className="text-muted-foreground font-medium">{planName} Plan</span>
+                                    <span className="text-[11px] mt-1 px-2 py-0.5 bg-primary/10 text-primary rounded font-bold uppercase">
                                         {validityDisplay}
                                     </span>
                                 </div>
-                                <span className="font-semibold dark:text-white">PKR {basePrice.toFixed(2)}</span>
+                                <span className="font-semibold text-foreground">PKR {basePrice.toFixed(2)}</span>
                             </div>
 
                             {isPromoApplied && (
-                                <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
+                                <div className="flex justify-between text-emerald-600 dark:text-emerald-400 text-sm font-medium">
                                     <span className="flex items-center"><BadgePercent className="mr-1.5 h-4 w-4" /> {promoDiscountDisplay}</span>
                                     <span>- PKR {(basePrice - priceAfterPromo).toFixed(2)}</span>
                                 </div>
                             )}
 
-                            <div className="pt-6 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                            <div className="pt-6 border-t border-border flex justify-between items-center">
                                 <div className="flex flex-col">
-                                    <span className="text-sm text-muted-foreground dark:text-slate-400 uppercase font-bold">Grand Total</span>
-                                    <span className="text-3xl font-black text-purple-600 dark:text-purple-400">PKR {grandTotal.toFixed(2)}</span>
+                                    <span className="text-sm text-muted-foreground uppercase font-bold">Grand Total</span>
+                                    <span className="text-3xl font-black text-primary">PKR {grandTotal.toFixed(2)}</span>
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
 
                     <div className="space-y-3">
-                        <label className="text-sm font-semibold dark:text-slate-300">Promo Code</label>
+                        <label className="text-sm font-semibold text-foreground">Promo Code</label>
                         <div className="flex gap-2">
                             <Input
                                 placeholder="Enter code"
                                 value={promoCode}
-                                className="dark:bg-slate-900 dark:border-slate-700 dark:text-white"
+                                className="bg-card border-border text-foreground"
                                 onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
                                 disabled={isPromoApplied || isLoading}
                             />
                             <Button variant="outline" onClick={handleApplyPromoCode} disabled={isLoading || isPromoApplied || !promoCode}>
-                                {isPromoApplied ? <CheckCircle className="h-4 w-4 text-green-500" /> : 'Apply'}
+                                {isPromoApplied ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : 'Apply'}
                             </Button>
                         </div>
-                        {promoCodeError && <p className="text-xs text-red-500">{promoCodeError}</p>}
+                        {promoCodeError && <p className="text-xs text-destructive">{promoCodeError}</p>}
                     </div>
                 </div>
 
                 <div className="space-y-6">
-                    <h2 className="text-2xl font-bold dark:text-white">Payment Method</h2>
+                    <h2 className="text-2xl font-bold text-foreground">Payment Method</h2>
                     <div className="space-y-4">
                         <div
                             onClick={() => setPaymentMethod('easypaisa')}
-                            className={cn("cursor-pointer p-4 border-2 rounded-xl transition-all", paymentMethod === 'easypaisa' ? "border-purple-600 bg-purple-50/50 dark:bg-purple-900/20" : "border-slate-200 dark:border-slate-800")}
+                            className={cn("cursor-pointer p-4 border-2 rounded-xl transition-all", paymentMethod === 'easypaisa' ? "border-primary bg-primary/5" : "border-border")}
                         >
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-3">
-                                    <Wallet className="w-5 h-5 text-green-600" />
-                                    <span className="font-bold dark:text-white">Easypaisa</span>
+                                    <Wallet className="w-5 h-5 text-emerald-600" />
+                                    <span className="font-bold text-foreground">Easypaisa</span>
                                 </div>
                                 <img src="/images/Easypaisa-logo.png" className="h-4" alt="Easypaisa" />
                             </div>
                             {paymentMethod === 'easypaisa' && (
                                 <div className="space-y-2 mt-2 animate-in fade-in zoom-in-95">
-                                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Mobile Account Number</label>
-                                    <Input
-                                        placeholder="03XXXXXXXXX"
-                                        value={mobileNumber}
-                                        onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
-                                        maxLength={11}
-                                        className="bg-white dark:bg-slate-950 dark:border-slate-700 dark:text-white"
-                                    />
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Mobile Account Number</label>
+                                    <Input placeholder="03XXXXXXXXX" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))} maxLength={11} className="bg-card border-border text-foreground" />
                                 </div>
                             )}
                         </div>
 
                         <div
                             onClick={() => !isPayFastDisabled && setPaymentMethod('payfast')}
-                            className={cn("p-4 border-2 rounded-xl transition-all flex items-center justify-between", isPayFastDisabled ? "opacity-50 grayscale cursor-not-allowed" : "cursor-pointer", paymentMethod === 'payfast' ? "border-purple-600 bg-purple-50/50 dark:bg-purple-900/20" : "border-slate-200 dark:border-slate-800")}
+                            className={cn("p-4 border-2 rounded-xl transition-all flex items-center justify-between", isPayFastDisabled ? "opacity-50 grayscale cursor-not-allowed" : "cursor-pointer", paymentMethod === 'payfast' ? "border-primary bg-primary/5" : "border-border")}
                         >
                             <div className="flex items-center gap-3">
-                                <CreditCard className="w-5 h-5 text-purple-600" />
+                                <CreditCard className="w-5 h-5 text-primary" />
                                 <div className="flex flex-col">
-                                    <span className="font-bold dark:text-white">Cards / Bank (PayFast)</span>
-                                    <span className="text-[10px] text-purple-500 font-medium">+2.5% Tax</span>
+                                    <span className="font-bold text-foreground">Cards / Bank (PayFast)</span>
+                                    <span className="text-[10px] text-primary font-medium">+2.5% Tax</span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <div className="flex items-start space-x-3 p-2">
-                        <Checkbox
-                            id="terms"
-                            checked={agreedToTerms}
-                            onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
-                            className="mt-1"
-                        />
-                        <label htmlFor="terms" className="text-sm leading-snug text-slate-600 dark:text-slate-400">
+                        <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)} className="mt-1" />
+                        <label htmlFor="terms" className="text-sm leading-snug text-muted-foreground">
                             By continuing to pay to Medmacs/Hmacs Studios, you agree to our{' '}
-                            <Link to="/terms" className="text-purple-600 hover:underline font-medium">Terms and Conditions</Link>,{' '}
-                            <Link to="/privacypolicy" className="text-purple-600 hover:underline font-medium">Privacy Policy</Link>, and{' '}
-                            <Link to="/refund-policy" className="text-purple-600 hover:underline font-medium">Refund Policy</Link>.
+                            <Link to="/terms" className="text-primary hover:underline font-medium">Terms and Conditions</Link>,{' '}
+                            <Link to="/privacypolicy" className="text-primary hover:underline font-medium">Privacy Policy</Link>, and{' '}
+                            <Link to="/refund-policy" className="text-primary hover:underline font-medium">Refund Policy</Link>.
                         </label>
                     </div>
 
-                    {error && <p className="text-red-500 text-sm font-medium">{error}</p>}
+                    {error && <p className="text-destructive text-sm font-medium">{error}</p>}
 
                     <Button
-                        className="w-full bg-purple-600 hover:bg-purple-700 h-14 text-xl font-black shadow-lg"
+                        className="w-full bg-primary hover:bg-primary/90 h-14 text-xl font-black shadow-lg text-primary-foreground"
                         onClick={processPayment}
                         disabled={isLoading || isRedirecting}
                     >
@@ -496,40 +315,35 @@ const Checkout = () => {
 
             <Dialog open={modalState !== 'idle'} onOpenChange={(open) => !open && setModalState('idle')}>
                 <DialogContent className={cn(
-                    "sm:max-w-md dark:bg-slate-900 dark:border-slate-800 transition-all duration-300",
+                    "sm:max-w-md bg-card border-border transition-all duration-300",
                     "max-sm:fixed max-sm:bottom-0 max-sm:top-auto max-sm:translate-y-0 max-sm:rounded-t-2xl max-sm:rounded-b-none max-sm:max-w-full max-sm:border-x-0 max-sm:border-b-0"
                 )}>
                     <div className="flex flex-col items-center justify-center py-6 text-center">
                         {modalState === 'processing' && (
                             <>
-                                <Loader2 className="h-12 w-12 text-purple-600 animate-spin mb-4" />
-                                <DialogTitle className="dark:text-white">Authorizing Payment</DialogTitle>
-                                <DialogDescription className="mt-2 dark:text-slate-400 px-4">
+                                <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
+                                <DialogTitle className="text-foreground">Authorizing Payment</DialogTitle>
+                                <DialogDescription className="mt-2 text-muted-foreground px-4">
                                     Please approve the request on your Easypaisa app or enter your PIN on the mobile prompt.
                                 </DialogDescription>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="mt-4 text-xs text-slate-500 hover:text-purple-600"
-                                    onClick={checkPaymentStatus}
-                                >
+                                <Button variant="ghost" size="sm" className="mt-4 text-xs text-muted-foreground hover:text-primary" onClick={checkPaymentStatus}>
                                     <RefreshCw className="mr-2 h-3 w-3" /> Still waiting? Click to check status
                                 </Button>
                             </>
                         )}
                         {modalState === 'success' && (
                             <>
-                                <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
-                                <DialogTitle className="dark:text-white">Payment Successful!</DialogTitle>
-                                <DialogDescription className="mt-2 dark:text-slate-400">Your account has been upgraded.</DialogDescription>
+                                <CheckCircle className="h-16 w-16 text-emerald-500 mb-4" />
+                                <DialogTitle className="text-foreground">Payment Successful!</DialogTitle>
+                                <DialogDescription className="mt-2 text-muted-foreground">Your account has been upgraded.</DialogDescription>
                                 <Button className="mt-6 w-full" onClick={() => window.location.href = '/dashboard'}>Continue to Dashboard</Button>
                             </>
                         )}
                         {modalState === 'failure' && (
                             <>
-                                <XCircle className="h-16 w-16 text-red-500 mb-4" />
-                                <DialogTitle className="dark:text-white">Transaction Failed</DialogTitle>
-                                <DialogDescription className="mt-2 text-red-600 px-4">{error || "Something went wrong."}</DialogDescription>
+                                <XCircle className="h-16 w-16 text-destructive mb-4" />
+                                <DialogTitle className="text-foreground">Transaction Failed</DialogTitle>
+                                <DialogDescription className="mt-2 text-destructive px-4">{error || "Something went wrong."}</DialogDescription>
                                 <div className="flex gap-2 w-full mt-6">
                                     <Button variant="outline" className="flex-1" onClick={() => setModalState('idle')}>Try Again</Button>
                                     <Button variant="secondary" className="flex-1" onClick={checkPaymentStatus}>Check Again</Button>
