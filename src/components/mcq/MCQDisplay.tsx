@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Clock, CheckCircle, XCircle, Timer, Bot, MessageSquare, X, Bookmark, BookmarkCheck, Crown, LogOut, AlertTriangle } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Timer, Bot, MessageSquare, X, Bookmark, BookmarkCheck, Crown, LogOut, AlertTriangle, MoreVertical, Flag, BotOff, Moon, Sun } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { fetchMCQsByChapter, MCQ } from '@/utils/mcqData';
@@ -11,6 +11,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { AIChatbot } from './AIChatbot';
 import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Textarea } from '@/components/ui/textarea';
+import { useTheme } from 'next-themes';
 
 interface MCQDisplayProps {
   subject: string;
@@ -78,6 +81,80 @@ const LeaveTestModal = ({ isOpen, onClose, onConfirm }) => (
   </Dialog>
 );
 
+// --- Report MCQ Modal ---
+const ReportMCQModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
+  const [reason, setReason] = useState('');
+  const [category, setCategory] = useState('');
+
+  const categories = [
+    'Incorrect answer marked as correct',
+    'Typo or grammatical error',
+    'Incomplete or unclear question',
+    'Wrong explanation provided',
+    'Duplicate question',
+    'Other'
+  ];
+
+  const handleSubmit = () => {
+    if (!category) return;
+    onSubmit({ category, reason });
+    setReason('');
+    setCategory('');
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[450px] bg-background border-border rounded-2xl">
+        <DialogHeader className="text-center">
+          <div className="mx-auto mb-3 w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center">
+            <Flag className="w-7 h-7 text-destructive" />
+          </div>
+          <DialogTitle className="text-xl font-bold">Report Question</DialogTitle>
+          <DialogDescription className="text-muted-foreground mt-2">
+            Help us improve by reporting issues with this question.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 mt-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">What's wrong?</label>
+            <div className="grid grid-cols-1 gap-2">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setCategory(cat)}
+                  className={`text-left text-sm px-3 py-2.5 rounded-xl border transition-all ${
+                    category === cat
+                      ? 'bg-primary/10 border-primary/30 text-foreground font-medium'
+                      : 'bg-muted/20 border-border/30 text-muted-foreground hover:bg-muted/40'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">Additional details (optional)</label>
+            <Textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Provide more context about the issue..."
+              className="rounded-xl bg-muted/20 border-border/30 resize-none text-sm"
+              rows={3}
+            />
+          </div>
+        </div>
+        <DialogFooter className="flex flex-col sm:flex-row gap-3 mt-4">
+          <Button onClick={onClose} variant="outline" className="w-full sm:w-auto">Cancel</Button>
+          <Button onClick={handleSubmit} disabled={!category || isSubmitting} className="w-full sm:w-auto bg-destructive hover:bg-destructive/90 text-destructive-foreground font-bold">
+            {isSubmitting ? 'Submitting...' : 'Submit Report'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 
 export const MCQDisplay = ({
   subject,
@@ -88,6 +165,7 @@ export const MCQDisplay = ({
 }: MCQDisplayProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { theme, setTheme } = useTheme();
   const [mcqs, setMcqs] = useState<ShuffledMCQ[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -103,6 +181,12 @@ export const MCQDisplay = ({
   const [isCurrentMCQSaved, setIsCurrentMCQSaved] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [isReportSubmitting, setIsReportSubmitting] = useState(false);
+  const [aiPopupsDisabled, setAiPopupsDisabled] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('aiPopupsDisabled') === 'true';
+    return false;
+  });
   const [dailySubmissionsCount, setDailySubmissionsCount] = useState(0);
   const [lastSubmissionResetDate, setLastSubmissionResetDate] = useState<string | null>(null);
 
@@ -135,6 +219,7 @@ export const MCQDisplay = ({
   });
 
   const userPlanForChatbot = profile?.plan?.toLowerCase() || 'free';
+  const isPremium = userPlanForChatbot === 'premium';
 
   useEffect(() => {
     if (profile && !profileLoading) {
@@ -153,6 +238,25 @@ export const MCQDisplay = ({
     const lastResetDateTimePKT = new Date(lastResetDateTime.toLocaleString("en-US", { timeZone: "Asia/Karachi" }));
     return lastResetDateTimePKT < today12AMPKT;
   };
+
+  // --- Timer logic ---
+  useEffect(() => {
+    if (!timerEnabled || showExplanation || loading || mcqs.length === 0) return;
+    if (timeLeft <= 0) {
+      handleTimeUp();
+      return;
+    }
+    const interval = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [timerEnabled, showExplanation, loading, mcqs.length, timeLeft]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -209,7 +313,7 @@ export const MCQDisplay = ({
   useEffect(() => {
     if (helpToastTimerRef.current) clearTimeout(helpToastTimerRef.current);
     setShowHelpToast(false);
-    if (user && userPlanForChatbot === 'premium' && !selectedAnswer && !isChatbotOpen) {
+    if (user && isPremium && !aiPopupsDisabled && !selectedAnswer && !isChatbotOpen) {
       helpToastTimerRef.current = setTimeout(() => {
         if (!selectedAnswer && !isChatbotOpen) {
           setHelpToastMessage(helpMessages[Math.floor(Math.random() * helpMessages.length)]);
@@ -218,13 +322,18 @@ export const MCQDisplay = ({
       }, 10000);
     }
     return () => { if (helpToastTimerRef.current) clearTimeout(helpToastTimerRef.current); };
-  }, [currentQuestionIndex, selectedAnswer, isChatbotOpen, user, userPlanForChatbot]);
+  }, [currentQuestionIndex, selectedAnswer, isChatbotOpen, user, isPremium, aiPopupsDisabled]);
 
   const currentMCQ = mcqs[currentQuestionIndex];
   const totalQuestions = mcqs.length;
   const progressPercentage = totalQuestions > 0 ? ((currentQuestionIndex + 1) / totalQuestions) * 100 : 0;
 
-  const handleTimeUp = () => { if (!showExplanation) handleSubmitAnswer(true); };
+  const handleTimeUp = () => {
+    if (!showExplanation && !selectedAnswer) {
+      // Time's up — mark as wrong, show correct answer
+      handleSubmitAnswer(true);
+    }
+  };
 
   const handleAnswerSelect = (answer: string) => {
     if (showExplanation) return;
@@ -251,7 +360,7 @@ export const MCQDisplay = ({
     const isCorrect = answer === currentMCQ.correct_answer;
     if (isCorrect && !timeUp) setScore(prev => prev + 1);
     try {
-      await supabase.from('user_answers').insert({ user_id: user.id, mcq_id: currentMCQ.id, selected_answer: answer || 'No answer', is_correct: isCorrect, time_taken: timeTaken });
+      await supabase.from('user_answers').insert({ user_id: user.id, mcq_id: currentMCQ.id, selected_answer: answer || 'No answer (time up)', is_correct: isCorrect, time_taken: timeTaken });
     } catch (error) { console.error('Error saving answer:', error); }
     setShowExplanation(true);
     setShowHelpToast(false);
@@ -298,6 +407,38 @@ export const MCQDisplay = ({
     }
   };
 
+  const handleReportSubmit = async ({ category, reason }: { category: string; reason: string }) => {
+    if (!user || !currentMCQ?.id) return;
+    setIsReportSubmitting(true);
+    try {
+      const { error } = await supabase.from('mcq_reports').insert({
+        user_id: user.id,
+        mcq_id: currentMCQ.id,
+        category,
+        reason: reason || null,
+      });
+      if (error) throw error;
+      toast({ title: "Report Submitted", description: "Thanks for helping us improve!" });
+      setShowReportModal(false);
+    } catch (error: any) {
+      console.error('Error reporting MCQ:', error);
+      toast({ title: "Error", description: `Failed to submit report. ${error.message || ''}`, variant: "destructive" });
+    } finally {
+      setIsReportSubmitting(false);
+    }
+  };
+
+  const handleToggleAiPopups = () => {
+    if (!isPremium) {
+      toast({ title: "Premium Feature", description: "Upgrade to Premium to manage AI popups.", variant: "destructive" });
+      return;
+    }
+    const newVal = !aiPopupsDisabled;
+    setAiPopupsDisabled(newVal);
+    localStorage.setItem('aiPopupsDisabled', String(newVal));
+    toast({ title: newVal ? "AI Popups Disabled" : "AI Popups Enabled", description: newVal ? "Dr. Ahroid won't nudge you anymore." : "Dr. Ahroid will offer help when you're stuck." });
+  };
+
   const handleUpgradeClick = () => { setShowUpgradeModal(false); };
 
   // --- Loading skeleton ---
@@ -337,7 +478,7 @@ export const MCQDisplay = ({
 
   return (
     <div className="max-w-3xl mx-auto px-3">
-      {/* Main quiz card - pricing page style */}
+      {/* Main quiz card */}
       <div className="relative overflow-hidden rounded-[2rem] bg-card/60 backdrop-blur-2xl border border-border/40 shadow-2xl p-2">
         {/* Subtle pattern overlay */}
         <div className="absolute inset-0 opacity-5" style={{
@@ -356,13 +497,17 @@ export const MCQDisplay = ({
                   Q{currentQuestionIndex + 1}/{totalQuestions}
                 </span>
                 {timerEnabled && (
-                  <div className={`flex items-center space-x-1 text-sm font-mono font-bold px-2 py-1 rounded-lg ${timeLeft <= 10 ? 'bg-destructive/15 text-destructive' : 'bg-muted/50 text-muted-foreground'}`}>
+                  <div className={`flex items-center space-x-1 text-sm font-mono font-bold px-2 py-1 rounded-lg transition-colors ${
+                    timeLeft <= 5 ? 'bg-destructive/20 text-destructive animate-pulse' : 
+                    timeLeft <= 10 ? 'bg-destructive/15 text-destructive' : 
+                    'bg-muted/50 text-muted-foreground'
+                  }`}>
                     <Timer className="w-3.5 h-3.5" />
                     <span>{timeLeft}s</span>
                   </div>
                 )}
               </div>
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2">
                 <div className="flex items-center space-x-1 text-xs font-semibold text-muted-foreground">
                   <CheckCircle className="w-3.5 h-3.5" />
                   <span>{score}/{currentQuestionIndex}</span>
@@ -377,6 +522,40 @@ export const MCQDisplay = ({
                     {isCurrentMCQSaved ? <BookmarkCheck className="w-4 h-4 fill-current" /> : <Bookmark className="w-4 h-4" />}
                   </Button>
                 )}
+                {/* 3-dot menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground hover:text-foreground hover:bg-muted/50">
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52 bg-background/90 backdrop-blur-xl border-border/40 rounded-xl">
+                    <DropdownMenuItem onClick={() => setShowReportModal(true)} className="text-sm cursor-pointer">
+                      <Flag className="w-4 h-4 mr-2 text-destructive" />
+                      Report Question
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={handleToggleAiPopups}
+                      disabled={!isPremium}
+                      className={`text-sm cursor-pointer ${!isPremium ? 'opacity-50' : ''}`}
+                    >
+                      <BotOff className="w-4 h-4 mr-2" />
+                      {aiPopupsDisabled ? 'Enable AI Popups' : 'Disable AI Popups'}
+                      {!isPremium && <Crown className="w-3 h-3 ml-auto text-yellow-500" />}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="text-sm cursor-pointer">
+                      {theme === 'dark' ? <Sun className="w-4 h-4 mr-2" /> : <Moon className="w-4 h-4 mr-2" />}
+                      {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setShowLeaveModal(true)} className="text-sm cursor-pointer text-destructive">
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Leave Test
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
             <Progress value={progressPercentage} className="w-full h-1.5" />
@@ -435,6 +614,18 @@ export const MCQDisplay = ({
                 })}
               </div>
 
+              {/* Time's up indicator */}
+              {showExplanation && !selectedAnswer && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-xl flex items-center space-x-2"
+                >
+                  <Clock className="w-4 h-4 text-destructive flex-shrink-0" />
+                  <span className="text-sm font-medium text-destructive">Time's up! The correct answer is highlighted above.</span>
+                </motion.div>
+              )}
+
               {/* Explanation */}
               {showExplanation && currentMCQ?.explanation && (
                 <motion.div
@@ -479,10 +670,11 @@ export const MCQDisplay = ({
                 </div>
               </div>
 
-              {/* Good luck message */}
+              {/* Good luck message - balanced for dark mode */}
               {user && (
-                <div className="mt-5 text-center text-muted-foreground/60 text-xs uppercase tracking-widest font-medium">
-                  Best of luck, <span className="text-foreground font-bold">{username}</span>
+                <div className="mt-5 text-center space-y-0.5">
+                  <p className="text-muted-foreground/50 text-xs uppercase tracking-widest font-medium">Best of luck</p>
+                  <p className="text-foreground/70 text-sm font-bold truncate max-w-[200px] mx-auto">{username}</p>
                 </div>
               )}
             </motion.div>
@@ -510,11 +702,14 @@ export const MCQDisplay = ({
       </AnimatePresence>
 
       {/* AI Chatbot */}
-      <AIChatbot currentQuestion={currentMCQ?.question} options={(currentMCQ as any)?.options} userPlan={userPlanForChatbot} />
+      {!aiPopupsDisabled && (
+        <AIChatbot currentQuestion={currentMCQ?.question} options={(currentMCQ as any)?.options} userPlan={userPlanForChatbot} />
+      )}
 
       {/* Modals */}
       <UpgradeAccountModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} onUpgradeClick={handleUpgradeClick} />
       <LeaveTestModal isOpen={showLeaveModal} onClose={() => setShowLeaveModal(false)} onConfirm={onBack} />
+      <ReportMCQModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} onSubmit={handleReportSubmit} isSubmitting={isReportSubmitting} />
     </div>
   );
 };
