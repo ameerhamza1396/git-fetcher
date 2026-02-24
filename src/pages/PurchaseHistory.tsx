@@ -1,9 +1,8 @@
 // @ts-nocheck
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Receipt, ShoppingBag, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,7 +12,6 @@ import { useState, useEffect, useRef } from 'react';
 const PurchaseHistory = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const headerRef = useRef<HTMLElement>(null);
   const lastScrollY = useRef(0);
   const [headerVisible, setHeaderVisible] = useState(true);
 
@@ -43,12 +41,26 @@ const PurchaseHistory = () => {
     enabled: !!user?.id,
   });
 
+  const isExpired = (p: any) => {
+    if (!p.created_at || !p.validity) return false;
+    const created = new Date(p.created_at);
+    const days = p.validity?.toLowerCase() === 'yearly' ? 365 : 30;
+    const expiry = new Date(created.getTime() + days * 24 * 60 * 60 * 1000);
+    return new Date() > expiry;
+  };
+
+  const getExpiryDate = (p: any) => {
+    if (!p.created_at || !p.validity) return null;
+    const created = new Date(p.created_at);
+    const days = p.validity?.toLowerCase() === 'yearly' ? 365 : 30;
+    return new Date(created.getTime() + days * 24 * 60 * 60 * 1000);
+  };
+
   return (
     <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950">
       <Seo title="Purchase History" description="View your purchase history" />
 
       <header
-        ref={headerRef}
         className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
       >
         <div className="container mx-auto px-4 py-4 flex justify-between items-center max-w-7xl">
@@ -94,28 +106,52 @@ const PurchaseHistory = () => {
         )}
 
         <div className="space-y-3">
-          {purchases?.map((p: any) => (
-            <div key={p.id} className="relative overflow-hidden rounded-[1.5rem] bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white shadow-xl p-4">
-              <div className="absolute inset-0 opacity-10" style={{
-                backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`,
-                maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
-              }} />
-              <div className="relative z-10 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-black uppercase tracking-tight">{p.plan_name || p.plan || 'Premium'} Plan</p>
-                  <p className="text-[11px] text-white/60 mt-0.5">
-                    {new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </p>
-                  <Badge className="mt-1.5 bg-white/20 text-white border-white/20 text-[9px] font-bold uppercase tracking-widest">
-                    <CheckCircle className="w-3 h-3 mr-1" /> Completed
-                  </Badge>
-                </div>
-                <div className="text-right">
-                  <span className="text-2xl font-black">Rs. {p.amount || '—'}</span>
+          {purchases?.map((p: any) => {
+            const expired = isExpired(p);
+            const expiry = getExpiryDate(p);
+            const durationType = p.validity?.toLowerCase() === 'yearly' ? 'Yearly' : 'Monthly';
+            
+            return (
+              <div key={p.id} className={`relative overflow-hidden rounded-[1.5rem] bg-gradient-to-br ${expired ? 'from-slate-500 via-slate-600 to-slate-700' : 'from-blue-600 via-indigo-600 to-violet-700'} text-white shadow-xl p-4`}>
+                <div className="absolute inset-0 opacity-10" style={{
+                  backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`,
+                  maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
+                }} />
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-black uppercase tracking-tight">{p.plan_name || p.plan || 'Premium'} Plan</p>
+                      <p className="text-[11px] text-white/60 mt-0.5">
+                        {new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-2xl font-black">Rs. {p.amount || '—'}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge className="bg-white/20 text-white border-white/20 text-[9px] font-bold uppercase tracking-widest">
+                      {durationType}
+                    </Badge>
+                    {expired ? (
+                      <Badge className="bg-red-500/30 text-red-100 border-red-300/30 text-[9px] font-bold uppercase tracking-widest">
+                        <AlertTriangle className="w-3 h-3 mr-1" /> Expired
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-emerald-500/30 text-emerald-100 border-emerald-300/30 text-[9px] font-bold uppercase tracking-widest">
+                        <CheckCircle className="w-3 h-3 mr-1" /> Active
+                      </Badge>
+                    )}
+                  </div>
+                  {expiry && (
+                    <p className="text-[10px] text-white/50 mt-1.5">
+                      {expired ? 'Expired' : 'Expires'}: {expiry.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </p>
+                  )}
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </main>
     </div>
