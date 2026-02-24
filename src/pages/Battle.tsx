@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { BattleLobby } from '@/components/battle/BattleLobby';
 import { BattleRoom } from '@/components/battle/BattleRoom';
@@ -7,7 +7,7 @@ import { BattleGame } from '@/components/battle/BattleGame';
 import { BattleResults } from '@/components/battle/BattleResults';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Swords, Hash, Plus, Users, RefreshCw, Clock, Trophy } from 'lucide-react';
+import { ArrowLeft, Swords, Hash, Plus, Users, RefreshCw, Clock, Trophy, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,6 +49,8 @@ interface AvailableRoom {
 const Battle: React.FC = () => {
   const { user, loading } = useAuth();
   const { toast } = useToast();
+  const headerRef = useRef<HTMLElement>(null);
+  const lastScrollY = useRef(0);
 
   const [battleState, setBattleState] = useState<BattleState>('lobby');
   const [lobbyTab, setLobbyTab] = useState<'create' | 'join'>('create');
@@ -58,6 +60,18 @@ const Battle: React.FC = () => {
   const [roomCode, setRoomCode] = useState('');
   const [availableRooms, setAvailableRooms] = useState<AvailableRoom[]>([]);
   const [roomsLoading, setRoomsLoading] = useState(false);
+  const [headerVisible, setHeaderVisible] = useState(true);
+
+  // Scroll-hide header
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      setHeaderVisible(currentScrollY < lastScrollY.current || currentScrollY < 10);
+      lastScrollY.current = currentScrollY;
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Load available rooms for join tab
   useEffect(() => {
@@ -183,64 +197,78 @@ const Battle: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] dark:bg-gray-950">
+        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-24 h-24 object-contain animate-pulse" />
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6">
-        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-          <Swords className="h-8 w-8 text-primary" />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] dark:bg-gray-950 p-6">
+        <div className="relative">
+          <div className="absolute inset-0 bg-orange-400 blur-2xl opacity-30 rounded-full" />
+          <div className="relative bg-gradient-to-br from-orange-500 to-red-600 p-5 rounded-3xl shadow-2xl mb-6">
+            <Swords className="h-10 w-10 text-white" />
+          </div>
         </div>
-        <h1 className="text-xl font-bold text-foreground mb-2">Battle Arena</h1>
-        <p className="text-muted-foreground text-center text-sm mb-6">Log in to compete with other students</p>
+        <h1 className="text-2xl font-black text-foreground mb-2 uppercase tracking-tight italic">Battle Arena</h1>
+        <p className="text-muted-foreground text-center text-sm mb-8 max-w-xs">Log in to compete with other medical students in real-time MCQ battles</p>
         <div className="flex gap-3">
-          <Link to="/login"><Button>Sign In</Button></Link>
-          <Link to="/signup"><Button variant="outline">Sign Up</Button></Link>
+          <Link to="/login"><Button className="bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-2xl h-12 px-8 font-black uppercase text-xs tracking-widest">Sign In</Button></Link>
+          <Link to="/signup"><Button variant="outline" className="rounded-2xl h-12 px-8 font-bold">Sign Up</Button></Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950">
       <Seo title="Battle Arena" description="Compete in MCQ battles" canonical="https://medmacs.app/battle" />
 
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-2xl border-b border-border/30 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center gap-3 px-4 h-12">
-          {battleState !== 'lobby' ? (
-            <button onClick={handleLeaveBattle} className="text-muted-foreground hover:text-foreground transition-colors">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-          ) : (
-            <Link to="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-          )}
-          <Swords className="w-5 h-5 text-primary" />
-          <span className="text-sm font-extrabold text-foreground tracking-tight">Battle Arena</span>
+      {/* Scroll-hide header */}
+      <header
+        ref={headerRef}
+        className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
+      >
+        <div className="flex items-center justify-between px-4 h-14">
+          <div className="flex items-center gap-3">
+            {battleState !== 'lobby' ? (
+              <Button variant="ghost" size="sm" className="w-9 h-9 p-0" onClick={handleLeaveBattle}>
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            ) : (
+              <Link to="/dashboard">
+                <Button variant="ghost" size="sm" className="w-9 h-9 p-0">
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+              </Link>
+            )}
+            <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-7 h-7" />
+            <span className="text-lg font-black tracking-tight">Battle Arena</span>
+          </div>
+          <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 text-[10px] font-bold px-3">
+            <Swords className="w-3 h-3 mr-1" /> Live
+          </Badge>
         </div>
       </header>
 
-      <main className="px-4 mt-[calc(env(safe-area-inset-top)+60px)] pb-8 max-w-lg mx-auto">
+      <main className="px-4 mt-[calc(env(safe-area-inset-top)+70px)] pb-8 max-w-lg mx-auto">
         {battleState === 'lobby' && (
-          <div className="space-y-4">
-            <div className="text-center mb-3">
-              <h2 className="text-lg font-bold text-foreground">⚔️ Battle Arena</h2>
-              <p className="text-xs text-muted-foreground font-medium">Challenge others in real-time</p>
+          <div className="space-y-5">
+            {/* Hero */}
+            <div className="text-center mb-2">
+              <h1 className="text-2xl font-black text-foreground uppercase tracking-tight italic">⚔️ Battle Arena</h1>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mt-1">Challenge others in real-time</p>
             </div>
 
-            {/* Create / Join toggle */}
-            <div className="flex bg-muted/60 rounded-2xl p-1 gap-1">
+            {/* Create / Join toggle - pricing style */}
+            <div className="inline-flex items-center w-full p-1 bg-slate-200/50 dark:bg-slate-800/50 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-slate-700">
               <button
                 onClick={() => setLobbyTab('create')}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${
                   lobbyTab === 'create'
-                    ? 'bg-card text-foreground shadow-md'
+                    ? 'bg-white dark:bg-gray-700 text-foreground shadow-xl'
                     : 'text-muted-foreground'
                 }`}
               >
@@ -248,9 +276,9 @@ const Battle: React.FC = () => {
               </button>
               <button
                 onClick={() => setLobbyTab('join')}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${
                   lobbyTab === 'join'
-                    ? 'bg-card text-foreground shadow-md'
+                    ? 'bg-white dark:bg-gray-700 text-foreground shadow-xl'
                     : 'text-muted-foreground'
                 }`}
               >
@@ -261,90 +289,91 @@ const Battle: React.FC = () => {
             {lobbyTab === 'create' ? (
               <BattleLobby onJoinBattle={handleJoinBattle} />
             ) : (
-              <div className="space-y-4">
-                {/* Join by code */}
-                <Card className="border border-border/40 shadow-sm bg-card/80">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2 font-bold">
-                      <Hash className="w-4 h-4 text-muted-foreground" /> Join by Code
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
+              <div className="space-y-5">
+                {/* Join by code - pricing card style */}
+                <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-500 via-slate-600 to-slate-700 text-white shadow-2xl p-6">
+                  <div className="absolute inset-0 opacity-10" style={{
+                    backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`,
+                    maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
+                  }} />
+                  <div className="relative z-10">
+                    <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2 mb-4">
+                      <Hash className="w-4 h-4" /> Join by Code
+                    </h3>
                     <Input
-                      placeholder="Enter room code (e.g. ABC123)"
+                      placeholder="ABC123"
                       value={roomCode}
                       onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                      className="text-center font-mono text-lg tracking-widest"
+                      className="text-center font-mono text-lg tracking-widest bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-xl h-12"
                       maxLength={6}
                     />
-                    <Button onClick={joinByCode} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold">
+                    <Button onClick={joinByCode} className="w-full mt-3 bg-white text-slate-900 hover:scale-105 transition-all rounded-xl h-12 font-black uppercase text-xs tracking-widest">
                       Join Room
                     </Button>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
 
                 {/* Available rooms */}
-                <Card className="border border-border/40 shadow-sm bg-card/80">
-                  <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                    <CardTitle className="text-sm flex items-center gap-2 font-bold">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-black text-foreground uppercase tracking-widest flex items-center gap-2">
                       <Trophy className="w-4 h-4 text-primary" /> Available Rooms
-                    </CardTitle>
+                    </h3>
                     <Button variant="ghost" size="sm" onClick={loadAvailableRooms} className="h-8 w-8 p-0 text-muted-foreground">
                       <RefreshCw className={`w-3.5 h-3.5 ${roomsLoading ? 'animate-spin' : ''}`} />
                     </Button>
-                  </CardHeader>
-                  <CardContent>
-                    {roomsLoading && availableRooms.length === 0 ? (
-                      <div className="flex justify-center py-8">
-                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : availableRooms.length === 0 ? (
-                      <div className="text-center py-8">
-                        <Swords className="w-10 h-10 mx-auto mb-2 text-muted-foreground/30" />
-                        <p className="text-xs text-muted-foreground font-medium">No active rooms</p>
-                        <p className="text-[11px] text-muted-foreground/70">Create one or check back later</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2.5">
-                        {availableRooms.map((room) => (
-                          <div key={room.id} className="flex items-center justify-between p-3 rounded-xl border border-border/30 bg-background/50 hover:bg-accent/30 transition-colors">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Badge className={`text-[10px] font-bold border-0 px-1.5 py-0 ${getBattleTypeColor(room.battle_type)}`}>
-                                  {getBattleTypeLabel(room.battle_type)}
-                                </Badge>
-                                <span className="font-mono text-xs font-bold text-foreground">{room.room_code}</span>
-                              </div>
-                              <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                                <span className="flex items-center gap-0.5">
-                                  <Users className="w-3 h-3" />
-                                  {room.current_players}/{room.max_players}
-                                </span>
-                                <span className="flex items-center gap-0.5">
-                                  <Clock className="w-3 h-3" />
-                                  {room.time_per_question}s
-                                </span>
-                                {room.subject && <span className="text-primary font-semibold truncate">{room.subject}</span>}
-                              </div>
+                  </div>
+
+                  {roomsLoading && availableRooms.length === 0 ? (
+                    <div className="flex justify-center py-12">
+                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : availableRooms.length === 0 ? (
+                    <div className="text-center py-12 rounded-2xl bg-muted/30 border border-border/30">
+                      <Swords className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
+                      <p className="text-xs text-muted-foreground font-bold">No active rooms</p>
+                      <p className="text-[11px] text-muted-foreground/70">Create one or check back later</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {availableRooms.map((room) => (
+                        <div key={room.id} className="flex items-center justify-between p-4 rounded-2xl border border-border/30 bg-card/80 backdrop-blur-sm hover:shadow-md transition-all">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge className={`text-[10px] font-bold border-0 px-2 py-0.5 ${getBattleTypeColor(room.battle_type)}`}>
+                                {getBattleTypeLabel(room.battle_type)}
+                              </Badge>
+                              <span className="font-mono text-xs font-bold text-foreground">{room.room_code}</span>
                             </div>
-                            <Button
-                              size="sm"
-                              onClick={() => handleJoinBattle(room.id)}
-                              disabled={room.current_players >= room.max_players}
-                              className={`text-xs font-bold h-8 px-4 rounded-xl ${
-                                room.current_players >= room.max_players
-                                  ? 'bg-muted text-muted-foreground'
-                                  : 'bg-primary text-primary-foreground'
-                              }`}
-                            >
-                              {room.current_players >= room.max_players ? 'Full' : 'Join'}
-                            </Button>
+                            <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                              <span className="flex items-center gap-0.5">
+                                <Users className="w-3 h-3" />
+                                {room.current_players}/{room.max_players}
+                              </span>
+                              <span className="flex items-center gap-0.5">
+                                <Clock className="w-3 h-3" />
+                                {room.time_per_question}s
+                              </span>
+                              {room.subject && <span className="text-primary font-semibold truncate">{room.subject}</span>}
+                            </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                          <Button
+                            size="sm"
+                            onClick={() => handleJoinBattle(room.id)}
+                            disabled={room.current_players >= room.max_players}
+                            className={`text-xs font-black h-9 px-5 rounded-xl uppercase tracking-wider ${
+                              room.current_players >= room.max_players
+                                ? 'bg-muted text-muted-foreground'
+                                : 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg'
+                            }`}
+                          >
+                            {room.current_players >= room.max_players ? 'Full' : 'Join'}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

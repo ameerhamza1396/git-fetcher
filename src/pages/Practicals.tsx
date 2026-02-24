@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
-import { ElasticWrapper } from '@/components/ElasticWrapper'
+
 import Seo from '@/components/Seo';
 import PlanBadge from '@/components/PlanBadge';
 
@@ -155,8 +155,6 @@ const PracticalNotes = () => {
                     </div>
                 </div>
             </header>
-            <ElasticWrapper>
-
             <div className="container mx-auto px-4 lg:px-8 py-8 max-w-7xl mt-[calc(45px+env(safe-area-inset-top))] overscroll-y-contain">
                 {/* Hero */}
                 <div className="text-center mb-8 animate-fade-in">
@@ -179,7 +177,7 @@ const PracticalNotes = () => {
                     </div>
                 </section>
             </div>
-            </ElasticWrapper>
+            
         </div>
     );
 };

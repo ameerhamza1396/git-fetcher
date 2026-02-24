@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,64 +10,43 @@ import { toast } from 'sonner';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import {
-    Mail,
-    Phone,
-    Instagram,
-    Facebook,
-    Linkedin,
-    User,
-    MessageSquare,
-    Loader2,
-    CheckCircle,
-    Send,
-    ArrowLeft,
-    Moon,
-    Sun
+    Mail, Phone, Instagram, Facebook, Linkedin, User, MessageSquare,
+    Loader2, CheckCircle, Send, ArrowLeft
 } from 'lucide-react';
-
-import { useTheme } from 'next-themes';
 import { useAuth } from '@/hooks/useAuth';
-import { Badge } from '@/components/ui/badge';
-import { ElasticWrapper } from '@/components/ElasticWrapper'
-// ProfileDropdown is not used in the provided code, so it's commented out.
-// import { ProfileDropdown } from '@/components/ProfileDropdown';
-import Seo from '@/components/Seo'; // Import the Seo component
-import PlanBadge from '@/components/PlanBadge';
-
+import Seo from '@/components/Seo';
 
 const ContactUsPage = () => {
     const { user } = useAuth();
-    const { theme, setTheme } = useTheme();
+    const headerRef = useRef<HTMLElement>(null);
+    const lastScrollY = useRef(0);
+    const [headerVisible, setHeaderVisible] = useState(true);
 
-    const [formData, setFormData] = useState({
-        fullName: '',
-        email: '',
-        message: '',
-    });
+    const [formData, setFormData] = useState({ fullName: '', email: '', message: '' });
     const [formErrors, setFormErrors] = useState({});
-    const [showSuccessMessage, setShowSuccessMessage] = useState(false); // New state for success message
+    const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
     const { data: profile } = useQuery({
         queryKey: ['profileForContact', user?.id],
         queryFn: async () => {
             if (!user?.id) return null;
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('full_name, email, avatar_url, plan')
-                .eq('id', user.id)
-                .maybeSingle();
-            if (error) {
-                console.error('Error fetching profile for contact page:', error);
-                return null;
-            }
+            const { data, error } = await supabase.from('profiles').select('full_name, email, avatar_url, plan').eq('id', user.id).maybeSingle();
+            if (error) return null;
             return data;
         },
         enabled: !!user?.id,
         staleTime: Infinity,
     });
 
-    const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
-    const userAvatarUrl = profile?.avatar_url;
+    useEffect(() => {
+        const handleScroll = () => {
+            const currentScrollY = window.scrollY;
+            setHeaderVisible(currentScrollY < lastScrollY.current || currentScrollY < 10);
+            lastScrollY.current = currentScrollY;
+        };
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     useEffect(() => {
         if (user) {
@@ -83,246 +62,151 @@ const ContactUsPage = () => {
         const { id, value } = e.target;
         setFormData(prev => ({ ...prev, [id]: value }));
         setFormErrors(prev => ({ ...prev, [id]: undefined }));
-        setShowSuccessMessage(false); // Hide success message on input change
+        setShowSuccessMessage(false);
     };
 
     const validateForm = () => {
         const errors = {};
         if (!formData.fullName.trim()) errors.fullName = 'Full Name is required.';
-        if (!formData.email.trim()) {
-            errors.email = 'Email is required.';
-        } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-            errors.email = 'Email address is invalid.';
-        }
+        if (!formData.email.trim()) errors.email = 'Email is required.';
+        else if (!/\S+@\S+\.\S+/.test(formData.email)) errors.email = 'Email address is invalid.';
         if (!formData.message.trim()) errors.message = 'Message is required.';
         else if (formData.message.trim().length < 10) errors.message = 'Message must be at least 10 characters.';
-
         setFormErrors(errors);
         return Object.keys(errors).length === 0;
     };
 
     const submitMessageMutation = useMutation({
         mutationFn: async (messageData) => {
-            const { data, error } = await supabase
-                .from('contact_messages')
-                .insert([
-                    {
-                        full_name: messageData.fullName,
-                        email: messageData.email,
-                        message: messageData.message,
-                        user_id: user?.id || null,
-                    },
-                ]);
+            const { data, error } = await supabase.from('contact_messages').insert([{
+                full_name: messageData.fullName, email: messageData.email,
+                message: messageData.message, user_id: user?.id || null,
+            }]);
             if (error) throw error;
             return data;
         },
         onSuccess: () => {
-            toast.success('Your message has been sent successfully! We will get back to you soon.');
+            toast.success('Your message has been sent successfully!');
             setFormData({ fullName: user?.user_metadata?.full_name || profile?.full_name || '', email: user?.email || '', message: '' });
             setFormErrors({});
-            setShowSuccessMessage(true); // Show success message on success
+            setShowSuccessMessage(true);
         },
         onError: (error) => {
-            console.error('Error submitting contact message:', error);
-            toast.error(`Failed to send message: ${error.message || 'An unexpected error occurred.'}`);
-            setShowSuccessMessage(false); // Ensure success message is hidden on error
+            toast.error(`Failed to send message: ${error.message}`);
+            setShowSuccessMessage(false);
         },
     });
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        setShowSuccessMessage(false); // Hide any previous success message on new submission attempt
-        if (validateForm()) {
-            submitMessageMutation.mutate(formData);
-        } else {
-            toast.error('Please correct the errors in the form.');
-        }
+        setShowSuccessMessage(false);
+        if (validateForm()) submitMessageMutation.mutate(formData);
+        else toast.error('Please correct the errors in the form.');
     };
 
+    const contactLinks = [
+        { icon: Mail, label: 'Email', value: 'hi@medmacs.app', href: 'mailto:hi@medmacs.app', gradient: 'from-blue-600 via-indigo-600 to-violet-700' },
+        { icon: Phone, label: 'WhatsApp', value: '03242456162', href: 'tel:+923242456162', gradient: 'from-emerald-600 via-teal-600 to-cyan-700' },
+        { icon: Instagram, label: 'Instagram', value: '@ameerhamza.exe', href: 'https://instagram.com/ameerhamza.exe', gradient: 'from-rose-600 via-pink-600 to-fuchsia-700' },
+        { icon: Facebook, label: 'Facebook', value: 'ameerhamza.exe2', href: 'https://facebook.com/ameerhamza.exe2', gradient: 'from-blue-700 via-blue-600 to-indigo-700' },
+        { icon: Linkedin, label: 'LinkedIn', value: 'ameerhamza.exe', href: 'https://www.linkedin.com/in/ameerhamza.exe/', gradient: 'from-sky-600 via-blue-600 to-indigo-700' },
+    ];
+
     return (
-        <div className="min-h-screen w-full bg-white dark:bg-gray-900">
-            <Seo
-            title="Contact Us"
-            description="Get in touch with Medmacs App customer support for any queries, feedback, or assistance."
-            canonical="https://medmacs.app/contact-us"
-            />
-    <header className="absolute top-0 left-0 right-0 z-50 bg-white/30 dark:bg-gray-900/30 
-    backdrop-blur-md border-b border-purple-200/50 dark:border-purple-800/50 
-    pt-[env(safe-area-inset-top)]">                  <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
-                    <Link to="/dashboard" className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors">
-                        <ArrowLeft className="w-4 h-4" />
-                    </Link>
+        <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950">
+            <Seo title="Contact Us" description="Get in touch with Medmacs App" canonical="https://medmacs.app/contact-us" />
 
-                    <div className="flex items-center space-x-3">
-                        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs Logo" className="w-8 h-8 object-contain" />
-                        <span className="text-xl font-bold text-gray-900 dark:text-white">Contact Us</span>
-                    </div>
-
-                    <div className="flex items-center space-x-3">
-                        <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-9 h-9 p-0 hover:scale-110 transition-transform duration-200">
-                            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            <header
+                ref={headerRef}
+                className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
+            >
+                <div className="container mx-auto px-4 py-4 flex justify-between items-center max-w-7xl">
+                    <Link to="/dashboard">
+                        <Button variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110">
+                            <ArrowLeft className="h-5 w-5" />
                         </Button>
-                        <PlanBadge plan={profile?.plan} />
-                        <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center border border-purple-300 dark:border-purple-700">
-                            {userAvatarUrl ? (
-                                <img
-                                    src={userAvatarUrl}
-                                    alt="User Avatar"
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => {
-                                        e.target.onerror = null;
-                                        e.target.src = `https://placehold.co/32x32/cccccc/333333?text=${displayName.substring(0,1).toUpperCase()}`;
-                                    }}
-                                />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-sm">
-                                    {displayName.substring(0, 1).toUpperCase()}
-                                </div>
-                            )}
-                        </div>
+                    </Link>
+                    <div className="flex items-center gap-2">
+                        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-7 h-7" />
+                        <span className="text-lg font-black">Contact Us</span>
                     </div>
+                    <div className="w-9" />
                 </div>
             </header>
 
-        <ElasticWrapper>
-            <div className="container mx-auto px-4 lg:px-8 py-8 max-w-4xl">
-                <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-8 text-center pt-[calc(45px+env(safe-area-inset-top))] overscroll-y-contain">
-                    Get in Touch with Medmacs!
-                </h1>
+            <main className="container mx-auto px-4 py-8 max-w-2xl mt-[calc(env(safe-area-inset-top)+60px)]">
+                <div className="text-center mb-8">
+                    <h1 className="text-2xl md:text-4xl font-black tracking-tight text-foreground uppercase italic">
+                        Get in <span className="text-blue-600">Touch</span>
+                    </h1>
+                    <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] mt-2">We'd love to hear from you</p>
+                </div>
 
-                <Card className="mb-8 bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-800 shadow-lg animate-fade-in">
-                    <CardHeader className="text-center">
-                        <CardTitle className="text-gray-900 dark:text-white text-2xl mb-2">Our Contact Information</CardTitle>
-                        <CardDescription className="text-gray-600 dark:text-gray-400">
-                            Feel free to reach out to us through any of the following channels.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {/* Email */}
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 text-gray-700 dark:text-gray-300">
-                            <div className="flex items-center mb-1 sm:mb-0 sm:flex-shrink-0">
-                                <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2" />
-                                <span className="font-medium">Email:</span>
+                {/* Contact cards - pricing style */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
+                    {contactLinks.map((item, i) => (
+                        <a key={i} href={item.href} target="_blank" rel="noopener noreferrer"
+                           className={`relative overflow-hidden rounded-[1.5rem] bg-gradient-to-br ${item.gradient} text-white p-4 shadow-xl hover:scale-105 transition-all duration-300 ${i === 0 ? 'col-span-2 sm:col-span-1' : ''}`}>
+                            <div className="absolute inset-0 opacity-10" style={{
+                                backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`,
+                                maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
+                            }} />
+                            <div className="relative z-10">
+                                <item.icon className="w-5 h-5 mb-2 opacity-80" />
+                                <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">{item.label}</p>
+                                <p className="text-xs font-bold mt-1 truncate">{item.value}</p>
                             </div>
-                            <a href="mailto:hi@medmacs.app" className="text-blue-600 dark:text-blue-400 hover:underline">hi@medmacs.app</a>
-                        </div>
-                        {/* Phone */}
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 text-gray-700 dark:text-gray-300">
-                            <div className="flex items-center mb-1 sm:mb-0 sm:flex-shrink-0">
-                                <Phone className="h-5 w-5 text-green-600 dark:text-green-400 mr-2" />
-                                <span className="font-medium">Contact & WhatsApp:</span>
-                            </div>
-                            <a href="tel:+923242456162" className="text-green-600 dark:text-green-400 hover:underline">03242456162</a>
-                        </div>
-                        {/* Instagram */}
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 text-gray-700 dark:text-gray-300">
-                            <div className="flex items-center mb-1 sm:mb-0 sm:flex-shrink-0">
-                                <Instagram className="h-5 w-5 text-pink-600 dark:text-pink-400 mr-2" />
-                                <span className="font-medium">Instagram:</span>
-                            </div>
-                            <a href="https://instagram.com/ameerhamza.exe" target="_blank" rel="noopener noreferrer" className="text-pink-600 dark:text-pink-400 hover:underline">instagram.com/ameerhamza.exe2</a>
-                        </div>
-                        {/* Facebook */}
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 text-gray-700 dark:text-gray-300">
-                            <div className="flex items-center mb-1 sm:mb-0 sm:flex-shrink-0">
-                                <Facebook className="h-5 w-5 text-blue-800 dark:text-blue-600 mr-2" />
-                                <span className="font-medium">Facebook:</span>
-                            </div>
-                            <a href="https://facebook.com/ameerhamza.exe2" target="_blank" rel="noopener noreferrer" className="text-blue-800 dark:text-blue-600 hover:underline">facebook.com/ameerhamza.exe2</a>
-                        </div>
-                        {/* LinkedIn */}
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 text-gray-700 dark:text-gray-300">
-                            <div className="flex items-center mb-1 sm:mb-0 sm:flex-shrink-0">
-                                <Linkedin className="h-5 w-5 text-blue-700 dark:text-blue-500 mr-2" />
-                                <span className="font-medium">LinkedIn:</span>
-                            </div>
-                            <a href="https://www.linkedin.com/in/ameerhamza.exe/" target="_blank" rel="noopener noreferrer" className="text-blue-700 dark:text-blue-500 hover:underline">linkedin.com/in/ameerhamza.exe/</a>
-                        </div>
-                    </CardContent>
-                </Card>
+                        </a>
+                    ))}
+                </div>
 
-                <Card className="bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-800 shadow-lg animate-fade-in">
-                    <CardHeader className="text-center pb-6">
-                        <CardTitle className="text-gray-900 dark:text-white text-2xl mb-2">Send Us a Message</CardTitle>
-                        <CardDescription className="text-gray-600 dark:text-gray-400">
-                            Have a question, feedback, or need support? Send us a message directly!
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Message form - glass card */}
+                <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-500 via-slate-600 to-slate-700 text-white shadow-2xl p-1">
+                    <div className="absolute inset-0 opacity-10" style={{
+                        backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`,
+                        maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
+                    }} />
+                    <div className="relative z-10 bg-white/10 backdrop-blur-xl rounded-[1.8rem] p-6 border border-white/10">
+                        <h2 className="text-xl font-black uppercase tracking-tight mb-1">Send a Message</h2>
+                        <p className="text-xs text-white/60 mb-6">Questions, feedback, or support requests</p>
+
+                        <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <Label htmlFor="fullName" className="text-gray-700 dark:text-gray-300 flex items-center mb-1">
-                                    <User className="h-4 w-4 mr-2 text-blue-500" /> Full Name
-                                </Label>
-                                <Input
-                                    id="fullName"
-                                    type="text"
-                                    placeholder="Your Full Name"
-                                    value={formData.fullName}
-                                    onChange={handleInputChange}
-                                    required
+                                <Label htmlFor="fullName" className="text-white/80 text-xs font-bold uppercase tracking-wider">Full Name</Label>
+                                <Input id="fullName" value={formData.fullName} onChange={handleInputChange} required
                                     readOnly={!!user && !!profile?.full_name}
-                                    className={!!user && !!profile?.full_name ? 'bg-gray-100 dark:bg-gray-700 cursor-not-allowed' : ''}
-                                />
-                                {formErrors.fullName && <p className="text-red-500 text-sm mt-1">{formErrors.fullName}</p>}
+                                    className="bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-xl h-11 mt-1" />
+                                {formErrors.fullName && <p className="text-red-300 text-xs mt-1">{formErrors.fullName}</p>}
                             </div>
-
                             <div>
-                                <Label htmlFor="email" className="text-gray-700 dark:text-gray-300 flex items-center mb-1">
-                                    <Mail className="h-4 w-4 mr-2 text-green-500" /> Email
-                                </Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    placeholder="your@example.com"
-                                    value={formData.email}
-                                    onChange={handleInputChange}
-                                    required
+                                <Label htmlFor="email" className="text-white/80 text-xs font-bold uppercase tracking-wider">Email</Label>
+                                <Input id="email" type="email" value={formData.email} onChange={handleInputChange} required
                                     readOnly={!!user && !!user.email}
-                                    className={!!user && !!user.email ? 'bg-gray-100 dark:bg-gray-700 cursor-not-allowed' : ''}
-                                />
-                                {formErrors.email && <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>}
+                                    className="bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-xl h-11 mt-1" />
+                                {formErrors.email && <p className="text-red-300 text-xs mt-1">{formErrors.email}</p>}
                             </div>
-
                             <div>
-                                <Label htmlFor="message" className="text-gray-700 dark:text-gray-300 flex items-center mb-1">
-                                    <MessageSquare className="h-4 w-4 mr-2 text-purple-500" /> Your Message
-                                </Label>
-                                <Textarea
-                                    id="message"
-                                    placeholder="Type your message here..."
-                                    value={formData.message}
-                                    onChange={handleInputChange}
-                                    rows={6}
-                                    required
-                                />
-                                {formErrors.message && <p className="text-red-500 text-sm mt-1">{formErrors.message}</p>}
+                                <Label htmlFor="message" className="text-white/80 text-xs font-bold uppercase tracking-wider">Message</Label>
+                                <Textarea id="message" value={formData.message} onChange={handleInputChange} rows={5}
+                                    placeholder="Type your message..."
+                                    className="bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-xl mt-1" />
+                                {formErrors.message && <p className="text-red-300 text-xs mt-1">{formErrors.message}</p>}
                             </div>
-
-                            <Button
-                                type="submit"
-                                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2"
-                                disabled={submitMessageMutation.isPending}
-                            >
-                                {submitMessageMutation.isPending ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Send className="mr-2 h-4 w-4" />
-                                )}
-                                {submitMessageMutation.isPending ? 'Sending Message...' : 'Send Message'}
+                            <Button type="submit" disabled={submitMessageMutation.isPending}
+                                className="w-full bg-white text-slate-900 hover:scale-105 transition-all rounded-xl h-12 uppercase font-black text-xs tracking-widest shadow-2xl">
+                                {submitMessageMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                                {submitMessageMutation.isPending ? 'Sending...' : 'Send Message'}
                             </Button>
-
                             {showSuccessMessage && (
-                                <div className="text-center mt-4 p-3 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded-md border border-green-200 dark:border-green-800 flex items-center justify-center">
-                                    <CheckCircle className="h-5 w-5 mr-2" />
-                                    <span>Your message has been received and our team will contact you shortly.</span>
+                                <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-200 text-sm">
+                                    <CheckCircle className="h-4 w-4 shrink-0" />
+                                    <span>Message received! We'll get back to you soon.</span>
                                 </div>
                             )}
                         </form>
-                    </CardContent>
-                </Card>
-            </div>
-            </ElasticWrapper>
+                    </div>
+                </div>
+            </main>
         </div>
     );
 };

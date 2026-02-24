@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Lock, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { ElasticWrapper } from '@/components/ElasticWrapper'
+
 
 const ChangePassword = () => {
   const { user } = useAuth();
@@ -131,7 +131,7 @@ const ChangePassword = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 dark:from-gray-900 dark:to-gray-800">
-      <ElasticWrapper>
+      
       <div className="container mx-auto px-4 py-8 max-w-md">
         <div className="mb-6">
           <Link to="/profile" className="flex items-center text-purple-600 hover:text-purple-700 mb-4">
@@ -241,7 +241,7 @@ const ChangePassword = () => {
           </CardContent>
         </Card>
       </div>
-      </ElasticWrapper>
+      
     </div>
   );
 };

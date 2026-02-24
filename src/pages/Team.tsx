@@ -3,7 +3,7 @@ import { ArrowLeft, Instagram, Sun, Moon } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Seo from '@/components/Seo';
 import { useEffect, useState } from 'react';
-import { ElasticWrapper } from '@/components/ElasticWrapper'
+
 import { Typewriter } from 'react-simple-typewriter'; // ✅ Added for typewriter
 
 const Teams = () => {
@@ -80,8 +80,6 @@ const Teams = () => {
           </div>
         </div>
       </header>
-
-                    <ElasticWrapper>
 
       <div className="container mx-auto px-4 lg:px-8 py-16 max-w-6xl">
         {/* Hero Section */}
@@ -276,7 +274,7 @@ const Teams = () => {
           <p className="text-xs">&copy; 2025 Hmacs Studios. All rights reserved.</p>
         </div>
       </footer>
-      </ElasticWrapper>
+      
     </div>
   );
 };

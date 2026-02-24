@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ReCAPTCHA from 'react-google-recaptcha';
 import { ProfileDropdown } from '@/components/ProfileDropdown'; // NEW: Import ProfileDropdown
-import { ElasticWrapper } from '@/components/ElasticWrapper'
+
 import Seo from '@/components/Seo'; // Import the Seo component
 import PlanBadge from '@/components/PlanBadge';
 
@@ -188,7 +188,7 @@ const CareerAmbassador = () => {
                 </div>
             </header>
 
-        <ElasticWrapper>
+        
             <div className="container mx-auto px-4 lg:px-8 py-8 max-w-7xl">
                 {/* Hero Section */}
                 <div className="text-center mb-8 animate-fade-in">
@@ -392,7 +392,7 @@ const CareerAmbassador = () => {
                     </div>
                 </div>
             </div>
-        </ElasticWrapper>
+        
         </div>
     );
 };
