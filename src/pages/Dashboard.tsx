@@ -42,7 +42,6 @@ const Dashboard = () => {
   const [showWhatsNew, setShowWhatsNew] = useState(false);
   const [showTermOfDay, setShowTermOfDay] = useState(false);
   const [showCaseOfDay, setShowCaseOfDay] = useState(false);
-  const [isNavigating, setIsNavigating] = useState(true);
 
   type Profile = {
     avatar_url: string;
