@@ -1,10 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Trophy, Crown, Medal, Award, Users, ArrowRight } from 'lucide-react';
+import { Trophy, Crown, Medal, Award, Users, ArrowRight, Target } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 interface LeaderboardEntry {
   id: string;
@@ -16,6 +17,8 @@ interface LeaderboardEntry {
 }
 
 export const LeaderboardPreview = () => {
+  const { user } = useAuth();
+
   const { data: topUsers = [], isLoading } = useQuery({
     queryKey: ['leaderboard-preview'],
     queryFn: async () => {
@@ -67,10 +70,14 @@ export const LeaderboardPreview = () => {
             };
           }) || [];
 
-        return leaderboardEntries.sort((a, b) => b.total_score - a.total_score).slice(0, 5);
+        return leaderboardEntries.sort((a, b) => b.total_score - a.total_score).slice(0, 10);
       } catch (error) { return []; }
     }
   });
+
+  // Calculate user rank
+  const userRank = topUsers.findIndex(u => u.user_id === user?.id) + 1;
+  const currentUserData = topUsers.find(u => u.user_id === user?.id);
 
   const getRankIcon = (rank: number) => {
     switch (rank) {
@@ -98,9 +105,33 @@ export const LeaderboardPreview = () => {
         </div>
       </CardHeader>
       <CardContent className="pt-0">
+        {/* User rank banner */}
+        {currentUserData && userRank > 0 && (
+          <div className="flex items-center justify-between p-3 mb-3 rounded-xl bg-primary/10 border border-primary/20">
+            <div className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-primary" />
+              <span className="text-xs font-bold text-foreground">Your Rank</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-black text-primary">#{userRank}</span>
+              <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary border-0">
+                {currentUserData.total_score} pts
+              </Badge>
+            </div>
+          </div>
+        )}
+        {!currentUserData && user && (
+          <div className="flex items-center justify-between p-3 mb-3 rounded-xl bg-muted/50 border border-border/30">
+            <div className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-muted-foreground" />
+              <span className="text-xs font-medium text-muted-foreground">Start practicing to get ranked!</span>
+            </div>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
+            {[...Array(10)].map((_, i) => (
               <div key={i} className="flex items-center space-x-3 animate-pulse">
                 <div className="w-6 h-6 bg-muted rounded-full"></div>
                 <div className="flex-1 space-y-1">

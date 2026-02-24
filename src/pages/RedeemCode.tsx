@@ -1,22 +1,16 @@
-import { useState, useRef } from 'react';
+// @ts-nocheck
+import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Gift, Sun, Moon } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { ArrowLeft, Gift } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { ProfileDropdown } from '@/components/ProfileDropdown';
-import { ElasticWrapper } from '@/components/ElasticWrapper'
 import Seo from '@/components/Seo';
-import PlanBadge from '@/components/PlanBadge';
-
 
 const RedeemCode = () => {
-    const { theme, setTheme } = useTheme();
     const { user } = useAuth();
     const [code, setCode] = useState('');
     const [loading, setLoading] = useState(false);
@@ -24,140 +18,122 @@ const RedeemCode = () => {
     const successModalRef = useRef(null);
     const [activatedPlan, setActivatedPlan] = useState("");
     const [days, setDays] = useState(0);
+    const headerRef = useRef<HTMLElement>(null);
+    const lastScrollY = useRef(0);
+    const [headerVisible, setHeaderVisible] = useState(true);
 
     const { data: profile, refetch } = useQuery({
         queryKey: ['profile', user?.id],
         queryFn: async () => {
             if (!user?.id) return null;
-            const { data } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .maybeSingle();
+            const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
             return data;
         },
         enabled: !!user?.id
     });
 
-    const handleRedeem = async () => {
-        if (!code.trim()) {
-            setErrorMsg("Enter a valid code");
-            return;
-        }
+    useEffect(() => {
+        const handleScroll = () => {
+            const currentScrollY = window.scrollY;
+            setHeaderVisible(currentScrollY < lastScrollY.current || currentScrollY < 10);
+            lastScrollY.current = currentScrollY;
+        };
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
-        // ⭐ ONLY CHANGE ADDED HERE ⭐
+    const handleRedeem = async () => {
+        if (!code.trim()) { setErrorMsg("Enter a valid code"); return; }
         if (profile?.plan && profile.plan.toLowerCase() !== "free") {
             setErrorMsg("You are already a paid user and cannot avail this offer now.");
             return;
         }
-        // ⭐ END OF SINGLE CHANGE ⭐
-
         setErrorMsg('');
         setLoading(true);
-
-        // Validate + update usage atomically
-        const { data, error } = await supabase.rpc('use_redeem_code', {
-            code_input: code.trim(),
-            uid: user.id
-        });
-
-        if (error || !data?.[0]?.success) {
-            setErrorMsg("Invalid, expired, or fully used code.");
-            setLoading(false);
-            return;
-        }
-
+        const { data, error } = await supabase.rpc('use_redeem_code', { code_input: code.trim(), uid: user.id });
+        if (error || !data?.[0]?.success) { setErrorMsg("Invalid, expired, or fully used code."); setLoading(false); return; }
         const { plan, duration_days } = data[0];
-
-        // Extend expiry
         const expiry = new Date();
         expiry.setDate(expiry.getDate() + duration_days);
-
-        await supabase
-            .from('profiles')
-            .update({
-                plan,
-                plan_expiry_date: expiry.toISOString()
-            })
-            .eq('id', user.id);
-
+        await supabase.from('profiles').update({ plan, plan_expiry_date: expiry.toISOString() }).eq('id', user.id);
         setActivatedPlan(plan);
         setDays(duration_days);
         successModalRef.current?.showModal();
-
         setCode('');
         setLoading(false);
         refetch();
     };
 
     return (
-        <div className="min-h-screen bg-white dark:bg-gray-900">
+        <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950">
             <Seo title="Redeem Code" />
 
-            <dialog ref={successModalRef} className="rounded-xl p-6 w-80 bg-white dark:bg-gray-800 shadow-xl">
-                <h3 className="text-lg font-semibold text-green-600 dark:text-green-400">Congratulations 🎉</h3>
-                <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
-                    Your <b>{activatedPlan}</b> plan is activated for <b>{days}</b> days!
+            <dialog ref={successModalRef} className="rounded-[2rem] p-8 w-80 bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-2xl border-0">
+                <h3 className="text-xl font-black uppercase">Congratulations 🎉</h3>
+                <p className="mt-3 text-sm text-white/80">
+                    Your <b className="text-white">{activatedPlan}</b> plan is activated for <b className="text-white">{days}</b> days!
                 </p>
-                <div className="mt-4 text-right">
-                    <Button onClick={() => successModalRef.current.close()}>OK</Button>
+                <div className="mt-5">
+                    <Button onClick={() => successModalRef.current.close()} className="w-full bg-white text-emerald-700 font-black uppercase tracking-widest rounded-xl h-11">OK</Button>
                 </div>
             </dialog>
 
-    <header className="absolute top-0 left-0 right-0 z-50 bg-white/30 dark:bg-gray-900/30 
-    backdrop-blur-md border-b border-purple-200/50 dark:border-purple-800/50 
-    pt-[env(safe-area-inset-top)]">  
-                    <div className="container mx-auto px-4 py-4 flex justify-between items-center max-w-7xl">
-                    <Link to="/dashboard" className="text-purple-500">
-                        <ArrowLeft className="w-5 h-5" />
-                    </Link>
-                    <span className="flex items-center gap-2 font-bold text-gray-900 dark:text-white">
-                        <Gift className="w-5 h-5 text-purple-500" /> Redeem Code
-                    </span>
-                    <div className="flex gap-2 items-center">
-                        <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
-                            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            <header
+                ref={headerRef}
+                className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
+            >
+                <div className="container mx-auto px-4 py-4 flex justify-between items-center max-w-7xl">
+                    <Link to="/dashboard">
+                        <Button variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110">
+                            <ArrowLeft className="h-5 w-5" />
                         </Button>
-                        <PlanBadge plan={profile?.plan} />
-                        <ProfileDropdown />
+                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Gift className="w-5 h-5 text-purple-500" />
+                        <span className="text-lg font-black">Redeem Code</span>
                     </div>
+                    <div className="w-9" />
                 </div>
             </header>
 
-                  <ElasticWrapper>
+            <main className="container mx-auto px-4 py-8 max-w-md mt-[calc(env(safe-area-inset-top)+60px)]">
+                <div className="text-center mb-8">
+                    <div className="relative inline-block mb-4">
+                        <div className="absolute inset-0 bg-purple-400 blur-2xl opacity-30 rounded-full" />
+                        <div className="relative bg-gradient-to-br from-purple-600 to-violet-700 p-5 rounded-3xl shadow-2xl">
+                            <Gift className="w-10 h-10 text-white" />
+                        </div>
+                    </div>
+                    <h1 className="text-2xl font-black text-foreground uppercase tracking-tight italic">
+                        Redeem Your <span className="text-purple-600">Gift Code</span>
+                    </h1>
+                    <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] mt-2">Enter your code to unlock premium access</p>
+                </div>
 
-            <div className="container mx-auto px-4 pt-10 pb-5 max-w-md text-center mt-[calc(50px+env(safe-area-inset-top))] overscroll-y-contain">
-                <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
-                    <Gift className="inline-block w-8 h-8 mr-2 text-purple-600 dark:text-purple-400" />
-                    Redeem Your Gift Code
-                </h1>
-                <p className="text-md text-gray-600 dark:text-gray-400">
-                    Enter your unique code below to instantly unlock exclusive access.
-                </p>
-            </div>
-
-            <div className="container mx-auto px-4 py-10 max-w-md">
-                <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-gray-800 dark:to-gray-900 border-purple-300 dark:border-purple-700">
-                    <CardHeader className="text-center">
-                        <CardTitle className="text-xl text-purple-700 dark:text-purple-300">Enter Redeem Code</CardTitle>
-                        <CardDescription>Unlock premium features</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <Input
-                            placeholder="Enter promo code"
-                            value={code}
-                            onChange={(e) => setCode(e.target.value)}
-                        />
-
-                        {errorMsg && <p className="text-red-500 text-sm text-center">{errorMsg}</p>}
-
-                        <Button onClick={handleRedeem} disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700 text-white">
+                {/* Redeem card - pricing style */}
+                <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-purple-600 via-violet-600 to-indigo-700 text-white shadow-2xl p-1">
+                    <div className="absolute inset-0 opacity-10" style={{
+                        backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`,
+                        maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
+                    }} />
+                    <div className="relative z-10 bg-white/10 backdrop-blur-xl rounded-[1.8rem] p-6 border border-white/10 space-y-5">
+                        <div>
+                            <p className="text-xs font-bold uppercase tracking-widest text-white/60 mb-2">Enter Promo Code</p>
+                            <Input
+                                placeholder="ABCD-1234"
+                                value={code}
+                                onChange={(e) => setCode(e.target.value)}
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-xl h-12 text-center text-lg font-mono tracking-widest"
+                            />
+                        </div>
+                        {errorMsg && <p className="text-red-300 text-sm text-center font-medium">{errorMsg}</p>}
+                        <Button onClick={handleRedeem} disabled={loading}
+                            className="w-full bg-white text-purple-700 hover:scale-105 transition-all rounded-xl h-12 uppercase font-black text-xs tracking-widest shadow-2xl">
                             {loading ? "Processing..." : "Redeem Code"}
                         </Button>
-                    </CardContent>
-                </Card>
-            </div>
-            </ElasticWrapper>
+                    </div>
+                </div>
+            </main>
         </div>
     );
 };

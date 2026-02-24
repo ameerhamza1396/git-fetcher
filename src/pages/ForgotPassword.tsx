@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft } from 'lucide-react';
-import { ElasticWrapper } from '@/components/ElasticWrapper'
+
 import Seo from '@/components/Seo'; // Import the Seo component
 
 const ForgotPassword = () => {
@@ -85,7 +85,7 @@ const ForgotPassword = () => {
         canonical="https://medmacs.app/forgot-password"
       />
 
-            <ElasticWrapper>
+            
       <div className="w-full max-w-md space-y-6 animate-fade-in">
         <div className="text-center">
           <Link to="/" className="inline-flex items-center text-purple-600 hover:text-purple-700 mb-6">
@@ -148,7 +148,7 @@ const ForgotPassword = () => {
           </CardContent>
         </Card>
       </div>
-      </ElasticWrapper>
+      
     </div>
   );
 };

@@ -14,7 +14,7 @@ import { useTheme } from 'next-themes';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { ElasticWrapper } from '@/components/ElasticWrapper'
+
 import { ProfileDropdown } from '@/components/ProfileDropdown'; // NEW: Import ProfileDropdown
 import Seo from '@/components/Seo'; // Import the Seo component
 import PlanBadge from '@/components/PlanBadge';
@@ -367,7 +367,7 @@ const InternshipApplication = () => {
         </div>
       </header>
 
-            <ElasticWrapper>
+            
 
       <div className="container mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8 max-w-3xl">
         <Card className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-purple-200 dark:border-purple-800 shadow-lg mt-[calc(55px+env(safe-area-inset-top))] overscroll-y-contain">
@@ -645,7 +645,7 @@ const InternshipApplication = () => {
           <p>© 2025 Medmacs. All rights reserved.</p>
         </div>
       </footer>
-      </ElasticWrapper>
+      
     </div>
   );
 };

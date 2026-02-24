@@ -9,7 +9,7 @@ import { useTheme } from 'next-themes';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'; // Import useMutation and useQueryClient
 import { supabase } from '@/integrations/supabase/client';
-import { ElasticWrapper } from '@/components/ElasticWrapper'
+
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -163,8 +163,6 @@ const AnnouncementsPage = () => {
                 </div>
             </header>
 
-                  <ElasticWrapper>
-
             <div className="container mx-auto px-4 lg:px-8 py-8 max-w-7xl">
                 <div className="text-center mb-8 animate-fade-in">
                     <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4 pt-[calc(45px+env(safe-area-inset-top))] overscroll-y-contain">
@@ -241,7 +239,7 @@ const AnnouncementsPage = () => {
                     ))}
                 </div>
             </div>
-            </ElasticWrapper>
+            
         </div>
     );
 };

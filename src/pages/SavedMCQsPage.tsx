@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ElasticWrapper } from '@/components/ElasticWrapper'
+
 import { useToast } from '@/hooks/use-toast';
 import { ProfileDropdown } from '@/components/ProfileDropdown'; // NEW: Import ProfileDropdown
 import Seo from '@/components/Seo'; // Import the Seo component
@@ -183,8 +183,6 @@ const SavedMCQsPage = () => {
         </div>
       </header>
 
-            <ElasticWrapper>
-
       <div className="container mx-auto px-4 lg:px-8 py-8 max-w-7xl mt-[calc(45px+env(safe-area-inset-top))] overscroll-y-contain">
         <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-6 text-center">
           📚 Your Saved MCQs
@@ -307,7 +305,7 @@ const SavedMCQsPage = () => {
           </div>
         )}
       </div>
-      </ElasticWrapper>
+      
     </div>
   );
 };

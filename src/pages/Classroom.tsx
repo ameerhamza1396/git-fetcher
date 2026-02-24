@@ -12,7 +12,7 @@ import { ProfileDropdown } from '@/components/ProfileDropdown'; // NEW: Import P
 // Import the new components
 import { GroupsDisplay } from '@/components/classroom/GroupsDisplay';
 import { MessageScreen } from '@/components/classroom/MessageScreen';
-import { ElasticWrapper } from '@/components/ElasticWrapper'
+
 import Seo from '@/components/Seo'; // Import the Seo component
 
 // Type definitions (re-defined here for component self-containment)
@@ -669,8 +669,6 @@ export const Classroom = () => {
         </div>
       </header>
 
-            <ElasticWrapper>
-
       <div className="container mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8 max-w-full">
         {currentView === 'list' ? (
           <GroupsDisplay
@@ -718,7 +716,7 @@ export const Classroom = () => {
           )
         )}
       </div>
-      </ElasticWrapper>
+      
     </div>
   );
 };

@@ -7,8 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
-import { ElasticWrapper } from '@/components/ElasticWrapper'
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Seo from '@/components/Seo';
 import PlanBadge from '@/components/PlanBadge';
 
@@ -17,6 +16,19 @@ const Leaderboard = () => {
     const { user } = useAuth();
     const [userPlan, setUserPlan] = useState<string | null>(null);
     const [currentUserAvatar, setCurrentUserAvatar] = useState<string | null>(null);
+    const headerRef = useRef<HTMLElement>(null);
+    const lastScrollY = useRef(0);
+    const [headerVisible, setHeaderVisible] = useState(true);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            const currentScrollY = window.scrollY;
+            setHeaderVisible(currentScrollY < lastScrollY.current || currentScrollY < 10);
+            lastScrollY.current = currentScrollY;
+        };
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     useEffect(() => {
         const fetchUserPlanAndAvatar = async () => {
@@ -116,7 +128,10 @@ const Leaderboard = () => {
         <div className="min-h-screen w-full bg-background">
             <Seo title="Leaderboard" description="See how you rank against other students on Medmacs App's leaderboard." canonical="https://medmacs.app/leaderboard" />
 
-            <header className="absolute top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)]">
+            <header
+                ref={headerRef}
+                className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
+            >
                 <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center">
                     <Link to="/dashboard" className="flex items-center space-x-2 text-primary hover:text-primary/80 transition-colors">
                         <ArrowLeft className="w-4 h-4" />
@@ -132,151 +147,149 @@ const Leaderboard = () => {
                 </div>
             </header>
 
-            <ElasticWrapper>
-                <div className="container mx-auto px-4 lg:px-8 py-6 lg:py-8">
-                    <div className="text-center mb-6 lg:mb-8 animate-fade-in">
-                        <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-4 pt-[calc(45px+env(safe-area-inset-top))]">
-                            🏆 Leaderboard
-                        </h1>
-                        <p className="text-base md:text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto">
-                            See how you rank against the best medical students in Pakistan.
-                        </p>
-                    </div>
+            <div className="container mx-auto px-4 lg:px-8 py-6 lg:py-8 mt-[calc(env(safe-area-inset-top)+60px)]">
+                <div className="text-center mb-6 lg:mb-8 animate-fade-in">
+                    <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-4">
+                        🏆 Leaderboard
+                    </h1>
+                    <p className="text-base md:text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto">
+                        See how you rank against the best medical students in Pakistan.
+                    </p>
+                </div>
 
-                    {currentUserData && (
-                        <Card className="mb-6 lg:mb-8 bg-gradient-to-br from-primary/5 to-accent border-border hover:shadow-lg transition-all duration-300 animate-scale-in backdrop-blur-sm">
-                            <CardHeader className="p-4 lg:p-6">
-                                <CardTitle className="flex items-center space-x-2 text-foreground text-lg md:text-xl">
-                                    <Target className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                                    <span>Your Current Rank</span>
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-4 lg:p-6 pt-0">
-                                <div className="flex items-center justify-between flex-wrap gap-4">
-                                    <div className="flex items-center space-x-3 md:space-x-4">
-                                        <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-r from-primary to-primary/70 rounded-full flex items-center justify-center overflow-hidden">
-                                            {currentUserAvatar ? (
-                                                <img src={currentUserAvatar} alt="avatar" className="w-full h-full object-cover" />
-                                            ) : (
-                                                <span className="text-primary-foreground font-bold text-lg md:text-xl">
-                                                    {currentUserData.username?.substring(0, 2).toUpperCase() || 'U'}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div>
-                                            <p className="font-semibold text-foreground text-sm md:text-base">{currentUserData.username}</p>
-                                            <p className="text-xs md:text-sm text-muted-foreground">Total Score: {currentUserData.total_score}</p>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-xl md:text-2xl font-bold text-primary">#{userRank || 'N/A'}</div>
-                                        <p className="text-xs md:text-sm text-muted-foreground">Current Rank</p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {leaderboardData.length > 0 && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 lg:gap-6 mb-6 lg:mb-8">
-                            {leaderboardData.slice(0, 3).map((entry, index) => (
-                                <Card
-                                    key={entry.id}
-                                    className={`relative overflow-hidden hover:scale-105 transition-all duration-300 animate-fade-in bg-gradient-to-br from-primary/5 to-accent border-border backdrop-blur-sm ${
-                                        index === 0 ? 'md:order-2' : index === 1 ? 'md:order-1' : 'md:order-3'
-                                    }`}
-                                    style={{ animationDelay: `${index * 100}ms` }}
-                                >
-                                    <div className={`absolute top-0 left-0 right-0 h-2 ${getRankBadge(index + 1)}`}></div>
-                                    <CardHeader className="text-center pb-2 p-4 lg:p-6">
-                                        <div className="flex justify-center mb-2">{getRankIcon(index + 1)}</div>
-                                        <CardTitle className="text-base md:text-lg text-foreground">#{index + 1}</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="text-center p-4 lg:p-6 pt-0">
-                                        <div className="w-12 h-12 md:w-16 md:h-16 bg-gradient-to-r from-primary to-primary/70 rounded-full flex items-center justify-center mx-auto mb-2 overflow-hidden">
-                                            {entry.avatar_url ? (
-                                                <img src={entry.avatar_url} alt="avatar" className="w-full h-full object-cover" />
-                                            ) : (
-                                                <span className="text-primary-foreground font-bold text-lg md:text-xl">
-                                                    {entry.username?.substring(0, 2).toUpperCase() || 'U'}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <h3 className="font-semibold text-foreground mb-1 text-sm md:text-base truncate">{entry.username || 'Anonymous'}</h3>
-                                        <div className="space-y-1">
-                                            <p className="text-lg md:text-2xl font-bold text-primary">{entry.total_score}</p>
-                                            <p className="text-xs text-muted-foreground">Total Score</p>
-                                            <p className="text-xs text-muted-foreground">{entry.accuracy}% accuracy • {entry.total_questions} questions</p>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
-                        </div>
-                    )}
-
-                    <Card className="bg-gradient-to-br from-primary/5 to-accent border-border hover:shadow-lg transition-all duration-300 animate-slide-up backdrop-blur-sm">
+                {currentUserData && (
+                    <Card className="mb-6 lg:mb-8 bg-gradient-to-br from-primary/5 to-accent border-border hover:shadow-lg transition-all duration-300 animate-scale-in backdrop-blur-sm">
                         <CardHeader className="p-4 lg:p-6">
                             <CardTitle className="flex items-center space-x-2 text-foreground text-lg md:text-xl">
-                                <Users className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                                <span>Top Students</span>
+                                <Target className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+                                <span>Your Current Rank</span>
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 lg:p-6 pt-0">
-                            {isLoading ? (
-                                <div className="space-y-4">
-                                    {[...Array(10)].map((_, i) => (
-                                        <div key={i} className="flex items-center space-x-4 p-3 animate-pulse">
-                                            <div className="w-8 h-8 md:w-10 md:h-10 bg-muted rounded-full"></div>
-                                            <div className="flex-1 space-y-2">
-                                                <div className="h-3 md:h-4 bg-muted rounded w-1/4"></div>
-                                                <div className="h-2 md:h-3 bg-muted rounded w-1/6"></div>
-                                            </div>
-                                            <div className="h-3 md:h-4 bg-muted rounded w-16"></div>
-                                        </div>
-                                    ))}
+                            <div className="flex items-center justify-between flex-wrap gap-4">
+                                <div className="flex items-center space-x-3 md:space-x-4">
+                                    <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-r from-primary to-primary/70 rounded-full flex items-center justify-center overflow-hidden">
+                                        {currentUserAvatar ? (
+                                            <img src={currentUserAvatar} alt="avatar" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <span className="text-primary-foreground font-bold text-lg md:text-xl">
+                                                {currentUserData.username?.substring(0, 2).toUpperCase() || 'U'}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-foreground text-sm md:text-base">{currentUserData.username}</p>
+                                        <p className="text-xs md:text-sm text-muted-foreground">Total Score: {currentUserData.total_score}</p>
+                                    </div>
                                 </div>
-                            ) : leaderboardData.length === 0 ? (
-                                <div className="text-center py-8">
-                                    <p className="text-muted-foreground text-sm md:text-base">No data available yet. Start practicing!</p>
+                                <div className="text-right">
+                                    <div className="text-xl md:text-2xl font-bold text-primary">#{userRank || 'N/A'}</div>
+                                    <p className="text-xs md:text-sm text-muted-foreground">Current Rank</p>
                                 </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    {leaderboardData.slice(3).map((entry, index) => (
-                                        <div
-                                            key={entry.id}
-                                            className="flex items-center space-x-3 md:space-x-4 p-3 rounded-lg bg-card/60 hover:bg-accent/50 transition-all duration-300 border border-border/40 backdrop-blur-sm"
-                                        >
-                                            <div className="flex items-center space-x-2 md:space-x-3 flex-1 min-w-0">
-                                                <span className="text-xs md:text-sm font-medium text-muted-foreground w-6 md:w-8 flex-shrink-0">#{index + 4}</span>
-                                                <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-r from-primary to-primary/70 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
-                                                    {entry.avatar_url ? (
-                                                        <img src={entry.avatar_url} alt="avatar" className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <span className="text-primary-foreground font-bold text-xs md:text-sm">
-                                                            {entry.username?.substring(0, 2).toUpperCase() || 'U'}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="font-medium text-foreground text-sm md:text-base truncate">{entry.username || 'Anonymous'}</p>
-                                                    <p className="text-xs md:text-sm text-muted-foreground">{entry.accuracy}% accuracy • {entry.total_questions} questions</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center space-x-2 md:space-x-4 flex-shrink-0">
-                                                <div className="text-right">
-                                                    <p className="font-bold text-primary text-sm md:text-base">{entry.total_score}</p>
-                                                    <p className="text-xs text-muted-foreground">Score</p>
-                                                </div>
-                                                <Star className="w-3 h-3 md:w-4 md:h-4 text-yellow-500 flex-shrink-0" />
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                            </div>
                         </CardContent>
                     </Card>
-                </div>
-            </ElasticWrapper>
+                )}
+
+                {leaderboardData.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 lg:gap-6 mb-6 lg:mb-8">
+                        {leaderboardData.slice(0, 3).map((entry, index) => (
+                            <Card
+                                key={entry.id}
+                                className={`relative overflow-hidden hover:scale-105 transition-all duration-300 animate-fade-in bg-gradient-to-br from-primary/5 to-accent border-border backdrop-blur-sm ${
+                                    index === 0 ? 'md:order-2' : index === 1 ? 'md:order-1' : 'md:order-3'
+                                }`}
+                                style={{ animationDelay: `${index * 100}ms` }}
+                            >
+                                <div className={`absolute top-0 left-0 right-0 h-2 ${getRankBadge(index + 1)}`}></div>
+                                <CardHeader className="text-center pb-2 p-4 lg:p-6">
+                                    <div className="flex justify-center mb-2">{getRankIcon(index + 1)}</div>
+                                    <CardTitle className="text-base md:text-lg text-foreground">#{index + 1}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="text-center p-4 lg:p-6 pt-0">
+                                    <div className="w-12 h-12 md:w-16 md:h-16 bg-gradient-to-r from-primary to-primary/70 rounded-full flex items-center justify-center mx-auto mb-2 overflow-hidden">
+                                        {entry.avatar_url ? (
+                                            <img src={entry.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <span className="text-primary-foreground font-bold text-lg md:text-xl">
+                                                {entry.username?.substring(0, 2).toUpperCase() || 'U'}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <h3 className="font-semibold text-foreground mb-1 text-sm md:text-base truncate">{entry.username || 'Anonymous'}</h3>
+                                    <div className="space-y-1">
+                                        <p className="text-lg md:text-2xl font-bold text-primary">{entry.total_score}</p>
+                                        <p className="text-xs text-muted-foreground">Total Score</p>
+                                        <p className="text-xs text-muted-foreground">{entry.accuracy}% accuracy • {entry.total_questions} questions</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                )}
+
+                <Card className="bg-gradient-to-br from-primary/5 to-accent border-border hover:shadow-lg transition-all duration-300 animate-slide-up backdrop-blur-sm">
+                    <CardHeader className="p-4 lg:p-6">
+                        <CardTitle className="flex items-center space-x-2 text-foreground text-lg md:text-xl">
+                            <Users className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+                            <span>Top Students</span>
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 lg:p-6 pt-0">
+                        {isLoading ? (
+                            <div className="space-y-4">
+                                {[...Array(10)].map((_, i) => (
+                                    <div key={i} className="flex items-center space-x-4 p-3 animate-pulse">
+                                        <div className="w-8 h-8 md:w-10 md:h-10 bg-muted rounded-full"></div>
+                                        <div className="flex-1 space-y-2">
+                                            <div className="h-3 md:h-4 bg-muted rounded w-1/4"></div>
+                                            <div className="h-2 md:h-3 bg-muted rounded w-1/6"></div>
+                                        </div>
+                                        <div className="h-3 md:h-4 bg-muted rounded w-16"></div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : leaderboardData.length === 0 ? (
+                            <div className="text-center py-8">
+                                <p className="text-muted-foreground text-sm md:text-base">No data available yet. Start practicing!</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {leaderboardData.slice(3).map((entry, index) => (
+                                    <div
+                                        key={entry.id}
+                                        className="flex items-center space-x-3 md:space-x-4 p-3 rounded-lg bg-card/60 hover:bg-accent/50 transition-all duration-300 border border-border/40 backdrop-blur-sm"
+                                    >
+                                        <div className="flex items-center space-x-2 md:space-x-3 flex-1 min-w-0">
+                                            <span className="text-xs md:text-sm font-medium text-muted-foreground w-6 md:w-8 flex-shrink-0">#{index + 4}</span>
+                                            <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-r from-primary to-primary/70 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                                {entry.avatar_url ? (
+                                                    <img src={entry.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <span className="text-primary-foreground font-bold text-xs md:text-sm">
+                                                        {entry.username?.substring(0, 2).toUpperCase() || 'U'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="font-medium text-foreground text-sm md:text-base truncate">{entry.username || 'Anonymous'}</p>
+                                                <p className="text-xs md:text-sm text-muted-foreground">{entry.accuracy}% accuracy • {entry.total_questions} questions</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center space-x-2 md:space-x-4 flex-shrink-0">
+                                            <div className="text-right">
+                                                <p className="font-bold text-primary text-sm md:text-base">{entry.total_score}</p>
+                                                <p className="text-xs text-muted-foreground">Score</p>
+                                            </div>
+                                            <Star className="w-3 h-3 md:w-4 md:h-4 text-yellow-500 flex-shrink-0" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     );
 };
