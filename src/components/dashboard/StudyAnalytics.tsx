@@ -148,7 +148,7 @@ export const StudyAnalytics = () => {
 
       // Calculate study streak (consecutive days with activity)
       const studyDates = allAnswers?.map(a => new Date(a.created_at).toDateString()) || [];
-      const uniqueStudyDates = [...new Set(studyDates)].sort((a, b) => new Date(b) - new Date(a)); // Sort descending
+      const uniqueStudyDates = [...new Set(studyDates)].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
       let currentStreak = 0;
       const today = new Date().toDateString();

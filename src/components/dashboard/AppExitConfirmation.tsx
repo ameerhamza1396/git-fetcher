@@ -29,7 +29,7 @@ const AppExitConfirmation = ({ showExitConfirm, setShowExitConfirm }: AppExitCon
                 });
 
                 return () => {
-                    backButtonListener.remove();
+                    (backButtonListener as any).remove?.();
                 };
             }).catch(console.error);
         }

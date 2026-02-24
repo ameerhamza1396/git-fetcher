@@ -13,7 +13,7 @@ import { Lock } from 'lucide-react';
 // 4. Storing PIN verification status in local storage for an indefinite period.
 // It renders its children only if all access requirements are met.
 export default function AdminLockout({ children }) {
-  const { user, isLoading: isUserLoading } = useAuth();
+  const { user, loading: isUserLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation(); // To check for the 'auth=true' query parameter
 

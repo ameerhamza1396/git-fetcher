@@ -248,7 +248,7 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60 }: FLPQuizProps) 
     };
 
     try {
-      const { error: deleteError } = await supabase
+      const { error: deleteError } = await (supabase as any)
         .from('flp_user_attempts')
         .delete()
         .eq('user_id', user.id)
@@ -258,7 +258,7 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60 }: FLPQuizProps) 
         console.error('Error deleting previous FLP attempts:', deleteError.message);
       }
 
-      const { data: insertedResult, error: insertError } = await supabase
+      const { data: insertedResult, error: insertError } = await (supabase as any)
         .from('flp_user_attempts')
         .insert([resultData])
         .select('id')
@@ -268,7 +268,7 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60 }: FLPQuizProps) 
         throw insertError;
       }
 
-      const newTestResultId = insertedResult.id;
+      const newTestResultId = (insertedResult as any).id;
       setCurrentTestResultId(newTestResultId);
       setIsQuizEnded(true);
       toast({

@@ -63,8 +63,8 @@ export const FLPResults = () => {
 
       try {
         // Fetch overall test result
-        const { data: resultData, error: resultError } = await supabase
-          .from('flp_user_attempts') // Fetch from the new table
+        const { data: resultData, error: resultError } = await (supabase as any)
+          .from('flp_user_attempts')
           .select('id, user_id, username, score, total_questions, completed_at, test_config_id, question_attempts') // Ensure question_attempts is selected as JSONB
           .eq('id', testResultId)
           .single();
@@ -79,10 +79,9 @@ export const FLPResults = () => {
           return;
         }
 
-        setTestResult(resultData as TestResult); // Cast to TestResult type
+        setTestResult(resultData as unknown as TestResult);
 
-        // Extract all MCQ IDs from the question_attempts to fetch their details
-        const mcqIds = (resultData.question_attempts as MCQAttempt[]).map(attempt => attempt.question_id);
+        const mcqIds = ((resultData as any).question_attempts as MCQAttempt[]).map(attempt => attempt.question_id);
 
         if (mcqIds.length > 0) {
             const { data: fetchedMcqs, error: mcqError } = await supabase
@@ -95,8 +94,8 @@ export const FLPResults = () => {
             }
 
             const mcqMap: Record<string, MCQ> = {};
-            fetchedMcqs?.forEach(mcq => {
-                mcqMap[mcq.id] = mcq;
+            fetchedMcqs?.forEach((mcq: any) => {
+                mcqMap[mcq.id] = mcq as MCQ;
             });
             setMcqDetails(mcqMap);
         }

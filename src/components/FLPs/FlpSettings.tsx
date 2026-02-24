@@ -80,7 +80,7 @@ const FlpSettings: React.FC<FlpSettingsProps> = ({
 
                 console.log("Fetching user profile to determine academic year...");
                 // get profile.year
-                const { data: profile, error: profileError } = await supabase
+                const { data: profile, error: profileError } = await (supabase as any)
                     .from("profiles")
                     .select("year")
                     .eq("id", user.id)
@@ -103,7 +103,7 @@ const FlpSettings: React.FC<FlpSettingsProps> = ({
 
                 console.log(`Fetching subjects for year: ${userYear}`);
                 // fetch subjects for the user's year
-                const { data: subjectsData, error: subjectsError } = await supabase
+                const { data: subjectsData, error: subjectsError } = await (supabase as any)
                     .from("subjects")
                     .select("id, name, year, icon, color")
                     .eq("year", userYear);
