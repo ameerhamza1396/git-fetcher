@@ -105,6 +105,12 @@ export const SubjectSelectionScreen = ({ onSubjectSelect }: SubjectSelectionScre
           </Button>
         </motion.div>
       )}
+
+      {/* Footer */}
+      <div className="text-center pt-6 pb-4">
+        <p className="text-[10px] text-muted-foreground font-medium">A Project by Hmacs Studios.</p>
+        <p className="text-[10px] text-muted-foreground mt-1">© 2026 Hmacs Studios. All rights reserved</p>
+      </div>
     </div>
   );
 };

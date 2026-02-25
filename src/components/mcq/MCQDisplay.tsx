@@ -411,11 +411,11 @@ export const MCQDisplay = ({
     if (!user || !currentMCQ?.id) return;
     setIsReportSubmitting(true);
     try {
-      const { error } = await supabase.from('mcq_reports').insert({
+      const { error } = await supabase.from('reported_questions').insert({
         user_id: user.id,
         mcq_id: currentMCQ.id,
-        category,
-        reason: reason || null,
+        reason: `${category}${reason ? ': ' + reason : ''}`,
+        status: 'pending',
       });
       if (error) throw error;
       toast({ title: "Report Submitted", description: "Thanks for helping us improve!" });
@@ -478,16 +478,19 @@ export const MCQDisplay = ({
 
   return (
     <div className="max-w-3xl mx-auto px-3">
-      {/* Main quiz card */}
-      <div className="relative overflow-hidden rounded-[2rem] bg-card/60 backdrop-blur-2xl border border-border/40 shadow-2xl p-2">
-        {/* Subtle pattern overlay */}
-        <div className="absolute inset-0 opacity-5" style={{
-          backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, hsl(var(--foreground) / 0.15) 20px, hsl(var(--foreground) / 0.15) 40px)`,
+      {/* Main quiz card - vibrant glassmorphic */}
+      <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary/10 via-blue-500/5 to-violet-500/10 backdrop-blur-2xl border border-primary/20 shadow-2xl p-1.5">
+        {/* Vibrant pattern overlay */}
+        <div className="absolute inset-0 opacity-10" style={{
+          backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(59,130,246,0.2) 20px, rgba(59,130,246,0.2) 40px)`,
           maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
         }} />
+        {/* Accent glow */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/15 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-violet-500/10 rounded-full blur-2xl" />
 
         {/* Inner glass container */}
-        <div className="relative z-10 bg-background/30 backdrop-blur-xl rounded-[1.5rem] border border-border/30 shadow-inner">
+        <div className="relative z-10 bg-background/50 backdrop-blur-xl rounded-[1.5rem] border border-primary/10 shadow-inner">
           
           {/* Quiz header inside card */}
           <div className="px-4 sm:px-6 py-4 border-b border-border/30">
@@ -670,11 +673,11 @@ export const MCQDisplay = ({
                 </div>
               </div>
 
-              {/* Good luck message - balanced for dark mode */}
+              {/* Good luck message - vibrant */}
               {user && (
-                <div className="mt-5 text-center space-y-0.5">
-                  <p className="text-muted-foreground/50 text-xs uppercase tracking-widest font-medium">Best of luck</p>
-                  <p className="text-foreground/70 text-sm font-bold truncate max-w-[200px] mx-auto">{username}</p>
+                <div className="mt-6 text-center space-y-1">
+                  <p className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-500 to-violet-500 text-xs uppercase tracking-[0.3em] font-black">Best of luck</p>
+                  <p className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-500 text-base font-black truncate max-w-[250px] mx-auto">{username}</p>
                 </div>
               )}
             </motion.div>
