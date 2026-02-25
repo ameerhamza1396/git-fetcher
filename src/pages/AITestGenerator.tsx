@@ -112,7 +112,27 @@ const AITestGenerator: React.FC = () => {
     const select = (i: number, a: string) => !answers[i] && setAnswers(s => ({ ...s, [i]: a }));
     const next = () => idx < questions.length - 1 && setIdx(idx + 1);
     const prev = () => idx > 0 && setIdx(idx - 1);
-    const submit = () => { setSubmitted(true); setCurrentStep(5); };
+    const submit = async () => {
+        setSubmitted(true);
+        setCurrentStep(5);
+        // Save score to ai_generated_tests
+        if (user) {
+            const finalScore = questions.reduce((acc, q, i) => answers[i] === q.answer ? acc + 1 : acc, 0);
+            const accuracy = questions.length > 0 ? parseFloat(((finalScore / questions.length) * 100).toFixed(2)) : 0;
+            try {
+                await supabase.from('ai_generated_tests').insert({
+                    user_id: user.id,
+                    topic: topicMapping(selectedChapters[0]),
+                    difficulty: 'medium',
+                    questions: questions,
+                    total_questions: questions.length,
+                    test_taken: true,
+                    score: finalScore,
+                    accuracy,
+                });
+            } catch (e) { console.error('Failed to save AI test result:', e); }
+        }
+    };
     const score = questions.reduce((acc, q, i) => answers[i] === q.answer ? acc + 1 : acc, 0);
 
     const startNewTest = () => { setQuestions([]); setIdx(0); setAnswers({}); setSubmitted(false); setTotalQ(10); setCustomPrompt(''); setSelectedChapters([]); setError(null); setShowExitConfirm(false); setCurrentStep(1); };
@@ -199,7 +219,7 @@ const AITestGenerator: React.FC = () => {
                             <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] mt-2">Select number of questions</p>
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-                            {[2, 5, 10, 15, 20].map(num => (
+                            {[2, 5, 10].map(num => (
                                 <div key={num} onClick={() => setTotalQ(num)}
                                     className={`relative overflow-hidden rounded-[1.5rem] p-4 shadow-xl cursor-pointer transition-all duration-300 text-center ${
                                         totalQ === num

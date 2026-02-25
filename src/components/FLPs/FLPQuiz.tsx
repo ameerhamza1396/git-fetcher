@@ -41,6 +41,7 @@ interface FLPQuizProps {
   mcqs: MCQ[];
   onFinish: (score: number, totalQuestions: number) => void;
   timePerQuestion?: number;
+  subjectName?: string;
 }
 
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -52,7 +53,7 @@ const shuffleArray = <T,>(array: T[]): T[] => {
   return shuffled;
 };
 
-export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60 }: FLPQuizProps) => {
+export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName }: FLPQuizProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -256,8 +257,11 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60 }: FLPQuizProps) 
 
         {/* Main Content */}
         <main className={`flex-grow flex flex-col items-center px-4 py-8 mt-[calc(env(safe-area-inset-top)+60px)] pb-[env(safe-area-inset-bottom)] overflow-y-auto ${isPanelOpen ? 'lg:ml-64' : ''}`}>
-          <div className="text-center mb-6">
-            <p className="text-muted-foreground text-xs uppercase tracking-[0.2em]">Question {currentQuestionIndex + 1} of {totalQuestions}</p>
+          <div className="text-center mb-6 space-y-1">
+            {subjectName && (
+              <p className="text-primary text-xs uppercase tracking-[0.2em] font-bold">{subjectName}</p>
+            )}
+            <p className="text-foreground text-lg font-black">Question {currentQuestionIndex + 1} <span className="text-muted-foreground font-medium text-sm">of {totalQuestions}</span></p>
           </div>
 
           <AnimatePresence mode="wait">
@@ -312,9 +316,10 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60 }: FLPQuizProps) 
             )}
           </AnimatePresence>
 
-          <p className="mt-6 text-sm font-medium text-muted-foreground">
-            Best of luck, <span className="text-primary font-bold">{displayUsername}</span>!
-          </p>
+          <div className="mt-6 text-center space-y-0.5">
+            <p className="text-muted-foreground/50 text-xs uppercase tracking-widest font-medium">Best of luck</p>
+            <p className="text-foreground/70 text-sm font-bold truncate max-w-[200px] mx-auto">{displayUsername}</p>
+          </div>
         </main>
       </div>
 

@@ -31,6 +31,7 @@ const FLP = () => {
   const [fetchedMcqs, setFetchedMcqs] = useState<MCQ[]>([]);
   const [showQuiz, setShowQuiz] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [selectedSubjectName, setSelectedSubjectName] = useState('');
 
   const shuffleArray = <T,>(array: T[]): T[] => {
     const shuffled = [...array];
@@ -48,6 +49,9 @@ const FLP = () => {
 
     setIsFetchingMcqs(true);
     try {
+      // Get subject name
+      const { data: subjectData } = await supabase.from("subjects").select("name").eq("id", subjectId).single();
+      if (subjectData) setSelectedSubjectName(subjectData.name);
       const { data: chapters, error: chaptersError } = await supabase.from("chapters").select("id").eq("subject_id", subjectId);
       if (chaptersError) throw chaptersError;
       const chapterIds = (chapters || []).map((c) => c.id);
@@ -74,7 +78,7 @@ const FLP = () => {
     setSelectedMcqCount(null);
   };
 
-  if (showQuiz && fetchedMcqs.length > 0) return <FlpTestPage mcqs={fetchedMcqs} onFinish={handleFLPQuizFinish} />;
+  if (showQuiz && fetchedMcqs.length > 0) return <FlpTestPage mcqs={fetchedMcqs} onFinish={handleFLPQuizFinish} subjectName={selectedSubjectName} />;
 
   if (isAuthLoading) {
     return (
