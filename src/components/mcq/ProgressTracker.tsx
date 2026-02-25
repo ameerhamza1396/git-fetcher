@@ -1,7 +1,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Target, Trophy, TrendingUp } from 'lucide-react';
+import { Target, Trophy, TrendingUp, Flame, Clock } from 'lucide-react';
 
 interface ProgressTrackerProps {
   userId?: string;
@@ -14,7 +14,7 @@ export const ProgressTracker = ({ userId }: ProgressTrackerProps) => {
       if (!userId) return [];
       const { data, error } = await supabase
         .from('user_answers')
-        .select('is_correct')
+        .select('is_correct, time_taken, created_at')
         .eq('user_id', userId);
       if (error) throw error;
       return data || [];
@@ -26,14 +26,30 @@ export const ProgressTracker = ({ userId }: ProgressTrackerProps) => {
   const totalCorrect = answers?.filter(a => a.is_correct).length || 0;
   const overallAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
 
+  // Average time
+  const timeTakenArr = answers?.filter(a => a.time_taken != null).map(a => a.time_taken) || [];
+  const avgTime = timeTakenArr.length > 0 ? Math.round(timeTakenArr.reduce((s, t) => s + t, 0) / timeTakenArr.length) : 0;
+
+  // Best streak
+  let bestStreak = 0;
+  let currentStreak = 0;
+  if (answers) {
+    const sorted = [...answers].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    for (const a of sorted) {
+      if (a.is_correct) { currentStreak++; bestStreak = Math.max(bestStreak, currentStreak); }
+      else { currentStreak = 0; }
+    }
+  }
+
   const stats = [
-    { label: 'Total Questions', value: totalQuestions, icon: Target, gradient: 'from-blue-600 via-indigo-600 to-violet-700', glow: 'bg-blue-400' },
-    { label: 'Correct Answers', value: totalCorrect, icon: Trophy, gradient: 'from-emerald-600 via-teal-600 to-cyan-700', glow: 'bg-emerald-400' },
-    { label: 'Accuracy Rate', value: `${overallAccuracy}%`, icon: TrendingUp, gradient: 'from-rose-600 via-red-600 to-orange-700', glow: 'bg-rose-400' },
+    { label: 'Questions Practiced', value: totalQuestions, icon: Target, gradient: 'from-blue-600 via-indigo-600 to-violet-700', glow: 'bg-blue-400' },
+    { label: 'Accuracy Rate', value: `${overallAccuracy}%`, icon: TrendingUp, gradient: 'from-emerald-600 via-teal-600 to-cyan-700', glow: 'bg-emerald-400' },
+    { label: 'Best Streak', value: bestStreak, icon: Flame, gradient: 'from-orange-500 via-red-500 to-rose-600', glow: 'bg-orange-400' },
+    { label: 'Avg. Time', value: `${avgTime}s`, icon: Clock, gradient: 'from-rose-600 via-pink-600 to-fuchsia-700', glow: 'bg-rose-400' },
   ];
 
   return (
-    <div className="grid grid-cols-3 gap-3 mb-6">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
       {stats.map((stat) => (
         <div key={stat.label} className={`relative overflow-hidden rounded-[1.5rem] bg-gradient-to-br ${stat.gradient} text-white shadow-xl p-1`}>
           <div className="absolute inset-0 opacity-10" style={{

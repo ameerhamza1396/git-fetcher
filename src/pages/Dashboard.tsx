@@ -30,6 +30,58 @@ import SignInPrompt from '@/components/SigninPrompt';
 import AppExitConfirmation from '@/components/dashboard/AppExitConfirmation';
 import VersionGuard from '@/components/VersionControl';
 import ProfileAvatar from '@/components/profile/ProfileAvatar';
+// Swipe-to-reveal Case of Day card
+const CaseOfDayCard = ({ caseOfDay }: { caseOfDay: { headline: string; details: string } }) => {
+  const [step, setStep] = useState(0); // 0=question, 1=answer, 2=explanation
+
+  const answer = "Acute Inferior STEMI — Immediate PCI (Percutaneous Coronary Intervention) with dual antiplatelet therapy, heparin, and morphine for pain management.";
+  const explanation = "ST elevation in leads II, III, and aVF indicates inferior wall MI. In a 25-year-old, consider cocaine use, hypercoagulable states, or coronary anomalies. Immediate reperfusion via primary PCI is the gold standard within 90 minutes of presentation.";
+
+  const handleSwipe = () => {
+    if (step < 2) setStep(s => s + 1);
+  };
+
+  return (
+    <div className="relative">
+      <div className="bg-gradient-to-br from-blue-500 via-indigo-500 to-violet-600 p-6 text-white">
+        <div className="absolute inset-0 opacity-10" style={{
+          backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`,
+          maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
+        }} />
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/20">
+              <Stethoscope className="w-5 h-5 text-white" />
+            </div>
+            <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Case of the Day</p>
+          </div>
+          <h3 className="text-lg font-black text-white mb-3">{caseOfDay.headline}</h3>
+          <p className="text-white/80 text-sm leading-relaxed mb-4">{caseOfDay.details}</p>
+
+          {step >= 1 && (
+            <div className="bg-white/15 backdrop-blur-md rounded-2xl p-4 border border-white/20 mb-3 animate-fade-in">
+              <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest mb-1">Answer</p>
+              <p className="text-white text-sm font-bold leading-relaxed">{answer}</p>
+            </div>
+          )}
+
+          {step >= 2 && (
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15 mb-3 animate-fade-in">
+              <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest mb-1">Explanation</p>
+              <p className="text-white/90 text-sm leading-relaxed">{explanation}</p>
+            </div>
+          )}
+
+          {step < 2 && (
+            <Button onClick={handleSwipe} className="w-full bg-white/20 hover:bg-white/30 text-white border border-white/20 rounded-2xl h-11 font-bold text-xs uppercase tracking-widest mt-2">
+              {step === 0 ? '👆 Tap to Reveal Answer' : '👆 Tap to Reveal Explanation'}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
@@ -579,29 +631,34 @@ const Dashboard = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Term of Day Dialog */}
+      {/* Term of Day Dialog - vibrant */}
       <Dialog open={showTermOfDay} onOpenChange={setShowTermOfDay}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-black flex items-center gap-2"><Sparkles className="w-5 h-5 text-emerald-500" /> Term of the Day</DialogTitle>
-          </DialogHeader>
-          <div className="mt-2">
-            <h3 className="text-lg font-black text-foreground mb-2">{termOfDay.term}</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">{termOfDay.definition}</p>
+        <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border-0">
+          <div className="relative bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 p-6 text-white">
+            <div className="absolute inset-0 opacity-10" style={{
+              backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`,
+              maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
+            }} />
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/20">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Term of the Day</p>
+                  <h3 className="text-2xl font-black text-white">{termOfDay.term}</h3>
+                </div>
+              </div>
+              <p className="text-white/80 text-sm leading-relaxed">{termOfDay.definition}</p>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Case of Day Dialog */}
+      {/* Case of Day Dialog - swipe reveal */}
       <Dialog open={showCaseOfDay} onOpenChange={setShowCaseOfDay}>
-        <DialogContent className="sm:max-w-[450px]">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-black flex items-center gap-2"><Stethoscope className="w-5 h-5 text-blue-500" /> Case of the Day</DialogTitle>
-          </DialogHeader>
-          <div className="mt-2">
-            <h3 className="text-base font-black text-foreground mb-2">{caseOfDay.headline}</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">{caseOfDay.details}</p>
-          </div>
+        <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-0">
+          <CaseOfDayCard caseOfDay={caseOfDay} />
         </DialogContent>
       </Dialog>
 
