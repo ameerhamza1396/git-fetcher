@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Crown, ArrowLeft, X } from 'lucide-react';
+import { Crown, ArrowLeft, X, Sparkles } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardContent, CardFooter, CardTitle } from '@/components/ui/card';
@@ -66,7 +66,7 @@ const AITestGenerator: React.FC = () => {
         queryKey: ['plan_and_year', user?.id],
         queryFn: async () => {
             if (!user?.id) return null;
-            const { data } = await supabase.from('profiles').select('plan, year').eq('id', user.id).single();
+            const { data } = await supabase.from('profiles').select('plan, year, full_name, username').eq('id', user.id).single();
             return data;
         },
         enabled: !!user?.id, retry: false
@@ -86,6 +86,7 @@ const AITestGenerator: React.FC = () => {
     const [questions, setQuestions] = useState<Question[]>([]);
     const [idx, setIdx] = useState(0);
     const [answers, setAnswers] = useState<Record<number, string>>({});
+    const [revealed, setRevealed] = useState<Record<number, boolean>>({});
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -104,18 +105,24 @@ const AITestGenerator: React.FC = () => {
             const res = await fetch(`https://medmacs-ai-bot.vercel.app/generate-ai-test`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic: apiTopic, difficulty: 'medium', count: totalQ, prompt: `Strictly adhere to the syllabus for ${userYear} year and module: ${apiTopic}. ${customPrompt}` }) });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || `Status ${res.status}`);
-            setQuestions(data.questions); setIdx(0); setAnswers({}); setSubmitted(false); setCurrentStep(4);
+            setQuestions(data.questions); setIdx(0); setAnswers({}); setRevealed({}); setSubmitted(false); setCurrentStep(4);
         } catch (e: any) { setError(e.message); }
         finally { setLoading(0); if (timerRef.current) clearInterval(timerRef.current); }
     };
 
-    const select = (i: number, a: string) => !answers[i] && setAnswers(s => ({ ...s, [i]: a }));
+    const select = (i: number, a: string) => !revealed[i] && setAnswers(s => ({ ...s, [i]: a }));
+
+    const revealAnswer = () => {
+        if (answers[idx]) {
+            setRevealed(s => ({ ...s, [idx]: true }));
+        }
+    };
+
     const next = () => idx < questions.length - 1 && setIdx(idx + 1);
     const prev = () => idx > 0 && setIdx(idx - 1);
     const submit = async () => {
         setSubmitted(true);
         setCurrentStep(5);
-        // Save score to ai_generated_tests
         if (user) {
             const finalScore = questions.reduce((acc, q, i) => answers[i] === q.answer ? acc + 1 : acc, 0);
             const accuracy = questions.length > 0 ? parseFloat(((finalScore / questions.length) * 100).toFixed(2)) : 0;
@@ -135,7 +142,7 @@ const AITestGenerator: React.FC = () => {
     };
     const score = questions.reduce((acc, q, i) => answers[i] === q.answer ? acc + 1 : acc, 0);
 
-    const startNewTest = () => { setQuestions([]); setIdx(0); setAnswers({}); setSubmitted(false); setTotalQ(10); setCustomPrompt(''); setSelectedChapters([]); setError(null); setShowExitConfirm(false); setCurrentStep(1); };
+    const startNewTest = () => { setQuestions([]); setIdx(0); setAnswers({}); setRevealed({}); setSubmitted(false); setTotalQ(10); setCustomPrompt(''); setSelectedChapters([]); setError(null); setShowExitConfirm(false); setCurrentStep(1); };
 
     if (authLoading || planLoading) {
         return <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] dark:bg-gray-950"><img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-16 h-16 animate-pulse" /></div>;
@@ -153,10 +160,9 @@ const AITestGenerator: React.FC = () => {
                     <Link to="/dashboard"><Button variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110"><ArrowLeft className="h-5 w-5" /></Button></Link>
                     <div className="flex items-center gap-2">
                         <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-7 h-7" />
-                        <span className="text-lg font-black">AI Test Generator</span>
+                        <span className="text-lg font-black">Medmacs.App</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <PlanBadge plan={profile?.plan} />
                         <ProfileDropdown />
                     </div>
                 </div>
@@ -191,11 +197,10 @@ const AITestGenerator: React.FC = () => {
                         <div className="grid grid-cols-1 gap-3">
                             {availableTopics.map(topic => (
                                 <div key={topic} onClick={() => handleChapterToggle(topic)}
-                                    className={`relative overflow-hidden rounded-[1.5rem] p-4 shadow-xl cursor-pointer transition-all duration-300 ${
-                                        selectedChapters.includes(topic)
+                                    className={`relative overflow-hidden rounded-[1.5rem] p-4 shadow-xl cursor-pointer transition-all duration-300 ${selectedChapters.includes(topic)
                                             ? 'bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white'
                                             : 'bg-gradient-to-br from-slate-400 via-slate-500 to-slate-600 text-white/90'
-                                    }`}>
+                                        }`}>
                                     <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
                                     <div className="relative z-10 flex items-center gap-3">
                                         <Checkbox checked={selectedChapters.includes(topic)} className="border-white data-[state=checked]:bg-white data-[state=checked]:text-slate-900" />
@@ -221,11 +226,10 @@ const AITestGenerator: React.FC = () => {
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
                             {[2, 5, 10].map(num => (
                                 <div key={num} onClick={() => setTotalQ(num)}
-                                    className={`relative overflow-hidden rounded-[1.5rem] p-4 shadow-xl cursor-pointer transition-all duration-300 text-center ${
-                                        totalQ === num
+                                    className={`relative overflow-hidden rounded-[1.5rem] p-4 shadow-xl cursor-pointer transition-all duration-300 text-center ${totalQ === num
                                             ? 'bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white'
                                             : 'bg-gradient-to-br from-slate-400 via-slate-500 to-slate-600 text-white/90'
-                                    }`}>
+                                        }`}>
                                     <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
                                     <span className="relative z-10 font-black text-lg">{num}</span>
                                 </div>
@@ -272,37 +276,76 @@ const AITestGenerator: React.FC = () => {
                         </div>
                         <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-500 via-slate-600 to-slate-700 text-white shadow-2xl p-1">
                             <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
+
                             <div className="relative z-10 bg-white/10 backdrop-blur-xl rounded-[1.8rem] p-6 border border-white/10">
                                 <Button variant="ghost" size="icon" onClick={() => setShowExitConfirm(true)} className="absolute top-4 right-4 text-white/60 hover:text-white hover:bg-white/10"><X className="w-5 h-5" /></Button>
+
+                                {/* AI Label */}
+                                <div className="flex items-center gap-1.5 bg-blue-500/20 border border-blue-400/30 w-fit px-2.5 py-1 rounded-full mb-4">
+                                    <Sparkles className="w-3 h-3 text-blue-300" />
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-blue-200">AI Generated</span>
+                                </div>
+
                                 <p className="text-base sm:text-lg leading-relaxed font-semibold mb-6 pr-8">{questions[idx].question}</p>
                                 <div className="space-y-3">
                                     {questions[idx].options.map((opt, i) => {
                                         const isSelected = answers[idx] === opt;
                                         const isCorrectOption = opt === questions[idx].answer;
-                                        const answered = typeof answers[idx] === 'string';
+                                        const isRevealed = revealed[idx];
+
                                         let cls = 'w-full text-left py-3 px-4 rounded-xl font-medium text-sm transition-all break-words whitespace-normal ';
-                                        if (!answered) cls += 'bg-white/10 hover:bg-white/20 text-white border border-white/10 cursor-pointer';
-                                        else if (isCorrectOption) cls += 'bg-emerald-500/30 text-emerald-100 border border-emerald-400/40';
-                                        else if (isSelected && !isCorrectOption) cls += 'bg-red-500/30 text-red-100 border border-red-400/40';
-                                        else cls += 'bg-white/5 text-white/50 border border-white/5';
-                                        return <button key={i} className={cls} onClick={() => select(idx, opt)} disabled={answered}>{opt}</button>;
+
+                                        if (!isRevealed) {
+                                            if (isSelected) cls += 'bg-blue-500/40 text-white border-2 border-blue-300 shadow-[0_0_15px_rgba(59,130,246,0.5)]';
+                                            else cls += 'bg-white/10 hover:bg-white/20 text-white border border-white/10 cursor-pointer';
+                                        } else {
+                                            if (isCorrectOption) cls += 'bg-emerald-500/30 text-emerald-100 border border-emerald-400/40';
+                                            else if (isSelected && !isCorrectOption) cls += 'bg-red-500/30 text-red-100 border border-red-400/40';
+                                            else cls += 'bg-white/5 text-white/50 border border-white/5';
+                                        }
+
+                                        return <button key={i} className={cls} onClick={() => select(idx, opt)} disabled={isRevealed}>{opt}</button>;
                                     })}
                                 </div>
-                                {answers[idx] && (
+
+                                {revealed[idx] && (
                                     <div className={`mt-4 p-4 rounded-xl ${answers[idx] === questions[idx].answer ? 'bg-emerald-500/20 border border-emerald-400/30' : 'bg-red-500/20 border border-red-400/30'}`}>
                                         <p className="text-sm font-bold mb-1">{answers[idx] === questions[idx].answer ? '✓ Correct!' : '✗ Incorrect!'}</p>
                                         <p className="text-xs text-white/80">{questions[idx].explanation}</p>
                                     </div>
                                 )}
-                                <div className="flex justify-between mt-6 pt-4 border-t border-white/10">
-                                    <Button onClick={prev} disabled={idx === 0} variant="ghost" className="text-white hover:bg-white/10 disabled:opacity-30">Previous</Button>
-                                    {idx < questions.length - 1 ? (
-                                        <Button onClick={next} disabled={!answers[idx]} className="bg-white text-slate-900 hover:bg-white/90 rounded-xl font-bold text-xs uppercase">Next</Button>
-                                    ) : (
-                                        <Button onClick={submit} disabled={!answers[idx]} className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-bold text-xs uppercase">Submit Test</Button>
+
+                                <div className="flex flex-col gap-3 mt-6 pt-4 border-t border-white/10">
+                                    {!revealed[idx] && (
+                                        <Button
+                                            onClick={revealAnswer}
+                                            disabled={!answers[idx]}
+                                            className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest h-11"
+                                        >
+                                            Submit Answer
+                                        </Button>
                                     )}
+
+                                    <div className="flex justify-between items-center w-full">
+                                        <Button onClick={prev} disabled={idx === 0} variant="ghost" className="text-white hover:bg-white/10 disabled:opacity-30">Previous</Button>
+                                        {idx < questions.length - 1 ? (
+                                            <Button onClick={next} disabled={!revealed[idx]} className="bg-white text-slate-900 hover:bg-white/90 rounded-xl font-bold text-xs uppercase">Next</Button>
+                                        ) : (
+                                            <Button onClick={submit} disabled={!revealed[idx]} className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-bold text-xs uppercase">Finish</Button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Best of Luck Wish */}
+                        <div className="mt-12 text-center space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+                            <h3 className="text-2xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500">
+                                Best of Luck, {profile?.username || 'Student'}!
+                            </h3>
+                            <p className="text-[10px] uppercase tracking-[0.4em] font-bold text-slate-400">
+                                Prepared specifically for {profile?.full_name}
+                            </p>
                         </div>
                     </div>
                 )}
