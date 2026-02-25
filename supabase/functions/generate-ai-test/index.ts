@@ -99,11 +99,11 @@ Return a JSON object with this exact structure:
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in generate-ai-test function:', error);
     return new Response(JSON.stringify({ 
-      error: error.message || 'Failed to generate test',
-      details: error.toString()
+      error: (error as Error).message || 'Failed to generate test',
+      details: String(error)
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

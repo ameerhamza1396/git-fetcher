@@ -13,10 +13,11 @@ interface MCQ {
 interface FlpTestPageProps {
     mcqs: MCQ[];
     onFinish: (score: number, totalQuestions: number) => void;
+    subjectName?: string;
 }
 
-const FlpTestPage: React.FC<FlpTestPageProps> = ({ mcqs, onFinish }) => {
-    return <FLPQuiz mcqs={ mcqs } onFinish = { onFinish } timePerQuestion = { 60} />;
+const FlpTestPage: React.FC<FlpTestPageProps> = ({ mcqs, onFinish, subjectName }) => {
+    return <FLPQuiz mcqs={ mcqs } onFinish = { onFinish } timePerQuestion = { 60} subjectName={subjectName} />;
 };
 
 export default FlpTestPage;

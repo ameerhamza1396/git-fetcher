@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, BookOpen } from 'lucide-react';
 import { fetchSubjects, Subject } from '@/utils/mcqData';
 
 interface SubjectSelectionScreenProps {
@@ -10,16 +9,9 @@ interface SubjectSelectionScreenProps {
 }
 
 const SubjectCardSkeleton = () => (
-  <Card className="border-2 h-full animate-pulse overflow-hidden relative border-border bg-muted/50">
-    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-muted-foreground/10 to-transparent animate-shimmer"
-      style={{ animationDuration: '1.5s', animationIterationCount: 'infinite', animationTimingFunction: 'linear' }}></div>
-    <CardHeader className="text-center px-4 sm:px-6 py-4 sm:py-6 flex flex-col items-center justify-center h-full">
-      <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full mx-auto mb-3 sm:mb-4 bg-muted"></div>
-      <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-      <div className="h-3 bg-muted rounded w-full mb-1"></div>
-      <div className="h-3 bg-muted rounded w-5/6"></div>
-    </CardHeader>
-  </Card>
+  <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-400 via-slate-500 to-slate-600 shadow-2xl p-1 animate-pulse">
+    <div className="bg-white/10 backdrop-blur-xl rounded-[1.8rem] p-6 border border-white/10 h-24" />
+  </div>
 );
 
 export const SubjectSelectionScreen = ({ onSubjectSelect }: SubjectSelectionScreenProps) => {
@@ -41,63 +33,62 @@ export const SubjectSelectionScreen = ({ onSubjectSelect }: SubjectSelectionScre
     if (selectedSubject) onSubjectSelect(selectedSubject);
   };
 
-  const numberOfSkeletons = 3;
-
   return (
-    <div className="max-w-6xl mx-auto px-2 sm:px-0 pb-24">
-      <div className="text-center mb-6 sm:mb-8">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-3 sm:mb-4">
-          Choose Your Subject
+    <div className="max-w-3xl mx-auto px-2 sm:px-0 pb-24">
+      <div className="text-center mb-8">
+        <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground uppercase italic">
+          Choose Your <span className="text-primary">Subject</span>
         </h2>
-        <p className="text-base sm:text-lg text-muted-foreground px-4 sm:px-0">
+        <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] mt-2">
           Select the subject you want to practice
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+      <div className="grid grid-cols-1 gap-4">
         {loading ? (
-          Array.from({ length: numberOfSkeletons }).map((_, index) => (
-            <SubjectCardSkeleton key={index} />
-          ))
+          Array.from({ length: 3 }).map((_, i) => <SubjectCardSkeleton key={i} />)
         ) : (
           subjects.map((subject, index) => (
             <motion.div
               key={subject.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              whileHover={{ scale: 1.02 }}
+              transition={{ delay: index * 0.08 }}
               whileTap={{ scale: 0.98 }}
+              onClick={() => setSelectedSubject(subject)}
+              className="cursor-pointer"
             >
-              <Card
-                className={`cursor-pointer hover:shadow-lg transition-all duration-300 border-2 h-full flex flex-col
-                  ${selectedSubject?.id === subject.id
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border hover:border-primary/50'
-                  } bg-card/80 backdrop-blur-sm`}
-                onClick={() => setSelectedSubject(subject)}
-              >
-                <CardHeader className="text-center px-4 sm:px-6 py-4 sm:py-6 flex-grow flex flex-col items-center justify-center">
-                  <div
-                    className="w-12 h-12 sm:w-16 sm:h-16 rounded-full mx-auto flex items-center justify-center text-xl sm:text-2xl mb-3 sm:mb-4 bg-accent/50"
-                    style={{ backgroundColor: subject.color ? `${subject.color}20` : undefined }}
-                  >
+              <div className={`relative overflow-hidden rounded-[2rem] p-1 shadow-2xl transition-all duration-300 ${
+                selectedSubject?.id === subject.id
+                  ? 'bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700'
+                  : 'bg-gradient-to-br from-slate-400 via-slate-500 to-slate-600'
+              }`}>
+                {/* Pattern */}
+                <div className="absolute inset-0 opacity-10" style={{
+                  backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`,
+                  maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
+                }} />
+
+                <div className="relative z-10 bg-white/10 backdrop-blur-xl rounded-[1.8rem] p-5 border border-white/10 flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center text-2xl border border-white/20 flex-shrink-0">
                     {subject.icon || '📚'}
                   </div>
-                  <CardTitle className="text-lg sm:text-xl text-foreground">
-                    {subject.name}
-                  </CardTitle>
-                  <CardDescription className="text-sm sm:text-base text-muted-foreground mt-2">
-                    {subject.description}
-                  </CardDescription>
-                </CardHeader>
-              </Card>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-black text-white tracking-tight">{subject.name}</h3>
+                    <p className="text-white/60 text-xs mt-0.5 truncate">{subject.description}</p>
+                  </div>
+                  {selectedSubject?.id === subject.id && (
+                    <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center flex-shrink-0">
+                      <div className="w-3 h-3 rounded-full bg-indigo-600" />
+                    </div>
+                  )}
+                </div>
+              </div>
             </motion.div>
           ))
         )}
       </div>
 
-      {/* Fixed bottom continue button */}
       {selectedSubject && (
         <motion.div
           initial={{ opacity: 0, y: 40 }}
@@ -106,11 +97,11 @@ export const SubjectSelectionScreen = ({ onSubjectSelect }: SubjectSelectionScre
         >
           <Button
             onClick={handleContinue}
-            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg hover:scale-[1.01] transition-all duration-300"
+            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:scale-[1.01] transition-all rounded-2xl h-14 uppercase font-black text-xs tracking-widest shadow-2xl"
             size="lg"
           >
             Continue with {selectedSubject.name}
-            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
+            <ArrowRight className="w-5 h-5 ml-2" />
           </Button>
         </motion.div>
       )}

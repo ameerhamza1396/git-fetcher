@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, BookOpen, Target, Trophy, Clock, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { SubjectSelectionScreen } from '@/components/mcq/SubjectSelectionScreen';
 import { ChapterSelectionScreen } from '@/components/mcq/ChapterSelectionScreen';
@@ -164,7 +164,7 @@ const MCQs = () => {
   }
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-background via-accent/20 to-primary/5">
+    <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950">
       <Seo title="MCQs Practice" description="Practice thousands of MCQs for MDCAT and other medical entrance exams with Medmacs App." canonical="https://medmacs.app/mcqs" />
       
       {/* Glass header with scroll retract */}
@@ -199,12 +199,11 @@ const MCQs = () => {
           <>
             {/* Hero with mascot */}
             <div className="text-center mb-6 sm:mb-8 animate-fade-in">
-              <img src="/images/mascots/doctor-desk.png" alt="Study mascot" className="w-28 h-28 mx-auto mb-4 object-contain drop-shadow-lg" />
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-3 sm:mb-4">
-                📚 MCQ Practice
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-foreground uppercase italic mb-3">
+                📚 MCQ <span className="text-primary">Practice</span>
               </h1>
-              <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto px-4 sm:px-0">
-                Master medical concepts with our comprehensive MCQ practice system.
+              <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] max-w-2xl mx-auto px-4 sm:px-0">
+                Master medical concepts with our comprehensive MCQ practice system
               </p>
             </div>
 
@@ -212,47 +211,7 @@ const MCQs = () => {
               <ProgressTracker userId={user?.id} />
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
-              <Card className="text-center bg-card/80 backdrop-blur-sm border-border hover:scale-105 transition-transform duration-300 animate-fade-in">
-                <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
-                  <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 mx-auto mb-1 sm:mb-2 text-primary" />
-                  <CardTitle className="text-xs sm:text-sm text-foreground">Questions Practiced</CardTitle>
-                </CardHeader>
-                <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
-                  <div className="text-lg sm:text-xl md:text-2xl font-bold text-primary">{userStats.totalQuestions}</div>
-                </CardContent>
-              </Card>
-
-              <Card className="text-center bg-card/80 backdrop-blur-sm border-border hover:scale-105 transition-transform duration-300 animate-fade-in">
-                <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
-                  <Target className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 mx-auto mb-1 sm:mb-2 text-emerald-500" />
-                  <CardTitle className="text-xs sm:text-sm text-foreground">Accuracy Rate</CardTitle>
-                </CardHeader>
-                <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
-                  <div className="text-lg sm:text-xl md:text-2xl font-bold text-emerald-500">{userStats.accuracy}%</div>
-                </CardContent>
-              </Card>
-
-              <Card className="text-center bg-card/80 backdrop-blur-sm border-border hover:scale-105 transition-transform duration-300 animate-fade-in">
-                <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
-                  <Trophy className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 mx-auto mb-1 sm:mb-2 text-yellow-500" />
-                  <CardTitle className="text-xs sm:text-sm text-foreground">Best Streak</CardTitle>
-                </CardHeader>
-                <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
-                  <div className="text-lg sm:text-xl md:text-2xl font-bold text-yellow-500">{userStats.bestStreak}</div>
-                </CardContent>
-              </Card>
-
-              <Card className="text-center bg-card/80 backdrop-blur-sm border-border hover:scale-105 transition-transform duration-300 animate-fade-in">
-                <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
-                  <Clock className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 mx-auto mb-1 sm:mb-2 text-blue-500" />
-                  <CardTitle className="text-xs sm:text-sm text-foreground">Avg. Time</CardTitle>
-                </CardHeader>
-                <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
-                  <div className="text-lg sm:text-xl md:text-2xl font-bold text-blue-500">{userStats.averageTime}s</div>
-                </CardContent>
-              </Card>
-            </div>
+            {/* Stats cards removed - using ProgressTracker's new design */}
           </>
         )}
 
