@@ -31,7 +31,7 @@ interface ChatMessage {
 interface SavedChat {
   id: string;
   created_at: string;
-  messages: any; // Supabase stores JSON as any
+  messages: any;
   session_name?: string;
 }
 
@@ -52,7 +52,6 @@ const DrSultanChat: React.FC = () => {
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // --- 1. DATA FETCHING ---
   const { data: profile } = useQuery({
@@ -88,9 +87,7 @@ const DrSultanChat: React.FC = () => {
     },
     onSuccess: (_, deletedId) => {
       queryClient.invalidateQueries({ queryKey: ['chatHistory'] });
-      if (deletedId === currentSessionId) {
-        startNewChat();
-      }
+      if (deletedId === currentSessionId) startNewChat();
       setSessionToDelete(null);
     },
   });
@@ -99,9 +96,10 @@ const DrSultanChat: React.FC = () => {
   const syncChatToDb = async (updatedMessages: ChatMessage[], sessionId: string | null) => {
     if (!user?.id || updatedMessages.length === 0) return;
 
-    const recordToSave = updatedMessages.slice(-50); // Increased history slightly
+    const recordToSave = updatedMessages.slice(-50);
     const firstUserMsg = updatedMessages.find(m => m.sender === 'user')?.text || "New Chat";
-    const sessionName = firstUserMsg.substring(0, 40);
+    // Updated: Session name limit increased to 200 characters
+    const sessionName = firstUserMsg.substring(0, 200);
 
     try {
       if (sessionId) {
@@ -136,7 +134,6 @@ const DrSultanChat: React.FC = () => {
     const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const userMsg: ChatMessage = { sender: 'user', text: trimmedInput, time: ts };
 
-    // Update UI immediately
     const messagesWithUser = [...messages, userMsg];
     setMessages(messagesWithUser);
     setInputMessage('');
@@ -149,11 +146,9 @@ const DrSultanChat: React.FC = () => {
         body: JSON.stringify({ question: trimmedInput })
       });
 
-      if (!res.ok) throw new Error("Server responded with an error");
-
+      if (!res.ok) throw new Error("Server error");
       const payload = await res.json();
 
-      // Fix: Check if payload.answer is an object or string
       const aiResponseText = typeof payload.answer === 'object'
         ? JSON.stringify(payload.answer, null, 2)
         : (payload.answer || 'I am sorry, I could not process that.');
@@ -166,16 +161,13 @@ const DrSultanChat: React.FC = () => {
 
       const finalMessages = [...messagesWithUser, aiMsg];
       setMessages(finalMessages);
-
-      // Sync to DB using the ID available in current closure
       await syncChatToDb(finalMessages, currentSessionId);
     } catch (err: any) {
-      const errorMsg: ChatMessage = {
+      setMessages(prev => [...prev, {
         sender: 'ai',
-        text: "⚠️ Connection error. Please check your internet or try again later.",
+        text: "⚠️ Connection error. Please try again.",
         time: ts
-      };
-      setMessages(prev => [...prev, errorMsg]);
+      }]);
     } finally {
       setApiLoading(false);
     }
@@ -188,209 +180,151 @@ const DrSultanChat: React.FC = () => {
   };
 
   const loadSession = (chat: SavedChat) => {
-    // Ensure messages are cast correctly from JSON
-    const loadedMessages = Array.isArray(chat.messages) ? chat.messages : [];
-    setMessages(loadedMessages);
+    setMessages(Array.isArray(chat.messages) ? chat.messages : []);
     setCurrentSessionId(chat.id);
     setIsSidebarOpen(false);
   };
 
-  // Auto-scroll to bottom
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, apiLoading]);
 
   const handleMicClick = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Speech recognition is not supported in this browser.");
-      return;
-    }
+    if (!SpeechRecognition) return alert("Browser not supported");
     const rec = new SpeechRecognition();
     rec.onstart = () => setRecording(true);
     rec.onresult = (evt: any) => setInputMessage(evt.results[0][0].transcript);
     rec.onend = () => setRecording(false);
-    rec.onerror = () => setRecording(false);
     rec.start();
   };
 
-  if (authLoading) return <div className="h-screen flex items-center justify-center font-medium">Loading Medical Portal...</div>;
+  if (authLoading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
 
   return (
-    <div className="h-screen w-full flex overflow-hidden bg-white dark:bg-gray-950 transition-colors duration-300">
+    <div className="h-screen w-full flex overflow-hidden bg-white dark:bg-gray-950">
       <Seo title="Dr. Ahroid | AI Tutor" />
 
       {/* DELETE MODAL */}
       <AlertDialog open={!!sessionToDelete} onOpenChange={() => setSessionToDelete(null)}>
-        <AlertDialogContent className="dark:bg-gray-900 border-gray-800">
+        <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-500" /> Delete Session?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently erase this chat history. This action cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>Delete Session?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="dark:bg-gray-800">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => sessionToDelete && deleteSessionMutation.mutate(sessionToDelete)}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              Delete
-            </AlertDialogAction>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => sessionToDelete && deleteSessionMutation.mutate(sessionToDelete)} className="bg-red-600">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       {/* SIDEBAR */}
       <aside className={`fixed lg:relative z-50 w-72 h-full bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 flex flex-col`}>
-        <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-white dark:bg-gray-900">
-          <span className="font-bold text-purple-600 tracking-tight">STUDY HISTORY</span>
-          <Button variant="ghost" size="icon" onClick={startNewChat} className="hover:bg-purple-50 dark:hover:bg-purple-900/20">
-            <PlusCircle className="w-5 h-5 text-purple-600" />
-          </Button>
+        <div className="p-4 border-b flex justify-between items-center bg-white dark:bg-gray-900">
+          <span className="font-bold text-purple-600 text-sm">STUDY HISTORY</span>
+          <Button variant="ghost" size="icon" onClick={startNewChat}><PlusCircle className="w-5 h-5" /></Button>
         </div>
-
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {chatHistory?.length === 0 && (
-            <p className="text-center text-xs text-muted-foreground mt-10">No previous sessions</p>
-          )}
           {chatHistory?.map((chat) => (
             <div key={chat.id} className="group relative">
-              <button
-                onClick={() => loadSession(chat)}
-                className={`w-full text-left p-3 pr-10 rounded-xl text-sm transition-all border ${currentSessionId === chat.id
-                  ? 'bg-purple-50 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 shadow-sm'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-800 border-transparent'}`}
-              >
+              <button onClick={() => loadSession(chat)} className={`w-full text-left p-3 rounded-xl text-sm border ${currentSessionId === chat.id ? 'bg-purple-50 dark:bg-purple-900/30 border-purple-200' : 'border-transparent hover:bg-gray-100'}`}>
                 <div className="font-semibold truncate">{chat.session_name || "New Chat"}</div>
-                <div className="text-[10px] opacity-60 mt-1">{new Date(chat.created_at).toLocaleDateString()}</div>
+                <div className="text-[10px] opacity-60">{new Date(chat.created_at).toLocaleDateString()}</div>
               </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); setSessionToDelete(chat.id); }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-red-500 lg:opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <button onClick={(e) => { e.stopPropagation(); setSessionToDelete(chat.id); }} className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-2"><Trash2 className="w-4 h-4 text-gray-400" /></button>
             </div>
           ))}
         </div>
-
-        <div className="p-4 border-t border-gray-200 dark:border-gray-800">
-          <Button variant="outline" className="w-full justify-start gap-2 rounded-xl" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+        <div className="p-4 border-t">
+          <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            Mode
           </Button>
         </div>
       </aside>
 
-      {/* MAIN CHAT */}
-      <main className="flex-1 flex flex-col min-w-0 bg-white dark:bg-gray-950">
-        <header className="absolute top-0 left-0 right-0 z-50 bg-white/30 dark:bg-gray-900/30 
-    backdrop-blur-md border-b border-purple-200/50 dark:border-purple-800/50 
-    pt-[env(safe-area-inset-top)]">  
+      {/* MAIN CHAT AREA */}
+      <main className="flex-1 flex flex-col min-h-0 relative">
+        {/* HEADER: Updated Profile Dropdown to Right */}
+        <header className="sticky top-0 z-30 w-full bg-white/80 dark:bg-gray-950/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 px-4 py-3 flex items-center justify-between pt-[env(safe-area-inset-top)]">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsSidebarOpen(true)}>
               <Menu className="w-6 h-6" />
             </Button>
             <div className="flex flex-col">
-              <CardTitle className="text-base font-bold dark:text-white">Dr. Ahroid</CardTitle>
-              <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider">AI Medical Tutor</span>
+              <CardTitle className="text-base font-bold">Dr. Ahroid</CardTitle>
+              <span className="text-[10px] text-green-500 font-bold uppercase">AI Medical Tutor</span>
             </div>
           </div>
-          <ProfileDropdown />
+          <div className="flex items-center">
+            <ProfileDropdown />
+          </div>
         </header>
 
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-6 custom-scrollbar">
-          {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center max-w-sm mx-auto animate-in fade-in duration-700">
-              <div className="w-20 h-20 bg-purple-100 dark:bg-purple-900/30 rounded-3xl flex items-center justify-center mb-4">
-                <MessageSquare className="w-10 h-10 text-purple-600" />
+        {/* MESSAGES: Properly scrollable container */}
+        <div className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-6 scroll-smooth">
+          <div className="min-h-full flex flex-col justify-end">
+            {messages.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center py-20">
+                <MessageSquare className="w-12 h-12 text-purple-600 mb-4 opacity-20" />
+                <h2 className="text-xl font-bold">Start Your Consult</h2>
+                <p className="text-sm text-muted-foreground">Ask about anatomy, pharmacology, or clinical cases.</p>
               </div>
-              <h2 className="text-xl font-bold dark:text-white">Start Your Medical Consult</h2>
-              <p className="text-sm text-muted-foreground mt-2">Ask about anatomy, pharmacology, clinical cases, or any MBBS subject.</p>
-            </div>
-          ) : (
-            messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2`}>
-                <div className={`max-w-[90%] lg:max-w-[75%] p-4 rounded-2xl shadow-sm ${msg.sender === 'user'
-                  ? 'bg-purple-600 text-white rounded-tr-none'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-tl-none border border-gray-200 dark:border-gray-700'
-                  }`}>
-                  <p className="text-[15px] leading-relaxed whitespace-pre-wrap font-medium">
-                    {msg.text}
-                  </p>
-                  <div className="mt-3 flex items-center justify-between opacity-50 text-[10px] border-t border-black/10 dark:border-white/10 pt-2">
-                    <span>{msg.time}</span>
-                    <button
-                      className="hover:text-white dark:hover:text-purple-400 p-1"
-                      onClick={() => { navigator.clipboard.writeText(msg.text); setCopiedIndex(i); setTimeout(() => setCopiedIndex(null), 2000); }}
-                    >
-                      {copiedIndex === i ? 'Copied!' : <Copy className="w-3.5 h-3.5" />}
-                    </button>
+            ) : (
+              messages.map((msg, i) => (
+                <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
+                  <div className={`max-w-[85%] p-4 rounded-2xl ${msg.sender === 'user' ? 'bg-purple-600 text-white rounded-tr-none' : 'bg-gray-100 dark:bg-gray-800 rounded-tl-none border'}`}>
+                    <p className="text-[15px] whitespace-pre-wrap">{msg.text}</p>
+                    <div className="mt-2 flex justify-between items-center text-[10px] opacity-50">
+                      <span>{msg.time}</span>
+                      <button onClick={() => navigator.clipboard.writeText(msg.text)}><Copy className="w-3 h-3" /></button>
+                    </div>
                   </div>
                 </div>
+              ))
+            )}
+            {apiLoading && (
+              <div className="flex justify-start mb-4">
+                <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-2xl animate-pulse text-xs font-bold text-purple-600">THINKING...</div>
               </div>
-            ))
-          )}
-          {apiLoading && (
-            <div className="flex justify-start animate-in fade-in">
-              <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 flex items-center gap-3">
-                <div className="flex gap-1">
-                  <span className="w-1.5 h-1.5 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-1.5 h-1.5 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-1.5 h-1.5 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-                <span className="text-xs font-bold text-purple-600 uppercase tracking-widest">Thinking</span>
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
+            )}
+            <div ref={messagesEndRef} className="h-2" />
+          </div>
         </div>
 
-        {/* FOOTER INPUT */}
-        <div className="p-4 lg:p-6 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+        {/* FOOTER: Fixed at bottom with safe area support */}
+        <footer className="p-4 lg:p-6 border-t bg-white dark:bg-gray-950 pb-[max(1rem,env(safe-area-inset-bottom))]">
           {!canUseChat ? (
-            <div className="max-w-4xl mx-auto p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-2xl flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 text-amber-800 dark:text-amber-200 text-sm font-semibold">
-                <Crown className="w-5 h-5 text-amber-500" /> Upgrade to Premium for Unlimited AI Chat.
+            <div className="max-w-4xl mx-auto p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 rounded-2xl flex items-center justify-between">
+              <div className="flex items-center gap-3 text-sm font-semibold text-amber-800 dark:text-amber-200">
+                <Crown className="w-5 h-5 text-amber-500" /> Premium Required
               </div>
-              <Link to="/pricing"><Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl">Upgrade</Button></Link>
+              <Link to="/pricing"><Button size="sm">Upgrade</Button></Link>
             </div>
           ) : (
             <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex items-center gap-3">
-              <div className="relative flex-1 group">
+              <div className="relative flex-1">
                 <Input
-                  placeholder="Ask anything about your medical studies..."
+                  placeholder="Ask anything..."
                   value={inputMessage}
                   onChange={e => setInputMessage(e.target.value)}
                   disabled={apiLoading}
-                  className="pr-12 h-14 rounded-2xl border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-purple-500 transition-all text-base"
+                  className="pr-12 h-14 rounded-2xl bg-gray-50 dark:bg-gray-900"
                 />
-                <button
-                  type="button"
-                  onClick={handleMicClick}
-                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-xl transition-all ${recording ? 'bg-red-500 text-white animate-pulse' : 'text-gray-400 hover:text-purple-600'}`}
-                >
+                <button type="button" onClick={handleMicClick} className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 ${recording ? 'text-red-500 animate-pulse' : 'text-gray-400'}`}>
                   <Mic className="w-5 h-5" />
                 </button>
               </div>
-              <Button type="submit" disabled={apiLoading || !inputMessage.trim()} size="icon" className="h-14 w-14 rounded-2xl bg-purple-600 hover:bg-purple-700 shadow-lg shadow-purple-200 dark:shadow-none transition-transform active:scale-95">
+              <Button type="submit" disabled={apiLoading || !inputMessage.trim()} size="icon" className="h-14 w-14 rounded-2xl bg-purple-600">
                 <Send className="w-6 h-6 text-white" />
               </Button>
             </form>
           )}
-          <p className="text-[10px] text-center text-muted-foreground mt-3 uppercase tracking-tighter">Medical AI can make mistakes. Verify critical clinical info.</p>
-        </div>
+        </footer>
       </main>
 
-      {/* OVERLAY */}
-      {isSidebarOpen && (
-        <div className="fixed inset-0 bg-black/40 z-40 lg:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />
-      )}
+      {isSidebarOpen && <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setIsSidebarOpen(false)} />}
     </div>
   );
 };

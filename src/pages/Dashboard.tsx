@@ -499,7 +499,7 @@ const Dashboard = () => {
               <a href="https://medistics.app" target="_blank" rel="noopener noreferrer">
                 <div className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-violet-600 to-purple-700 shadow-lg shadow-violet-500/10 active:scale-[0.97] transition-all">
                   <div className="relative z-10 flex items-center gap-3">
-                    <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs" className="w-8 h-8" />
+                    <img src="lovable-uploads/WhatsApp Image 2025-07-20 at 15.46.21_0d2711fb rem bg.png" alt="Medmacs" className="w-8 h-8" />
                     <div>
                       <h3 className="text-sm font-bold text-white">Medistics App</h3>
                       <p className="text-white/60 text-[11px] font-medium">The Best AI for MDCAT</p>
