@@ -147,7 +147,7 @@ const Leaderboard = () => {
                 </div>
             </header>
 
-            <div className="container mx-auto px-4 lg:px-8 py-6 lg:py-8 mt-[calc(env(safe-area-inset-top)+60px)]">
+            <div className="container mx-auto px-4 lg:px-8 py-6 lg:py-8 mt-[calc(env(safe-area-inset-top))]">
                 <div className="text-center mb-6 lg:mb-8 animate-fade-in">
                     <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-4">
                         🏆 Leaderboard

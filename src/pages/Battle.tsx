@@ -253,7 +253,7 @@ const Battle: React.FC = () => {
         </div>
       </header>
 
-      <main className="px-4 mt-[calc(env(safe-area-inset-top)+70px)] pb-8 max-w-lg mx-auto">
+      <main className="px-4 mt-[calc(env(safe-area-inset-top))] pb-8 max-w-lg mx-auto">
         {battleState === 'lobby' && (
           <div className="space-y-5">
             {/* Hero */}

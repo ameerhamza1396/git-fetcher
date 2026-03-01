@@ -96,7 +96,7 @@ const RedeemCode = () => {
                 </div>
             </header>
 
-            <main className="container mx-auto px-4 py-8 max-w-md mt-[calc(env(safe-area-inset-top)+60px)]">
+            <main className="container mx-auto px-4 py-8 max-w-md mt-[calc(env(safe-area-inset-top))]">
                 <div className="text-center mb-8">
                     <div className="relative inline-block mb-4">
                         <div className="absolute inset-0 bg-purple-400 blur-2xl opacity-30 rounded-full" />

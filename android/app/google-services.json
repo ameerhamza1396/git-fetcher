@@ -1,26 +1,36 @@
 {
   "project_info": {
-    "project_number": "287093141844",
-    "project_id": "medmacs-667ac",
-    "storage_bucket": "medmacs-667ac.firebasestorage.app"
+    "project_number": "1072567800759",
+    "project_id": "medmacs",
+    "storage_bucket": "medmacs.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:287093141844:android:8e2626393d7b2a44cad8c1",
+        "mobilesdk_app_id": "1:1072567800759:android:0b35acd02d629171210e32",
         "android_client_info": {
           "package_name": "com.hmacs.medmacs"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1072567800759-9gup2643t3svl9bbf5p9ic813n42h5fq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyCzL7SDOMi46zisSvt3k0aqezs_EIYWwqM"
+          "current_key": "AIzaSyBxWo_hjUQWVnSQiO7xCkV-HVzUVbNqMRg"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1072567800759-9gup2643t3svl9bbf5p9ic813n42h5fq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

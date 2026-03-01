@@ -30,12 +30,27 @@ import SignInPrompt from '@/components/SigninPrompt';
 import AppExitConfirmation from '@/components/dashboard/AppExitConfirmation';
 import VersionGuard from '@/components/VersionControl';
 import ProfileAvatar from '@/components/profile/ProfileAvatar';
-// Swipe-to-reveal Case of Day card
-const CaseOfDayCard = ({ caseOfDay }: { caseOfDay: { headline: string; details: string } }) => {
-  const [step, setStep] = useState(0); // 0=question, 1=answer, 2=explanation
 
-  const answer = "Acute Inferior STEMI — Immediate PCI (Percutaneous Coronary Intervention) with dual antiplatelet therapy, heparin, and morphine for pain management.";
-  const explanation = "ST elevation in leads II, III, and aVF indicates inferior wall MI. In a 25-year-old, consider cocaine use, hypercoagulable states, or coronary anomalies. Immediate reperfusion via primary PCI is the gold standard within 90 minutes of presentation.";
+// Types
+type TermOfDay = {
+  id: string;
+  term: string;
+  definition: string;
+  created_at: string;
+};
+
+type CaseOfDay = {
+  id: string;
+  headline: string;
+  details: string;
+  answer: string;
+  explanation: string;
+  created_at: string;
+};
+
+// Swipe-to-reveal Case of Day card
+const CaseOfDayCard = ({ caseOfDay }: { caseOfDay: CaseOfDay }) => {
+  const [step, setStep] = useState(0); // 0=question, 1=answer, 2=explanation
 
   const handleSwipe = () => {
     if (step < 2) setStep(s => s + 1);
@@ -61,14 +76,14 @@ const CaseOfDayCard = ({ caseOfDay }: { caseOfDay: { headline: string; details: 
           {step >= 1 && (
             <div className="bg-white/15 backdrop-blur-md rounded-2xl p-4 border border-white/20 mb-3 animate-fade-in">
               <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest mb-1">Answer</p>
-              <p className="text-white text-sm font-bold leading-relaxed">{answer}</p>
+              <p className="text-white text-sm font-bold leading-relaxed">{caseOfDay.answer}</p>
             </div>
           )}
 
           {step >= 2 && (
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15 mb-3 animate-fade-in">
               <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest mb-1">Explanation</p>
-              <p className="text-white/90 text-sm leading-relaxed">{explanation}</p>
+              <p className="text-white/90 text-sm leading-relaxed">{caseOfDay.explanation}</p>
             </div>
           )}
 
@@ -173,6 +188,38 @@ const Dashboard = () => {
     enabled: !!user?.id,
   });
 
+  // Fetch Term of the Day
+  const { data: termOfDay, isLoading: termLoading } = useQuery<TermOfDay>({
+    queryKey: ['termOfDay'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('term_of_day')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch Case of the Day
+  const { data: caseOfDay, isLoading: caseLoading } = useQuery<CaseOfDay>({
+    queryKey: ['caseOfDay'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('case_of_day')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const markAsReadMutation = useMutation({
     mutationFn: async (announcementIds: string[]) => {
       if (!user?.id || !announcementIds?.length) return;
@@ -204,16 +251,6 @@ const Dashboard = () => {
     { title: 'Collaborate', description: 'Apply for Medmacs!', icon: Briefcase, link: '/summerinternship2025', gradient: 'from-rose-500 to-pink-600', iconColor: 'text-rose-100', tag: 'Open now!', tagColor: 'bg-white/90 text-rose-600 animate-pulse' },
   ];
 
-  const termOfDay = {
-    term: "Hemoglobin",
-    definition: "Hemoglobin is a protein in red blood cells that carries oxygen from the lungs to the rest of the body and returns carbon dioxide from the body to the lungs. It consists of four subunits, each containing a heme group with an iron atom that binds oxygen. Normal hemoglobin levels range from 12-16 g/dL in females and 14-18 g/dL in males."
-  };
-
-  const caseOfDay = {
-    headline: "25-Year-Old Male with Acute Chest Pain",
-    details: "A 25-year-old male presents to the emergency department with acute onset chest pain radiating to the left arm, accompanied by diaphoresis and shortness of breath. He has no significant past medical history. ECG shows ST elevation in leads II, III, and aVF. Troponin levels are elevated. The patient is hemodynamically stable with BP 130/80 mmHg and HR 92 bpm. What is the most likely diagnosis and immediate management plan?"
-  };
-
   const premiumPerks = [
     { title: 'AI Test Generator', description: 'Custom tests with AI', icon: Brain, link: '/ai/test-generator', gradient: 'from-cyan-500 to-blue-600', iconColor: 'text-cyan-100' },
     { title: 'AI Chatbot', description: 'Instant AI tutor', icon: Zap, link: '/ai/chatbot', gradient: 'from-amber-400 to-orange-500', iconColor: 'text-yellow-100' },
@@ -224,7 +261,7 @@ const Dashboard = () => {
   const rawUserPlan = profile?.plan?.toLowerCase() || 'free';
   const userPlanDisplayName = rawUserPlan.charAt(0).toUpperCase() + rawUserPlan.slice(1) + ' Plan';
 
-  if (isNavigating || authLoading || profileLoading || userStatsLoading) {
+  if (isNavigating || authLoading || profileLoading || userStatsLoading || termLoading || caseLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-24 h-24 object-contain animate-pulse" />
@@ -514,24 +551,32 @@ const Dashboard = () => {
               </div>
 
               {/* Term of the Day */}
-              <button onClick={() => setShowTermOfDay(true)} className="rounded-2xl border border-border/40 bg-gradient-to-br from-emerald-500/10 to-teal-500/5 backdrop-blur-sm p-4 text-left active:scale-[0.97] transition-all">
+              <button
+                onClick={() => setShowTermOfDay(true)}
+                className="rounded-2xl border border-border/40 bg-gradient-to-br from-emerald-500/10 to-teal-500/5 backdrop-blur-sm p-4 text-left active:scale-[0.97] transition-all"
+                disabled={!termOfDay}
+              >
                 <div className="flex items-center gap-1.5 mb-2">
                   <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
                   <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Term of the Day</span>
                 </div>
-                <h4 className="text-sm font-black text-foreground mb-1">{termOfDay.term}</h4>
-                <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{termOfDay.definition}</p>
+                <h4 className="text-sm font-black text-foreground mb-1">{termOfDay?.term || 'Loading...'}</h4>
+                <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{termOfDay?.definition || ''}</p>
               </button>
             </div>
 
             {/* Case of the Day */}
-            <button onClick={() => setShowCaseOfDay(true)} className="w-full rounded-2xl border border-border/40 bg-gradient-to-br from-blue-500/10 to-indigo-500/5 backdrop-blur-sm p-4 text-left mb-6 active:scale-[0.97] transition-all">
+            <button
+              onClick={() => setShowCaseOfDay(true)}
+              className="w-full rounded-2xl border border-border/40 bg-gradient-to-br from-blue-500/10 to-indigo-500/5 backdrop-blur-sm p-4 text-left mb-6 active:scale-[0.97] transition-all"
+              disabled={!caseOfDay}
+            >
               <div className="flex items-center gap-1.5 mb-2">
                 <Stethoscope className="w-3.5 h-3.5 text-blue-500" />
                 <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Case of the Day</span>
               </div>
-              <h4 className="text-sm font-black text-foreground mb-1">{caseOfDay.headline}</h4>
-              <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{caseOfDay.details}</p>
+              <h4 className="text-sm font-black text-foreground mb-1">{caseOfDay?.headline || 'Loading...'}</h4>
+              <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{caseOfDay?.details || ''}</p>
             </button>
 
             {/* Premium Perks with animated crown */}
@@ -600,7 +645,7 @@ const Dashboard = () => {
       </header>
 
       {/* Content */}
-      <div className="px-5 mt-[calc(env(safe-area-inset-top)+60px)]">
+      <div className="px-5 mt-[calc(env(safe-area-inset-top))]">
         {renderTabContent()}
       </div>
 
@@ -634,31 +679,33 @@ const Dashboard = () => {
       {/* Term of Day Dialog - vibrant */}
       <Dialog open={showTermOfDay} onOpenChange={setShowTermOfDay}>
         <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border-0">
-          <div className="relative bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 p-6 text-white">
-            <div className="absolute inset-0 opacity-10" style={{
-              backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`,
-              maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
-            }} />
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/20">
-                  <Sparkles className="w-5 h-5 text-white" />
+          {termOfDay && (
+            <div className="relative bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 p-6 text-white">
+              <div className="absolute inset-0 opacity-10" style={{
+                backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`,
+                maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
+              }} />
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/20">
+                    <Sparkles className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Term of the Day</p>
+                    <h3 className="text-2xl font-black text-white">{termOfDay.term}</h3>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Term of the Day</p>
-                  <h3 className="text-2xl font-black text-white">{termOfDay.term}</h3>
-                </div>
+                <p className="text-white/80 text-sm leading-relaxed">{termOfDay.definition}</p>
               </div>
-              <p className="text-white/80 text-sm leading-relaxed">{termOfDay.definition}</p>
             </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
 
       {/* Case of Day Dialog - swipe reveal */}
       <Dialog open={showCaseOfDay} onOpenChange={setShowCaseOfDay}>
         <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-0">
-          <CaseOfDayCard caseOfDay={caseOfDay} />
+          {caseOfDay && <CaseOfDayCard caseOfDay={caseOfDay} />}
         </DialogContent>
       </Dialog>
 
@@ -672,34 +719,29 @@ const Dashboard = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`relative flex flex-col items-center justify-end pb-2 transition-all duration-300 ${
-                    isActive ? 'min-w-[64px]' : 'min-w-[48px]'
-                  }`}
+                  className={`relative flex flex-col items-center justify-end pb-2 transition-all duration-300 ${isActive ? 'min-w-[64px]' : 'min-w-[48px]'
+                    }`}
                 >
-                  <div className={`flex flex-col items-center transition-all duration-300 ${
-                    isActive ? '-translate-y-2' : ''
-                  }`}>
-                    <div className={`relative flex items-center justify-center transition-all duration-300 ${
-                      isActive
+                  <div className={`flex flex-col items-center transition-all duration-300 ${isActive ? '-translate-y-2' : ''
+                    }`}>
+                    <div className={`relative flex items-center justify-center transition-all duration-300 ${isActive
                         ? 'w-11 h-11 rounded-2xl bg-primary shadow-lg shadow-primary/30'
                         : 'w-9 h-9'
-                    }`}>
-                      <tab.icon className={`transition-all duration-300 ${
-                        isActive
+                      }`}>
+                      <tab.icon className={`transition-all duration-300 ${isActive
                           ? 'w-5 h-5 text-primary-foreground'
                           : 'w-[18px] h-[18px] text-muted-foreground'
-                      }`} />
+                        }`} />
                       {tab.badge && (
                         <span className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full flex items-center justify-center shadow-sm">
                           {tab.badge > 9 ? '9+' : tab.badge}
                         </span>
                       )}
                     </div>
-                    <span className={`mt-0.5 transition-all duration-300 ${
-                      isActive
+                    <span className={`mt-0.5 transition-all duration-300 ${isActive
                         ? 'text-[10px] font-bold text-primary'
                         : 'text-[9px] font-medium text-muted-foreground'
-                    }`}>
+                      }`}>
                       {tab.label}
                     </span>
                   </div>

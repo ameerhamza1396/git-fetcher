@@ -55,6 +55,10 @@ import PracticalNotesDetails from "@/components/PracticalNotes/PracticalNotesDet
 import RedeemCode from '@/pages/RedeemCode';
 import PurchaseHistory from '@/pages/PurchaseHistory';
 import { VideoCallProvider } from '@/video-sdk/VideoCallProvider';
+import PaymentFailure from "@/pages/PaymentFailure.tsx";
+import PaymentSuccess from "@/pages/PaymentSuccess.tsx";
+import Setup from "@/pages/SetupPage";
+
 
 const queryClient = new QueryClient();
 
@@ -143,6 +147,9 @@ function App() {
                 <Route path="/practical-notes/subject/:id" element={<PracticalNotesDetails />} />
                 <Route path="/redeem" element={<RedeemCode />} />
                 <Route path="/purchase-history" element={<PurchaseHistory />} />
+                <Route path="/payment-failure" element={<PaymentFailure />} />
+                <Route path="/payment-success" element={<PaymentSuccess />} />
+                <Route path="/setup" element={<Setup />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </VideoCallProvider>

@@ -104,7 +104,7 @@ const FLP = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 max-w-3xl pt-[calc(env(safe-area-inset-top)+90px)] pb-12">
+      <main className="container mx-auto px-4 max-w-3xl pt-[calc(env(safe-area-inset-top))] pb-12">
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
           <div className="relative overflow-hidden border-none bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white shadow-2xl rounded-[2.5rem] p-2">
             {/* Pattern */}

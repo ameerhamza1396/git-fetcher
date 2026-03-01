@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { PushNotifications } from '@capacitor/push-notifications';
+import { Capacitor } from '@capacitor/core';
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -9,31 +11,81 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  // 🎯 Helper to Register Push & Update Supabase
+  const initializePushNotifications = useCallback(async (userId: string) => {
+    if (Capacitor.getPlatform() === 'web') return;
+
+    try {
+      // Check/Request Permissions
+      let permStatus = await PushNotifications.checkPermissions();
+      if (permStatus.receive === 'prompt') {
+        permStatus = await PushNotifications.requestPermissions();
+      }
+
+      if (permStatus.receive !== 'granted') {
+        console.warn('Push permissions denied by user');
+        return;
+      }
+
+      // Add Listener before registering
+      await PushNotifications.removeAllListeners(); // Clean old listeners
+
+      await PushNotifications.addListener('registration', async (token) => {
+        console.log('FCM Token Generated:', token.value);
+
+        // Update Supabase profiles table
+        const { error } = await supabase
+          .from('profiles')
+          .update({ fcm_token: token.value })
+          .eq('id', userId);
+
+        if (error) console.error('Supabase token update error:', error);
+      });
+
+      await PushNotifications.addListener('registrationError', (err) => {
+        console.error('Push registration error:', err.error);
+      });
+
+      // Trigger FCM Registration
+      await PushNotifications.register();
+
+    } catch (error) {
+      console.error('Push initialization failed:', error);
+    }
+  }, []);
+
   useEffect(() => {
-    // Set up auth state listener
+    // 1. Listen for Auth Changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log('Auth state changed:', event, session);
-        setSession(session);
-        setUser(session?.user ?? null);
+      (event, currentSession) => {
+        console.log('Auth state changed:', event);
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
         setLoading(false);
+
+        // If user logs in, trigger push registration
+        if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && currentSession?.user) {
+          initializePushNotifications(currentSession.user.id);
+        }
       }
     );
 
-    // Check for existing session on mount
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    // 2. Check for existing session on mount
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
       setLoading(false);
+
+      if (currentSession?.user) {
+        initializePushNotifications(currentSession.user.id);
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, [toast]); // Added toast to dependency array, although it's stable.
+  }, [initializePushNotifications]);
 
   const signUp = async (email: string, password: string, userData: any) => {
     try {
-      console.log('Starting signup with:', { email, userData });
-
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -42,137 +94,68 @@ export const useAuth = () => {
             full_name: userData.fullName || userData.full_name,
             username: userData.username,
           },
-          emailRedirectTo: `${window.location.origin}/dashboard` // Ensure this is correct
+          emailRedirectTo: `${window.location.origin}/dashboard`
         }
       });
-
-      if (error) {
-        console.error('Signup error:', error);
-        throw error;
-      }
-
-      console.log('Signup successful:', data);
-
-      toast({
-        title: "Account created!",
-        description: "Welcome to Medmacs! Please check your email to confirm your account.", // Adjusted message for email verification flow
-      });
-
-      // Supabase sends a verification email. The user is not truly signed in until they verify.
-      // You might want to handle data.user being null here if email verification is required.
+      if (error) throw error;
+      toast({ title: "Account created!", description: "Please check your email to confirm." });
       return { data, error: null };
     } catch (error: any) {
-      console.error('Signup error:', error);
-      toast({
-        title: "Signup failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Signup failed", description: error.message, variant: "destructive" });
       return { data: null, error };
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       return { data, error: null };
     } catch (error: any) {
-      console.error('Signin error:', error);
-      toast({
-        title: "Sign in failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Sign in failed", description: error.message, variant: "destructive" });
       return { data: null, error };
     }
   };
 
-  // --- NEW: signInWithGoogle function ---
   const signInWithGoogle = async () => {
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          // This redirectTo URL MUST be one of your "Authorized JavaScript origins"
-          // in Google Cloud Console and also implicitly handled by Supabase's callback URL.
-          // It's the URL your user will land on *after* completing Google's authentication.
-          redirectTo: `${window.location.origin}/dashboard`, // Example: redirects to your dashboard after Google auth
-        },
+        options: { redirectTo: `${window.location.origin}/dashboard` },
       });
-
-      if (error) {
-        console.error('Google Sign-in error:', error);
-        throw error;
-      }
-
-      // No explicit navigation here for OAuth, as Supabase handles the redirect automatically
-      // through the browser's native flow.
+      if (error) throw error;
       return { data, error: null };
     } catch (error: any) {
-      console.error('Google Sign-in process failed:', error);
-      toast({
-        title: "Google Sign-in Failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Google Sign-in Failed", description: error.message, variant: "destructive" });
       return { data: null, error };
     }
   };
-  // --- END NEW FUNCTION ---
 
-  // --- NEW: signInWithGoogleSupabase for Native/Capacitor Flow ---
   const signInWithGoogleSupabase = async (idToken: string) => {
     try {
-      console.log('Exchanging native ID token for Supabase session...');
-      // The core requirement: exchange the Google ID token for a Supabase session
       const { data, error } = await supabase.auth.signInWithIdToken({
         provider: 'google',
         token: idToken,
       });
-
-      if (error) {
-        console.error('ID Token Sign-in error:', error);
-        throw error;
-      }
-
-      console.log('ID Token Sign-in successful:', data);
+      if (error) throw error;
       return { data, error: null };
     } catch (error: any) {
-      toast({
-        title: "Native Sign-in Failed",
-        description: error.message || "Could not exchange Google token for Supabase session.",
-        variant: "destructive",
-      });
+      toast({ title: "Native Sign-in Failed", description: error.message, variant: "destructive" });
       return { data: null, error };
     }
   };
-  // --- END NEW FUNCTION ---
 
   const signOut = async () => {
     try {
+      // Clear token from DB on logout for security (optional)
+      if (user) {
+        await supabase.from('profiles').update({ fcm_token: null }).eq('id', user.id);
+      }
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-
-      toast({
-        title: "Signed out",
-        description: "You have been successfully signed out.",
-      });
-
-      // Redirect to home page after successful logout
-      // Using window.location.href ensures a full page reload, clearing any previous state
       window.location.href = '/';
     } catch (error: any) {
-      console.error('Signout error:', error);
-      toast({
-        title: "Sign out failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Sign out failed", description: error.message, variant: "destructive" });
     }
   };
 

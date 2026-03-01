@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Zap, RefreshCw } from 'lucide-react';
 
-const CURRENT_APP_VERSION = "5.0.0"; // Update this manually in your code for every release
+const CURRENT_APP_VERSION = "7.1.0"
 
 const VersionGuard = () => {
     const [isOutdated, setIsOutdated] = useState(false);

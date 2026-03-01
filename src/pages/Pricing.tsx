@@ -11,7 +11,6 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import Seo from '@/components/Seo';
-import { Skeleton } from '@/components/ui/skeleton';
 
 interface SupabasePlan {
     id: string;
@@ -74,9 +73,8 @@ const Pricing = () => {
         enabled: !!user?.id,
     });
 
-    const currentUserPlan = profile?.plan?.toLowerCase();
+    const currentUserPlan = profile?.plan?.toLowerCase() || 'free';
 
-    // Style Mapping to match Purchase History
     const planStyles: { [key: string]: { gradient: string; accent: string; icon: any; glow: string } } = {
         free: {
             gradient: 'from-slate-500 via-slate-600 to-slate-700',
@@ -158,7 +156,7 @@ const Pricing = () => {
         <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950">
             <Seo title="Pricing Plans" />
 
-    <header className="absolute top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)]">  
+            <header className="absolute top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)]">
                 <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
                     <div className="flex items-center space-x-3">
                         <Link to="/dashboard">
@@ -198,7 +196,7 @@ const Pricing = () => {
             <main className="container mx-auto px-4 lg:px-8 py-12 lg:py-16 max-w-7xl">
                 <div className="text-center mb-12">
                     <h1 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 
-                    dark:text-white mb-4 italic uppercase mt-[calc(env(safe-area-inset-top)+40px)]">
+                    dark:text-white mb-4 italic uppercase mt-[calc(env(safe-area-inset-top))]">
                         Choose Your <span className="text-blue-600">Path</span>
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 font-medium max-w-xl mx-auto mb-10 uppercase text-xs tracking-[0.2em]">
@@ -228,11 +226,14 @@ const Pricing = () => {
                         const displayPrice = plan.id === 'free' ? '0' : currentPlanDetails.price;
                         const originalPrice = plan.id === 'free' ? null : currentPlanDetails.originalPrice;
 
+                        // Logic to disable Free plan if user is on a paid plan
+                        const isUserOnPaidPlan = currentUserPlan !== 'free';
+                        const isFreePlanAndPaidUser = plan.id === 'free' && isUserOnPaidPlan;
+
                         return (
                             <div key={plan.id} className={`relative transition-all duration-500 ${plan.popular ? 'md:-mt-4 md:mb-4 scale-100' : ''}`}>
                                 <Card className={`relative h-full overflow-hidden border-none bg-gradient-to-br ${style.gradient} text-white shadow-2xl flex flex-col rounded-[2.5rem] p-2`}>
 
-                                    {/* Pattern Overlay */}
                                     <div className="absolute inset-0 opacity-10" style={{
                                         backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255, 255, 255, 0.4) 20px, rgba(255, 255, 255, 0.4) 40px)`,
                                         maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
@@ -274,7 +275,6 @@ const Pricing = () => {
                                     </CardHeader>
 
                                     <CardContent className="relative z-10 flex flex-col flex-grow">
-                                        {/* Features Glass Box */}
                                         <div className="bg-white/10 backdrop-blur-xl rounded-[2rem] p-6 border border-white/10 flex-grow flex flex-col shadow-inner">
                                             <ul className="space-y-4 mb-8 flex-grow">
                                                 {currentPlanDetails.features.map((feature, idx) => (
@@ -290,11 +290,15 @@ const Pricing = () => {
                                                     <Button disabled className="w-full bg-white/10 border border-white/20 text-white rounded-2xl h-14 uppercase font-bold text-xs tracking-widest">
                                                         Active Plan
                                                     </Button>
+                                                ) : isFreePlanAndPaidUser ? (
+                                                    <Button disabled className="w-full bg-white/5 border border-white/10 text-white/40 rounded-2xl h-14 uppercase font-bold text-xs tracking-widest">
+                                                        YOU ARE PAID USER
+                                                    </Button>
                                                 ) : (
                                                     <Link
-                                                        to="/checkout"
+                                                        to={plan.id === 'free' ? '/dashboard' : '/checkout'}
                                                         className="block"
-                                                        state={{
+                                                        state={plan.id === 'free' ? undefined : {
                                                             planName: plan.display,
                                                             price: displayPrice,
                                                             duration: isMonthly ? 'Monthly' : 'Yearly',
@@ -304,7 +308,7 @@ const Pricing = () => {
                                                         }}
                                                     >
                                                         <Button className="w-full bg-white text-slate-900 hover:scale-105 transition-all duration-300 rounded-2xl h-14 uppercase font-black text-xs tracking-widest shadow-2xl">
-                                                            {plan.id === 'free' ? 'Get Started' : 'Upgrade Now'}
+                                                            {plan.id === 'free' ? 'Continue with Free Plan' : 'Upgrade Now'}
                                                         </Button>
                                                     </Link>
                                                 )}

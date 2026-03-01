@@ -5,10 +5,11 @@
 body {
   overscroll-behavior-y: none;
   overflow: hidden;
+  position: fixed;
   background-color: hsl(var(--background));
-    height: 100%;
-    width: 100%;
-    overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
 }
 
 /* 2. Make Ionic's background transparent to reveal the body color */
@@ -17,6 +18,16 @@ body {
 ion-content::part(scroll) {
   overscroll-behavior-y: none !important;
   background: transparent !important;
+}
+
+ion-content {
+  --offset-top: 0px !important;
+  --offset-bottom: 0px !important;
+}
+
+/* Ensure the scrollable part starts exactly where it should */
+ion-content::part(scroll) {
+  padding-top: 0 !important;
 }
 
 /* Ensure the glass effect can see through the layers */
@@ -38,6 +49,7 @@ header {
 #root {
   background-color: hsl(var(--background));
 }
+
 /* 3. Enable the bounce logic for the inner scroll container */
 ion-content::part(scroll) {
   overscroll-behavior-y: reveal;

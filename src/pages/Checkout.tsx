@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Checkbox } from "@/components/ui/checkbox";
 
 const MDR_RATE = 0.025;
-const EASYPAISA_API_URL = "https://mobile-payment-medmacs.vercel.app/paypaisa";
+const EASYPAISA_API_URL = "https://medmacs.app/api/pay-easypaisa";
 
 const Checkout = () => {
     const { user } = useAuth();
@@ -36,6 +36,10 @@ const Checkout = () => {
     const [isPromoApplied, setIsPromoApplied] = useState(false);
     const [promoDiscountDisplay, setPromoDiscountDisplay] = useState<string | null>(null);
 
+    // WebView Specific States
+    const [showPayFastModal, setShowPayFastModal] = useState(false);
+    const [payFastHtml, setPayFastHtml] = useState<string | null>(null);
+
     useEffect(() => {
         const handleScroll = () => {
             const currentScrollY = window.scrollY;
@@ -51,8 +55,19 @@ const Checkout = () => {
         try {
             const { data } = await supabase.from('pending_payments').select('status, error_message').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1).single();
             if (data) {
-                if (data.status === 'success') { setModalState('success'); setIsLoading(false); return true; }
-                else if (data.status === 'failed') { setError(data.error_message || "Transaction failed."); setModalState('failure'); setIsLoading(false); return true; }
+                if (data.status === 'success') {
+                    setModalState('success');
+                    setShowPayFastModal(false); // Close WebView on success
+                    setIsLoading(false);
+                    return true;
+                }
+                else if (data.status === 'failed') {
+                    setError(data.error_message || "Transaction failed.");
+                    setModalState('failure');
+                    setShowPayFastModal(false); // Close WebView on failure
+                    setIsLoading(false);
+                    return true;
+                }
             }
         } catch (e) { console.error("Status check failed", e); }
         return false;
@@ -64,8 +79,17 @@ const Checkout = () => {
             .channel('payment-tracking')
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pending_payments', filter: `user_id=eq.${user.id}` },
                 (payload) => {
-                    if (payload.new.status === 'success') { setModalState('success'); setIsLoading(false); }
-                    else if (payload.new.status === 'failed') { setError(payload.new.error_message || "Transaction failed."); setModalState('failure'); setIsLoading(false); }
+                    if (payload.new.status === 'success') {
+                        setModalState('success');
+                        setShowPayFastModal(false);
+                        setIsLoading(false);
+                    }
+                    else if (payload.new.status === 'failed') {
+                        setError(payload.new.error_message || "Transaction failed.");
+                        setModalState('failure');
+                        setShowPayFastModal(false);
+                        setIsLoading(false);
+                    }
                 }
             ).subscribe();
         let pollInterval;
@@ -123,15 +147,54 @@ const Checkout = () => {
         try {
             const { error: insertError } = await supabase.from('pending_payments').insert([{ user_id: user?.id, amount: finalAmount, order_id: basketId, status: 'initiated', validity, email: user?.email, plan_name: planName }]);
             if (insertError) throw new Error("Could not initialize transaction.");
-            const response = await fetch('https://mobile-payment-medmacs.vercel.app/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: finalAmount, basketId }) });
+
+            const response = await fetch('https://medmacs.app/api/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: finalAmount, basketId }) });
             const text = await response.text();
             let data; try { data = text ? JSON.parse(text) : null; } catch { throw new Error("Payment server returned invalid response."); }
             if (!response.ok || !data?.ACCESS_TOKEN) throw new Error(data?.message || "Failed to get payment token.");
-            setIsRedirecting(true);
-            const form = document.createElement('form'); form.method = 'POST'; form.action = "https://ipg1.apps.net.pk/Ecommerce/api/Transaction/PostTransaction";
-            const fields = { MERCHANT_ID: "248744", Merchant_Name: "MEMACS Pakistan", MERCHANT_USERAGENT: navigator.userAgent, TOKEN: data.ACCESS_TOKEN, PROCCODE: "00", TXNAMT: finalAmount, CUSTOMER_MOBILE_NO: mobileNumber || "03000000000", CUSTOMER_EMAIL_ADDRESS: user?.email || "", SUCCESS_URL: `${window.location.origin}/payment-success?plan=${planName}&validity=${validity}`, FAILURE_URL: `${window.location.origin}/payment-failure`, CHECKOUT_URL: `https://mobile-payment-medmacs.vercel.app/pqyment-webhook`, BASKET_ID: basketId, ORDER_DATE: new Date().toISOString().slice(0, 10), SIGNATURE: "PAYMENT_REQ", VERSION: "V1.2", TXNDESC: `Upgrade to ${planName} (${duration})`, CURRENCY_CODE: "PKR", P1: user?.id || "", P2: planName, P3: duration };
-            Object.entries(fields).forEach(([key, value]) => { const input = document.createElement('input'); input.type = 'hidden'; input.name = key; input.value = value; form.appendChild(input); });
-            document.body.appendChild(form); form.submit();
+
+            // GENERATE AUTO-SUBMITTING HTML FOR THE WEBVIEW
+            const fields = {
+                MERCHANT_ID: "103", Merchant_Name: "MEDMACS Pakistan", MERCHANT_USERAGENT: navigator.userAgent, TOKEN: data.ACCESS_TOKEN, PROCCODE: "00", TXNAMT: finalAmount, CUSTOMER_MOBILE_NO: mobileNumber || "03000000000",
+                CUSTOMER_EMAIL_ADDRESS: user?.email || "", SUCCESS_URL: `${window.location.origin}/payment-success?plan=${planName}&validity=${validity}`, FAILURE_URL: `${window.location.origin}/payment-failure`,
+                CHECKOUT_URL: `https://medmacs.app/api/payment-webhook`, BASKET_ID: basketId, ORDER_DATE: new Date().toISOString().slice(0, 10), SIGNATURE: "PAYMENT_REQ", VERSION: "V1.2",
+                TXNDESC: `Upgrade to ${planName} (${duration})`, CURRENCY_CODE: "PKR", P1: user?.id || "", P2: planName, P3: duration
+            };
+
+            const formInputs = Object.entries(fields)
+                .map(([key, value]) => `<input type="hidden" name="${key}" value="${value}">`)
+                .join('');
+
+            const autoSubmitHtml = `
+                <html>
+                <body onload="document.forms[0].submit()">
+                    <form method="POST" action="https://ipguat.apps.net.pk/Ecommerce/api/Transaction/PostTransaction">
+                        ${formInputs}
+                    </form>
+                    <div style="display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;">
+                        <p>Loading Secure Payment Gateway...</p>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            const form = document.createElement("form");
+            form.method = "POST";
+            form.action = "https://ipguat.apps.net.pk/Ecommerce/api/Transaction/PostTransaction";
+
+            Object.entries(fields).forEach(([key, value]) => {
+                const input = document.createElement("input");
+                input.type = "hidden";
+                input.name = key;
+                input.value = value as string;
+                form.appendChild(input);
+            });
+
+            document.body.appendChild(form);
+            form.submit();
+
+            setModalState('processing'); // Set to processing so Supabase listener starts
+            setIsLoading(false);
         } catch (err) { setError(err.message || "An error occurred."); setIsLoading(false); }
     };
 
@@ -161,7 +224,7 @@ const Checkout = () => {
                 </div>
             </header>
 
-            <main className="container mx-auto px-4 py-8 max-w-lg mt-[calc(env(safe-area-inset-top)+60px)]">
+            <main className="container mx-auto px-4 py-8 max-w-lg mt-[calc(env(safe-area-inset-top))]">
                 <div className="text-center mb-8">
                     <h1 className="text-2xl md:text-4xl font-black tracking-tight text-foreground uppercase italic">
                         Complete <span className="text-blue-600">Payment</span>
@@ -169,7 +232,6 @@ const Checkout = () => {
                     <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] mt-2">Secure checkout</p>
                 </div>
 
-                {/* Order Summary Card */}
                 <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white shadow-2xl p-1 mb-6">
                     <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
                     <div className="relative z-10 bg-white/10 backdrop-blur-xl rounded-[1.8rem] p-6 border border-white/10">
@@ -200,7 +262,6 @@ const Checkout = () => {
                     </div>
                 </div>
 
-                {/* Promo Code */}
                 <div className="relative overflow-hidden rounded-[1.5rem] bg-gradient-to-br from-slate-500 via-slate-600 to-slate-700 text-white shadow-xl p-4 mb-6">
                     <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
                     <div className="relative z-10">
@@ -215,7 +276,6 @@ const Checkout = () => {
                     </div>
                 </div>
 
-                {/* Payment Methods */}
                 <div className="space-y-3 mb-6">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Payment Method</p>
                     <div onClick={() => setPaymentMethod('easypaisa')}
@@ -248,7 +308,6 @@ const Checkout = () => {
                     </div>
                 </div>
 
-                {/* Terms */}
                 <div className="flex items-start space-x-3 p-3 mb-4">
                     <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(checked) => setAgreedToTerms(checked)} className="mt-1" />
                     <label htmlFor="terms" className="text-xs leading-snug text-muted-foreground">
@@ -266,7 +325,22 @@ const Checkout = () => {
                 </Button>
             </main>
 
-            <Dialog open={modalState !== 'idle'} onOpenChange={(open) => !open && setModalState('idle')}>
+            {/* PAYFAST WEBVIEW MODAL */}
+            <Dialog open={showPayFastModal} onOpenChange={setShowPayFastModal}>
+                <DialogContent className="sm:max-w-[500px] h-[85vh] p-0 overflow-hidden bg-white border-none rounded-t-3xl sm:rounded-3xl">
+                    <DialogTitle className="sr-only">Secure Payment</DialogTitle>
+                    {payFastHtml && (
+                        <iframe
+                            id="payfast-frame"
+                            title="PayFast Gateway"
+                            className="w-full h-full border-none"
+                            srcDoc={payFastHtml}
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={modalState !== 'idle' && !showPayFastModal} onOpenChange={(open) => !open && setModalState('idle')}>
                 <DialogContent className={cn("sm:max-w-md bg-card border-border transition-all duration-300", "max-sm:fixed max-sm:bottom-0 max-sm:top-auto max-sm:translate-y-0 max-sm:rounded-t-2xl max-sm:rounded-b-none max-sm:max-w-full max-sm:border-x-0 max-sm:border-b-0")}>
                     <div className="flex flex-col items-center justify-center py-6 text-center">
                         {modalState === 'processing' && (
