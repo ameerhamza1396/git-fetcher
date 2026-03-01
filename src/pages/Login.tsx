@@ -63,7 +63,7 @@ const Login = () => {
       </header>
 
       <main className="container mx-auto px-4 max-w-7xl w-full">
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto mt-[calc(env(safe-area-inset-top))]">
+        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto mt-[calc(env(safe-area-inset-top)+60px)]">
 
           {/* Login Card - styled like pricing card */}
           <motion.div

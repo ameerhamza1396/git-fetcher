@@ -75,7 +75,7 @@ const PurchaseHistory = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-xl mt-[calc(env(safe-area-inset-top))]">
+      <main className="container mx-auto px-4 py-8 max-w-xl mt-[calc(env(safe-area-inset-top)+60px)]">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-black text-foreground uppercase tracking-tight italic">
             Your <span className="text-blue-600">Purchases</span>
