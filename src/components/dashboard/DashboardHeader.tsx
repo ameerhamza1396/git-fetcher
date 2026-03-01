@@ -26,8 +26,8 @@ const DashboardHeader = ({ profile, user, displayName }: DashboardHeaderProps) =
   const userPlanDisplayName = rawUserPlan.charAt(0).toUpperCase() + rawUserPlan.slice(1) + ' Plan';
 
   return (
-    <header className="absolute top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)]">      
-     <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)]">      
+     <div className="container mx-auto px-4 lg:px-8 h-14 flex justify-between items-center">
         <div className="flex items-center space-x-3">
           <img
             src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png"
