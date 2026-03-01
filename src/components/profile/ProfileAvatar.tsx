@@ -1,7 +1,5 @@
 // @ts-nocheck
-// rewritten file, with plan restrictions removed
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,6 +15,9 @@ import {
     Pencil,
     Trash2,
     XCircle,
+    ZoomIn,
+    ZoomOut,
+    RotateCw,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/hooks/useAuth';
@@ -31,9 +32,53 @@ import {
 } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
+import Cropper from 'react-easy-crop';
 
 const CLOUDINARY_CLOUD_NAME = 'dsrzawwej';
 const CLOUDINARY_UPLOAD_PRESET = 'profiles_pictures';
+
+// Helper to create a cropped image blob from canvas
+const createCroppedImage = async (imageSrc: string, pixelCrop: any): Promise<Blob> => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.src = imageSrc;
+
+    await new Promise((resolve, reject) => {
+        image.onload = resolve;
+        image.onerror = reject;
+    });
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Could not get canvas context');
+
+    canvas.width = pixelCrop.width;
+    canvas.height = pixelCrop.height;
+
+    ctx.drawImage(
+        image,
+        pixelCrop.x,
+        pixelCrop.y,
+        pixelCrop.width,
+        pixelCrop.height,
+        0,
+        0,
+        pixelCrop.width,
+        pixelCrop.height
+    );
+
+    return new Promise((resolve, reject) => {
+        canvas.toBlob(
+            (blob) => {
+                if (blob) resolve(blob);
+                else reject(new Error('Canvas toBlob failed'));
+            },
+            'image/jpeg',
+            0.92
+        );
+    });
+};
 
 const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDisplayName, planColors, isHeader }) => {
     const queryClient = useQueryClient();
@@ -44,18 +89,28 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
     const [isUploading, setIsUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [showAvatarEditDialog, setShowAvatarEditDialog] = useState(false);
-    const [isAutoDeletingAvatar, setIsAutoDeletingAvatar] = useState(false);
+
+    // Cropper state
+    const [imageSrc, setImageSrc] = useState<string | null>(null);
+    const [crop, setCrop] = useState({ x: 0, y: 0 });
+    const [zoom, setZoom] = useState(1);
+    const [rotation, setRotation] = useState(0);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
 
     const userAvatarUrl = profileData?.avatar_url;
-
-    // *** MODIFICATION: Removed plan restriction. Now always true. ***
-    const canEditProfilePicture = true;
-
     const currentPlanColorClasses = planColors[rawUserPlan] || planColors['default'];
+
+    const onCropComplete = useCallback((_croppedArea: any, croppedPixels: any) => {
+        setCroppedAreaPixels(croppedPixels);
+    }, []);
 
     const handleFileChange = (e) => {
         setProfilePictureError('');
         setProfilePictureFile(null);
+        setImageSrc(null);
+        setCrop({ x: 0, y: 0 });
+        setZoom(1);
+        setRotation(0);
 
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
@@ -64,7 +119,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
             const maxSizeBytes = maxSizeMB * 1024 * 1024;
 
             if (!allowedTypes.includes(file.type)) {
-                setProfilePictureError(`Invalid file type. Please upload a JPEG, PNG, or WEBP image.`);
+                setProfilePictureError('Invalid file type. Please upload a JPEG, PNG, or WEBP image.');
                 e.target.value = '';
                 return;
             }
@@ -76,14 +131,21 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
             }
 
             setProfilePictureFile(file);
+
+            // Read file for cropper
+            const reader = new FileReader();
+            reader.onload = () => {
+                setImageSrc(reader.result as string);
+            };
+            reader.readAsDataURL(file);
         }
     };
 
-    const uploadFileToCloudinary = async (file) => {
-        if (!file) return null;
+    const uploadFileToCloudinary = async (fileOrBlob: File | Blob) => {
+        if (!fileOrBlob) return null;
 
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', fileOrBlob);
         formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
 
         setIsUploading(true);
@@ -95,7 +157,6 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                 body: formData,
             });
 
-            // Retained the simulated progress bar
             for (let i = 0; i <= 100; i += 10) {
                 await new Promise(resolve => setTimeout(resolve, 50));
                 setUploadProgress(i);
@@ -124,20 +185,17 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
     const updateAvatarUrlMutation = useMutation({
         mutationFn: async (newAvatarUrl) => {
             if (!user?.id) throw new Error('User not authenticated.');
-
             const { data, error } = await supabase
                 .from('profiles')
                 .update({ avatar_url: newAvatarUrl })
                 .eq('id', user.id);
-
             if (error) throw error;
             return data as any;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
-            setProfilePictureFile(null);
-            setProfilePictureError('');
-            setShowAvatarEditDialog(false);
+            queryClient.invalidateQueries({ queryKey: ['profileDropdownProfile', user.id] });
+            resetDialogState();
         },
         onError: (err) => {
             toast.error(`Failed to update profile: ${err.message}`);
@@ -147,67 +205,38 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
     const deleteAvatarMutation = useMutation({
         mutationFn: async () => {
             if (!user?.id) throw new Error('User not authenticated.');
-
             const { error } = await supabase
                 .from('profiles')
                 .update({ avatar_url: null })
                 .eq('id', user.id);
-
             if (error) throw error;
         },
-        onSuccess: (_data: any, _variables: any, context: any) => {
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
-            if (!context?.isAutoDelete) {
-                toast.success('Profile picture deleted successfully!');
-            }
-            setShowAvatarEditDialog(false);
+            queryClient.invalidateQueries({ queryKey: ['profileDropdownProfile', user.id] });
+            toast.success('Profile picture deleted successfully!');
+            resetDialogState();
         },
-        onError: (err: any, _variables: any, context: any) => {
-            if (!context?.isAutoDelete) {
-                toast.error(`Failed to delete profile picture: ${err.message}`);
-            } else {
-                console.error("Auto-delete avatar failed:", err);
-            }
+        onError: (err) => {
+            toast.error(`Failed to delete profile picture: ${err.message}`);
         },
     });
 
-    // *** MODIFICATION: Removed plan check from useEffect that performs auto-delete ***
-    useEffect(() => {
-        if (user && profileData && !deleteAvatarMutation.isPending && !isAutoDeletingAvatar) {
-            const currentPlan = profileData.plan?.toLowerCase();
-            // Original condition: ['free', 'iconic'].includes(currentPlan) && profileData.avatar_url
-            // The purpose of this seems to be auto-deleting the avatar if the user is on a plan that *doesn't* support it.
-            // Since we're removing all restrictions, this entire block should be removed or disabled to prevent accidental deletions.
-            // However, based on the prompt to *only* remove restrictions on uploading/deleting, I will comment this out 
-            // as it contradicts the goal of allowing avatars for all plans.
-
-            /*
-            if (['free', 'iconic'].includes(currentPlan) && profileData.avatar_url) {
-                setIsAutoDeletingAvatar(true);
-                deleteAvatarMutation.mutate(undefined, {
-                    onSuccess: () => {
-                        queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
-                        setIsAutoDeletingAvatar(false);
-                    },
-                    onError: (error) => {
-                        console.error("Auto-delete avatar failed:", error);
-                        toast.error("Failed to remove unsupported profile picture.", {
-                            description: error.message,
-                        });
-                        setIsAutoDeletingAvatar(false);
-                    },
-                    context: { isAutoDelete: true }
-                });
-            }
-            */
-        }
-    }, [user, profileData, deleteAvatarMutation.mutate, queryClient, isAutoDeletingAvatar]);
-
+    const resetDialogState = () => {
+        setShowAvatarEditDialog(false);
+        setProfilePictureFile(null);
+        setProfilePictureError('');
+        setImageSrc(null);
+        setCrop({ x: 0, y: 0 });
+        setZoom(1);
+        setRotation(0);
+        setCroppedAreaPixels(null);
+    };
 
     const handleSubmitProfilePicture = async (e) => {
         e.preventDefault();
-        if (!profilePictureFile) {
-            setProfilePictureError('Please select an image to upload.');
+        if (!imageSrc || !croppedAreaPixels) {
+            setProfilePictureError('Please select and crop an image.');
             return;
         }
         if (profilePictureError) {
@@ -215,39 +244,21 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
             return;
         }
 
-        // *** MODIFICATION: Removed plan restriction check ***
-        /* if (!canEditProfilePicture) {
-            toast.error("Your current plan does not allow profile picture updates.");
-            return;
-        }
-        */
-
-        const uploadedUrl = await uploadFileToCloudinary(profilePictureFile);
-        if (uploadedUrl) {
-            updateAvatarUrlMutation.mutate(uploadedUrl);
+        try {
+            const croppedBlob = await createCroppedImage(imageSrc, croppedAreaPixels);
+            const uploadedUrl = await uploadFileToCloudinary(croppedBlob);
+            if (uploadedUrl) {
+                updateAvatarUrlMutation.mutate(uploadedUrl);
+            }
+        } catch (err) {
+            console.error('Crop error:', err);
+            toast.error('Failed to crop image. Please try again.');
         }
     };
 
     const handleDeleteAvatar = () => {
-        // *** MODIFICATION: Removed plan restriction check ***
-        /* if (!canEditProfilePicture) {
-            toast.error("Your current plan does not allow profile picture deletion.");
-            return;
-        }
-        */
         deleteAvatarMutation.mutate(undefined);
     };
-
-    if (isAutoDeletingAvatar && !isHeader) {
-        return (
-            <div className="flex flex-col items-center justify-center p-4">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-2" />
-                <p className="text-sm text-gray-700 dark:text-gray-300">
-                    Cleaning up unsupported avatar...
-                </p>
-            </div>
-        );
-    }
 
     return (
         <>
@@ -270,135 +281,135 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                     </Avatar>
                 </div>
             ) : (
-                <div
-                    // *** MODIFICATION: Removed 'group-hover:grayscale' conditional class from the main avatar div's class name. 
-                    // Since canEditProfilePicture is always true, the ternary '... : '' ' part is not needed, but for simplicity of diff, 
-                    // I'll keep it (or rather, remove the `!canEditProfilePicture` check that triggers the greyscale).
-                    className={`relative w-32 h-32 mx-auto rounded-full overflow-hidden border-4 border-blue-400 dark:border-blue-600 shadow-md mb-4 group`}
-                >
+                <div className="relative w-20 h-20 rounded-full overflow-hidden border-[3px] border-white/30 shadow-lg group cursor-pointer" onClick={() => setShowAvatarEditDialog(true)}>
                     <Avatar className="w-full h-full">
-                        <AvatarImage
-                            src={userAvatarUrl || undefined}
-                            alt="Profile Avatar"
-                            // *** MODIFICATION: Removed 'group-hover:grayscale' conditional class from AvatarImage. ***
-                            className={`w-full h-full object-cover transition-all duration-300`}
-                        />
-                        <AvatarFallback
-                            // *** MODIFICATION: Removed 'group-hover:grayscale' conditional class from AvatarFallback. ***
-                            className={`w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white text-5xl font-bold transition-all duration-300`}
-                        >
+                        <AvatarImage src={userAvatarUrl || undefined} alt="Profile Avatar" className="w-full h-full object-cover transition-all duration-300" />
+                        <AvatarFallback className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white text-2xl font-bold">
                             {displayName.substring(0, 1).toUpperCase()}
                         </AvatarFallback>
                     </Avatar>
-
-                    {/* *** MODIFICATION: Removed the plan restriction tooltip block completely. *** */}
-                    {/* {!canEditProfilePicture && (
-                        <div className={`
-                            absolute top-full left-1/2 -translate-x-1/2 mt-2 p-2
-                            bg-gray-800 dark:bg-gray-700 text-white text-xs rounded-lg shadow-lg
-                            whitespace-nowrap z-10
-                            transition-opacity duration-300
-                            opacity-0 invisible group-hover:opacity-100 group-hover:visible
-                            pointer-events-none
-                        `}>
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-b-[6px] border-l-transparent border-r-transparent border-b-gray-800 dark:border-b-gray-700"></div>
-                            Updating profile picture feature is not available on your current plan. Upgrade your plan to continue.
-                        </div>
-                    )}
-                    */}
-
-                    {/* *** MODIFICATION: The edit button is now always visible on hover (since canEditProfilePicture is always true). *** */}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute bottom-1 right-1 bg-white/80 dark:bg-gray-700/80 rounded-full p-2 shadow-md hover:bg-white dark:hover:bg-gray-600 transition-all duration-200 opacity-0 group-hover:opacity-100"
-                        onClick={() => setShowAvatarEditDialog(true)}
-                        aria-label="Edit profile picture"
-                    >
-                        <Pencil className="h-4 w-4 text-gray-700 dark:text-gray-300" />
-                    </Button>
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <Pencil className="h-5 w-5 text-white" />
+                    </div>
                 </div>
             )}
 
-            {/* Profile Picture Edit Dialog */}
-            <Dialog open={showAvatarEditDialog} onOpenChange={setShowAvatarEditDialog}>
-                <DialogContent className="sm:max-w-[425px]">
+            {/* Profile Picture Edit Dialog — Overhauled */}
+            <Dialog open={showAvatarEditDialog} onOpenChange={(open) => { if (!open) resetDialogState(); else setShowAvatarEditDialog(true); }}>
+                <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle className="flex items-center">
-                            <ImageIcon className="h-5 w-5 mr-2 text-blue-600" /> Edit Profile Picture
+                        <DialogTitle className="flex items-center gap-2">
+                            <ImageIcon className="h-5 w-5 text-primary" /> Edit Profile Picture
                         </DialogTitle>
                         <DialogDescription>
-                            Upload a new profile picture or remove your current one.
+                            Upload and crop your photo to a perfect square.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="flex flex-col items-center space-y-4 py-4">
-                        <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-blue-300 dark:border-blue-700 shadow-sm">
-                            <Avatar className="w-full h-full">
-                                <AvatarImage
-                                    src={userAvatarUrl || undefined}
-                                    alt="Current Avatar"
-                                    className="w-full h-full object-cover"
-                                />
-                                <AvatarFallback className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white text-3xl font-bold">
-                                    {displayName.substring(0, 1).toUpperCase()}
-                                </AvatarFallback>
-                            </Avatar>
-                        </div>
-                        {userAvatarUrl && (
-                            <Button
-                                variant="destructive"
-                                onClick={handleDeleteAvatar}
-                                // *** MODIFICATION: Removed plan restriction check from disabled prop. ***
-                                disabled={deleteAvatarMutation.isPending}
-                                className="w-full max-w-xs"
-                            >
-                                {deleteAvatarMutation.isPending ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                )}
-                                Delete Current Picture
-                            </Button>
+
+                    <div className="flex flex-col items-center gap-4 py-2">
+                        {/* Current avatar — large preview */}
+                        {!imageSrc && (
+                            <div className="relative w-48 h-48 rounded-2xl overflow-hidden border-2 border-border shadow-md bg-muted">
+                                <Avatar className="w-full h-full rounded-none">
+                                    <AvatarImage src={userAvatarUrl || undefined} alt="Current Avatar" className="w-full h-full object-cover" />
+                                    <AvatarFallback className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white text-6xl font-bold rounded-none">
+                                        {displayName.substring(0, 1).toUpperCase()}
+                                    </AvatarFallback>
+                                </Avatar>
+                            </div>
                         )}
-                        <div className="w-full max-w-xs border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
-                            <Label htmlFor="dialogProfilePictureUpload" className="mb-2 block">Upload New Image (JPEG, PNG, WEBP, max 2MB)</Label>
-                            <Input
-                                id="dialogProfilePictureUpload"
-                                type="file"
-                                accept="image/jpeg,image/png,image/webp"
-                                onChange={handleFileChange}
-                                className="bg-gray-50 dark:bg-gray-700 file:text-blue-600 dark:file:text-blue-400"
-                            // *** MODIFICATION: Removed plan restriction check from disabled prop. ***
-                            // disabled={!canEditProfilePicture} 
-                            />
-                            {profilePictureFile && (
-                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+
+                        {/* 1:1 Cropper */}
+                        {imageSrc && (
+                            <div className="w-full flex flex-col gap-3">
+                                <div className="relative w-full aspect-square rounded-2xl overflow-hidden bg-black">
+                                    <Cropper
+                                        image={imageSrc}
+                                        crop={crop}
+                                        zoom={zoom}
+                                        rotation={rotation}
+                                        aspect={1}
+                                        cropShape="round"
+                                        showGrid={false}
+                                        onCropChange={setCrop}
+                                        onZoomChange={setZoom}
+                                        onRotationChange={setRotation}
+                                        onCropComplete={onCropComplete}
+                                    />
+                                </div>
+                                {/* Zoom & Rotate controls */}
+                                <div className="flex items-center gap-3 px-1">
+                                    <ZoomOut className="h-4 w-4 text-muted-foreground shrink-0" />
+                                    <Slider
+                                        value={[zoom]}
+                                        min={1}
+                                        max={3}
+                                        step={0.05}
+                                        onValueChange={(val) => setZoom(val[0])}
+                                        className="flex-1"
+                                    />
+                                    <ZoomIn className="h-4 w-4 text-muted-foreground shrink-0" />
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setRotation((r) => (r + 90) % 360)}>
+                                        <RotateCw className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* File picker + Delete row */}
+                        <div className="w-full space-y-3">
+                            <div className="flex items-center gap-2">
+                                <Label htmlFor="dialogProfilePictureUpload" className="sr-only">Upload image</Label>
+                                <Input
+                                    id="dialogProfilePictureUpload"
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    onChange={handleFileChange}
+                                    className="flex-1 text-xs file:text-xs bg-muted/50 border-border"
+                                />
+                                {userAvatarUrl && !imageSrc && (
+                                    <Button
+                                        variant="destructive"
+                                        size="icon"
+                                        onClick={handleDeleteAvatar}
+                                        disabled={deleteAvatarMutation.isPending}
+                                        className="h-9 w-9 shrink-0"
+                                        title="Delete current picture"
+                                    >
+                                        {deleteAvatarMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                    </Button>
+                                )}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">JPEG, PNG or WEBP · Max 2 MB</p>
+
+                            {profilePictureFile && !profilePictureError && (
+                                <p className="text-xs text-muted-foreground">
                                     Selected: {profilePictureFile.name} ({(profilePictureFile.size / 1024 / 1024).toFixed(2)} MB)
                                 </p>
                             )}
                             {profilePictureError && (
-                                <p className="text-red-500 text-sm mt-1 flex items-center">
-                                    <XCircle className="h-4 w-4 mr-1" /> {profilePictureError}
+                                <p className="text-destructive text-xs flex items-center gap-1">
+                                    <XCircle className="h-3.5 w-3.5" /> {profilePictureError}
                                 </p>
                             )}
                         </div>
                     </div>
-                    <DialogFooter>
+
+                    <DialogFooter className="gap-2 sm:gap-0">
                         <DialogClose asChild>
-                            <Button variant="outline">Cancel</Button>
+                            <Button variant="outline" size="sm">Cancel</Button>
                         </DialogClose>
                         <Button
-                            type="submit"
+                            size="sm"
                             onClick={handleSubmitProfilePicture}
-                            // *** MODIFICATION: Removed plan restriction check from disabled prop. ***
-                            disabled={isUploading || updateAvatarUrlMutation.isPending || !profilePictureFile || !!profilePictureError}
+                            disabled={isUploading || updateAvatarUrlMutation.isPending || !imageSrc || !croppedAreaPixels || !!profilePictureError}
                         >
                             {isUploading || updateAvatarUrlMutation.isPending ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             ) : (
                                 <UploadCloud className="mr-2 h-4 w-4" />
                             )}
-                            {isUploading ? `Uploading (${uploadProgress.toFixed(0)}%)` : 'Save New Picture'}
+                            {isUploading ? `Uploading ${uploadProgress.toFixed(0)}%` : 'Save'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
