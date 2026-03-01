@@ -153,7 +153,7 @@ const Profile = () => {
                 </div>
             </header>
 
-            <main className="container mx-auto px-4 py-8 max-w-xl mt-[calc(env(safe-area-inset-top)+60px)]">
+            <main className="container mx-auto px-4 py-8 max-w-xl mt-[var(--header-height)]">
                 {/* Profile hero card - pricing style */}
                 <div className={`relative overflow-hidden rounded-[2rem] bg-gradient-to-br ${style.gradient} text-white shadow-2xl p-6 mb-6`}>
                     <div className="absolute inset-0 opacity-10" style={{

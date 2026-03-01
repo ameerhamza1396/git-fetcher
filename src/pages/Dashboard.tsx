@@ -645,7 +645,7 @@ const Dashboard = () => {
       </header>
 
       {/* Content */}
-      <div className="px-5 mt-[calc(env(safe-area-inset-top)+60px)]">
+      <div className="px-5 mt-[var(--header-height)]">
         {renderTabContent()}
       </div>
 

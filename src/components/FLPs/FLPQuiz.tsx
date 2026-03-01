@@ -256,7 +256,7 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName }: F
         </AnimatePresence>
 
         {/* Main Content */}
-        <main className={`flex-grow flex flex-col items-center px-4 py-8 mt-[calc(env(safe-area-inset-top)+60px)] pb-[env(safe-area-inset-bottom)] overflow-y-auto ${isPanelOpen ? 'lg:ml-64' : ''}`}>
+        <main className={`flex-grow flex flex-col items-center px-4 py-8 mt-[var(--header-height)] pb-[env(safe-area-inset-bottom)] overflow-y-auto ${isPanelOpen ? 'lg:ml-64' : ''}`}>
           <div className="text-center mb-6 space-y-1">
             {subjectName && (
               <p className="text-primary text-xs uppercase tracking-[0.2em] font-bold">{subjectName}</p>
