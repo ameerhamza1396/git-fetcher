@@ -161,12 +161,8 @@ const Profile = () => {
                         maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
                     }} />
                     <div className="relative z-10 flex items-center gap-4">
-                        <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center overflow-hidden shrink-0">
-                            {profileData?.avatar_url ? (
-                                <img src={profileData.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                            ) : (
-                                <span className="text-white font-black text-xl">{displayName.substring(0, 2).toUpperCase()}</span>
-                            )}
+                        <div className="shrink-0">
+                            <ProfileAvatar user={user} profileData={profileData} displayName={displayName} rawUserPlan={rawUserPlan} userPlanDisplayName={userPlanDisplayName} planColors={planColors} isHeader={false} />
                         </div>
                         <div>
                             <h2 className="text-xl font-black italic uppercase tracking-tight">{displayName}</h2>
