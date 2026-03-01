@@ -194,7 +194,7 @@ const MCQs = () => {
         </div>
       </header>
 
-      <div className="container mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8 max-w-full mt-[calc(env(safe-area-inset-top))]">
+      <div className="container mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8 max-w-full mt-[calc(env(safe-area-inset-top)+60px)]">
         {currentScreen === 'subjects' && (
           <>
             {/* Hero with mascot */}

@@ -168,7 +168,7 @@ const AITestGenerator: React.FC = () => {
                 </div>
             </header>
 
-            <main className="container mx-auto px-4 py-8 max-w-2xl mt-[calc(env(safe-area-inset-top))]">
+            <main className="container mx-auto px-4 py-8 max-w-2xl mt-[calc(env(safe-area-inset-top)+60px)]">
                 {/* No Access */}
                 {!hasAccess && (
                     <div className="text-center py-16 space-y-6">
