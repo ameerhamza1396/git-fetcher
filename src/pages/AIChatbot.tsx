@@ -202,7 +202,7 @@ const DrSultanChat: React.FC = () => {
   if (authLoading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
 
   return (
-    <div className="h-screen w-full flex overflow-hidden bg-white dark:bg-gray-950">
+    <div className="h-screen w-full flex overflow-hidden bg-background">
       <Seo title="Dr. Ahroid | AI Tutor" />
 
       {/* DELETE MODAL */}
@@ -294,7 +294,7 @@ const DrSultanChat: React.FC = () => {
         </div>
 
         {/* FOOTER: Fixed at bottom with safe area support */}
-        <footer className="p-4 lg:p-6 border-t bg-white dark:bg-gray-950 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <footer className="p-4 lg:p-6 border-t bg-background pb-[max(1rem,calc(env(safe-area-inset-bottom)+60px))]">
           {!canUseChat ? (
             <div className="max-w-4xl mx-auto p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 rounded-2xl flex items-center justify-between">
               <div className="flex items-center gap-3 text-sm font-semibold text-amber-800 dark:text-amber-200">

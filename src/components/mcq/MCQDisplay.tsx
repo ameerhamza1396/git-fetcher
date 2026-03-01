@@ -10,6 +10,7 @@ import { fetchMCQsByChapter, MCQ } from '@/utils/mcqData';
 import { supabase } from '@/integrations/supabase/client';
 import { AIChatbot } from './AIChatbot';
 import { useQuery } from '@tanstack/react-query';
+import { playCorrectSound, playIncorrectSound } from '@/utils/soundEffects';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
@@ -187,6 +188,10 @@ export const MCQDisplay = ({
     if (typeof window !== 'undefined') return localStorage.getItem('aiPopupsDisabled') === 'true';
     return false;
   });
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('mcqSoundDisabled') !== 'true';
+    return true;
+  });
   const [dailySubmissionsCount, setDailySubmissionsCount] = useState(0);
   const [lastSubmissionResetDate, setLastSubmissionResetDate] = useState<string | null>(null);
 
@@ -358,6 +363,10 @@ export const MCQDisplay = ({
     const answer = timeUp ? '' : selectedAnswer;
     const timeTaken = Math.floor((Date.now() - startTime) / 1000);
     const isCorrect = answer === currentMCQ.correct_answer;
+    if (soundEnabled) {
+      if (isCorrect && !timeUp) playCorrectSound();
+      else playIncorrectSound();
+    }
     if (isCorrect && !timeUp) setScore(prev => prev + 1);
     try {
       await supabase.from('user_answers').insert({ user_id: user.id, mcq_id: currentMCQ.id, selected_answer: answer || 'No answer (time up)', is_correct: isCorrect, time_taken: timeTaken });
@@ -546,6 +555,18 @@ export const MCQDisplay = ({
                       <BotOff className="w-4 h-4 mr-2" />
                       {aiPopupsDisabled ? 'Enable AI Popups' : 'Disable AI Popups'}
                       {!isPremium && <Crown className="w-3 h-3 ml-auto text-yellow-500" />}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        const newVal = !soundEnabled;
+                        setSoundEnabled(newVal);
+                        localStorage.setItem('mcqSoundDisabled', String(!newVal));
+                        toast({ title: newVal ? 'Sound Enabled' : 'Sound Disabled' });
+                      }}
+                      className="text-sm cursor-pointer"
+                    >
+                      {soundEnabled ? '🔊' : '🔇'}
+                      <span className="ml-2">{soundEnabled ? 'Disable Sound' : 'Enable Sound'}</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="text-sm cursor-pointer">
