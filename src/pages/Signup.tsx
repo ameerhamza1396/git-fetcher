@@ -174,7 +174,7 @@ const Signup = () => {
       </header>
 
       <main className="container mx-auto px-4 max-w-7xl w-full">
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto mt-[calc(env(safe-area-inset-top)+60px)]">
+        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto mt-[var(--header-height)]">
 
           {/* Side panel - desktop only */}
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="hidden md:block">

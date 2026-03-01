@@ -134,7 +134,7 @@ const ContactUsPage = () => {
                 </div>
             </header>
 
-            <main className="container mx-auto px-4 py-8 max-w-2xl mt-[calc(env(safe-area-inset-top)+60px)]">
+            <main className="container mx-auto px-4 py-8 max-w-2xl mt-[var(--header-height)]">
                 <div className="text-center mb-8">
                     <h1 className="text-2xl md:text-4xl font-black tracking-tight text-foreground uppercase italic">
                         Get in <span className="text-blue-600">Touch</span>

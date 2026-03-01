@@ -196,7 +196,7 @@ const Pricing = () => {
             <main className="container mx-auto px-4 lg:px-8 py-12 lg:py-16 max-w-7xl">
                 <div className="text-center mb-12">
                     <h1 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 
-                    dark:text-white mb-4 italic uppercase mt-[calc(env(safe-area-inset-top)+60px)]">
+                    dark:text-white mb-4 italic uppercase mt-[var(--header-height)]">
                         Choose Your <span className="text-blue-600">Path</span>
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 font-medium max-w-xl mx-auto mb-10 uppercase text-xs tracking-[0.2em]">
