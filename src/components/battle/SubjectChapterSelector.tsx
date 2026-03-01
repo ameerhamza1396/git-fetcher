@@ -1,10 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
-import { BookOpen, List } from 'lucide-react';
+import { BookOpen, ChevronDown, Check } from 'lucide-react';
 
 interface Subject {
   id: string;
@@ -34,129 +30,119 @@ export const SubjectChapterSelector = ({
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
   const [isLoadingChapters, setIsLoadingChapters] = useState(false);
+  const [showSubjects, setShowSubjects] = useState(false);
+  const [showChapters, setShowChapters] = useState(false);
 
-  useEffect(() => {
-    loadSubjects();
-  }, []);
+  const selectedSubject = subjects.find(s => s.id === selectedSubjectId);
+  const selectedChapter = chapters.find(c => c.id === selectedChapterId);
 
+  useEffect(() => { loadSubjects(); }, []);
   useEffect(() => {
-    if (selectedSubjectId) {
-      loadChapters(selectedSubjectId);
-    } else {
-      setChapters([]);
-    }
+    if (selectedSubjectId) loadChapters(selectedSubjectId);
+    else setChapters([]);
   }, [selectedSubjectId]);
 
   const loadSubjects = async () => {
     try {
-      const { data, error } = await supabase
-        .from('subjects')
-        .select('id, name')
-        .order('name');
-
+      const { data, error } = await supabase.from('subjects').select('id, name').order('name');
       if (error) throw error;
       setSubjects(data || []);
-    } catch (error) {
-      console.error('Error loading subjects:', error);
-    } finally {
-      setIsLoadingSubjects(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setIsLoadingSubjects(false); }
   };
 
   const loadChapters = async (subjectId: string) => {
     setIsLoadingChapters(true);
     try {
-      const { data, error } = await supabase
-        .from('chapters')
-        .select('id, name, subject_id')
-        .eq('subject_id', subjectId)
-        .order('chapter_number');
-
+      const { data, error } = await supabase.from('chapters').select('id, name, subject_id').eq('subject_id', subjectId).order('chapter_number');
       if (error) throw error;
       setChapters(data || []);
-    } catch (error) {
-      console.error('Error loading chapters:', error);
-    } finally {
-      setIsLoadingChapters(false);
-    }
-  };
-
-  const handleSubjectChange = (subjectId: string) => {
-    const subject = subjects.find(s => s.id === subjectId);
-    if (subject) {
-      onSubjectChange(subjectId, subject.name);
-    }
-  };
-
-  const handleChapterChange = (chapterId: string) => {
-    const chapter = chapters.find(c => c.id === chapterId);
-    if (chapter) {
-      onChapterChange(chapterId, chapter.name);
-    }
+    } catch (e) { console.error(e); }
+    finally { setIsLoadingChapters(false); }
   };
 
   return (
-    <Card className="border-red-200 dark:border-red-800">
-      <CardHeader>
-        <CardTitle className="text-gray-900 dark:text-white flex items-center">
-          <BookOpen className="w-5 h-5 mr-2 text-red-600" />
-          Battle Topic Selection
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="subject-select">Select Subject</Label>
-          <Select
-            value={selectedSubjectId || ''}
-            onValueChange={handleSubjectChange}
-            disabled={isLoadingSubjects}
-          >
-            <SelectTrigger id="subject-select">
-              <SelectValue placeholder={isLoadingSubjects ? "Loading subjects..." : "Choose a subject"} />
-            </SelectTrigger>
-            <SelectContent>
-              {subjects.map((subject) => (
-                <SelectItem key={subject.id} value={subject.id}>
-                  {subject.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary/10 via-blue-500/5 to-violet-500/10 backdrop-blur-2xl border border-primary/20 shadow-xl p-1.5">
+      <div className="relative z-10 bg-background/50 backdrop-blur-xl rounded-[1.5rem] border border-primary/10 p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <BookOpen className="w-5 h-5 text-primary" />
+          <h3 className="text-base font-black text-foreground">Battle Topic</h3>
         </div>
 
+        {/* Subject selector - custom expandable */}
+        <div>
+          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">Subject</label>
+          <button
+            onClick={() => { setShowSubjects(!showSubjects); setShowChapters(false); }}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-muted/30 border border-border/40 text-sm font-medium text-foreground hover:bg-muted/50 transition-all"
+          >
+            <span className={selectedSubject ? 'text-foreground' : 'text-muted-foreground'}>
+              {isLoadingSubjects ? 'Loading...' : selectedSubject?.name || 'Choose a subject'}
+            </span>
+            <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showSubjects ? 'rotate-180' : ''}`} />
+          </button>
+          {showSubjects && (
+            <div className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-border/40 bg-background/90 backdrop-blur-xl shadow-lg">
+              {subjects.map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    onSubjectChange(s.id, s.name);
+                    setShowSubjects(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-muted/40 transition-colors ${
+                    selectedSubjectId === s.id ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
+                  }`}
+                >
+                  {s.name}
+                  {selectedSubjectId === s.id && <Check className="w-4 h-4 text-primary" />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Chapter selector */}
         {selectedSubjectId && (
-          <div className="space-y-2">
-            <Label htmlFor="chapter-select">Select Chapter/Topic</Label>
-            <Select
-              value={selectedChapterId || ''}
-              onValueChange={handleChapterChange}
-              disabled={isLoadingChapters || !selectedSubjectId}
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">Chapter</label>
+            <button
+              onClick={() => { setShowChapters(!showChapters); setShowSubjects(false); }}
+              className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-muted/30 border border-border/40 text-sm font-medium text-foreground hover:bg-muted/50 transition-all"
             >
-              <SelectTrigger id="chapter-select">
-                <SelectValue placeholder={isLoadingChapters ? "Loading chapters..." : "Choose a chapter"} />
-              </SelectTrigger>
-              <SelectContent>
-                {chapters.map((chapter) => (
-                  <SelectItem key={chapter.id} value={chapter.id}>
-                    <div className="flex items-center">
-                      <List className="w-4 h-4 mr-2" />
-                      {chapter.name}
-                    </div>
-                  </SelectItem>
+              <span className={selectedChapter ? 'text-foreground' : 'text-muted-foreground'}>
+                {isLoadingChapters ? 'Loading...' : selectedChapter?.name || 'Choose a chapter'}
+              </span>
+              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showChapters ? 'rotate-180' : ''}`} />
+            </button>
+            {showChapters && (
+              <div className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-border/40 bg-background/90 backdrop-blur-xl shadow-lg">
+                {chapters.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => {
+                      onChapterChange(c.id, c.name);
+                      setShowChapters(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-muted/40 transition-colors ${
+                      selectedChapterId === c.id ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
+                    }`}
+                  >
+                    {c.name}
+                    {selectedChapterId === c.id && <Check className="w-4 h-4 text-primary" />}
+                  </button>
                 ))}
-              </SelectContent>
-            </Select>
+              </div>
+            )}
           </div>
         )}
 
         {selectedSubjectId && selectedChapterId && (
-          <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
-            <p className="text-sm text-green-700 dark:text-green-300">
-              ✓ Topic selected! Questions will be loaded from the selected chapter.
-            </p>
+          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+            <p className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold">✓ Topic selected! Ready to battle.</p>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
