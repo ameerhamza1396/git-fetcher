@@ -624,7 +624,7 @@ const Dashboard = () => {
 
       {/* Minimal top bar with avatar */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-2xl border-b border-border/30 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between px-5 h-12">
+        <div className="flex items-center justify-between px-5 h-14">
           <div className="flex items-center gap-2.5">
             <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-6 h-6" />
             <span className="text-sm font-extrabold text-foreground tracking-tight">Medmacs</span>
