@@ -155,7 +155,7 @@ const Checkout = () => {
 
             // GENERATE AUTO-SUBMITTING HTML FOR THE WEBVIEW
             const fields = {
-                MERCHANT_ID: "103", Merchant_Name: "MEDMACS Pakistan", MERCHANT_USERAGENT: navigator.userAgent, TOKEN: data.ACCESS_TOKEN, PROCCODE: "00", TXNAMT: finalAmount, CUSTOMER_MOBILE_NO: mobileNumber || "03000000000",
+                MERCHANT_ID: "248744", Merchant_Name: "MEDMACS Pakistan", MERCHANT_USERAGENT: navigator.userAgent, TOKEN: data.ACCESS_TOKEN, PROCCODE: "00", TXNAMT: finalAmount, CUSTOMER_MOBILE_NO: mobileNumber || "03000000000",
                 CUSTOMER_EMAIL_ADDRESS: user?.email || "", SUCCESS_URL: `${window.location.origin}/payment-success?plan=${planName}&validity=${validity}`, FAILURE_URL: `${window.location.origin}/payment-failure`,
                 CHECKOUT_URL: `https://medmacs.app/api/payment-webhook`, BASKET_ID: basketId, ORDER_DATE: new Date().toISOString().slice(0, 10), SIGNATURE: "PAYMENT_REQ", VERSION: "V1.2",
                 TXNDESC: `Upgrade to ${planName} (${duration})`, CURRENCY_CODE: "PKR", P1: user?.id || "", P2: planName, P3: duration
@@ -168,7 +168,7 @@ const Checkout = () => {
             const autoSubmitHtml = `
                 <html>
                 <body onload="document.forms[0].submit()">
-                    <form method="POST" action="https://ipguat.apps.net.pk/Ecommerce/api/Transaction/PostTransaction">
+                    <form method="POST" action="https://ipg1.apps.net.pk/Ecommerce/api/Transaction/PostTransaction">
                         ${formInputs}
                     </form>
                     <div style="display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;">
@@ -180,7 +180,7 @@ const Checkout = () => {
 
             const form = document.createElement("form");
             form.method = "POST";
-            form.action = "https://ipguat.apps.net.pk/Ecommerce/api/Transaction/PostTransaction";
+            form.action = "https://ipg1.apps.net.pk/Ecommerce/api/Transaction/PostTransaction";
 
             Object.entries(fields).forEach(([key, value]) => {
                 const input = document.createElement("input");
