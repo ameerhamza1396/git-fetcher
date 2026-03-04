@@ -3,22 +3,38 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { WifiOff, RefreshCw, Wifi } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+const OFFLINE_TOLERANCE_MS = 1500;
+
 const ConnectionStatusModal = () => {
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [isOffline, setIsOffline] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [showRestored, setShowRestored] = useState(false);
+  const toleranceTimer = useState<ReturnType<typeof setTimeout> | null>(null);
 
   const handleOnline = useCallback(() => {
-    setIsOffline(false);
-    setIsRetrying(false);
-    setShowRestored(true);
-    setTimeout(() => setShowRestored(false), 2500);
-  }, []);
+    // Clear any pending offline timer
+    if (toleranceTimer[0]) {
+      clearTimeout(toleranceTimer[0]);
+      toleranceTimer[0] = null;
+    }
+    if (isOffline) {
+      setIsOffline(false);
+      setIsRetrying(false);
+      setShowRestored(true);
+      setTimeout(() => setShowRestored(false), 2500);
+    }
+  }, [isOffline, toleranceTimer]);
 
   const handleOffline = useCallback(() => {
-    setIsOffline(true);
-    setShowRestored(false);
-  }, []);
+    // Delay showing offline modal to avoid false positives on refresh
+    const timer = setTimeout(() => {
+      if (!navigator.onLine) {
+        setIsOffline(true);
+        setShowRestored(false);
+      }
+    }, OFFLINE_TOLERANCE_MS);
+    toleranceTimer[0] = timer;
+  }, [toleranceTimer]);
 
   useEffect(() => {
     window.addEventListener('online', handleOnline);
