@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { INSTITUTES } from '@/utils/institutes';
+import { INSTITUTES, getInstituteDisplayName } from '@/utils/institutes';
 
 const VALID_YEARS = ['1st', '2nd', '3rd', '4th', '5th'];
 
@@ -27,7 +27,6 @@ const SetupWizard = () => {
   const [usernameError, setUsernameError] = useState('');
   const [existingProfile, setExistingProfile] = useState<any>(null);
 
-  // Determine which step user actually needs
   useEffect(() => {
     if (authLoading) return;
     if (!user) { navigate('/login'); return; }
@@ -37,17 +36,14 @@ const SetupWizard = () => {
       setExistingProfile(data);
 
       if (data) {
-        // Pre-fill existing values
         if (data.username) setUsername(data.username);
         if ((data as any).institute) setInstitute((data as any).institute);
         if ((data as any).year) setYear((data as any).year);
 
-        // Find first missing step (skip welcome which is step 0)
         if (!data.username) { setCurrentStep(1); }
         else if (!(data as any).institute) { setCurrentStep(2); }
         else if (!(data as any).year || !VALID_YEARS.includes((data as any).year)) { setCurrentStep(3); }
         else {
-          // All complete, redirect to dashboard
           navigate('/dashboard');
           return;
         }
@@ -64,7 +60,6 @@ const SetupWizard = () => {
   const validateUsername = async (value: string) => {
     if (value.length < 3) { setUsernameError('At least 3 characters'); return false; }
     if (!/^[a-zA-Z0-9_]+$/.test(value)) { setUsernameError('Letters, numbers, underscores only'); return false; }
-    // Check availability
     const { data } = await supabase.from('profiles').select('id').eq('username', value).neq('id', user!.id).maybeSingle();
     if (data) { setUsernameError('Username already taken'); return false; }
     setUsernameError('');
@@ -72,10 +67,7 @@ const SetupWizard = () => {
   };
 
   const handleNext = async () => {
-    if (currentStep === 0) {
-      setCurrentStep(1);
-      return;
-    }
+    if (currentStep === 0) { setCurrentStep(1); return; }
     if (currentStep === 1) {
       setSaving(true);
       const valid = await validateUsername(username);
@@ -104,9 +96,7 @@ const SetupWizard = () => {
       setCurrentStep(4);
       return;
     }
-    if (currentStep === 4) {
-      navigate('/dashboard');
-    }
+    if (currentStep === 4) { navigate('/dashboard'); }
   };
 
   const handleBack = () => {
@@ -139,7 +129,7 @@ const SetupWizard = () => {
 
   const renderStepContent = () => {
     switch (currentStep) {
-      case 0: // Welcome
+      case 0:
         return (
           <div className="text-center">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.2 }}>
@@ -153,7 +143,7 @@ const SetupWizard = () => {
           </div>
         );
 
-      case 1: // Username
+      case 1:
         return (
           <div className="text-center max-w-md mx-auto">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
@@ -178,7 +168,7 @@ const SetupWizard = () => {
           </div>
         );
 
-      case 2: // Institute
+      case 2:
         return (
           <div className="text-center max-w-lg mx-auto">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
@@ -188,13 +178,13 @@ const SetupWizard = () => {
             </motion.div>
             <h2 className="text-3xl font-black text-white mb-2">Select Your Institute</h2>
             <p className="text-white/60 text-sm mb-6">We'll tailor content for your college.</p>
-            <div className="space-y-3 max-h-[40vh] overflow-y-auto px-1">
+            <div className="space-y-3 max-h-[40vh] overflow-y-auto px-1 overscroll-contain">
               {INSTITUTES.map((inst) => (
                 <button
                   key={inst.id}
                   onClick={() => inst.enabled && setInstitute(inst.id)}
                   disabled={!inst.enabled}
-                  className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-200 text-left ${
+                  className={`w-full flex items-center gap-3 p-3 rounded-2xl border-2 transition-all duration-200 text-left ${
                     institute === inst.id
                       ? 'border-white bg-white/20 shadow-lg'
                       : inst.enabled
@@ -202,17 +192,30 @@ const SetupWizard = () => {
                         : 'border-white/5 bg-white/[0.02] opacity-50 cursor-not-allowed'
                   }`}
                 >
-                  <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
-                    <Building2 className="w-6 h-6 text-white/60" />
+                  {/* Institute image fading from right */}
+                  <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-white/10">
+                    <img
+                      src={inst.image}
+                      alt={inst.shortName}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-l from-transparent to-white/5" />
+                    {/* Fallback icon if image fails */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Building2 className="w-6 h-6 text-white/30" />
+                    </div>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className={`text-sm font-bold truncate ${institute === inst.id ? 'text-white' : 'text-white/80'}`}>
-                      {inst.shortName}
+                    <p className={`text-sm font-bold leading-tight ${institute === inst.id ? 'text-white' : 'text-white/80'}`}>
+                      {inst.name}
                     </p>
-                    <p className="text-[11px] text-white/50 truncate">{inst.name}</p>
+                    <p className="text-[11px] text-white/40 mt-0.5">{inst.shortName}</p>
                   </div>
                   {!inst.enabled && (
-                    <span className="text-[10px] font-bold text-amber-300 bg-amber-300/10 px-2 py-1 rounded-full shrink-0">
+                    <span className="text-[10px] font-bold text-amber-300 bg-amber-300/10 px-2 py-1 rounded-full shrink-0 whitespace-nowrap">
                       Coming Soon
                     </span>
                   )}
@@ -225,7 +228,7 @@ const SetupWizard = () => {
           </div>
         );
 
-      case 3: // Year
+      case 3:
         return (
           <div className="text-center max-w-md mx-auto">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
@@ -253,7 +256,7 @@ const SetupWizard = () => {
           </div>
         );
 
-      case 4: // All Set
+      case 4:
         return (
           <div className="text-center">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.2 }}>
@@ -305,7 +308,6 @@ const SetupWizard = () => {
         </div>
       </div>
 
-      {/* Skip (only on welcome) */}
       {currentStep === 0 && (
         <button
           onClick={() => navigate('/dashboard')}

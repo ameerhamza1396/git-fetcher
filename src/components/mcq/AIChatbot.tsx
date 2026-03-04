@@ -70,7 +70,7 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({ currentQuestion, userPlan,
         </Button>
       </motion.div>
 
-      {/* Chat panel - translucent overlay */}
+      {/* Chat panel */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -80,15 +80,25 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({ currentQuestion, userPlan,
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="fixed inset-0 z-50 sm:inset-auto sm:bottom-4 sm:right-4 sm:w-96 sm:h-[500px] sm:rounded-2xl overflow-hidden shadow-2xl border border-border/30 bg-background/60 backdrop-blur-2xl flex flex-col"
           >
-            {/* Header - translucent */}
-            <div className="flex items-center justify-between px-4 py-3 bg-primary/80 backdrop-blur-xl text-primary-foreground flex-shrink-0 border-b border-primary-foreground/10">
-              <div className="flex items-center space-x-2">
-                <Bot className="w-5 h-5" />
-                <span className="text-base font-bold">Dr. Ahroid</span>
+            {/* Edge-to-edge header with fade — no colored bar, content fades into status bar */}
+            <div className="relative flex-shrink-0">
+              {/* Fade overlay at top for status bar blend */}
+              <div className="absolute top-0 left-0 right-0 h-[env(safe-area-inset-top,0px)] bg-gradient-to-b from-background to-transparent z-10 pointer-events-none" />
+              
+              <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+12px)] pb-3 border-b border-border/20">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Bot className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-bold text-foreground">Dr. Ahroid</span>
+                    <p className="text-[10px] text-muted-foreground">AI Study Assistant</p>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)} className="w-8 h-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted">
+                  <X className="w-5 h-5" />
+                </Button>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)} className="w-8 h-8 p-0 text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/10">
-                <X className="w-5 h-5" />
-              </Button>
             </div>
 
             {hasPremiumAccess ? (

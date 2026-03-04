@@ -5,7 +5,7 @@ export interface Institute {
   shortName: string;
   image: string;
   enabled: boolean;
-  years: string[]; // which years this institute supports
+  years: string[];
 }
 
 export const INSTITUTES: Institute[] = [
@@ -26,10 +26,10 @@ export const INSTITUTES: Institute[] = [
     years: ['1st', '2nd', '3rd', '4th', '5th'],
   },
   {
-    id: 'duhs',
-    name: 'Dow University of Health Sciences',
-    shortName: 'DUHS',
-    image: '/images/institutes/duhs.png',
+    id: 'ojha',
+    name: 'Dow University of Health Sciences, Ojha Campus',
+    shortName: 'OJHA',
+    image: '/images/institutes/ojha.png',
     enabled: true,
     years: ['1st', '2nd', '3rd', '4th', '5th'],
   },
@@ -59,28 +59,18 @@ export const INSTITUTES: Institute[] = [
   },
 ];
 
-// Subject-to-institute mapping (subjects can belong to multiple institutes)
-export const SUBJECT_INSTITUTE_MAP: Record<string, string[]> = {
-  // Example mappings - these should be updated based on actual subject IDs
-  anatomy: ['dmc', 'smbb', 'duhs'],
-  physiology: ['dmc', 'smbb', 'duhs'],
-  biochemistry: ['dmc', 'smbb', 'duhs'],
-  pharmacology: ['dmc', 'smbb', 'duhs'],
-  pathology: ['dmc', 'smbb', 'duhs'],
-  forensic_medicine: ['dmc', 'smbb', 'duhs'],
-  community_medicine: ['dmc', 'smbb', 'duhs'],
-  medicine: ['dmc', 'smbb', 'duhs'],
-  surgery: ['dmc', 'smbb', 'duhs'],
-  gynecology: ['dmc', 'smbb', 'duhs'],
-  pediatrics: ['dmc', 'smbb', 'duhs'],
-  ophthalmology: ['dmc', 'smbb', 'duhs'],
-  ent: ['dmc', 'smbb', 'duhs'],
-  radiology: ['dmc', 'smbb', 'duhs'],
-  psychiatry: ['dmc', 'smbb', 'duhs'],
-};
+// Map institute ID to full display name
+export const INSTITUTE_DISPLAY_NAMES: Record<string, string> = {};
+INSTITUTES.forEach(inst => {
+  INSTITUTE_DISPLAY_NAMES[inst.id] = inst.name;
+});
 
 export function getInstituteById(id: string): Institute | undefined {
   return INSTITUTES.find(i => i.id === id);
+}
+
+export function getInstituteDisplayName(id: string): string {
+  return INSTITUTE_DISPLAY_NAMES[id] || id;
 }
 
 export function getEnabledInstitutes(): Institute[] {
