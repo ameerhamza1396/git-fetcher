@@ -10,6 +10,7 @@ import { Capacitor } from '@capacitor/core';
 // Internal Components & Pages
 import BackHandler from "@/components/backhandler";
 import ScrollToTop from "@/components/ScrollToTop";
+import ConnectionStatusModal from "@/components/ConnectionStatusModal";
 import Index from '@/pages/Index';
 import Login from '@/pages/Login';
 import Signup from '@/pages/Signup';
@@ -32,7 +33,6 @@ import TestCompletionPage from '@/pages/TestCompletion';
 import Classroom from '@/pages/Classroom';
 import VerifyEmail from '@/pages/VerifyEmail';
 import UsernamePage from '@/pages/UsernamePage';
-import WelcomeNewUserPage from './pages/WelcomeNewUserPage';
 import AllSetPage from '@/pages/AllSetPage';
 import MockTestResults from '@/pages/MockTestResults';
 import TestCompletion from '@/pages/TestResults';
@@ -58,6 +58,7 @@ import { VideoCallProvider } from '@/video-sdk/VideoCallProvider';
 import PaymentFailure from "@/pages/PaymentFailure.tsx";
 import PaymentSuccess from "@/pages/PaymentSuccess.tsx";
 import Setup from "@/pages/SetupPage";
+import DetailedAnalytics from "@/pages/DetailedAnalytics";
 
 
 const queryClient = new QueryClient();
@@ -101,10 +102,10 @@ function App() {
             <VideoCallProvider>
               <ScrollToTop />
               <BackHandler />
+              <ConnectionStatusModal />
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/mcqs" element={<MCQs />} />
                 <Route path="/battle" element={<Battle />} />
