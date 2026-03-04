@@ -768,7 +768,7 @@ const Dashboard = () => {
 
       {/* Premium bottom tab bar — active tab expands with label */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-3 mb-2 bg-card/95 backdrop-blur-2xl rounded-2xl border border-border/40 shadow-xl shadow-black/8 dark:shadow-black/30">
+        <div className="mx-3 mb-2 bg-card/60 backdrop-blur-2xl rounded-2xl border-0 shadow-xl shadow-black/8 dark:shadow-black/30">
           <div className="flex items-center justify-around h-16 px-1">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
