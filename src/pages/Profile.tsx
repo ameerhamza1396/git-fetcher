@@ -205,7 +205,7 @@ const Profile = () => {
                                     id="institute"
                                     value={userInstituteName}
                                     disabled
-                                    onClick={() => toast.info('To change your institute, please email us at hi@medistics.app')}
+                                    onClick={() => toast.info('Institute can only be set once. To request a change, please contact us at hi@medistics.app.')}
                                     className="bg-white/5 border-white/10 text-white/60 rounded-xl h-11 mt-1 cursor-not-allowed"
                                 />
                                 <p className="text-[10px] text-white/40 mt-1">To change institute, email hi@medistics.app</p>
