@@ -549,8 +549,9 @@ const Dashboard = () => {
                 <span className="text-primary">{userStats?.accuracy || 0}% accuracy</span>
                 <span className="text-muted-foreground">{userStats?.totalQuestions || 0} solved</span>
               </div>
-            </div>
+            </motion.div>
             )}
+            </div>
 
             {/* Quick Actions - elevated cards */}
             <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-1.5">
@@ -590,15 +591,16 @@ const Dashboard = () => {
               </div>
 
               {termLoading ? (
-                <div className="rounded-2xl border border-border/40 bg-muted/30 p-4 animate-pulse">
+                <div className="rounded-2xl border border-border/40 bg-muted/30 p-4 animate-pulse min-h-[120px]">
                   <div className="h-3 bg-muted rounded w-2/3 mb-3" />
                   <div className="h-4 bg-muted rounded w-full mb-2" />
                   <div className="h-3 bg-muted rounded w-3/4" />
                 </div>
               ) : (
-              <button
+              <motion.button
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}
                 onClick={() => setShowTermOfDay(true)}
-                className="rounded-2xl border border-border/40 bg-gradient-to-br from-emerald-500/10 to-teal-500/5 backdrop-blur-sm p-4 text-left active:scale-[0.97] transition-all"
+                className="rounded-2xl border border-border/40 bg-gradient-to-br from-emerald-500/10 to-teal-500/5 backdrop-blur-sm p-4 text-left active:scale-[0.97] transition-all min-h-[120px]"
                 disabled={!termOfDay}
               >
                 <div className="flex items-center gap-1.5 mb-2">
@@ -607,20 +609,22 @@ const Dashboard = () => {
                 </div>
                 <h4 className="text-sm font-black text-foreground mb-1">{termOfDay?.term || 'Loading...'}</h4>
                 <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{termOfDay?.definition || ''}</p>
-              </button>
+              </motion.button>
               )}
             </div>
 
+            <div className="min-h-[100px] mb-6">
             {caseLoading ? (
-              <div className="w-full rounded-2xl border border-border/40 bg-muted/30 p-4 mb-6 animate-pulse">
+              <div className="w-full rounded-2xl border border-border/40 bg-muted/30 p-4 animate-pulse">
                 <div className="h-3 bg-muted rounded w-1/3 mb-3" />
                 <div className="h-4 bg-muted rounded w-2/3 mb-2" />
                 <div className="h-3 bg-muted rounded w-full" />
               </div>
             ) : (
-            <button
+            <motion.button
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}
               onClick={() => setShowCaseOfDay(true)}
-              className="w-full rounded-2xl border border-border/40 bg-gradient-to-br from-blue-500/10 to-indigo-500/5 backdrop-blur-sm p-4 text-left mb-6 active:scale-[0.97] transition-all"
+              className="w-full rounded-2xl border border-border/40 bg-gradient-to-br from-blue-500/10 to-indigo-500/5 backdrop-blur-sm p-4 text-left active:scale-[0.97] transition-all"
               disabled={!caseOfDay}
             >
               <div className="flex items-center gap-1.5 mb-2">
@@ -629,8 +633,9 @@ const Dashboard = () => {
               </div>
               <h4 className="text-sm font-black text-foreground mb-1">{caseOfDay?.headline || 'Loading...'}</h4>
               <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{caseOfDay?.details || ''}</p>
-            </button>
+            </motion.button>
             )}
+            </div>
 
             {/* Premium Perks with animated crown */}
             <div className="flex items-center gap-2 mb-3">
