@@ -144,8 +144,7 @@ const DetailedAnalytics = () => {
           <div className="flex items-center space-x-3">
             <Button variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110" onClick={() => navigate(-1)}>
               <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
+            </Button>
             <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-8 h-8" />
             <span className="text-xl font-bold text-foreground">Analytics</span>
           </div>
