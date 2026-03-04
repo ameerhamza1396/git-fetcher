@@ -142,7 +142,7 @@ const Dashboard = () => {
     queryKey: ['user-stats', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data: answers, error: answersError } = await supabase.from('user_answers').select('*').eq('user_id', user.id);
+      const { data: answers, error: answersError } = await supabase.from('user_answers').select('id, is_correct, time_taken, created_at').eq('user_id', user.id);
       if (answersError) return { totalQuestions: 0, correctAnswers: 0, accuracy: 0, currentStreak: 0, rankPoints: 0, battlesWon: 0, totalBattles: 0 };
       const totalQuestions = answers?.length || 0;
       const correctAnswers = answers?.filter(a => a.is_correct)?.length || 0;
@@ -267,7 +267,7 @@ const Dashboard = () => {
   const rawUserPlan = profile?.plan?.toLowerCase() || 'free';
   const userPlanDisplayName = rawUserPlan.charAt(0).toUpperCase() + rawUserPlan.slice(1) + ' Plan';
 
-  if (isNavigating || authLoading || profileLoading || userStatsLoading || termLoading || caseLoading) {
+  if (isNavigating || authLoading || profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-24 h-24 object-contain animate-pulse" />

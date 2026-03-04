@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Instagram, Sun, Moon, Zap } from 'lucide-react'; // Added Zap for the new button
+import { ArrowLeft, Instagram, Sun, Moon, Zap } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Seo from '@/components/Seo';
 import { useEffect, useState } from 'react';
 import { Typewriter } from 'react-simple-typewriter';
+import { useAuth } from '@/hooks/useAuth';
+import { ProfileDropdown } from '@/components/ProfileDropdown';
 
 const Teams = () => {
   const { user } = useAuth();
