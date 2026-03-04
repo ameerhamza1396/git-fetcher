@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -188,33 +189,37 @@ const Dashboard = () => {
     enabled: !!user?.id,
   });
 
-  // Fetch Term of the Day
+  const userYear = (profile as any)?.year || null;
+
+  // Fetch Term of the Day (year-specific)
   const { data: termOfDay, isLoading: termLoading } = useQuery<TermOfDay>({
-    queryKey: ['termOfDay'],
+    queryKey: ['termOfDay', userYear],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('term_of_day')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+        .limit(1);
 
+      if (userYear) query = query.eq('year', userYear);
+      const { data, error } = await query.single();
       if (error) throw error;
       return data;
     },
   });
 
-  // Fetch Case of the Day
+  // Fetch Case of the Day (year-specific)
   const { data: caseOfDay, isLoading: caseLoading } = useQuery<CaseOfDay>({
-    queryKey: ['caseOfDay'],
+    queryKey: ['caseOfDay', userYear],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('case_of_day')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+        .limit(1);
 
+      if (userYear) query = query.eq('year', userYear);
+      const { data, error } = await query.single();
       if (error) throw error;
       return data;
     },
@@ -238,9 +243,10 @@ const Dashboard = () => {
   useEffect(() => {
     if (authLoading || profileLoading) { setIsNavigating(true); return; }
     if (!user || !profile) { setIsNavigating(false); return; }
-    if (profile.username === null) { navigate('/welcome-new-user'); return; }
+    // Redirect to setup wizard if any required field is missing
     const validYears = ["1st", "2nd", "3rd", "4th", "5th"];
-    if (profile.year && !validYears.includes(profile.year)) { navigate('/select-year'); return; }
+    const needsSetup = !profile.username || !(profile as any).institute || !((profile as any).year && validYears.includes((profile as any).year));
+    if (needsSetup) { navigate('/setup'); return; }
     setIsNavigating(false);
   }, [authLoading, profileLoading, user, profile, navigate]);
 
@@ -366,7 +372,17 @@ const Dashboard = () => {
       case 'analytics':
         return (
           <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-            <h1 className="text-xl font-bold text-foreground mb-1">📊 Analytics</h1>
+            <div className="flex items-center justify-between mb-1">
+              <h1 className="text-xl font-bold text-foreground">📊 Analytics</h1>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs font-bold text-primary"
+                onClick={() => navigate('/detailed-analytics')}
+              >
+                Detailed Report <ChevronRight className="w-3 h-3 ml-1" />
+              </Button>
+            </div>
             <p className="text-xs text-muted-foreground mb-5">Track your progress</p>
             <div className="grid grid-cols-2 gap-3 mb-6">
               {[
@@ -709,41 +725,49 @@ const Dashboard = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Premium bottom tab bar */}
+      {/* Premium bottom tab bar — active tab expands with label */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 pb-[env(safe-area-inset-bottom)]">
         <div className="mx-3 mb-2 bg-card/95 backdrop-blur-2xl rounded-2xl border border-border/40 shadow-xl shadow-black/8 dark:shadow-black/30">
-          <div className="flex items-end justify-around h-16 px-1">
+          <div className="flex items-center justify-around h-16 px-1">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`relative flex flex-col items-center justify-end pb-2 transition-all duration-300 ${isActive ? 'min-w-[64px]' : 'min-w-[48px]'
-                    }`}
+                  className="relative flex items-center justify-center transition-all duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
+                  style={{
+                    minWidth: isActive ? '110px' : '48px',
+                  }}
                 >
-                  <div className={`flex flex-col items-center transition-all duration-300 ${isActive ? '-translate-y-2' : ''
-                    }`}>
-                    <div className={`relative flex items-center justify-center transition-all duration-300 ${isActive
-                        ? 'w-11 h-11 rounded-2xl bg-primary shadow-lg shadow-primary/30'
-                        : 'w-9 h-9'
-                      }`}>
-                      <tab.icon className={`transition-all duration-300 ${isActive
-                          ? 'w-5 h-5 text-primary-foreground'
+                  <div className={`relative flex items-center gap-2 transition-all duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                    isActive
+                      ? 'bg-primary rounded-2xl px-4 py-2.5 shadow-lg shadow-primary/25'
+                      : 'py-2'
+                  }`}>
+                    <div className="relative">
+                      <tab.icon className={`transition-all duration-300 ${
+                        isActive
+                          ? 'w-[18px] h-[18px] text-primary-foreground'
                           : 'w-[18px] h-[18px] text-muted-foreground'
-                        }`} />
-                      {tab.badge && (
-                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full flex items-center justify-center shadow-sm">
+                      }`} />
+                      {tab.badge && !isActive && (
+                        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full flex items-center justify-center shadow-sm">
                           {tab.badge > 9 ? '9+' : tab.badge}
                         </span>
                       )}
                     </div>
-                    <span className={`mt-0.5 transition-all duration-300 ${isActive
-                        ? 'text-[10px] font-bold text-primary'
-                        : 'text-[9px] font-medium text-muted-foreground'
-                      }`}>
-                      {tab.label}
-                    </span>
+                    {isActive && (
+                      <motion.span
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: 'auto' }}
+                        exit={{ opacity: 0, width: 0 }}
+                        transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                        className="text-[11px] font-bold text-primary-foreground whitespace-nowrap overflow-hidden"
+                      >
+                        {tab.label}
+                      </motion.span>
+                    )}
                   </div>
                 </button>
               );

@@ -10,6 +10,7 @@ import { Capacitor } from '@capacitor/core';
 // Internal Components & Pages
 import BackHandler from "@/components/backhandler";
 import ScrollToTop from "@/components/ScrollToTop";
+import ConnectionStatusModal from "@/components/ConnectionStatusModal";
 import Index from '@/pages/Index';
 import Login from '@/pages/Login';
 import Signup from '@/pages/Signup';
@@ -32,7 +33,6 @@ import TestCompletionPage from '@/pages/TestCompletion';
 import Classroom from '@/pages/Classroom';
 import VerifyEmail from '@/pages/VerifyEmail';
 import UsernamePage from '@/pages/UsernamePage';
-import WelcomeNewUserPage from './pages/WelcomeNewUserPage';
 import AllSetPage from '@/pages/AllSetPage';
 import MockTestResults from '@/pages/MockTestResults';
 import TestCompletion from '@/pages/TestResults';
@@ -58,6 +58,7 @@ import { VideoCallProvider } from '@/video-sdk/VideoCallProvider';
 import PaymentFailure from "@/pages/PaymentFailure.tsx";
 import PaymentSuccess from "@/pages/PaymentSuccess.tsx";
 import Setup from "@/pages/SetupPage";
+import DetailedAnalytics from "@/pages/DetailedAnalytics";
 
 
 const queryClient = new QueryClient();
@@ -101,6 +102,7 @@ function App() {
             <VideoCallProvider>
               <ScrollToTop />
               <BackHandler />
+              <ConnectionStatusModal />
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
@@ -123,7 +125,7 @@ function App() {
                 <Route path="/terms" element={<TermsAndConditions />} />
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/classroom" element={<Classroom />} />
-                <Route path="/welcome-new-user" element={<WelcomeNewUserPage />} />
+                <Route path="/welcome-new-user" element={<Setup />} />
                 <Route path="/all-set" element={<AllSetPage />} />
                 <Route path="/settings/username" element={<UsernamePage />} />
                 <Route path="/results" element={<MockTestResults />} />
@@ -150,6 +152,7 @@ function App() {
                 <Route path="/payment-failure" element={<PaymentFailure />} />
                 <Route path="/payment-success" element={<PaymentSuccess />} />
                 <Route path="/setup" element={<Setup />} />
+                <Route path="/detailed-analytics" element={<DetailedAnalytics />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </VideoCallProvider>
