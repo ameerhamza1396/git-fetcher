@@ -372,17 +372,7 @@ const Dashboard = () => {
       case 'analytics':
         return (
           <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-            <div className="flex items-center justify-between mb-1">
-              <h1 className="text-xl font-bold text-foreground">📊 Analytics</h1>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs font-bold text-primary"
-                onClick={() => navigate('/detailed-analytics')}
-              >
-                Detailed Report <ChevronRight className="w-3 h-3 ml-1" />
-              </Button>
-            </div>
+            <h1 className="text-xl font-bold text-foreground mb-1">📊 Analytics</h1>
             <p className="text-xs text-muted-foreground mb-5">Track your progress</p>
             <div className="grid grid-cols-2 gap-3 mb-6">
               {[
@@ -399,6 +389,23 @@ const Dashboard = () => {
               ))}
             </div>
             <StudyAnalytics />
+
+            {/* Deep Analysis CTA */}
+            <button
+              onClick={() => navigate('/detailed-analytics')}
+              className="w-full mt-6 p-4 rounded-2xl bg-gradient-to-r from-primary to-primary/80 text-primary-foreground flex items-center justify-between shadow-lg active:scale-[0.98] transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                  <PieChart className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-bold">Deep Analysis</p>
+                  <p className="text-[11px] text-primary-foreground/70">Subject & topic-wise breakdown</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5" />
+            </button>
           </div>
         );
 
