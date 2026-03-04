@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { INSTITUTES, getInstituteDisplayName } from '@/utils/institutes';
+import { fetchInstitutes, type Institute } from '@/utils/institutes';
 
 const VALID_YEARS = ['1st', '2nd', '3rd', '4th', '5th'];
 
@@ -19,8 +19,8 @@ const SetupWizard = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [institutes, setInstitutes] = useState<Institute[]>([]);
 
-  // Form state
   const [username, setUsername] = useState('');
   const [institute, setInstitute] = useState('');
   const [year, setYear] = useState('');
@@ -31,8 +31,13 @@ const SetupWizard = () => {
     if (authLoading) return;
     if (!user) { navigate('/login'); return; }
 
-    const loadProfile = async () => {
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+    const load = async () => {
+      const [profileRes, insts] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+        fetchInstitutes(),
+      ]);
+      setInstitutes(insts);
+      const data = profileRes.data;
       setExistingProfile(data);
 
       if (data) {
@@ -43,16 +48,13 @@ const SetupWizard = () => {
         if (!data.username) { setCurrentStep(1); }
         else if (!(data as any).institute) { setCurrentStep(2); }
         else if (!(data as any).year || !VALID_YEARS.includes((data as any).year)) { setCurrentStep(3); }
-        else {
-          navigate('/dashboard');
-          return;
-        }
+        else { navigate('/dashboard'); return; }
       } else {
         setCurrentStep(0);
       }
       setLoading(false);
     };
-    loadProfile();
+    load();
   }, [user, authLoading, navigate]);
 
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'there';
@@ -179,47 +181,45 @@ const SetupWizard = () => {
             <h2 className="text-3xl font-black text-white mb-2">Select Your Institute</h2>
             <p className="text-white/60 text-sm mb-6">We'll tailor content for your college.</p>
             <div className="space-y-3 max-h-[40vh] overflow-y-auto px-1 overscroll-contain">
-              {INSTITUTES.map((inst) => (
+              {institutes.map((inst) => (
                 <button
-                  key={inst.id}
-                  onClick={() => inst.enabled && setInstitute(inst.id)}
+                  key={inst.code}
+                  onClick={() => inst.enabled && setInstitute(inst.code)}
                   disabled={!inst.enabled}
                   className={`w-full flex items-center gap-3 p-3 rounded-2xl border-2 transition-all duration-200 text-left ${
-                    institute === inst.id
+                    institute === inst.code
                       ? 'border-white bg-white/20 shadow-lg'
                       : inst.enabled
                         ? 'border-white/10 bg-white/5 hover:bg-white/10'
                         : 'border-white/5 bg-white/[0.02] opacity-50 cursor-not-allowed'
                   }`}
                 >
-                  {/* Institute image fading from right */}
                   <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-white/10">
-                    <img
-                      src={inst.image}
-                      alt={inst.shortName}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
+                    {inst.image_url ? (
+                      <img
+                        src={inst.image_url}
+                        alt={inst.short_name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    ) : null}
                     <div className="absolute inset-0 bg-gradient-to-l from-transparent to-white/5" />
-                    {/* Fallback icon if image fails */}
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Building2 className="w-6 h-6 text-white/30" />
                     </div>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className={`text-sm font-bold leading-tight ${institute === inst.id ? 'text-white' : 'text-white/80'}`}>
+                    <p className={`text-sm font-bold leading-tight ${institute === inst.code ? 'text-white' : 'text-white/80'}`}>
                       {inst.name}
                     </p>
-                    <p className="text-[11px] text-white/40 mt-0.5">{inst.shortName}</p>
+                    <p className="text-[11px] text-white/40 mt-0.5">{inst.short_name}</p>
                   </div>
                   {!inst.enabled && (
                     <span className="text-[10px] font-bold text-amber-300 bg-amber-300/10 px-2 py-1 rounded-full shrink-0 whitespace-nowrap">
                       Coming Soon
                     </span>
                   )}
-                  {institute === inst.id && (
+                  {institute === inst.code && (
                     <CheckCircle2 className="w-5 h-5 text-white shrink-0" />
                   )}
                 </button>
@@ -283,7 +283,6 @@ const SetupWizard = () => {
 
   return (
     <div className={`relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden transition-all duration-700 bg-gradient-to-br ${gradients[currentStep]}`}>
-      {/* Progress bar */}
       <div className="absolute top-[calc(env(safe-area-inset-top,0px)+16px)] left-6 right-6 z-50">
         <div className="flex gap-2">
           {steps.map((_, i) => (
@@ -317,7 +316,6 @@ const SetupWizard = () => {
         </button>
       )}
 
-      {/* Content */}
       <div className="relative z-10 w-full max-w-2xl px-6 py-24">
         <AnimatePresence mode="wait">
           <motion.div
@@ -332,7 +330,6 @@ const SetupWizard = () => {
         </AnimatePresence>
       </div>
 
-      {/* Bottom buttons */}
       <div className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+24px)] left-6 right-6 z-50">
         <div className={`flex items-center gap-3 ${currentStep > 0 ? 'justify-between' : 'justify-center'}`}>
           {currentStep > 0 && currentStep < 4 && (

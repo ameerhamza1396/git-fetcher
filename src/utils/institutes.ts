@@ -1,82 +1,49 @@
-// Institute configuration
+// Institute utilities - fetches from backend
+import { supabase } from '@/integrations/supabase/client';
+
 export interface Institute {
   id: string;
+  code: string;
   name: string;
-  shortName: string;
-  image: string;
+  short_name: string;
+  image_url: string | null;
   enabled: boolean;
   years: string[];
 }
 
-export const INSTITUTES: Institute[] = [
-  {
-    id: 'dmc',
-    name: 'Dow Medical College Karachi',
-    shortName: 'DMC',
-    image: '/images/institutes/dmc.png',
-    enabled: true,
-    years: ['1st', '2nd', '3rd', '4th', '5th'],
-  },
-  {
-    id: 'smbb',
-    name: 'Shaheed Muhtarma Benazir Bhutto Medical College Karachi',
-    shortName: 'SMBB',
-    image: '/images/institutes/smbb.png',
-    enabled: true,
-    years: ['1st', '2nd', '3rd', '4th', '5th'],
-  },
-  {
-    id: 'ojha',
-    name: 'Dow University of Health Sciences, Ojha Campus',
-    shortName: 'OJHA',
-    image: '/images/institutes/ojha.png',
-    enabled: true,
-    years: ['1st', '2nd', '3rd', '4th', '5th'],
-  },
-  {
-    id: 'kemc',
-    name: 'King Edward Medical College Lahore',
-    shortName: 'KEMC',
-    image: '/images/institutes/kemc.png',
-    enabled: false,
-    years: ['1st', '2nd', '3rd', '4th', '5th'],
-  },
-  {
-    id: 'uhs',
-    name: 'University of Health Sciences Punjab',
-    shortName: 'UHS',
-    image: '/images/institutes/uhs.png',
-    enabled: false,
-    years: ['1st', '2nd', '3rd', '4th', '5th'],
-  },
-  {
-    id: 'qamc',
-    name: 'Quaid e Azam Medical University Rahim Yar Khan',
-    shortName: 'QAMC',
-    image: '/images/institutes/qamc.png',
-    enabled: false,
-    years: ['1st', '2nd', '3rd', '4th', '5th'],
-  },
-];
+// Cache for institutes
+let cachedInstitutes: Institute[] | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-// Map institute ID to full display name
-export const INSTITUTE_DISPLAY_NAMES: Record<string, string> = {};
-INSTITUTES.forEach(inst => {
-  INSTITUTE_DISPLAY_NAMES[inst.id] = inst.name;
-});
-
-export function getInstituteById(id: string): Institute | undefined {
-  return INSTITUTES.find(i => i.id === id);
+export async function fetchInstitutes(): Promise<Institute[]> {
+  if (cachedInstitutes && Date.now() - cacheTimestamp < CACHE_TTL) {
+    return cachedInstitutes;
+  }
+  const { data, error } = await supabase
+    .from('institutes')
+    .select('*')
+    .order('name');
+  if (error || !data) return cachedInstitutes || [];
+  cachedInstitutes = data as Institute[];
+  cacheTimestamp = Date.now();
+  return cachedInstitutes;
 }
 
-export function getInstituteDisplayName(id: string): string {
-  return INSTITUTE_DISPLAY_NAMES[id] || id;
+export async function getEnabledInstitutes(): Promise<Institute[]> {
+  const all = await fetchInstitutes();
+  return all.filter(i => i.enabled);
 }
 
-export function getEnabledInstitutes(): Institute[] {
-  return INSTITUTES.filter(i => i.enabled);
+export async function getAllInstitutes(): Promise<Institute[]> {
+  return fetchInstitutes();
 }
 
-export function getAllInstitutes(): Institute[] {
-  return INSTITUTES;
+export function getInstituteDisplayName(code: string, institutes: Institute[]): string {
+  const inst = institutes.find(i => i.code === code);
+  return inst?.name || code;
+}
+
+export function getInstituteByCode(code: string, institutes: Institute[]): Institute | undefined {
+  return institutes.find(i => i.code === code);
 }
