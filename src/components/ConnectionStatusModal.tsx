@@ -36,10 +36,8 @@ const ConnectionStatusModal = () => {
   }, []);
 
   useEffect(() => {
-    // Initial check with tolerance
-    if (!navigator.onLine) {
-      handleOffline();
-    }
+    // Only listen for actual offline/online events — do NOT check navigator.onLine
+    // on mount, as it can briefly report false during page load / iframe init.
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     return () => {
