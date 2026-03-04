@@ -142,7 +142,7 @@ const Dashboard = () => {
     queryKey: ['user-stats', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data: answers, error: answersError } = await supabase.from('user_answers').select('*').eq('user_id', user.id);
+      const { data: answers, error: answersError } = await supabase.from('user_answers').select('id, is_correct, time_taken, created_at').eq('user_id', user.id);
       if (answersError) return { totalQuestions: 0, correctAnswers: 0, accuracy: 0, currentStreak: 0, rankPoints: 0, battlesWon: 0, totalBattles: 0 };
       const totalQuestions = answers?.length || 0;
       const correctAnswers = answers?.filter(a => a.is_correct)?.length || 0;
@@ -267,7 +267,7 @@ const Dashboard = () => {
   const rawUserPlan = profile?.plan?.toLowerCase() || 'free';
   const userPlanDisplayName = rawUserPlan.charAt(0).toUpperCase() + rawUserPlan.slice(1) + ' Plan';
 
-  if (isNavigating || authLoading || profileLoading || userStatsLoading || termLoading || caseLoading) {
+  if (isNavigating || authLoading || profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-24 h-24 object-contain animate-pulse" />
@@ -521,6 +521,13 @@ const Dashboard = () => {
             </div>
 
             {/* Streak bar - elevated */}
+            {userStatsLoading ? (
+              <div className="bg-muted/50 rounded-2xl p-4 mb-6 animate-pulse">
+                <div className="h-4 bg-muted rounded w-1/3 mb-3" />
+                <div className="h-2.5 bg-muted rounded w-full mb-2" />
+                <div className="flex justify-between"><div className="h-3 bg-muted rounded w-1/4" /><div className="h-3 bg-muted rounded w-1/4" /></div>
+              </div>
+            ) : (
             <div className="bg-gradient-to-r from-primary/12 to-accent border border-primary/20 rounded-2xl p-4 mb-6 shadow-md shadow-primary/5">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
@@ -536,6 +543,7 @@ const Dashboard = () => {
                 <span className="text-muted-foreground">{userStats?.totalQuestions || 0} solved</span>
               </div>
             </div>
+            )}
 
             {/* Quick Actions - elevated cards */}
             <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-1.5">
@@ -574,7 +582,13 @@ const Dashboard = () => {
                 )}
               </div>
 
-              {/* Term of the Day */}
+              {termLoading ? (
+                <div className="rounded-2xl border border-border/40 bg-muted/30 p-4 animate-pulse">
+                  <div className="h-3 bg-muted rounded w-2/3 mb-3" />
+                  <div className="h-4 bg-muted rounded w-full mb-2" />
+                  <div className="h-3 bg-muted rounded w-3/4" />
+                </div>
+              ) : (
               <button
                 onClick={() => setShowTermOfDay(true)}
                 className="rounded-2xl border border-border/40 bg-gradient-to-br from-emerald-500/10 to-teal-500/5 backdrop-blur-sm p-4 text-left active:scale-[0.97] transition-all"
@@ -587,9 +601,16 @@ const Dashboard = () => {
                 <h4 className="text-sm font-black text-foreground mb-1">{termOfDay?.term || 'Loading...'}</h4>
                 <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{termOfDay?.definition || ''}</p>
               </button>
+              )}
             </div>
 
-            {/* Case of the Day */}
+            {caseLoading ? (
+              <div className="w-full rounded-2xl border border-border/40 bg-muted/30 p-4 mb-6 animate-pulse">
+                <div className="h-3 bg-muted rounded w-1/3 mb-3" />
+                <div className="h-4 bg-muted rounded w-2/3 mb-2" />
+                <div className="h-3 bg-muted rounded w-full" />
+              </div>
+            ) : (
             <button
               onClick={() => setShowCaseOfDay(true)}
               className="w-full rounded-2xl border border-border/40 bg-gradient-to-br from-blue-500/10 to-indigo-500/5 backdrop-blur-sm p-4 text-left mb-6 active:scale-[0.97] transition-all"
@@ -602,6 +623,7 @@ const Dashboard = () => {
               <h4 className="text-sm font-black text-foreground mb-1">{caseOfDay?.headline || 'Loading...'}</h4>
               <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{caseOfDay?.details || ''}</p>
             </button>
+            )}
 
             {/* Premium Perks with animated crown */}
             <div className="flex items-center gap-2 mb-3">
