@@ -7,6 +7,7 @@ export interface Subject {
   icon: string;
   color: string;
   year: string;
+  institutes?: string[];
 }
 
 export interface Chapter {
@@ -15,7 +16,7 @@ export interface Chapter {
   description: string;
   chapter_number: number;
   subject_id: string;
-  mcq_count?: number; // Added for optimization
+  mcq_count?: number;
 }
 
 export interface MCQ {
@@ -35,20 +36,34 @@ export const fetchSubjects = async (): Promise<Subject[]> => {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('year')
+      .select('year, institute')
       .eq('id', user.id)
       .single();
 
     if (profileError || !profile) return [];
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('subjects')
       .select('*')
-      .eq('year', profile.year)
+      .eq('year', (profile as any).year)
       .order('name');
 
+    const { data, error } = await query;
     if (error) return [];
-    return data || [];
+
+    const userInstitute = (profile as any).institute;
+
+    // Filter subjects that include the user's institute in their institutes JSONB array
+    const filtered = (data || []).filter((subject: any) => {
+      // If subject has no institutes field or it's empty, show it (backward compat)
+      if (!subject.institutes || !Array.isArray(subject.institutes) || subject.institutes.length === 0) {
+        return true;
+      }
+      // Check if user's institute is in the subject's institutes array
+      return !userInstitute || subject.institutes.includes(userInstitute);
+    });
+
+    return filtered;
   } catch {
     return [];
   }

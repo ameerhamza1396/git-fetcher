@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { Typewriter } from 'react-simple-typewriter';
 
 const Teams = () => {
-  const { theme, setTheme } = useTheme();
+  const { user } = useAuth();
   const [heroOpacity, setHeroOpacity] = useState(1);
   const [subheadingOpacity, setSubheadingOpacity] = useState(1);
 
@@ -19,20 +19,14 @@ const Teams = () => {
         const heroOffset = heroSection.offsetTop;
         const subheadingOffset = subheading.offsetTop;
 
-        // Fade out hero heading
         const heroFadeStart = heroOffset + 20;
         const heroFadeEnd = heroFadeStart + 100;
-        const newHeroOpacity =
-          1 - (scrollPosition - heroFadeStart) / (heroFadeEnd - heroFadeStart);
+        const newHeroOpacity = 1 - (scrollPosition - heroFadeStart) / (heroFadeEnd - heroFadeStart);
         setHeroOpacity(Math.max(0, newHeroOpacity));
 
-        // Fade out subheading
         const subheadingFadeStart = subheadingOffset + 20;
         const subheadingFadeEnd = subheadingFadeStart + 100;
-        const newSubheadingOpacity =
-          1 -
-          (scrollPosition - subheadingFadeStart) /
-          (subheadingFadeEnd - subheadingFadeStart);
+        const newSubheadingOpacity = 1 - (scrollPosition - subheadingFadeStart) / (subheadingFadeEnd - subheadingFadeStart);
         setSubheadingOpacity(Math.max(0, newSubheadingOpacity));
       }
     };
@@ -97,7 +91,7 @@ const Teams = () => {
   // --- Render Function ---
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-white via-purple-50 to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900/30">
+    <div className="min-h-screen w-full bg-background">
       <Seo
         title="Our Team - Medmacs"
         description="Meet the passionate team behind Medmacs — innovators, leaders, and contributors shaping the future of medical education."
@@ -119,16 +113,7 @@ const Teams = () => {
           </span>
 
           <div className="flex items-center space-x-3">
-            <button
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="w-9 h-9 rounded-full bg-purple-100 dark:bg-gray-800 flex items-center justify-center hover:scale-110 transition-transform"
-            >
-              {theme === 'dark' ? (
-                <Sun className="w-5 h-5 text-yellow-500" />
-              ) : (
-                <Moon className="w-5 h-5 text-gray-500" />
-              )}
-            </button>
+            {user ? <ProfileDropdown /> : <div className="w-9" />}
           </div>
         </div>
       </header>
@@ -150,12 +135,11 @@ const Teams = () => {
                 delaySpeed={1000}
               />
             </h1>
-            <div className="absolute inset-0 bg-white dark:bg-gray-900 opacity-0 z-0 radial-blur-effect"></div>
           </div>
           <p
             id="hero-subheading"
             style={{ opacity: subheadingOpacity }}
-            className="mt-6 text-lg md:text-xl text-gray-700 dark:text-gray-300 max-w-3xl mx-auto animate-fade-in transition-opacity duration-700"
+            className="mt-6 text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto animate-fade-in transition-opacity duration-700"
           >
             A collective of dreamers, innovators, and medical minds — working to
             reshape how students learn, connect, and succeed.
@@ -168,10 +152,9 @@ const Teams = () => {
             <img
               src="https://i.postimg.cc/VLJk5HPk/Gemini-Generated-Image-r8zbqr8zbqr8zbqr.png"
               alt="Founder"
-              className="w-40 h-40 rounded-full object-cover shadow-2xl border-4 border-purple-500/40 transition-all duration-500 group-hover:translate-x-[-80px]"
+              className="w-40 h-40 rounded-full object-cover shadow-2xl border-4 border-primary/40 transition-all duration-500 group-hover:translate-x-[-80px]"
             />
-            {/* Capsule with roles */}
-            <div className="absolute left-0 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 group-hover:translate-x-[60px] transition-all duration-500 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full px-6 py-3 shadow-lg whitespace-nowrap">
+            <div className="absolute left-0 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 group-hover:translate-x-[60px] transition-all duration-500 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground rounded-full px-6 py-3 shadow-lg whitespace-nowrap">
               <p>UI/UX Designer</p>
               <p>Web Developer</p>
               <p>Mobile Application</p>
@@ -179,17 +162,15 @@ const Teams = () => {
               <p>AI Trainer</p>
             </div>
           </div>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900 dark:text-white">
+          <h2 className="mt-6 text-3xl font-bold text-foreground">
             Dr. Muhammad Ameer Hamza
           </h2>
-          <p className="text-purple-600 dark:text-purple-400 font-medium">
-            Founder
-          </p>
+          <p className="text-primary font-medium">Founder</p>
           <a
             href="https://instagram.com/ameerhamza.exe"
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-3 inline-flex items-center text-pink-600 dark:text-pink-400 hover:underline hover:scale-105 transition-transform"
+            className="mt-3 inline-flex items-center text-primary hover:underline hover:scale-105 transition-transform"
           >
             <Instagram className="w-5 h-5 mr-2" /> ameerhamza.exe
           </a>
@@ -197,9 +178,7 @@ const Teams = () => {
 
         {/* Core Team */}
         <div className="mb-20 text-center">
-          <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-blue-500 mb-12">
-            Core Team
-          </h2>
+          <h2 className="text-4xl font-bold text-primary mb-12">Core Team</h2>
           <div className="flex flex-wrap justify-center gap-12">
             {coreTeam.map((member, i) => (
               <div
@@ -224,9 +203,7 @@ const Teams = () => {
 
         {/* Extended Team */}
         <div className="mb-20 text-center">
-          <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-pink-500 mb-12">
-            Extended Team
-          </h2>
+          <h2 className="text-4xl font-bold text-primary mb-12">Extended Team</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-12">
             {extendedTeam.map((member, i) => (
               <div
@@ -260,14 +237,12 @@ const Teams = () => {
 
         {/* Contributors */}
         <div className="mb-20 text-center">
-          <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-green-500 mb-10">
-            Contributors
-          </h2>
+          <h2 className="text-4xl font-bold text-primary mb-10">Contributors</h2>
           <div className="flex flex-wrap justify-center gap-6">
             {contributors.map((contrib, i) => (
               <span
                 key={i}
-                className="px-4 py-2 text-gray-900 dark:text-white rounded-full bg-gradient-to-r from-purple-100 to-purple-200 dark:from-purple-700 dark:to-purple-800 shadow hover:shadow-lg hover:scale-105 transition-all"
+                className="px-4 py-2 text-foreground rounded-full bg-accent shadow hover:shadow-lg hover:scale-105 transition-all"
               >
                 {contrib}
               </span>
@@ -289,7 +264,7 @@ const Teams = () => {
       </div>
 
       {/* Footer */}
-      <footer className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-md border-t border-purple-200 dark:border-purple-800 py-6 text-center text-gray-600 dark:text-gray-400">
+      <footer className="bg-card border-t border-border py-6 text-center text-muted-foreground">
         <div className="container mx-auto px-4 lg:px-8">
           <p className="text-sm font-semibold mb-1">A Project by Hmacs Studios.</p>
           <p className="text-xs">&copy; 2025 Hmacs Studios. All rights reserved.</p>

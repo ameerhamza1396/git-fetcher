@@ -1,212 +1,367 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    ChevronRight, ChevronLeft, Zap, BarChart3,
-    Trophy, Swords, Bot, Sparkles
+  ChevronRight, ChevronLeft, Sparkles, User, Building2, GraduationCap, CheckCircle2, Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
+import { fetchInstitutes, type Institute } from '@/utils/institutes';
 
-const STEPS = [
-    {
-        title: "Largest MCQ Collection",
-        description: "Attempt the MCQs from the largest collection in Pakistan, tailored for your success.",
-        mascot: "/mascots/Mascot1.png",
-        screen: "/screenMedia/screen7.png",
-        icon: <Zap className="w-20 h-20 text-yellow-400/80" />,
-        gradient: "from-blue-600 via-indigo-700 to-purple-800"
-    },
-    {
-        title: "Track Performance",
-        description: "Monitor your progress and identify weak spots through deep in-app Analysis.",
-        mascot: "/mascots/Mascot10.png",
-        screen: "/screenMedia/screen17.png",
-        icon: <BarChart3 className="w-20 h-20 text-green-400/80" />,
-        gradient: "from-emerald-600 via-teal-700 to-cyan-800"
-    },
-    {
-        title: "Rise to the Top",
-        description: "Compete with thousands and claim your spot at the top of the National Leaderboard.",
-        mascot: "/mascots/Mascot5.png",
-        screen: "/screenMedia/screen16.png",
-        icon: <Trophy className="w-20 h-20 text-orange-400/80" />,
-        gradient: "from-orange-600 via-red-700 to-rose-800"
-    },
-    {
-        title: "Battle Mode",
-        description: "Challenge your friends or random opponents in real-time MCQ battles.",
-        mascot: "/mascots/Mascot3.png",
-        screen: "/screenMedia/screen18.png",
-        icon: <Swords className="w-20 h-20 text-purple-400/80" />,
-        gradient: "from-violet-600 via-purple-700 to-fuchsia-800"
-    },
-    {
-        title: "Meet Dr. Ahroid",
-        description: "Your personal AI companion, ready to solve doubts and guide your study path.",
-        mascot: "/mascots/Mascot6.png",
-        screen: "/screenMedia/screen11.png",
-        icon: <Bot className="w-20 h-20 text-blue-300/80" />,
-        gradient: "from-slate-800 via-blue-900 to-indigo-950"
-    }
-];
+const VALID_YEARS = ['1st', '2nd', '3rd', '4th', '5th'];
 
 const SetupWizard = () => {
-    const [currentStep, setCurrentStep] = useState(0);
-    const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [currentStep, setCurrentStep] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [institutes, setInstitutes] = useState<Institute[]>([]);
 
-    const handleNext = () => {
-        if (currentStep < STEPS.length - 1) setCurrentStep(prev => prev + 1);
-        else completeSetup();
+  const [username, setUsername] = useState('');
+  const [institute, setInstitute] = useState('');
+  const [year, setYear] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+  const [existingProfile, setExistingProfile] = useState<any>(null);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) { navigate('/login'); return; }
+
+    const load = async () => {
+      const [profileRes, insts] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+        fetchInstitutes(),
+      ]);
+      setInstitutes(insts);
+      const data = profileRes.data;
+      setExistingProfile(data);
+
+      if (data) {
+        if (data.username) setUsername(data.username);
+        if ((data as any).institute) setInstitute((data as any).institute);
+        if ((data as any).year) setYear((data as any).year);
+
+        if (!data.username) { setCurrentStep(1); }
+        else if (!(data as any).institute) { setCurrentStep(2); }
+        else if (!(data as any).year || !VALID_YEARS.includes((data as any).year)) { setCurrentStep(3); }
+        else { navigate('/dashboard'); return; }
+      } else {
+        setCurrentStep(0);
+      }
+      setLoading(false);
     };
+    load();
+  }, [user, authLoading, navigate]);
 
-    const handleBack = () => {
-        if (currentStep > 0) setCurrentStep(prev => prev - 1);
-    };
+  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'there';
 
-    const completeSetup = () => {
-        localStorage.setItem('hasSeenWizard', 'true');
-        navigate('/');
-    };
+  const validateUsername = async (value: string) => {
+    if (value.length < 3) { setUsernameError('At least 3 characters'); return false; }
+    if (!/^[a-zA-Z0-9_]+$/.test(value)) { setUsernameError('Letters, numbers, underscores only'); return false; }
+    const { data } = await supabase.from('profiles').select('id').eq('username', value).neq('id', user!.id).maybeSingle();
+    if (data) { setUsernameError('Username already taken'); return false; }
+    setUsernameError('');
+    return true;
+  };
 
-    const step = STEPS[currentStep];
+  const handleNext = async () => {
+    if (currentStep === 0) { setCurrentStep(1); return; }
+    if (currentStep === 1) {
+      setSaving(true);
+      const valid = await validateUsername(username);
+      if (!valid) { setSaving(false); return; }
+      const { error } = await supabase.from('profiles').update({ username } as any).eq('id', user!.id);
+      setSaving(false);
+      if (error) { toast.error('Failed to save username'); return; }
+      setCurrentStep(2);
+      return;
+    }
+    if (currentStep === 2) {
+      if (!institute) { toast.error('Please select an institute'); return; }
+      setSaving(true);
+      const { error } = await supabase.from('profiles').update({ institute } as any).eq('id', user!.id);
+      setSaving(false);
+      if (error) { toast.error('Failed to save institute'); return; }
+      setCurrentStep(3);
+      return;
+    }
+    if (currentStep === 3) {
+      if (!year) { toast.error('Please select your year'); return; }
+      setSaving(true);
+      const { error } = await supabase.from('profiles').update({ year } as any).eq('id', user!.id);
+      setSaving(false);
+      if (error) { toast.error('Failed to save year'); return; }
+      setCurrentStep(4);
+      return;
+    }
+    if (currentStep === 4) { navigate('/dashboard'); }
+  };
 
+  const handleBack = () => {
+    if (currentStep > 0) setCurrentStep(prev => prev - 1);
+  };
+
+  const steps = [
+    { title: 'Welcome', icon: Sparkles },
+    { title: 'Username', icon: User },
+    { title: 'Institute', icon: Building2 },
+    { title: 'Year', icon: GraduationCap },
+    { title: 'All Set', icon: CheckCircle2 },
+  ];
+
+  const gradients = [
+    'from-violet-600 via-purple-600 to-indigo-700',
+    'from-blue-600 via-indigo-600 to-violet-700',
+    'from-emerald-600 via-teal-600 to-cyan-700',
+    'from-orange-500 via-amber-600 to-yellow-600',
+    'from-emerald-500 via-green-500 to-teal-600',
+  ];
+
+  if (loading || authLoading) {
     return (
-        <div className={`relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden transition-colors duration-700 bg-gradient-to-br ${step.gradient}`}>
-
-            {/* Skip Button */}
-            <button
-                onClick={completeSetup}
-                className="absolute top-8 right-8 z-50 text-white/50 hover:text-white transition-opacity text-sm font-bold uppercase tracking-widest"
-            >
-                Skip
-            </button>
-
-            {/* Visual Composition */}
-            <div className="relative w-full max-w-5xl h-[45vh] flex items-center justify-center">
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={currentStep}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="relative w-full h-full flex items-center justify-center"
-                    >
-                        {/* 1. Mobile Screen (Tilted to the other side) */}
-                        <motion.div
-                            initial={{ x: -100, opacity: 0, rotate: -5 }}
-                            animate={{ x: -80, opacity: 0.4, rotate: 15 }}
-                            exit={{ x: -150, opacity: 0 }}
-                            transition={{ duration: 0.4, ease: "easeOut" }}
-                            className="absolute left-[15%] md:left-[20%] z-10 w-48 md:w-72"
-                        >
-                            <img src={step.screen} alt="" className="rounded-[2.5rem] shadow-2xl border-8 border-white/5" />
-                        </motion.div>
-
-                        {/* 2. Larger Icon (Positioned at bottom) */}
-                        <motion.div
-                            initial={{ y: 50, scale: 0.5, opacity: 0 }}
-                            animate={{ y: 120, scale: 1.2, opacity: 0.3 }}
-                            exit={{ y: 100, opacity: 0 }}
-                            transition={{ delay: 0.1, duration: 0.3, type: "spring" }}
-                            className="absolute z-0"
-                        >
-                            {step.icon}
-                        </motion.div>
-
-                        {/* 3. Mascot (Front & Central) */}
-                        <motion.div
-                            initial={{ scale: 0.8, opacity: 0, y: 20 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 1.1, opacity: 0 }}
-                            transition={{ duration: 0.35, ease: "backOut" }}
-                            className="absolute z-30 w-64 md:w-96"
-                        >
-                            <img src={step.mascot} alt="Mascot" className="drop-shadow-[0_25px_50px_rgba(0,0,0,0.6)]" />
-                        </motion.div>
-                    </motion.div>
-                </AnimatePresence>
-            </div>
-
-            {/* Content Area */}
-            <div className="relative z-40 text-center px-8 max-w-3xl mt-12">
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={currentStep}
-                        initial={{ x: 30, opacity: 0 }}
-                        animate={{ x: 0, opacity: 1 }}
-                        exit={{ x: -30, opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                    >
-                        <h2 className="text-4xl md:text-6xl font-black text-white mb-6 tracking-tighter italic">
-                            {step.title}
-                        </h2>
-                        <p className="text-white/70 text-lg md:text-2xl mb-12 font-medium leading-tight max-w-xl mx-auto">
-                            {step.description}
-                        </p>
-                    </motion.div>
-                </AnimatePresence>
-
-                {/* Action Buttons */}
-                <div className="flex flex-col items-center gap-8">
-                    <div className={`flex items-center gap-4 w-full max-w-md transition-all duration-300 ${currentStep > 0 ? 'justify-between' : 'justify-center'}`}>
-
-                        {/* Back Button (Only shows from screen 2) */}
-                        <AnimatePresence>
-                            {currentStep > 0 && (
-                                <motion.div
-                                    initial={{ width: 0, opacity: 0, x: -20 }}
-                                    animate={{ width: "48%", opacity: 1, x: 0 }}
-                                    exit={{ width: 0, opacity: 0, x: -20 }}
-                                    transition={{ duration: 0.3 }}
-                                >
-                                    <Button
-                                        onClick={handleBack}
-                                        variant="outline"
-                                        className="w-full h-16 rounded-2xl border-2 border-white/20 bg-white/5 text-white hover:bg-white/10 text-lg font-bold"
-                                    >
-                                        <ChevronLeft className="mr-2 h-5 w-5" /> Back
-                                    </Button>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        {/* Next/Finish Button */}
-                        <motion.div
-                            layout
-                            className={currentStep > 0 ? "w-[48%]" : "w-full"}
-                            transition={{ duration: 0.3 }}
-                        >
-                            <Button
-                                onClick={handleNext}
-                                className="w-full h-16 rounded-2xl bg-white text-black hover:bg-slate-100 text-lg font-black shadow-2xl transition-transform active:scale-95"
-                            >
-                                {currentStep === STEPS.length - 1 ? (
-                                    <span className="flex items-center gap-2">Finish <Sparkles className="h-5 w-5 fill-black" /></span>
-                                ) : (
-                                    <span className="flex items-center gap-2">Next <ChevronRight className="h-6 w-6" /></span>
-                                )}
-                            </Button>
-                        </motion.div>
-                    </div>
-
-                    {/* Stepper Dots */}
-                    <div className="flex gap-3">
-                        {STEPS.map((_, idx) => (
-                            <motion.div
-                                key={idx}
-                                animate={{
-                                    scale: idx === currentStep ? 1.2 : 1,
-                                    backgroundColor: idx === currentStep ? "rgba(255,255,255,1)" : "rgba(255,255,255,0.2)"
-                                }}
-                                className="h-2 w-10 rounded-full"
-                            />
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-24 h-24 object-contain animate-pulse" />
+      </div>
     );
+  }
+
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 0:
+        return (
+          <div className="text-center">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.2 }}>
+              <img src="/mascots/Mascot1.png" alt="Welcome" className="w-48 h-48 mx-auto mb-6 drop-shadow-2xl" />
+            </motion.div>
+            <h2 className="text-3xl md:text-4xl font-black text-white mb-3">
+              Welcome, <span className="text-yellow-300">{displayName}</span>!
+            </h2>
+            <p className="text-white/70 text-lg mb-2">Let's set up your profile in 3 quick steps.</p>
+            <p className="text-white/50 text-sm">This will personalize your learning experience.</p>
+          </div>
+        );
+
+      case 1:
+        return (
+          <div className="text-center max-w-md mx-auto">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
+              <div className="w-20 h-20 rounded-3xl bg-white/15 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20">
+                <User className="w-10 h-10 text-white" />
+              </div>
+            </motion.div>
+            <h2 className="text-3xl font-black text-white mb-2">Choose Your Username</h2>
+            <p className="text-white/60 text-sm mb-8">This will be visible on leaderboards and battles.</p>
+            <div className="relative">
+              <Input
+                value={username}
+                onChange={(e) => { setUsername(e.target.value); setUsernameError(''); }}
+                placeholder="Enter your username"
+                className="h-14 rounded-2xl bg-white/10 border-white/20 text-white placeholder:text-white/40 text-center text-lg font-bold focus:ring-2 focus:ring-white/30"
+                maxLength={20}
+              />
+              {usernameError && (
+                <p className="text-red-300 text-xs mt-2 font-semibold">{usernameError}</p>
+              )}
+            </div>
+          </div>
+        );
+
+      case 2:
+        return (
+          <div className="text-center max-w-lg mx-auto">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
+              <div className="w-20 h-20 rounded-3xl bg-white/15 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20">
+                <Building2 className="w-10 h-10 text-white" />
+              </div>
+            </motion.div>
+            <h2 className="text-3xl font-black text-white mb-2">Select Your Institute</h2>
+            <p className="text-white/60 text-sm mb-6">We'll tailor content for your college.</p>
+            <div className="space-y-3 max-h-[40vh] overflow-y-auto px-1 overscroll-contain">
+              {institutes.map((inst) => (
+                <button
+                  key={inst.code}
+                  onClick={() => inst.enabled && setInstitute(inst.code)}
+                  disabled={!inst.enabled}
+                  className={`w-full flex items-center gap-3 p-3 rounded-2xl border-2 transition-all duration-200 text-left ${
+                    institute === inst.code
+                      ? 'border-white bg-white/20 shadow-lg'
+                      : inst.enabled
+                        ? 'border-white/10 bg-white/5 hover:bg-white/10'
+                        : 'border-white/5 bg-white/[0.02] opacity-50 cursor-not-allowed'
+                  }`}
+                >
+                  <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-white/10">
+                    {inst.image_url ? (
+                      <img
+                        src={inst.image_url}
+                        alt={inst.short_name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    ) : null}
+                    <div className="absolute inset-0 bg-gradient-to-l from-transparent to-white/5" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Building2 className="w-6 h-6 text-white/30" />
+                    </div>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-bold leading-tight ${institute === inst.code ? 'text-white' : 'text-white/80'}`}>
+                      {inst.name}
+                    </p>
+                    <p className="text-[11px] text-white/40 mt-0.5">{inst.short_name}</p>
+                  </div>
+                  {!inst.enabled && (
+                    <span className="text-[10px] font-bold text-amber-300 bg-amber-300/10 px-2 py-1 rounded-full shrink-0 whitespace-nowrap">
+                      Coming Soon
+                    </span>
+                  )}
+                  {institute === inst.code && (
+                    <CheckCircle2 className="w-5 h-5 text-white shrink-0" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 3:
+        return (
+          <div className="text-center max-w-md mx-auto">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
+              <div className="w-20 h-20 rounded-3xl bg-white/15 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20">
+                <GraduationCap className="w-10 h-10 text-white" />
+              </div>
+            </motion.div>
+            <h2 className="text-3xl font-black text-white mb-2">Select Your Year</h2>
+            <p className="text-white/60 text-sm mb-8">Pick your current MBBS year.</p>
+            <div className="grid grid-cols-2 gap-3">
+              {VALID_YEARS.map((y) => (
+                <button
+                  key={y}
+                  onClick={() => setYear(y)}
+                  className={`p-4 rounded-2xl border-2 transition-all duration-200 font-bold ${
+                    year === y
+                      ? 'border-white bg-white/20 text-white shadow-lg'
+                      : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
+                  }`}
+                >
+                  {y} Year MBBS
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 4:
+        return (
+          <div className="text-center">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.2 }}>
+              <img src="/mascots/Mascot5.png" alt="All Set" className="w-48 h-48 mx-auto mb-6 drop-shadow-2xl" />
+            </motion.div>
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.4, type: 'spring' }}>
+              <CheckCircle2 className="w-16 h-16 text-emerald-300 mx-auto mb-4" />
+            </motion.div>
+            <h2 className="text-3xl md:text-4xl font-black text-white mb-3">You're All Set!</h2>
+            <p className="text-white/70 text-lg">Your profile is complete. Let's start learning!</p>
+          </div>
+        );
+    }
+  };
+
+  const canProceed = () => {
+    if (currentStep === 0) return true;
+    if (currentStep === 1) return username.length >= 3;
+    if (currentStep === 2) return !!institute;
+    if (currentStep === 3) return !!year;
+    if (currentStep === 4) return true;
+    return false;
+  };
+
+  return (
+    <div className={`relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden transition-all duration-700 bg-gradient-to-br ${gradients[currentStep]}`}>
+      <div className="absolute top-[calc(env(safe-area-inset-top,0px)+16px)] left-6 right-6 z-50">
+        <div className="flex gap-2">
+          {steps.map((_, i) => (
+            <div key={i} className="flex-1 h-1.5 rounded-full overflow-hidden bg-white/15">
+              <motion.div
+                className="h-full bg-white rounded-full"
+                initial={{ width: '0%' }}
+                animate={{ width: i <= currentStep ? '100%' : '0%' }}
+                transition={{ duration: 0.4, ease: 'easeOut' }}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-between mt-2">
+          {steps.map((s, i) => (
+            <span key={i} className={`text-[9px] font-bold uppercase tracking-wider transition-all ${
+              i <= currentStep ? 'text-white/80' : 'text-white/30'
+            }`}>
+              {s.title}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {currentStep === 0 && (
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="absolute top-[calc(env(safe-area-inset-top,0px)+16px)] right-6 z-50 text-white/40 hover:text-white text-xs font-bold uppercase tracking-widest"
+        >
+          Skip
+        </button>
+      )}
+
+      <div className="relative z-10 w-full max-w-2xl px-6 py-24">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentStep}
+            initial={{ x: 40, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -40, opacity: 0 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+          >
+            {renderStepContent()}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      <div className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+24px)] left-6 right-6 z-50">
+        <div className={`flex items-center gap-3 ${currentStep > 0 ? 'justify-between' : 'justify-center'}`}>
+          {currentStep > 0 && currentStep < 4 && (
+            <Button
+              onClick={handleBack}
+              variant="outline"
+              className="flex-1 h-14 rounded-2xl border-2 border-white/20 bg-white/5 text-white hover:bg-white/10 font-bold"
+            >
+              <ChevronLeft className="mr-1 h-4 w-4" /> Back
+            </Button>
+          )}
+          <Button
+            onClick={handleNext}
+            disabled={!canProceed() || saving}
+            className={`h-14 rounded-2xl bg-white text-black hover:bg-white/90 font-black shadow-2xl transition-all active:scale-95 ${
+              currentStep > 0 && currentStep < 4 ? 'flex-1' : 'w-full max-w-md'
+            }`}
+          >
+            {saving ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : currentStep === 4 ? (
+              <span className="flex items-center gap-2">Go to Dashboard <Sparkles className="h-5 w-5 fill-black" /></span>
+            ) : currentStep === 0 ? (
+              <span className="flex items-center gap-2">Let's Go <ChevronRight className="h-5 w-5" /></span>
+            ) : (
+              <span className="flex items-center gap-2">Next <ChevronRight className="h-5 w-5" /></span>
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default SetupWizard;
