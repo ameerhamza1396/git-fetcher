@@ -188,33 +188,37 @@ const Dashboard = () => {
     enabled: !!user?.id,
   });
 
-  // Fetch Term of the Day
+  const userYear = (profile as any)?.year || null;
+
+  // Fetch Term of the Day (year-specific)
   const { data: termOfDay, isLoading: termLoading } = useQuery<TermOfDay>({
-    queryKey: ['termOfDay'],
+    queryKey: ['termOfDay', userYear],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('term_of_day')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+        .limit(1);
 
+      if (userYear) query = query.eq('year', userYear);
+      const { data, error } = await query.single();
       if (error) throw error;
       return data;
     },
   });
 
-  // Fetch Case of the Day
+  // Fetch Case of the Day (year-specific)
   const { data: caseOfDay, isLoading: caseLoading } = useQuery<CaseOfDay>({
-    queryKey: ['caseOfDay'],
+    queryKey: ['caseOfDay', userYear],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('case_of_day')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+        .limit(1);
 
+      if (userYear) query = query.eq('year', userYear);
+      const { data, error } = await query.single();
       if (error) throw error;
       return data;
     },
@@ -238,9 +242,10 @@ const Dashboard = () => {
   useEffect(() => {
     if (authLoading || profileLoading) { setIsNavigating(true); return; }
     if (!user || !profile) { setIsNavigating(false); return; }
-    if (profile.username === null) { navigate('/welcome-new-user'); return; }
+    // Redirect to setup wizard if any required field is missing
     const validYears = ["1st", "2nd", "3rd", "4th", "5th"];
-    if (profile.year && !validYears.includes(profile.year)) { navigate('/select-year'); return; }
+    const needsSetup = !profile.username || !(profile as any).institute || !((profile as any).year && validYears.includes((profile as any).year));
+    if (needsSetup) { navigate('/setup'); return; }
     setIsNavigating(false);
   }, [authLoading, profileLoading, user, profile, navigate]);
 
