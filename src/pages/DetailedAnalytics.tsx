@@ -3,15 +3,16 @@ import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { useNavigate, Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowLeft, Target, BookOpen, TrendingUp, TrendingDown, Lock, Loader2, BarChart3, ChevronRight
+  ArrowLeft, Target, BookOpen, TrendingUp, TrendingDown, Lock, Loader2, BarChart3, ChevronRight, Moon, Sun
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { useTheme } from 'next-themes';
+import { ProfileDropdown } from '@/components/ProfileDropdown';
 import Seo from '@/components/Seo';
 
 interface SubjectAnalytics {
@@ -34,6 +35,7 @@ interface ChapterAnalytics {
 const DetailedAnalytics = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { theme, setTheme } = useTheme();
 
   const { data: profile } = useQuery({
     queryKey: ['profile', user?.id],
@@ -47,21 +49,22 @@ const DetailedAnalytics = () => {
 
   const userPlan = (profile as any)?.plan?.toLowerCase() || 'free';
   const isPremium = userPlan === 'premium' || userPlan === 'iconic';
+  const userYear = (profile as any)?.year || null;
 
   const { data: analytics, isLoading } = useQuery<SubjectAnalytics[]>({
-    queryKey: ['detailed-analytics', user?.id],
+    queryKey: ['detailed-analytics', user?.id, userYear],
     queryFn: async () => {
       if (!user?.id) return [];
 
       // Fetch all answers with MCQ + chapter + subject info
       const { data: answers, error } = await supabase
         .from('user_answers')
-        .select('is_correct, mcq_id, mcqs(id, chapter_id, chapters(id, name, subject_id, subjects(id, name)))')
+        .select('is_correct, mcq_id, mcqs(id, chapter_id, chapters(id, name, subject_id, subjects(id, name, year)))')
         .eq('user_id', user.id);
 
       if (error || !answers) return [];
 
-      // Group by subject then chapter
+      // Group by subject then chapter, filtering by user's year
       const subjectMap: Record<string, SubjectAnalytics> = {};
 
       for (const ans of answers) {
@@ -70,6 +73,9 @@ const DetailedAnalytics = () => {
 
         const subject = mcq.chapters.subjects;
         const chapter = mcq.chapters;
+
+        // Filter by user's current year
+        if (userYear && subject.year && subject.year !== userYear) continue;
 
         if (!subjectMap[subject.id]) {
           subjectMap[subject.id] = {
@@ -85,7 +91,6 @@ const DetailedAnalytics = () => {
         subjectMap[subject.id].total++;
         if (ans.is_correct) subjectMap[subject.id].correct++;
 
-        // Find or create chapter entry
         let chap = subjectMap[subject.id].chapters.find(c => c.chapter_id === chapter.id);
         if (!chap) {
           chap = { chapter_id: chapter.id, chapter_name: chapter.name, total: 0, correct: 0, accuracy: 0 };
@@ -95,7 +100,6 @@ const DetailedAnalytics = () => {
         if (ans.is_correct) chap.correct++;
       }
 
-      // Calculate accuracies
       const result = Object.values(subjectMap).map(s => ({
         ...s,
         accuracy: s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0,
@@ -110,10 +114,8 @@ const DetailedAnalytics = () => {
     enabled: !!user?.id,
   });
 
-  // Find strongest (min 100 questions) and weakest (min 30 incorrect)
   const strongest = analytics?.filter(s => s.total >= 100).sort((a, b) => b.accuracy - a.accuracy)?.[0] || null;
   const weakest = analytics?.filter(s => (s.total - s.correct) >= 30).sort((a, b) => a.accuracy - b.accuracy)?.[0] || null;
-
   const strongestChapter = analytics?.flatMap(s => s.chapters).filter(c => c.total >= 100).sort((a, b) => b.accuracy - a.accuracy)?.[0] || null;
   const weakestChapter = analytics?.flatMap(s => s.chapters).filter(c => (c.total - c.correct) >= 30).sort((a, b) => a.accuracy - b.accuracy)?.[0] || null;
 
@@ -135,29 +137,49 @@ const DetailedAnalytics = () => {
   }
 
   const visibleSubjects = isPremium ? analytics : analytics?.slice(0, 3);
-  const hiddenCount = !isPremium && analytics ? analytics.length - 3 : 0;
+  const hiddenCount = !isPremium && analytics ? Math.max(analytics.length - 3, 0) : 0;
 
   return (
-    <div className="min-h-screen bg-background pb-8">
+    <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950">
       <Seo title="Detailed Analytics" description="Subject and topic-wise performance analysis" />
 
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-2xl border-b border-border/30 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center gap-3 px-4 h-14">
-          <button onClick={() => navigate(-1)} className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center">
-            <ArrowLeft className="w-4 h-4 text-foreground" />
-          </button>
-          <div>
-            <h1 className="text-sm font-black text-foreground">Detailed Analytics</h1>
-            <p className="text-[10px] text-muted-foreground">Subject & topic breakdown</p>
+      {/* Header - matching pricing page */}
+      <header className="absolute top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)]">
+        <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
+          <div className="flex items-center space-x-3">
+            <Link to="/dashboard">
+              <Button variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110">
+                <ArrowLeft className="h-5 w-5 text-blue-600" />
+              </Button>
+            </Link>
+            <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-8 h-8" />
+            <span className="text-xl font-bold text-foreground">Analytics</span>
+          </div>
+          <div className="flex items-center space-x-4">
+            {userYear && (
+              <Badge className="bg-primary/10 text-primary border-0 text-xs font-bold">{userYear} Year</Badge>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="w-9 h-9 p-0">
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            {user ? <ProfileDropdown /> : <Link to="/login"><Button size="sm">Sign In</Button></Link>}
           </div>
         </div>
       </header>
 
-      <div className="px-4 mt-[var(--header-height)] space-y-5 pt-4">
+      <main className="container mx-auto px-4 lg:px-8 py-12 lg:py-16 max-w-7xl">
+        <div className="text-center mb-10">
+          <h1 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 dark:text-white mb-4 italic uppercase mt-[var(--header-height)]">
+            Your <span className="text-blue-600">Performance</span>
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 font-medium max-w-xl mx-auto uppercase text-xs tracking-[0.2em]">
+            Subject & topic-wise breakdown for {userYear ? `${userYear} Year MBBS` : 'your year'}
+          </p>
+        </div>
+
         {/* Strengths & Weaknesses */}
         {(strongest || weakest || strongestChapter || weakestChapter) && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10 max-w-6xl mx-auto">
             {strongest && (
               <Card className="border border-emerald-500/20 bg-emerald-500/5">
                 <CardContent className="p-4">
@@ -202,8 +224,8 @@ const DetailedAnalytics = () => {
         )}
 
         {/* Subject List */}
-        <div>
-          <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-primary" /> Subject-wise Performance
           </h2>
 
@@ -223,7 +245,6 @@ const DetailedAnalytics = () => {
           {/* Locked content for free users */}
           {!isPremium && hiddenCount > 0 && (
             <div className="relative mt-3">
-              {/* Faded preview */}
               <div className="space-y-3 opacity-30 blur-[2px] pointer-events-none">
                 {analytics?.slice(3, 5).map((subject) => (
                   <Card key={subject.subject_id} className="border border-border/40 bg-card/80 p-4">
@@ -237,8 +258,6 @@ const DetailedAnalytics = () => {
                   </Card>
                 ))}
               </div>
-
-              {/* Overlay CTA */}
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-t from-background via-background/80 to-transparent rounded-2xl">
                 <Lock className="w-8 h-8 text-muted-foreground mb-3" />
                 <p className="text-sm font-bold text-foreground mb-1">Unlock Full Analytics</p>
@@ -255,12 +274,11 @@ const DetailedAnalytics = () => {
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 };
 
-// Individual subject card with expandable chapters
 const SubjectCard = ({ subject, isPremium, index }: { subject: SubjectAnalytics; isPremium: boolean; index: number }) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -295,43 +313,37 @@ const SubjectCard = ({ subject, isPremium, index }: { subject: SubjectAnalytics;
           <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform shrink-0 ${expanded ? 'rotate-90' : ''}`} />
         </button>
 
-        {/* Expanded chapters */}
-        <AnimatedExpand expanded={expanded}>
-          <div className="px-4 pb-4 space-y-2 border-t border-border/30 pt-3">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Topic Breakdown</p>
-            {subject.chapters.map((ch) => {
-              const chColor = ch.accuracy >= 70 ? 'text-emerald-500' : ch.accuracy >= 40 ? 'text-amber-500' : 'text-destructive';
-              return (
-                <div key={ch.chapter_id} className="flex items-center justify-between py-1.5">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-foreground truncate">{ch.chapter_name}</p>
-                    <p className="text-[10px] text-muted-foreground">{ch.total} Qs · {ch.correct} correct</p>
-                  </div>
-                  <span className={`text-sm font-bold ${chColor} shrink-0 ml-2`}>{ch.accuracy}%</span>
-                </div>
-              );
-            })}
-            {subject.chapters.length === 0 && (
-              <p className="text-xs text-muted-foreground">No topic data available</p>
-            )}
-          </div>
-        </AnimatedExpand>
+        <AnimatePresence>
+          {expanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="px-4 pb-4 space-y-2 border-t border-border/30 pt-3">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Topic Breakdown</p>
+                {subject.chapters.map((ch) => {
+                  const chColor = ch.accuracy >= 70 ? 'text-emerald-500' : ch.accuracy >= 40 ? 'text-amber-500' : 'text-destructive';
+                  return (
+                    <div key={ch.chapter_id} className="flex items-center justify-between py-1.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium text-foreground truncate">{ch.chapter_name}</p>
+                        <p className="text-[10px] text-muted-foreground">{ch.total} Qs · {ch.correct} correct</p>
+                      </div>
+                      <span className={`text-sm font-bold ${chColor} shrink-0 ml-2`}>{ch.accuracy}%</span>
+                    </div>
+                  );
+                })}
+                {subject.chapters.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No topic data available</p>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </Card>
-    </motion.div>
-  );
-};
-
-// Simple animated expand
-const AnimatedExpand = ({ expanded, children }: { expanded: boolean; children: React.ReactNode }) => {
-  if (!expanded) return null;
-  return (
-    <motion.div
-      initial={{ height: 0, opacity: 0 }}
-      animate={{ height: 'auto', opacity: 1 }}
-      exit={{ height: 0, opacity: 0 }}
-      transition={{ duration: 0.2 }}
-    >
-      {children}
     </motion.div>
   );
 };
