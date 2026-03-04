@@ -106,6 +106,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/mcqs" element={<MCQs />} />
                 <Route path="/battle" element={<Battle />} />
@@ -124,7 +125,7 @@ function App() {
                 <Route path="/terms" element={<TermsAndConditions />} />
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/classroom" element={<Classroom />} />
-                <Route path="/welcome-new-user" element={<WelcomeNewUserPage />} />
+                <Route path="/welcome-new-user" element={<Setup />} />
                 <Route path="/all-set" element={<AllSetPage />} />
                 <Route path="/settings/username" element={<UsernamePage />} />
                 <Route path="/results" element={<MockTestResults />} />
