@@ -27,7 +27,7 @@ import { useEffect, useState, useRef } from 'react';
 import AnnouncementToastManager from '@/components/ui/AnnouncementToastManager';
 import AuthErrorDisplay from '@/components/AuthErrorDisplay';
 import Seo from '@/components/Seo';
-import SignInPrompt from '@/components/SigninPrompt';
+
 import AppExitConfirmation from '@/components/dashboard/AppExitConfirmation';
 import VersionGuard from '@/components/VersionControl';
 import ProfileAvatar from '@/components/profile/ProfileAvatar';
@@ -235,6 +235,12 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/login', { replace: true });
+    }
+  }, [authLoading, user, navigate]);
+
+  useEffect(() => {
     if (activeTab === 'announcements' && user && announcements?.length) {
       markAsReadMutation.mutate(announcements.map(a => a.id));
     }
@@ -254,7 +260,7 @@ const Dashboard = () => {
     { title: 'Practice MCQs', description: 'Test your knowledge', icon: BookOpen, link: '/mcqs', gradient: 'from-blue-500 to-indigo-600', iconColor: 'text-blue-200' },
     { title: 'Saved MCQs', description: 'Review bookmarks', icon: Bookmark, link: '/saved-mcqs', gradient: 'from-emerald-500 to-teal-600', iconColor: 'text-emerald-200' },
     { title: 'Battle Arena', description: 'Compete with friends', icon: Swords, link: '/battle', gradient: 'from-orange-500 to-red-500', iconColor: 'text-orange-100' },
-    { title: 'Collaborate', description: 'Apply for Medmacs!', icon: Briefcase, link: '/summerinternship2025', gradient: 'from-rose-500 to-pink-600', iconColor: 'text-rose-100', tag: 'Open now!', tagColor: 'bg-white/90 text-rose-600 animate-pulse' },
+    { title: 'Collaborate', description: 'Open now! Apply for Medmacs', icon: Briefcase, link: '/summerinternship2025', gradient: 'from-rose-500 to-pink-600', iconColor: 'text-rose-100' },
   ];
 
   const premiumPerks = [
@@ -275,10 +281,11 @@ const Dashboard = () => {
     );
   }
 
+
   if (!user) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-background">
-        <SignInPrompt />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-24 h-24 object-contain animate-pulse" />
       </div>
     );
   }
@@ -761,7 +768,7 @@ const Dashboard = () => {
 
       {/* Premium bottom tab bar — active tab expands with label */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-3 mb-2 bg-card/95 backdrop-blur-2xl rounded-2xl border border-border/40 shadow-xl shadow-black/8 dark:shadow-black/30 gradient-border">
+        <div className="mx-3 mb-2 bg-card/60 backdrop-blur-2xl rounded-2xl border-0 shadow-xl shadow-black/8 dark:shadow-black/30">
           <div className="flex items-center justify-around h-16 px-1">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
