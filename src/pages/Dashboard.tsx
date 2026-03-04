@@ -12,7 +12,7 @@ import {
   TrendingUp, Award, Briefcase, BellRing, Bookmark, ScrollText,
   Home, User, Settings, ChevronRight, LogOut, Lock, CreditCard,
   Megaphone, BarChart3, Sun, Moon, ArrowRight, Crown, Mail,
-  Receipt, Shield, FileText, RefreshCw, Sparkles, Stethoscope, PieChart, Info, Star
+  Receipt, Shield, FileText, RefreshCw, Sparkles, Stethoscope, PieChart, Info, Star, Users
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
