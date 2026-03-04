@@ -235,6 +235,12 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/login', { replace: true });
+    }
+  }, [authLoading, user, navigate]);
+
+  useEffect(() => {
     if (activeTab === 'announcements' && user && announcements?.length) {
       markAsReadMutation.mutate(announcements.map(a => a.id));
     }
