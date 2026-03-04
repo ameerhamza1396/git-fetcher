@@ -149,11 +149,9 @@ const Battle: React.FC = () => {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             ) : (
-              <Link to="/dashboard">
-                <Button variant="ghost" size="sm" className="w-9 h-9 p-0">
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-              </Link>
+              <Button variant="ghost" size="sm" className="w-9 h-9 p-0" onClick={() => window.history.back()}>
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
             )}
             <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-7 h-7" />
             <span className="text-lg font-black tracking-tight">Battle Arena</span>
