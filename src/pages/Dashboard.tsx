@@ -285,7 +285,7 @@ const Dashboard = () => {
 
   const ActionCard = ({ action, isExternal = false, fixedHeight = false }: any) => {
     const content = (
-      <div className={`relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br ${action.gradient} shadow-lg shadow-black/5 dark:shadow-black/20 active:scale-[0.97] transition-all duration-150 ${fixedHeight ? 'h-[120px]' : ''}`}>
+      <div className={`relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br ${action.gradient} shadow-lg shadow-black/5 dark:shadow-black/20 active:scale-[0.97] transition-all duration-150 alive-card ${fixedHeight ? 'h-[120px]' : ''}`}>
         <div className="absolute -right-3 -bottom-3 opacity-10">
           <action.icon className={`w-20 h-20 ${action.iconColor}`} />
         </div>
@@ -515,7 +515,7 @@ const Dashboard = () => {
             {/* Greeting - no avatar here */}
             <div className="mb-5">
               <h1 className="text-xl font-black text-foreground leading-tight">
-                Hi, <span className="text-primary">{displayName}</span> ✨
+                Hi, <span className="text-shimmer">{displayName}</span> ✨
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5 font-medium">Ready to dominate your exams?</p>
             </div>
@@ -528,7 +528,7 @@ const Dashboard = () => {
                 <div className="flex justify-between"><div className="h-3 bg-muted rounded w-1/4" /><div className="h-3 bg-muted rounded w-1/4" /></div>
               </div>
             ) : (
-            <div className="bg-gradient-to-r from-primary/12 to-accent border border-primary/20 rounded-2xl p-4 mb-6 shadow-md shadow-primary/5">
+            <div className="bg-gradient-to-r from-primary/12 to-accent border border-primary/20 rounded-2xl p-4 mb-6 shadow-md shadow-primary/5 glow-breathe">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
                   <Flame className="w-4 h-4 text-orange-500" /> {userStats?.currentStreak || 0} day streak
@@ -664,12 +664,16 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-background pb-28 overflow-x-hidden">
+    <div className="min-h-screen w-full bg-background bg-mesh pb-28 overflow-x-hidden relative">
+      {/* Floating gradient orbs */}
+      <div className="orb orb-1" />
+      <div className="orb orb-2" />
+      <div className="orb orb-3" />
       <Seo title="Dashboard" description="Your personalized Medmacs App dashboard." canonical="https://medmacs.app/dashboard" />
       <VersionGuard />
 
       {/* Minimal top bar with avatar */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-2xl border-b border-border/30 pt-[env(safe-area-inset-top)]">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-2xl border-b border-border/30 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between px-5 h-14">
           <div className="flex items-center gap-2.5">
             <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-6 h-6" />
@@ -757,7 +761,7 @@ const Dashboard = () => {
 
       {/* Premium bottom tab bar — active tab expands with label */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-3 mb-2 bg-card/95 backdrop-blur-2xl rounded-2xl border border-border/40 shadow-xl shadow-black/8 dark:shadow-black/30">
+        <div className="mx-3 mb-2 bg-card/95 backdrop-blur-2xl rounded-2xl border border-border/40 shadow-xl shadow-black/8 dark:shadow-black/30 gradient-border">
           <div className="flex items-center justify-around h-16 px-1">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
