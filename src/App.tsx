@@ -152,6 +152,7 @@ function App() {
                 <Route path="/payment-failure" element={<PaymentFailure />} />
                 <Route path="/payment-success" element={<PaymentSuccess />} />
                 <Route path="/setup" element={<Setup />} />
+                <Route path="/detailed-analytics" element={<DetailedAnalytics />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </VideoCallProvider>
