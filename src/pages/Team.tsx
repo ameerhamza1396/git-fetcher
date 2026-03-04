@@ -1,10 +1,9 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Instagram, Sun, Moon } from 'lucide-react';
+import { ArrowLeft, Instagram, Sun, Moon, Zap } from 'lucide-react'; // Added Zap for the new button
 import { useTheme } from 'next-themes';
 import Seo from '@/components/Seo';
 import { useEffect, useState } from 'react';
-
-import { Typewriter } from 'react-simple-typewriter'; // ✅ Added for typewriter
+import { Typewriter } from 'react-simple-typewriter';
 
 const Teams = () => {
   const { theme, setTheme } = useTheme();
@@ -42,19 +41,72 @@ const Teams = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // --- Data with Position Vacant for non-founder/non-contributor roles ---
+
+  const coreTeam = [
+    {
+      name: 'Position Vacant',
+      role: 'Academics Head',
+      img: '/teampage/user.png',
+    },
+    {
+      name: 'Position Vacant',
+      role: 'Marketing Head',
+      img: '/teampage/user.png',
+    },
+  ];
+
+  const extendedTeam = [
+    {
+      name: 'Position Vacant',
+      role: 'Social Media Head',
+      img: '/teampage/user.png',
+    },
+    {
+      name: 'Position Vacant',
+      role: 'Graphics Head',
+      img: '/teampage/user.png',
+    },
+    {
+      name: 'Position Vacant',
+      role: 'Content Head',
+      img: '/teampage/user.png',
+    },
+    {
+      name: 'Position Vacant',
+      role: 'HR Head',
+      img: '/teampage/user.png',
+    },
+  ];
+
+  const contributors = [
+    'Muhammad Muzammil (Batch 11 SMBBMC)',
+    'Muhammad Irfan (Batch 11 SMBBMC)',
+    'Abdul Hadi Ansari (Batch 12 SMBBMC)',
+    'Hammad Faridi (Batch 12 SMBBMC)',
+    'Manhil Mushtaq (Batch 13 SMBBMC)',
+    'Hira Khan (Batch 14 SMBBMC)',
+    'Tania Ratani (Batch 15 SMBBMC)',
+  ];
+
+  const specialThanks = [
+    '✨ Dr Rahima Shakir',
+    '✨ Hafiz Abdul Ahad',
+  ];
+
+  // --- Render Function ---
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-white via-purple-50 to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900/30">
       <Seo
-        title="Our Teams"
+        title="Our Team - Medmacs"
         description="Meet the passionate team behind Medmacs — innovators, leaders, and contributors shaping the future of medical education."
         canonical="https://www.medmacs.app/teams"
       />
 
       {/* Header */}
-    <header className="absolute top-0 left-0 right-0 z-50 bg-white/30 dark:bg-gray-900/30 
-    backdrop-blur-md border-b border-purple-200/50 dark:border-purple-800/50 
-    pt-[env(safe-area-inset-top)]">  
-            <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
+      <header className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-md border-b border-purple-200 dark:border-purple-800 sticky top-0 z-50">
+        <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
           <Link
             to="/"
             className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors"
@@ -88,8 +140,7 @@ const Teams = () => {
             <h1
               id="hero-heading"
               style={{ opacity: heroOpacity }}
-              className="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-blue-500 to-pink-500 dark:from-purple-300 
-              dark:via-blue-300 dark:to-pink-300 animate-fade-in sticky top-20 opacity-90 transition-opacity duration-700 z-10 pt-[calc(45px+env(safe-area-inset-top))] overscroll-y-contain"
+              className="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-blue-500 to-pink-500 dark:from-purple-300 dark:via-blue-300 dark:to-pink-300 animate-fade-in sticky top-20 opacity-90 transition-opacity duration-700 z-10"
             >
               <Typewriter
                 words={['The Medmacs Team']}
@@ -150,18 +201,7 @@ const Teams = () => {
             Core Team
           </h2>
           <div className="flex flex-wrap justify-center gap-12">
-            {[
-              {
-                name: 'Saba Yaqoob',
-                role: 'Academics Head',
-                img: '/teampage/female.png',
-              },
-              {
-                name: 'Muhammad Junaid Imran',
-                role: 'Marketing Head',
-                img: '/teampage/male.png',
-              },
-            ].map((member, i) => (
+            {coreTeam.map((member, i) => (
               <div
                 key={i}
                 className="group text-center transform hover:scale-110 transition duration-500"
@@ -188,28 +228,7 @@ const Teams = () => {
             Extended Team
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-12">
-            {[
-              {
-                name: 'Manhil Mushtaq',
-                role: 'Social Media Head',
-                img: '/teampage/female.png',
-              },
-              {
-                name: 'Hira Khan',
-                role: 'Graphics Head',
-                img: '/teampage/female.png',
-              },
-              {
-                name: 'Tooba Soomro',
-                role: 'Content Head',
-                img: '/teampage/female.png',
-              },
-              {
-                name: 'Arshia Janjua',
-                role: 'HR Head',
-                img: '/teampage/female.png',
-              },
-            ].map((member, i) => (
+            {extendedTeam.map((member, i) => (
               <div
                 key={i}
                 className="group text-center hover:scale-110 transition-transform duration-500"
@@ -228,21 +247,24 @@ const Teams = () => {
           </div>
         </div>
 
+        {/* Collaboration Request Button */}
+        <div className="text-center my-16">
+          <Link
+            to="/collaborate" // Assuming you'd have a route for this
+            className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-full shadow-xl text-white bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 dark:from-pink-400 dark:to-purple-500 dark:hover:from-pink-500 dark:hover:to-purple-600 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800"
+          >
+            <Zap className="w-5 h-5 mr-2" />
+            Request to Become a Collaborator
+          </Link>
+        </div>
+
         {/* Contributors */}
         <div className="mb-20 text-center">
           <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-green-500 mb-10">
             Contributors
           </h2>
           <div className="flex flex-wrap justify-center gap-6">
-            {[
-              'Muhammad Muzammil (Batch 11 SMBBMC)',
-              'Muhammad Irfan (Batch 11 SMBBMC)',
-              'Abdul Hadi Ansari (Batch 12 SMBBMC)',
-              'Hammad Faridi (Batch 12 SMBBMC)',
-              'Manhil Mushtaq (Batch 13 SMBBMC)',
-              'Hira Khan (Batch 14 SMBBMC)',
-              'Tania Ratani (Batch 15 SMBBMC)',
-            ].map((contrib, i) => (
+            {contributors.map((contrib, i) => (
               <span
                 key={i}
                 className="px-4 py-2 text-gray-900 dark:text-white rounded-full bg-gradient-to-r from-purple-100 to-purple-200 dark:from-purple-700 dark:to-purple-800 shadow hover:shadow-lg hover:scale-105 transition-all"
@@ -258,12 +280,11 @@ const Teams = () => {
           <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-yellow-500 mb-6">
             Special Thanks To
           </h2>
-          <p className="text-lg text-gray-700 dark:text-gray-300">
-            ✨ Dr Rahima Shakir
-          </p>
-          <p className="text-lg text-gray-700 dark:text-gray-300">
-            ✨ Hafiz Abdul Ahad
-          </p>
+          {specialThanks.map((thanks, i) => (
+            <p key={i} className="text-lg text-gray-700 dark:text-gray-300">
+              {thanks}
+            </p>
+          ))}
         </div>
       </div>
 
@@ -274,7 +295,6 @@ const Teams = () => {
           <p className="text-xs">&copy; 2025 Hmacs Studios. All rights reserved.</p>
         </div>
       </footer>
-      
     </div>
   );
 };
