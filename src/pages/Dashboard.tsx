@@ -99,6 +99,28 @@ const CaseOfDayCard = ({ caseOfDay }: { caseOfDay: CaseOfDay }) => {
   );
 };
 
+const ActionCard = ({ action, isExternal = false, fixedHeight = false }: any) => {
+  const content = (
+    <div className={`relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br ${action.gradient} shadow-lg shadow-black/5 dark:shadow-black/20 active:scale-[0.97] transition-all duration-150 alive-card ${fixedHeight ? 'h-[120px]' : ''}`}>
+      <div className="absolute -right-3 -bottom-3 opacity-10">
+        <action.icon className={`w-20 h-20 ${action.iconColor}`} />
+      </div>
+      <div className="relative z-10">
+        {action.tag && (
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mb-1 ${action.tagColor || 'bg-white/20 text-white'}`}>
+            {action.tag}
+          </span>
+        )}
+        <h3 className="text-[15px] font-bold text-white leading-tight">{action.title}</h3>
+        <p className="text-white/60 text-[11px] mt-0.5 font-medium">{action.description}</p>
+      </div>
+    </div>
+  );
+
+  if (isExternal) return <a href={action.link} target="_blank" rel="noopener noreferrer">{content}</a>;
+  return <Link to={action.disabled ? '#' : action.link} className={action.disabled ? 'opacity-50 pointer-events-none' : ''}>{content}</Link>;
+};
+
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -290,26 +312,6 @@ const Dashboard = () => {
     );
   }
 
-  const ActionCard = ({ action, isExternal = false, fixedHeight = false }: any) => {
-    const content = (
-      <div className={`relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br ${action.gradient} shadow-lg shadow-black/5 dark:shadow-black/20 active:scale-[0.97] transition-all duration-150 alive-card ${fixedHeight ? 'h-[120px]' : ''}`}>
-        <div className="absolute -right-3 -bottom-3 opacity-10">
-          <action.icon className={`w-20 h-20 ${action.iconColor}`} />
-        </div>
-        <div className="relative z-10">
-          {action.tag && (
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mb-1 ${action.tagColor || 'bg-white/20 text-white'}`}>
-              {action.tag}
-            </span>
-          )}
-          <h3 className="text-[15px] font-bold text-white leading-tight">{action.title}</h3>
-          <p className="text-white/60 text-[11px] mt-0.5 font-medium">{action.description}</p>
-        </div>
-      </div>
-    );
-    if (isExternal) return <a href={action.link} target="_blank" rel="noopener noreferrer">{content}</a>;
-    return <Link to={action.disabled ? '#' : action.link} className={action.disabled ? 'opacity-50 pointer-events-none' : ''}>{content}</Link>;
-  };
 
   const unreadCount = (announcements && readAnnouncements)
     ? announcements.filter(a => !readAnnouncements.includes(a.id)).length : 0;
@@ -528,30 +530,34 @@ const Dashboard = () => {
             </div>
 
             {/* Streak bar - elevated */}
-            <div className="min-h-[100px] mb-6">
-            {userStatsLoading ? (
-              <div className="bg-muted/50 rounded-2xl p-4 animate-pulse">
-                <div className="h-4 bg-muted rounded w-1/3 mb-3" />
-                <div className="h-2.5 bg-muted rounded w-full mb-2" />
-                <div className="flex justify-between"><div className="h-3 bg-muted rounded w-1/4" /><div className="h-3 bg-muted rounded w-1/4" /></div>
-              </div>
-            ) : (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} className="bg-gradient-to-r from-primary/12 to-accent border border-primary/20 rounded-2xl p-4 shadow-md shadow-primary/5 glow-breathe">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                  <Flame className="w-4 h-4 text-orange-500" /> {userStats?.currentStreak || 0} day streak
-                </span>
-                <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 text-[10px] px-2 font-bold shadow-sm">
-                  {(userStats?.currentStreak || 0) > 0 ? '🔥 On Fire!' : 'Start!'}
-                </Badge>
-              </div>
-              <Progress value={userStats?.accuracy || 0} className="h-2.5 mb-2" />
-              <div className="flex justify-between text-[11px] font-semibold">
-                <span className="text-primary">{userStats?.accuracy || 0}% accuracy</span>
-                <span className="text-muted-foreground">{userStats?.totalQuestions || 0} solved</span>
-              </div>
-            </motion.div>
-            )}
+            <div className="relative min-h-[100px] mb-6">
+              <motion.div
+                animate={{ opacity: userStatsLoading ? 0 : 1, y: userStatsLoading ? 4 : 0 }}
+                transition={{ duration: 0.25 }}
+                className="bg-gradient-to-r from-primary/12 to-accent border border-primary/20 rounded-2xl p-4 shadow-md shadow-primary/5 glow-breathe"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <Flame className="w-4 h-4 text-orange-500" /> {userStats?.currentStreak || 0} day streak
+                  </span>
+                  <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 text-[10px] px-2 font-bold shadow-sm">
+                    {(userStats?.currentStreak || 0) > 0 ? '🔥 On Fire!' : 'Start!'}
+                  </Badge>
+                </div>
+                <Progress value={userStats?.accuracy || 0} className="h-2.5 mb-2" />
+                <div className="flex justify-between text-[11px] font-semibold">
+                  <span className="text-primary">{userStats?.accuracy || 0}% accuracy</span>
+                  <span className="text-muted-foreground">{userStats?.totalQuestions || 0} solved</span>
+                </div>
+              </motion.div>
+
+              {userStatsLoading && (
+                <div className="absolute inset-0 bg-muted/50 rounded-2xl p-4 animate-pulse pointer-events-none">
+                  <div className="h-4 bg-muted rounded w-1/3 mb-3" />
+                  <div className="h-2.5 bg-muted rounded w-full mb-2" />
+                  <div className="flex justify-between"><div className="h-3 bg-muted rounded w-1/4" /><div className="h-3 bg-muted rounded w-1/4" /></div>
+                </div>
+              )}
             </div>
 
             {/* Quick Actions - elevated cards */}
@@ -591,51 +597,55 @@ const Dashboard = () => {
                 )}
               </div>
 
-              {termLoading ? (
-                <div className="rounded-2xl border border-border/40 bg-muted/30 p-4 animate-pulse min-h-[120px]">
-                  <div className="h-3 bg-muted rounded w-2/3 mb-3" />
-                  <div className="h-4 bg-muted rounded w-full mb-2" />
-                  <div className="h-3 bg-muted rounded w-3/4" />
-                </div>
-              ) : (
-              <motion.button
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}
-                onClick={() => setShowTermOfDay(true)}
-                className="rounded-2xl border border-border/40 bg-gradient-to-br from-emerald-500/10 to-teal-500/5 backdrop-blur-sm p-4 text-left active:scale-[0.97] transition-all min-h-[120px]"
-                disabled={!termOfDay}
-              >
-                <div className="flex items-center gap-1.5 mb-2">
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Term of the Day</span>
-                </div>
-                <h4 className="text-sm font-black text-foreground mb-1">{termOfDay?.term || 'Loading...'}</h4>
-                <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{termOfDay?.definition || ''}</p>
-              </motion.button>
-              )}
+              <div className="relative min-h-[120px]">
+                <motion.button
+                  animate={{ opacity: termLoading ? 0 : 1, y: termLoading ? 4 : 0 }}
+                  transition={{ duration: 0.25 }}
+                  onClick={() => setShowTermOfDay(true)}
+                  className="rounded-2xl border border-border/40 bg-gradient-to-br from-emerald-500/10 to-teal-500/5 backdrop-blur-sm p-4 text-left active:scale-[0.97] transition-all min-h-[120px] w-full"
+                  disabled={termLoading || !termOfDay}
+                >
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Term of the Day</span>
+                  </div>
+                  <h4 className="text-sm font-black text-foreground mb-1">{termOfDay?.term || 'Term of the Day'}</h4>
+                  <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{termOfDay?.definition || 'Loading latest term...'}</p>
+                </motion.button>
+
+                {termLoading && (
+                  <div className="absolute inset-0 rounded-2xl border border-border/40 bg-muted/30 p-4 animate-pulse pointer-events-none">
+                    <div className="h-3 bg-muted rounded w-2/3 mb-3" />
+                    <div className="h-4 bg-muted rounded w-full mb-2" />
+                    <div className="h-3 bg-muted rounded w-3/4" />
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="min-h-[100px] mb-6">
-            {caseLoading ? (
-              <div className="w-full rounded-2xl border border-border/40 bg-muted/30 p-4 animate-pulse">
-                <div className="h-3 bg-muted rounded w-1/3 mb-3" />
-                <div className="h-4 bg-muted rounded w-2/3 mb-2" />
-                <div className="h-3 bg-muted rounded w-full" />
-              </div>
-            ) : (
-            <motion.button
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}
-              onClick={() => setShowCaseOfDay(true)}
-              className="w-full rounded-2xl border border-border/40 bg-gradient-to-br from-blue-500/10 to-indigo-500/5 backdrop-blur-sm p-4 text-left active:scale-[0.97] transition-all"
-              disabled={!caseOfDay}
-            >
-              <div className="flex items-center gap-1.5 mb-2">
-                <Stethoscope className="w-3.5 h-3.5 text-blue-500" />
-                <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Case of the Day</span>
-              </div>
-              <h4 className="text-sm font-black text-foreground mb-1">{caseOfDay?.headline || 'Loading...'}</h4>
-              <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{caseOfDay?.details || ''}</p>
-            </motion.button>
-            )}
+            <div className="relative min-h-[100px] mb-6">
+              <motion.button
+                animate={{ opacity: caseLoading ? 0 : 1, y: caseLoading ? 4 : 0 }}
+                transition={{ duration: 0.25 }}
+                onClick={() => setShowCaseOfDay(true)}
+                className="w-full rounded-2xl border border-border/40 bg-gradient-to-br from-blue-500/10 to-indigo-500/5 backdrop-blur-sm p-4 text-left active:scale-[0.97] transition-all"
+                disabled={caseLoading || !caseOfDay}
+              >
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Stethoscope className="w-3.5 h-3.5 text-blue-500" />
+                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Case of the Day</span>
+                </div>
+                <h4 className="text-sm font-black text-foreground mb-1">{caseOfDay?.headline || 'Case of the Day'}</h4>
+                <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{caseOfDay?.details || 'Loading latest case...'}</p>
+              </motion.button>
+
+              {caseLoading && (
+                <div className="absolute inset-0 w-full rounded-2xl border border-border/40 bg-muted/30 p-4 animate-pulse pointer-events-none">
+                  <div className="h-3 bg-muted rounded w-1/3 mb-3" />
+                  <div className="h-4 bg-muted rounded w-2/3 mb-2" />
+                  <div className="h-3 bg-muted rounded w-full" />
+                </div>
+              )}
             </div>
 
             {/* Premium Perks with animated crown */}
