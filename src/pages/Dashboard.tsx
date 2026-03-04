@@ -281,11 +281,6 @@ const Dashboard = () => {
     );
   }
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/login', { replace: true });
-    }
-  }, [authLoading, user, navigate]);
 
   if (!user) {
     return (
