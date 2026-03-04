@@ -451,6 +451,7 @@ const Dashboard = () => {
                   { label: 'Subscription', icon: CreditCard, link: '/pricing' },
                   { label: 'Redeem Code', icon: Award, link: '/redeem' },
                   { label: 'Purchase History', icon: Receipt, link: '/purchase-history' },
+                  { label: 'About Us', icon: Users, link: '/teams' },
                   { label: 'Contact Us', icon: Mail, link: '/contact-us' },
                 ].map((item, i) => (
                   <Link key={i} to={item.link} className="flex items-center justify-between p-4 hover:bg-accent/50 active:bg-accent transition-colors">
