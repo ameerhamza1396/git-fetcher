@@ -554,10 +554,10 @@ const Dashboard = () => {
                     <div className="relative w-20 h-20 mb-2">
                       <svg viewBox="0 0 36 36" className="w-full h-full">
                         <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="hsl(var(--muted))" strokeWidth="3" />
-                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="hsl(var(--primary))" strokeWidth="3" strokeDasharray={`${Math.min(((userStats?.totalQuestions || 0) / 50) * 100, 100)}, 100`} strokeLinecap="round" />
+                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="hsl(var(--primary))" strokeWidth="3" strokeDasharray={`${Math.min(((profile?.daily_mcq_submissions || 0) / 50) * 100, 100)}, 100`} strokeLinecap="round" />
                       </svg>
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-sm font-black text-foreground">{Math.min(userStats?.totalQuestions || 0, 50)}/50</span>
+                        <span className="text-sm font-black text-foreground">{Math.min(profile?.daily_mcq_submissions || 0, 50)}/50</span>
                       </div>
                     </div>
                     <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider text-center">Daily Limit</p>

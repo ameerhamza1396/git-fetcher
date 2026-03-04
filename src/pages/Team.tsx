@@ -49,11 +49,9 @@ const Teams = () => {
       {/* Header - themed */}
       <header className="absolute top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)]">
         <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
-          <Link to={user ? "/dashboard" : "/"}>
-            <Button variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
+          <Button variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110" onClick={() => window.history.back()}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
           <span className="text-xl font-bold text-foreground">Meet Our Team</span>
           <div className="flex items-center space-x-3">
             {user ? <ProfileDropdown /> : <div className="w-9" />}
