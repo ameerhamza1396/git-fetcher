@@ -528,14 +528,15 @@ const Dashboard = () => {
             </div>
 
             {/* Streak bar - elevated */}
+            <div className="min-h-[100px] mb-6">
             {userStatsLoading ? (
-              <div className="bg-muted/50 rounded-2xl p-4 mb-6 animate-pulse">
+              <div className="bg-muted/50 rounded-2xl p-4 animate-pulse">
                 <div className="h-4 bg-muted rounded w-1/3 mb-3" />
                 <div className="h-2.5 bg-muted rounded w-full mb-2" />
                 <div className="flex justify-between"><div className="h-3 bg-muted rounded w-1/4" /><div className="h-3 bg-muted rounded w-1/4" /></div>
               </div>
             ) : (
-            <div className="bg-gradient-to-r from-primary/12 to-accent border border-primary/20 rounded-2xl p-4 mb-6 shadow-md shadow-primary/5 glow-breathe">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} className="bg-gradient-to-r from-primary/12 to-accent border border-primary/20 rounded-2xl p-4 shadow-md shadow-primary/5 glow-breathe">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
                   <Flame className="w-4 h-4 text-orange-500" /> {userStats?.currentStreak || 0} day streak
