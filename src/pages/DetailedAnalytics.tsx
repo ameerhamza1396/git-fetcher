@@ -6,12 +6,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowLeft, Target, BookOpen, TrendingUp, TrendingDown, Lock, Loader2, BarChart3, ChevronRight, Moon, Sun
+  ArrowLeft, Target, BookOpen, TrendingUp, TrendingDown, Lock, Loader2, BarChart3, ChevronRight
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useTheme } from 'next-themes';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
 import Seo from '@/components/Seo';
 
@@ -35,7 +34,6 @@ interface ChapterAnalytics {
 const DetailedAnalytics = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { theme, setTheme } = useTheme();
 
   const { data: profile } = useQuery({
     queryKey: ['profile', user?.id],
@@ -56,7 +54,6 @@ const DetailedAnalytics = () => {
     queryFn: async () => {
       if (!user?.id) return [];
 
-      // Fetch all answers with MCQ + chapter + subject info
       const { data: answers, error } = await supabase
         .from('user_answers')
         .select('is_correct, mcq_id, mcqs(id, chapter_id, chapters(id, name, subject_id, subjects(id, name, year)))')
@@ -64,7 +61,6 @@ const DetailedAnalytics = () => {
 
       if (error || !answers) return [];
 
-      // Group by subject then chapter, filtering by user's year
       const subjectMap: Record<string, SubjectAnalytics> = {};
 
       for (const ans of answers) {
@@ -74,7 +70,6 @@ const DetailedAnalytics = () => {
         const subject = mcq.chapters.subjects;
         const chapter = mcq.chapters;
 
-        // Filter by user's current year
         if (userYear && subject.year && subject.year !== userYear) continue;
 
         if (!subjectMap[subject.id]) {
@@ -140,16 +135,16 @@ const DetailedAnalytics = () => {
   const hiddenCount = !isPremium && analytics ? Math.max(analytics.length - 3, 0) : 0;
 
   return (
-    <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950">
+    <div className="min-h-screen w-full bg-background">
       <Seo title="Detailed Analytics" description="Subject and topic-wise performance analysis" />
 
-      {/* Header - matching pricing page */}
+      {/* Header */}
       <header className="absolute top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)]">
         <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
           <div className="flex items-center space-x-3">
             <Link to="/dashboard">
               <Button variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110">
-                <ArrowLeft className="h-5 w-5 text-blue-600" />
+                <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
             <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-8 h-8" />
@@ -159,9 +154,6 @@ const DetailedAnalytics = () => {
             {userYear && (
               <Badge className="bg-primary/10 text-primary border-0 text-xs font-bold">{userYear} Year</Badge>
             )}
-            <Button variant="ghost" size="sm" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="w-9 h-9 p-0">
-              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
             {user ? <ProfileDropdown /> : <Link to="/login"><Button size="sm">Sign In</Button></Link>}
           </div>
         </div>
@@ -169,10 +161,10 @@ const DetailedAnalytics = () => {
 
       <main className="container mx-auto px-4 lg:px-8 py-12 lg:py-16 max-w-7xl">
         <div className="text-center mb-10">
-          <h1 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 dark:text-white mb-4 italic uppercase mt-[var(--header-height)]">
-            Your <span className="text-blue-600">Performance</span>
+          <h1 className="text-3xl md:text-5xl font-black tracking-tight text-foreground mb-4 italic uppercase mt-[var(--header-height)]">
+            Your <span className="text-primary">Performance</span>
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 font-medium max-w-xl mx-auto uppercase text-xs tracking-[0.2em]">
+          <p className="text-muted-foreground font-medium max-w-xl mx-auto uppercase text-xs tracking-[0.2em]">
             Subject & topic-wise breakdown for {userYear ? `${userYear} Year MBBS` : 'your year'}
           </p>
         </div>
@@ -281,9 +273,18 @@ const DetailedAnalytics = () => {
 
 const SubjectCard = ({ subject, isPremium, index }: { subject: SubjectAnalytics; isPremium: boolean; index: number }) => {
   const [expanded, setExpanded] = useState(false);
+  const navigate = useNavigate();
 
   const accuracyColor = subject.accuracy >= 70 ? 'text-emerald-500' : subject.accuracy >= 40 ? 'text-amber-500' : 'text-destructive';
   const progressColor = subject.accuracy >= 70 ? 'bg-emerald-500' : subject.accuracy >= 40 ? 'bg-amber-500' : 'bg-destructive';
+
+  const handleToggle = () => {
+    if (!isPremium) {
+      navigate('/pricing');
+      return;
+    }
+    setExpanded(!expanded);
+  };
 
   return (
     <motion.div
@@ -293,7 +294,7 @@ const SubjectCard = ({ subject, isPremium, index }: { subject: SubjectAnalytics;
     >
       <Card className="border border-border/40 bg-card/80 overflow-hidden">
         <button
-          onClick={() => setExpanded(!expanded)}
+          onClick={handleToggle}
           className="w-full p-4 flex items-center gap-3 text-left"
         >
           <div className="flex-1 min-w-0">
@@ -310,11 +311,15 @@ const SubjectCard = ({ subject, isPremium, index }: { subject: SubjectAnalytics;
               <div className={`h-full rounded-full ${progressColor} transition-all`} style={{ width: `${subject.accuracy}%` }} />
             </div>
           </div>
-          <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform shrink-0 ${expanded ? 'rotate-90' : ''}`} />
+          {isPremium ? (
+            <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform shrink-0 ${expanded ? 'rotate-90' : ''}`} />
+          ) : (
+            <Lock className="w-4 h-4 text-muted-foreground shrink-0" />
+          )}
         </button>
 
         <AnimatePresence>
-          {expanded && (
+          {expanded && isPremium && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}

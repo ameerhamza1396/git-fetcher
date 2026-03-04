@@ -9,11 +9,12 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, User, Loader2, XCircle, Shield, Star, Crown, Lock, CreditCard } from 'lucide-react';
+import { ArrowLeft, User, Loader2, XCircle, Shield, Star, Crown, Lock, CreditCard, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import Seo from '@/components/Seo';
 import ProfileAvatar from '@/components/profile/ProfileAvatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { fetchInstitutes, getInstituteDisplayName, type Institute } from '@/utils/institutes';
 
 const planStyles = {
     free: { gradient: 'from-slate-500 via-slate-600 to-slate-700', icon: Shield, accent: 'bg-slate-300' },
@@ -30,6 +31,7 @@ const Profile = () => {
 
     const [editableProfile, setEditableProfile] = useState({ full_name: '', username: '', year: '' });
     const [loadingUpdateProfile, setLoadingUpdateProfile] = useState(false);
+    const [institutes, setInstitutes] = useState<Institute[]>([]);
     const validYears = ["1st", "2nd", "3rd", "4th", "5th"];
 
     const planColors = {
@@ -44,13 +46,17 @@ const Profile = () => {
         queryKey: ['profile', user?.id],
         queryFn: async () => {
             if (!user?.id) return null;
-            const { data, error } = await supabase.from('profiles').select('id, full_name, username, email, avatar_url, plan, plan_expiry_date, role, year').eq('id', user.id).maybeSingle();
+            const { data, error } = await supabase.from('profiles').select('id, full_name, username, email, avatar_url, plan, plan_expiry_date, role, year, institute').eq('id', user.id).maybeSingle();
             if (error && error.code !== 'PGRST116') throw new Error(error.message);
             return data;
         },
         enabled: !!user?.id && !authLoading,
         staleTime: 1000 * 60,
     });
+
+    useEffect(() => {
+        fetchInstitutes().then(setInstitutes);
+    }, []);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -81,6 +87,9 @@ const Profile = () => {
     const style = planStyles[rawUserPlan] || planStyles.free;
     const PlanIcon = style.icon;
 
+    const userInstituteCode = (profileData as any)?.institute || '';
+    const userInstituteName = getInstituteDisplayName(userInstituteCode, institutes);
+
     const updateProfile = async (e) => {
         e.preventDefault();
         if (!editableProfile.full_name.trim() || !editableProfile.username.trim() || !editableProfile.year.trim()) {
@@ -107,7 +116,7 @@ const Profile = () => {
 
     if (authLoading || profileLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] dark:bg-gray-950">
+            <div className="min-h-screen flex items-center justify-center bg-background">
                 <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-24 h-24 object-contain animate-pulse" />
             </div>
         );
@@ -115,7 +124,7 @@ const Profile = () => {
 
     if (profileFetchError) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] dark:bg-gray-950 text-destructive">
+            <div className="min-h-screen flex items-center justify-center bg-background text-destructive">
                 <XCircle className="h-8 w-8 mr-2" />
                 <p>{profileFetchErrorMessage?.message || 'Error loading profile.'}</p>
             </div>
@@ -124,7 +133,7 @@ const Profile = () => {
 
     if (!user) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] dark:bg-gray-950 text-muted-foreground">
+            <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">
                 <User className="h-8 w-8 mr-2" />
                 <p>Please log in to view your profile.</p>
             </div>
@@ -132,7 +141,7 @@ const Profile = () => {
     }
 
     return (
-        <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950">
+        <div className="min-h-screen w-full bg-background">
             <Seo title="User Profile" description="Manage your Medmacs App profile" canonical="https://medmacs.app/profile" />
 
             <header
@@ -154,7 +163,7 @@ const Profile = () => {
             </header>
 
             <main className="container mx-auto px-4 py-8 max-w-xl mt-[var(--header-height)]">
-                {/* Profile hero card - pricing style */}
+                {/* Profile hero card */}
                 <div className={`relative overflow-hidden rounded-[2rem] bg-gradient-to-br ${style.gradient} text-white shadow-2xl p-6 mb-6`}>
                     <div className="absolute inset-0 opacity-10" style={{
                         backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`,
@@ -174,7 +183,7 @@ const Profile = () => {
                     </div>
                 </div>
 
-                {/* Edit form - glass card */}
+                {/* Edit form */}
                 <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-500 via-slate-600 to-slate-700 text-white shadow-2xl p-1 mb-6">
                     <div className="absolute inset-0 opacity-10" style={{
                         backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`,
@@ -189,6 +198,17 @@ const Profile = () => {
                                 <Label htmlFor="email" className="text-white/80 text-xs font-bold uppercase tracking-wider">Email</Label>
                                 <Input id="email" type="email" value={userEmail} disabled
                                     className="bg-white/5 border-white/10 text-white/60 rounded-xl h-11 mt-1 cursor-not-allowed" />
+                            </div>
+                            <div>
+                                <Label htmlFor="institute" className="text-white/80 text-xs font-bold uppercase tracking-wider">Institute</Label>
+                                <Input
+                                    id="institute"
+                                    value={userInstituteName}
+                                    disabled
+                                    onClick={() => toast.info('To change your institute, please email us at hi@medistics.app')}
+                                    className="bg-white/5 border-white/10 text-white/60 rounded-xl h-11 mt-1 cursor-not-allowed"
+                                />
+                                <p className="text-[10px] text-white/40 mt-1">To change institute, email hi@medistics.app</p>
                             </div>
                             <div>
                                 <Label htmlFor="full_name" className="text-white/80 text-xs font-bold uppercase tracking-wider">Full Name *</Label>
@@ -247,6 +267,17 @@ const Profile = () => {
                                     <span className="font-bold text-sm block">Subscription</span>
                                     <span className="text-xs text-muted-foreground">{userPlanDisplayName}{planExpiryDate ? ` · Expires ${new Date(planExpiryDate).toLocaleDateString()}` : ''}</span>
                                 </div>
+                            </div>
+                            <ArrowLeft className="w-4 h-4 text-muted-foreground rotate-180" />
+                        </div>
+                    </Link>
+                    <Link to="/teams">
+                        <div className="flex items-center justify-between p-4 rounded-2xl bg-card border border-border/40 hover:shadow-md transition-all mt-3">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
+                                    <Users className="w-5 h-5 text-muted-foreground" />
+                                </div>
+                                <span className="font-bold text-sm">About Us</span>
                             </div>
                             <ArrowLeft className="w-4 h-4 text-muted-foreground rotate-180" />
                         </div>
