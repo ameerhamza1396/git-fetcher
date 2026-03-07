@@ -82,7 +82,6 @@ const Teams = () => {
     'Hammad Faridi (Batch 12 SMBBMC)',
     'Manhil Mushtaq (Batch 13 SMBBMC)',
     'Hira Khan (Batch 14 SMBBMC)',
-    'Mohsin Jan (Batch 15 SMBBMC)',
     'Tania Ratani (Batch 15 SMBBMC)',
   ];
 
@@ -102,7 +101,7 @@ const Teams = () => {
       />
 
       {/* Header */}
-      <header className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-md border-b border-purple-200 dark:border-purple-800 sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
+      <header className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-md border-b border-purple-200 dark:border-purple-800 sticky top-0 z-50">
         <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
           <Link
             to="/"

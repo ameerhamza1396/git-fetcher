@@ -1,0 +1,4 @@
+{
+    "version": "1.0.1",
+    "url": "https://[YOUR-PROJECT-ID].supabase.co/storage/v1/object/public/app-updates/dist.zip"
+}

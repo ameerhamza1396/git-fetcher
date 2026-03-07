@@ -2,43 +2,20 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Eye, EyeOff, CheckCircle, XCircle, Sun, Moon, Mail, Loader2, Star, Shield, Lock, User } from "lucide-react";
+import {
+  Eye, EyeOff, CheckCircle, XCircle,
+  Mail, Loader2, User,
+} from "lucide-react";
 import Seo from "@/components/Seo";
 import { motion } from "framer-motion";
-import { useTheme } from "next-themes";
 import GoogleSignin from "@/components/GoogleSignin";
-
-const InputField = ({ id, label, type = "text", placeholder, value, onChange, error, showToggle = false, showState, onToggle, icon: Icon }) => {
-  return (
-    <div className="space-y-1.5 text-left">
-      <Label htmlFor={id} className="text-white/90 text-[10px] font-bold uppercase tracking-wider">{label}</Label>
-      <div className="relative">
-        {Icon && <Icon className="absolute left-3 top-3.5 h-4 w-4 text-white/40" />}
-        <Input
-          id={id}
-          name={id}
-          type={showToggle ? (showState ? "text" : "password") : type}
-          placeholder={placeholder}
-          value={value}
-          onChange={onChange}
-          className={`${Icon ? 'pl-10' : ''} ${showToggle ? 'pr-10' : ''} bg-white/10 border-white/20 text-white placeholder:text-white/30 focus:border-white/50 h-12 rounded-xl text-sm ${error ? "border-red-400/60" : ""}`}
-          required
-        />
-        {showToggle && (
-          <button type="button" onClick={onToggle} className="absolute right-3 top-3.5 text-white/40 hover:text-white/70">
-            {showState ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
-        )}
-      </div>
-      {error && <p className="text-red-300 text-[10px] font-medium leading-none mt-1">{error}</p>}
-    </div>
-  );
-};
 
 const EmailVerificationModal = ({ email, isOpen, onClose, onResend, resendLoading, resendDelay }) => {
   const navigate = useNavigate();
@@ -60,21 +37,23 @@ const EmailVerificationModal = ({ email, isOpen, onClose, onResend, resendLoadin
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] rounded-[2rem]">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader className="flex flex-col items-center text-center pt-4">
           <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 20 }}
             className="p-3 bg-primary/10 rounded-full mb-4">
             <Mail className="w-8 h-8 text-primary" />
           </motion.div>
-          <DialogTitle className="text-2xl font-bold">Verification Email Sent! 🚀</DialogTitle>
+          <DialogTitle className="text-2xl">Verification Email Sent! 🚀</DialogTitle>
           <DialogDescription className="text-muted-foreground mt-2">
-            We've sent a verification link to <br /><span className="font-bold text-foreground">{email}</span>
+            We've sent a verification link to **{email}**. Please check your inbox and spam folder.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col space-y-3 mt-4">
-          <Button onClick={() => { onClose(); navigate("/login"); }} className="w-full rounded-xl">Go to Login</Button>
-          <Button variant="outline" onClick={onResend} disabled={resendLoading || countdown > 0} className="w-full rounded-xl">
-            {resendLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : countdown > 0 ? `Resend in ${countdown}s` : "Resend Email"}
+          <Button onClick={() => { onClose(); navigate("/login"); }} className="w-full bg-primary hover:bg-primary/90">
+            Go to Login Page
+          </Button>
+          <Button variant="outline" onClick={onResend} disabled={resendLoading || countdown > 0} className="w-full">
+            {resendLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : countdown > 0 ? `Resend Email in ${countdown}s` : "Resend Verification Email"}
           </Button>
         </div>
       </DialogContent>
@@ -83,178 +62,187 @@ const EmailVerificationModal = ({ email, isOpen, onClose, onResend, resendLoadin
 };
 
 const Signup = () => {
-  const { signUp, user } = useAuth();
+  const { signUp, user, resendVerificationEmail } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { theme, setTheme } = useTheme();
 
   const [formData, setFormData] = useState({ email: "", fullName: "", password: "", confirmPassword: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [validationErrors, setValidationErrors] = useState({});
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [mounted, setMounted] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const RESEND_DELAY_SECONDS = 60;
 
   useEffect(() => { setMounted(true); if (user) navigate("/dashboard"); }, [user, navigate]);
 
   useEffect(() => {
-    const errors = {};
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = "Invalid email format";
-    if (formData.fullName && formData.fullName.length < 2) errors.fullName = "Name must be at least 2 characters";
+    const errors: Record<string, string> = {};
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = "Invalid email";
+    if (formData.fullName && formData.fullName.length < 2) errors.fullName = "Too short";
     if (formData.password) {
-      if (formData.password.length < 8) errors.password = "Minimum 8 characters required";
-      else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) errors.password = "Include uppercase, lowercase & digit";
+      if (formData.password.length < 8) errors.password = "Min 8 characters";
+      else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) errors.password = "Need upper, lower & number";
     }
-    if (formData.confirmPassword && formData.password !== formData.confirmPassword) errors.confirmPassword = "Passwords do not match";
+    if (formData.confirmPassword && formData.password !== formData.confirmPassword) errors.confirmPassword = "Passwords don't match";
     setValidationErrors(errors);
   }, [formData]);
 
   const handleInputChange = (e) => setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
+  const handleResendVerification = async () => {
+    setResendLoading(true);
+    try {
+      const { error } = await resendVerificationEmail(formData.email);
+      if (error) throw error;
+      toast({ title: "Resent!", description: "Verification email has been successfully re-sent.", duration: 5000 });
+    } catch (error) {
+      toast({ title: "Resend Failed", description: error.message || "Could not resend.", variant: "destructive" });
+    } finally { setResendLoading(false); }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (Object.keys(validationErrors).length > 0) return;
+    if (Object.keys(validationErrors).length > 0) { toast({ title: "Validation Error", description: "Please fix the errors.", variant: "destructive" }); return; }
+    if (!formData.email || !formData.fullName || !formData.password || !formData.confirmPassword) { toast({ title: "Missing Info", description: "Please fill in all fields.", variant: "destructive" }); return; }
     setLoading(true);
-    const { data, error } = await signUp(formData.email, formData.password, { fullName: formData.fullName });
-    if (!error && data) setIsModalOpen(true);
-    else toast({ title: "Signup Failed", description: error?.message || "Please try again later.", variant: "destructive" });
-    setLoading(false);
+    try {
+      const { data, error } = await signUp(formData.email, formData.password, { fullName: formData.fullName });
+      if (!error && data) { setIsModalOpen(true); }
+      else if (error) {
+        if (error.message.includes("already registered")) toast({ title: "Signup Failed", description: "This email is already registered.", variant: "destructive" });
+        else throw error;
+      }
+    } catch (error) { toast({ title: "Error", description: error.message || "An unexpected error occurred.", variant: "destructive" }); }
+    finally { setLoading(false); }
   };
 
   if (!mounted) return null;
 
-  return (
-    <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950 flex items-center justify-center overflow-x-hidden">
-      <Seo title="Create Account" description="Join Medmacs today." canonical="https://medmacs.app/signup" />
-      <EmailVerificationModal email={formData.email} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onResend={() => { }} resendLoading={false} resendDelay={60} />
+  const getInputIcon = (fieldName, hasError, hasValue) => {
+    if (hasValue && !hasError) return <CheckCircle className="w-4 h-4 text-emerald-400" />;
+    if (hasError) return <XCircle className="w-4 h-4 text-red-400" />;
+    return null;
+  };
 
-      {/* Header - Identical to Login */}
-      {/* <header className="absolute top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)]">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center max-w-7xl">
-          <div className="flex items-center space-x-3">
-            <Link to="/login">
-              <Button variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110">
-                <ArrowLeft className="h-5 w-5 text-primary" />
-              </Button>
-            </Link>
-            <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-8 h-8" />
-            <span className="text-xl font-bold">Medmacs</span>
+  const InputField = ({ id, label, type = "text", placeholder, error, showToggle = false, showState, onToggle, icon: Icon }) => (
+    <div className="space-y-1.5">
+      <Label htmlFor={id} className="text-white/80 text-xs font-semibold uppercase tracking-wider">{label}</Label>
+      <div className="relative">
+        {Icon && <Icon className="absolute left-3.5 top-3.5 h-4 w-4 text-white/30" />}
+        <Input
+          id={id} name={id} type={showToggle ? (showState ? "text" : "password") : type}
+          placeholder={placeholder} value={formData[id]} onChange={handleInputChange}
+          className={`${Icon ? 'pl-10' : 'pl-3.5'} ${showToggle ? 'pr-10' : ''} bg-white/[0.08] border-white/10 text-white placeholder:text-white/25 focus:border-[hsl(168,80%,50%)]/50 focus:ring-[hsl(168,80%,50%)]/20 h-12 rounded-xl ${error ? "border-red-400/50" : ""}`}
+          required
+        />
+        {showToggle && (
+          <button type="button" onClick={onToggle} className="absolute right-3.5 top-3.5 text-white/30 hover:text-white/60 transition-colors">
+            {showState ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        )}
+        {!showToggle && (
+          <div className="absolute right-3.5 top-1/2 transform -translate-y-1/2">
+            {getInputIcon(id, !!error, !!formData[id])}
           </div>
-          <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-9 h-9 p-0">
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
+        )}
+      </div>
+      {error && <p className="text-red-300/80 text-[11px]">{error}</p>}
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen w-full flex flex-col relative overflow-hidden bg-gradient-to-br from-[hsl(168,80%,20%)] via-[hsl(190,60%,14%)] to-[hsl(220,60%,12%)]">
+      <Seo title="Sign Up" description="Create a free account on Medmacs App." canonical="https://medmacs.app/signup" />
+      <EmailVerificationModal email={formData.email} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onResend={handleResendVerification} resendLoading={resendLoading} resendDelay={RESEND_DELAY_SECONDS} />
+
+      {/* Animated background orbs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 right-0 w-96 h-96 bg-[hsl(168,80%,40%)]/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-1/3 -left-32 w-80 h-80 bg-[hsl(280,60%,50%)]/12 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }} />
+        <div className="absolute -bottom-32 right-1/4 w-72 h-72 bg-[hsl(200,80%,50%)]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '0.8s' }} />
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.5) 20px, rgba(255,255,255,0.5) 21px)`
+        }} />
+      </div>
+
+      {/* Safe area top spacing */}
+      <div className="pt-[env(safe-area-inset-top)]" />
+
+      {/* Top bar - minimal */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="relative z-10 flex items-center justify-between px-5 py-4"
+      >
+        <Link to="/" className="flex items-center space-x-2 text-white/70 hover:text-white transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          <span className="text-sm font-medium">Back</span>
+        </Link>
+        <div className="flex items-center space-x-2">
+          <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-7 h-7" />
+          <span className="text-white font-bold text-lg tracking-tight">Medmacs</span>
         </div>
-      </header> */}
+      </motion.div>
 
-      <main className="container mx-auto px-4 max-w-7xl w-full py-20">
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+      {/* Main content */}
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-5 pb-[env(safe-area-inset-bottom)]">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="w-full max-w-md"
+        >
+          {/* Welcome text */}
+          <div className="text-center mb-6">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md rounded-full px-4 py-1.5 mb-3 border border-white/10"
+            >
+              <span className="text-[hsl(168,80%,60%)] text-xs font-semibold uppercase tracking-widest">Get Started</span>
+            </motion.div>
+            <h1 className="text-white text-3xl font-black tracking-tight">Create your account</h1>
+            <p className="text-white/50 text-sm mt-2">Join the best medical learning platform</p>
+          </div>
 
-          {/* Signup Card - Matching Login Style */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="md:col-span-2"
-          >
-            <div className="relative h-full overflow-hidden border-none bg-gradient-to-br from-slate-500 via-slate-600 to-slate-700 text-white shadow-2xl flex flex-col rounded-[2.5rem] p-2">
-              {/* Pattern Overlay */}
-              <div className="absolute inset-0 opacity-10" style={{
-                backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255, 255, 255, 0.4) 20px, rgba(255, 255, 255, 0.4) 40px)`,
-                maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
-              }} />
-
-              <div className="relative z-10 text-center pt-8 pb-4 px-6">
-                <div className="flex justify-center mb-4">
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-slate-400 blur-2xl opacity-40 rounded-full" />
-                    <div className="relative bg-white/10 p-3 rounded-2xl backdrop-blur-md border border-white/20">
-                      <Shield className="w-8 h-8 text-slate-200" />
-                    </div>
-                  </div>
-                </div>
-                <h1 className="text-3xl font-black italic uppercase tracking-tighter drop-shadow-md">Create Account</h1>
-                <div className="h-1.5 w-12 bg-slate-300 rounded-full mx-auto mt-2 shadow-lg" />
-                <p className="text-white/70 text-xs mt-3 font-medium uppercase tracking-[0.15em]">Join the elite MDCAT community</p>
+          {/* Form card */}
+          <div className="bg-white/[0.07] backdrop-blur-2xl rounded-3xl p-6 border border-white/10 shadow-2xl">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <InputField id="email" label="Email" type="email" placeholder="your@email.com" error={validationErrors.email} icon={Mail} />
+                <InputField id="fullName" label="Full Name" placeholder="Your name" error={validationErrors.fullName} icon={User} />
+                <InputField id="password" label="Password" placeholder="Create password" error={validationErrors.password} showToggle showState={showPassword} onToggle={() => setShowPassword(!showPassword)} />
+                <InputField id="confirmPassword" label="Confirm" placeholder="Confirm password" error={validationErrors.confirmPassword} showToggle showState={showConfirmPassword} onToggle={() => setShowConfirmPassword(!showConfirmPassword)} />
               </div>
 
-              <div className="relative z-10 px-2 pb-2 flex-grow">
-                <div className="bg-white/10 backdrop-blur-xl rounded-[2rem] p-6 md:p-8 border border-white/10 shadow-inner">
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <InputField id="fullName" label="Full Name" value={formData.fullName} onChange={handleInputChange} error={validationErrors.fullName} icon={User} placeholder="John Doe" />
-                      <InputField id="email" label="Email Address" value={formData.email} onChange={handleInputChange} error={validationErrors.email} icon={Mail} placeholder="john@example.com" />
-                    </div>
+              <Button
+                type="submit"
+                className="w-full bg-gradient-to-r from-[hsl(168,80%,36%)] to-[hsl(180,70%,38%)] hover:from-[hsl(168,80%,32%)] hover:to-[hsl(180,70%,34%)] text-white rounded-xl h-12 font-bold text-sm tracking-wide shadow-lg shadow-[hsl(168,80%,36%)]/20 transition-all duration-300"
+                disabled={loading || Object.keys(validationErrors).length > 0}
+              >
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Create Account"}
+              </Button>
+            </form>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <InputField id="password" label="Password" value={formData.password} onChange={handleInputChange} error={validationErrors.password} icon={Lock} showToggle showState={showPassword} onToggle={() => setShowPassword(!showPassword)} placeholder="••••••••" />
-                      <InputField id="confirmPassword" label="Confirm Password" value={formData.confirmPassword} onChange={handleInputChange} error={validationErrors.confirmPassword} icon={Lock} showToggle showState={showConfirmPassword} onToggle={() => setShowConfirmPassword(!showConfirmPassword)} placeholder="••••••••" />
-                    </div>
-
-                    <Button
-                      type="submit"
-                      className="w-full bg-white text-slate-900 hover:scale-[1.02] transition-all duration-300 rounded-2xl h-14 uppercase font-black text-xs tracking-widest shadow-2xl mt-4"
-                      disabled={loading}
-                    >
-                      {loading ? <Loader2 className="animate-spin" /> : "Start Your Journey"}
-                    </Button>
-
-                    <div className="relative my-4">
-                      <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t border-white/20" />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-transparent px-2 text-white/40 text-[10px] tracking-widest">Or Register With</span>
-                      </div>
-                    </div>
-
-                    <GoogleSignin buttonText="Sign up with Google" />
-
-                    <div className="text-center pt-2">
-                      <p className="text-sm text-white/60">
-                        Already a member?{" "}
-                        <Link to="/login" className="text-white font-bold hover:underline">
-                          Sign In
-                        </Link>
-                      </p>
-                    </div>
-                  </form>
-                </div>
-              </div>
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-white/10" /></div>
+              <div className="relative flex justify-center text-xs"><span className="bg-transparent px-3 text-white/30 text-[10px] uppercase tracking-widest">or continue with</span></div>
             </div>
-          </motion.div>
 
-          {/* Side Info Panel - Matching Login Style */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.15 }}
-            className="hidden md:block"
-          >
-            <div className="relative h-full overflow-hidden border-none bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white shadow-2xl flex flex-col rounded-[2.5rem] p-2">
-              <div className="absolute inset-0 opacity-10" style={{
-                backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255, 255, 255, 0.4) 20px, rgba(255, 255, 255, 0.4) 40px)`,
-                maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
-              }} />
-              <div className="relative z-10 flex flex-col items-center justify-center h-full text-center p-6">
-                <div className="relative mb-6">
-                  <div className="absolute inset-0 bg-yellow-400 blur-2xl opacity-40 rounded-full" />
-                  <div className="relative bg-white/10 p-3 rounded-2xl backdrop-blur-md border border-white/20">
-                    <Star className="w-8 h-8 text-yellow-300" />
-                  </div>
-                </div>
-                <h2 className="text-2xl font-black italic uppercase tracking-tighter mb-3">Join Medmacs</h2>
-                <div className="h-1.5 w-12 bg-yellow-400 rounded-full mx-auto mb-4" />
-                <img src="/images/drhamzaavatar.png" alt="Avatar" className="w-48 h-48 object-contain mb-4" />
-                <p className="text-white/70 text-[10px] leading-relaxed uppercase tracking-[0.15em] font-medium max-w-[200px]">
-                  Master the MDCAT with personalized AI guidance and expert-curated content.
-                </p>
-              </div>
-            </div>
-          </motion.div>
+            <GoogleSignin variant="signup" />
 
-        </div>
-      </main>
+            <p className="text-center text-white/40 text-sm mt-5">
+              Already have an account?{" "}
+              <Link to="/login" className="text-[hsl(168,80%,60%)] font-semibold hover:text-[hsl(168,80%,70%)] transition-colors">Sign in</Link>
+            </p>
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 };

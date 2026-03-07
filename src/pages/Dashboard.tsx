@@ -526,7 +526,7 @@ const Dashboard = () => {
               <h1 className="text-xl font-black text-foreground leading-tight">
                 Hi, <span className="text-shimmer">{displayName}</span> ✨
               </h1>
-              <p className="text-xs text-muted-foreground mt-0.5 font-medium">How's you doing today?</p>
+              <p className="text-xs text-muted-foreground mt-0.5 font-medium">Ready to dominate your exams?</p>
             </div>
 
             {/* Streak bar - elevated */}
@@ -798,13 +798,13 @@ const Dashboard = () => {
                   }}
                 >
                   <div className={`relative flex items-center gap-2 transition-all duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)] ${isActive
-                    ? 'bg-primary rounded-2xl px-4 py-2.5 shadow-lg shadow-primary/25'
-                    : 'py-2'
+                      ? 'bg-primary rounded-2xl px-4 py-2.5 shadow-lg shadow-primary/25'
+                      : 'py-2'
                     }`}>
                     <div className="relative">
                       <tab.icon className={`transition-all duration-300 ${isActive
-                        ? 'w-[18px] h-[18px] text-primary-foreground'
-                        : 'w-[18px] h-[18px] text-muted-foreground'
+                          ? 'w-[18px] h-[18px] text-primary-foreground'
+                          : 'w-[18px] h-[18px] text-muted-foreground'
                         }`} />
                       {tab.badge && !isActive && (
                         <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full flex items-center justify-center shadow-sm">

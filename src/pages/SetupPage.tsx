@@ -260,7 +260,7 @@ const SetupWizard = () => {
         return (
           <div className="text-center">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.2 }}>
-              <img src="/mascots/Mascot14.png" alt="All Set" className="w-48 h-auto mx-auto mb-6 drop-shadow-2xl" />
+              <img src="/mascots/Mascot5.png" alt="All Set" className="w-48 h-48 mx-auto mb-6 drop-shadow-2xl" />
             </motion.div>
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.4, type: 'spring' }}>
               <CheckCircle2 className="w-16 h-16 text-emerald-300 mx-auto mb-4" />
