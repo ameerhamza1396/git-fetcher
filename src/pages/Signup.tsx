@@ -35,7 +35,7 @@ const InputField = ({ id, label, type = "text", placeholder, value, onChange, er
           </button>
         )}
       </div>
-      {error && <p className="text-red-300 text-[10px] font-medium leading-none mt-1">{error}</p>}
+      <p className={`text-red-300 text-[10px] font-medium leading-none mt-1 h-3 ${error ? "visible" : "invisible"}`}>{error || "\u00A0"}</p>
     </div>
   );
 };
@@ -98,16 +98,22 @@ const Signup = () => {
 
   useEffect(() => { setMounted(true); if (user) navigate("/dashboard"); }, [user, navigate]);
 
+  const validationTimeoutRef = useRef<any>(null);
+  
   useEffect(() => {
-    const errors = {};
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = "Invalid email format";
-    if (formData.fullName && formData.fullName.length < 2) errors.fullName = "Name must be at least 2 characters";
-    if (formData.password) {
-      if (formData.password.length < 8) errors.password = "Minimum 8 characters required";
-      else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) errors.password = "Include uppercase, lowercase & digit";
-    }
-    if (formData.confirmPassword && formData.password !== formData.confirmPassword) errors.confirmPassword = "Passwords do not match";
-    setValidationErrors(errors);
+    if (validationTimeoutRef.current) clearTimeout(validationTimeoutRef.current);
+    validationTimeoutRef.current = setTimeout(() => {
+      const errors = {};
+      if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = "Invalid email format";
+      if (formData.fullName && formData.fullName.length < 2) errors.fullName = "Name must be at least 2 characters";
+      if (formData.password) {
+        if (formData.password.length < 8) errors.password = "Minimum 8 characters required";
+        else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) errors.password = "Include uppercase, lowercase & digit";
+      }
+      if (formData.confirmPassword && formData.password !== formData.confirmPassword) errors.confirmPassword = "Passwords do not match";
+      setValidationErrors(errors);
+    }, 500);
+    return () => clearTimeout(validationTimeoutRef.current);
   }, [formData]);
 
   const handleInputChange = (e) => setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
