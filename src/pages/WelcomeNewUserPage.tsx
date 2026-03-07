@@ -46,7 +46,7 @@ const WelcomeNewUserPage = () => {
         Welcome, <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent animate-pulse">{displayName}</span>!
       </h1>
       <p className="text-xl md:text-2xl text-gray-700 dark:text-gray-300 mb-8 max-w-2xl">
-        Get ready to supercharge your medical studies with Medmacs.
+        Get ready to supercharge your MBBS studies with Medmacs.
       </p>
       <p className="text-xl md:text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-10 max-w-xl">
         First, please choose your unique username for public visibility.

@@ -37,7 +37,7 @@ const Login = () => {
   if (!mounted) return null;
 
   return (
-    <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950 flex items-center justify-center">
+    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-gray-950">
       <Seo
         title="Login"
         description="Log in to your Medmacs App account to access personalized MDCAT preparation tools, MCQs, AI study assistant, and more."
@@ -45,7 +45,7 @@ const Login = () => {
       />
 
       {/* Header */}
-      <header className="absolute top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)]">
+      {/* <header className="absolute top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)]">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center max-w-7xl">
           <div className="flex items-center space-x-3">
             <Link to="/">
@@ -60,7 +60,7 @@ const Login = () => {
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
         </div>
-      </header>
+      </header> */}
 
       <main className="container mx-auto px-4 max-w-7xl w-full">
         <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto mt-[var(--header-height)]">

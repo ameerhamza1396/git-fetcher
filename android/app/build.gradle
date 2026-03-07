@@ -10,8 +10,8 @@ android {
         applicationId "com.hmacs.medmacs"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 6
-        versionName "5.1.0"
+        versionCode 7
+        versionName "5.2.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         aaptOptions {
@@ -44,7 +44,6 @@ dependencies {
 
     // Project Dependencies
     implementation project(':capacitor-android')
-    implementation project(':capacitor-cordova-android-plugins')
 
     // 🎯 FIX 2: Firebase Configuration
     // The BoM (Bill of Materials) MUST come before other firebase libraries
