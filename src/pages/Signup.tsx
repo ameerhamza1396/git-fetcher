@@ -10,12 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import {
-  ArrowLeft, Eye, EyeOff, CheckCircle, XCircle, Sun, Moon,
-  Mail, Loader2, Crown,
+  Eye, EyeOff, CheckCircle, XCircle,
+  Mail, Loader2, User,
 } from "lucide-react";
 import Seo from "@/components/Seo";
 import { motion } from "framer-motion";
-import { useTheme } from "next-themes";
 import GoogleSignin from "@/components/GoogleSignin";
 
 const EmailVerificationModal = ({ email, isOpen, onClose, onResend, resendLoading, resendDelay }) => {
@@ -66,7 +65,6 @@ const Signup = () => {
   const { signUp, user, resendVerificationEmail } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { theme, setTheme } = useTheme();
 
   const [formData, setFormData] = useState({ email: "", fullName: "", password: "", confirmPassword: "" });
   const [showPassword, setShowPassword] = useState(false);
@@ -82,13 +80,13 @@ const Signup = () => {
 
   useEffect(() => {
     const errors: Record<string, string> = {};
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = "Please enter a valid email address";
-    if (formData.fullName && formData.fullName.length < 2) errors.fullName = "Full name must be at least 2 characters";
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = "Invalid email";
+    if (formData.fullName && formData.fullName.length < 2) errors.fullName = "Too short";
     if (formData.password) {
-      if (formData.password.length < 8) errors.password = "Password must be at least 8 characters";
-      else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) errors.password = "Must contain uppercase, lowercase, and a number";
+      if (formData.password.length < 8) errors.password = "Min 8 characters";
+      else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) errors.password = "Need upper, lower & number";
     }
-    if (formData.confirmPassword && formData.password !== formData.confirmPassword) errors.confirmPassword = "Passwords do not match";
+    if (formData.confirmPassword && formData.password !== formData.confirmPassword) errors.confirmPassword = "Passwords don't match";
     setValidationErrors(errors);
   }, [formData]);
 
@@ -124,122 +122,127 @@ const Signup = () => {
   if (!mounted) return null;
 
   const getInputIcon = (fieldName, hasError, hasValue) => {
-    if (hasValue && !hasError) return <CheckCircle className="w-4 h-4 text-green-500" />;
-    if (hasError) return <XCircle className="w-4 h-4 text-red-500" />;
+    if (hasValue && !hasError) return <CheckCircle className="w-4 h-4 text-emerald-400" />;
+    if (hasError) return <XCircle className="w-4 h-4 text-red-400" />;
     return null;
   };
 
   const InputField = ({ id, label, type = "text", placeholder, error, showToggle = false, showState, onToggle, icon: Icon }) => (
     <div className="space-y-1.5">
-      <Label htmlFor={id} className="text-white/90 text-xs font-bold uppercase tracking-wider">{label}</Label>
+      <Label htmlFor={id} className="text-white/80 text-xs font-semibold uppercase tracking-wider">{label}</Label>
       <div className="relative">
-        {Icon && <Icon className="absolute left-3 top-3.5 h-4 w-4 text-white/40" />}
+        {Icon && <Icon className="absolute left-3.5 top-3.5 h-4 w-4 text-white/30" />}
         <Input
           id={id} name={id} type={showToggle ? (showState ? "text" : "password") : type}
           placeholder={placeholder} value={formData[id]} onChange={handleInputChange}
-          className={`${Icon ? 'pl-10' : ''} ${showToggle ? 'pr-10' : ''} bg-white/10 border-white/20 text-white placeholder:text-white/30 focus:border-white/50 h-12 rounded-xl ${error ? "border-red-400/60" : ""}`}
+          className={`${Icon ? 'pl-10' : 'pl-3.5'} ${showToggle ? 'pr-10' : ''} bg-white/[0.08] border-white/10 text-white placeholder:text-white/25 focus:border-[hsl(168,80%,50%)]/50 focus:ring-[hsl(168,80%,50%)]/20 h-12 rounded-xl ${error ? "border-red-400/50" : ""}`}
           required
         />
         {showToggle && (
-          <button type="button" onClick={onToggle} className="absolute right-3 top-3.5 text-white/40 hover:text-white/70">
+          <button type="button" onClick={onToggle} className="absolute right-3.5 top-3.5 text-white/30 hover:text-white/60 transition-colors">
             {showState ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
         )}
         {!showToggle && (
-          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+          <div className="absolute right-3.5 top-1/2 transform -translate-y-1/2">
             {getInputIcon(id, !!error, !!formData[id])}
           </div>
         )}
       </div>
-      {error && <p className="text-red-300 text-xs">{error}</p>}
+      {error && <p className="text-red-300/80 text-[11px]">{error}</p>}
     </div>
   );
 
   return (
-    <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950 flex items-center justify-center">
+    <div className="min-h-screen w-full flex flex-col relative overflow-hidden bg-gradient-to-br from-[hsl(168,80%,20%)] via-[hsl(190,60%,14%)] to-[hsl(220,60%,12%)]">
       <Seo title="Sign Up" description="Create a free account on Medmacs App." canonical="https://medmacs.app/signup" />
       <EmailVerificationModal email={formData.email} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onResend={handleResendVerification} resendLoading={resendLoading} resendDelay={RESEND_DELAY_SECONDS} />
 
-      <header className="absolute top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)]">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center max-w-7xl">
-          <div className="flex items-center space-x-3">
-            <Link to="/"><Button variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110"><ArrowLeft className="h-5 w-5 text-primary" /></Button></Link>
-            <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-8 h-8" />
-            <span className="text-xl font-bold">Medmacs</span>
+      {/* Animated background orbs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 right-0 w-96 h-96 bg-[hsl(168,80%,40%)]/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-1/3 -left-32 w-80 h-80 bg-[hsl(280,60%,50%)]/12 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }} />
+        <div className="absolute -bottom-32 right-1/4 w-72 h-72 bg-[hsl(200,80%,50%)]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '0.8s' }} />
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.5) 20px, rgba(255,255,255,0.5) 21px)`
+        }} />
+      </div>
+
+      {/* Safe area top spacing */}
+      <div className="pt-[env(safe-area-inset-top)]" />
+
+      {/* Top bar - minimal */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="relative z-10 flex items-center justify-between px-5 py-4"
+      >
+        <Link to="/" className="flex items-center space-x-2 text-white/70 hover:text-white transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          <span className="text-sm font-medium">Back</span>
+        </Link>
+        <div className="flex items-center space-x-2">
+          <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-7 h-7" />
+          <span className="text-white font-bold text-lg tracking-tight">Medmacs</span>
+        </div>
+      </motion.div>
+
+      {/* Main content */}
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-5 pb-[env(safe-area-inset-bottom)]">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="w-full max-w-md"
+        >
+          {/* Welcome text */}
+          <div className="text-center mb-6">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md rounded-full px-4 py-1.5 mb-3 border border-white/10"
+            >
+              <span className="text-[hsl(168,80%,60%)] text-xs font-semibold uppercase tracking-widest">Get Started</span>
+            </motion.div>
+            <h1 className="text-white text-3xl font-black tracking-tight">Create your account</h1>
+            <p className="text-white/50 text-sm mt-2">Join the best medical learning platform</p>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-9 h-9 p-0">
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
-        </div>
-      </header>
 
-      <main className="container mx-auto px-4 max-w-7xl w-full">
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto mt-[var(--header-height)]">
-
-          {/* Side panel - desktop only */}
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="hidden md:block">
-            <div className="relative h-full overflow-hidden border-none bg-gradient-to-br from-rose-600 via-red-600 to-orange-700 text-white shadow-2xl flex flex-col rounded-[2.5rem] p-2">
-              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255, 255, 255, 0.4) 20px, rgba(255, 255, 255, 0.4) 40px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
-              <div className="relative z-10 flex flex-col items-center justify-center h-full text-center p-6">
-                <div className="relative mb-6">
-                  <div className="absolute inset-0 bg-amber-400 blur-2xl opacity-40 rounded-full" />
-                  <div className="relative bg-white/10 p-3 rounded-2xl backdrop-blur-md border border-white/20">
-                    <Crown className="w-8 h-8 text-amber-300" />
-                  </div>
-                </div>
-                <h2 className="text-2xl font-black italic uppercase tracking-tighter mb-3">Join Us</h2>
-                <div className="h-1.5 w-12 bg-amber-400 rounded-full mx-auto mb-4" />
-                <img src="/images/drhamzaavatar.png" alt="Avatar" className="w-48 h-48 object-contain mb-4" />
-                <p className="text-white/70 text-xs uppercase tracking-[0.15em] font-medium">Start your journey with Medmacs</p>
+          {/* Form card */}
+          <div className="bg-white/[0.07] backdrop-blur-2xl rounded-3xl p-6 border border-white/10 shadow-2xl">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <InputField id="email" label="Email" type="email" placeholder="your@email.com" error={validationErrors.email} icon={Mail} />
+                <InputField id="fullName" label="Full Name" placeholder="Your name" error={validationErrors.fullName} icon={User} />
+                <InputField id="password" label="Password" placeholder="Create password" error={validationErrors.password} showToggle showState={showPassword} onToggle={() => setShowPassword(!showPassword)} />
+                <InputField id="confirmPassword" label="Confirm" placeholder="Confirm password" error={validationErrors.confirmPassword} showToggle showState={showConfirmPassword} onToggle={() => setShowConfirmPassword(!showConfirmPassword)} />
               </div>
+
+              <Button
+                type="submit"
+                className="w-full bg-gradient-to-r from-[hsl(168,80%,36%)] to-[hsl(180,70%,38%)] hover:from-[hsl(168,80%,32%)] hover:to-[hsl(180,70%,34%)] text-white rounded-xl h-12 font-bold text-sm tracking-wide shadow-lg shadow-[hsl(168,80%,36%)]/20 transition-all duration-300"
+                disabled={loading || Object.keys(validationErrors).length > 0}
+              >
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Create Account"}
+              </Button>
+            </form>
+
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-white/10" /></div>
+              <div className="relative flex justify-center text-xs"><span className="bg-transparent px-3 text-white/30 text-[10px] uppercase tracking-widest">or continue with</span></div>
             </div>
-          </motion.div>
 
-          {/* Signup Card */}
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className="md:col-span-2">
-            <div className="relative h-full overflow-hidden border-none bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700 text-white shadow-2xl flex flex-col rounded-[2.5rem] p-2">
-              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255, 255, 255, 0.4) 20px, rgba(255, 255, 255, 0.4) 40px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
+            <GoogleSignin variant="signup" />
 
-              <div className="relative z-10 text-center pt-8 pb-3 px-6">
-                <h1 className="text-3xl font-black italic uppercase tracking-tighter drop-shadow-md">Create Account</h1>
-                <div className="h-1.5 w-12 bg-emerald-300 rounded-full mx-auto mt-2 shadow-lg" />
-                <p className="text-white/70 text-sm mt-2 font-medium uppercase tracking-[0.15em]">Join the best medical learning platform</p>
-              </div>
-
-              <div className="relative z-10 px-2 pb-2 flex-grow">
-                <div className="bg-white/10 backdrop-blur-xl rounded-[2rem] p-6 border border-white/10 shadow-inner">
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <InputField id="email" label="Email" type="email" placeholder="Enter your email" error={validationErrors.email} icon={Mail} />
-                      <InputField id="fullName" label="Full Name" placeholder="Enter your full name" error={validationErrors.fullName} />
-                      <InputField id="password" label="Password" placeholder="Create a password" error={validationErrors.password} showToggle showState={showPassword} onToggle={() => setShowPassword(!showPassword)} />
-                      <InputField id="confirmPassword" label="Confirm Password" placeholder="Confirm password" error={validationErrors.confirmPassword} showToggle showState={showConfirmPassword} onToggle={() => setShowConfirmPassword(!showConfirmPassword)} />
-                    </div>
-
-                    <Button type="submit" className="w-full bg-white text-slate-900 hover:scale-105 transition-all duration-300 rounded-2xl h-14 uppercase font-black text-xs tracking-widest shadow-2xl" disabled={loading || Object.keys(validationErrors).length > 0}>
-                      {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Create Account"}
-                    </Button>
-                  </form>
-
-                  <div className="relative my-5">
-                    <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-white/20" /></div>
-                    <div className="relative flex justify-center text-xs uppercase"><span className="bg-transparent px-2 text-white/40 text-[10px] tracking-widest">Or</span></div>
-                  </div>
-
-                  <GoogleSignin variant="signup" />
-
-                  <div className="text-center mt-4">
-                    <p className="text-white/60 text-sm">
-                      Already have an account?{" "}
-                      <Link to="/login" className="text-white font-bold hover:underline">Sign in</Link>
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </main>
+            <p className="text-center text-white/40 text-sm mt-5">
+              Already have an account?{" "}
+              <Link to="/login" className="text-[hsl(168,80%,60%)] font-semibold hover:text-[hsl(168,80%,70%)] transition-colors">Sign in</Link>
+            </p>
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 };
