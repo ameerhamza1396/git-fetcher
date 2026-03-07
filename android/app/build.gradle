@@ -44,7 +44,6 @@ dependencies {
 
     // Project Dependencies
     implementation project(':capacitor-android')
-    implementation project(':capacitor-cordova-android-plugins')
 
     // 🎯 FIX 2: Firebase Configuration
     // The BoM (Bill of Materials) MUST come before other firebase libraries
