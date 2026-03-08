@@ -114,7 +114,8 @@ export default function Welcome() {
             scale: 0.9,
             transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] }
           }}
-          className={`relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden transition-colors duration-700 bg-gradient-to-br ${STEPS[currentStep].gradient}`}
+          className={`relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden transition-colors
+            duration-700 bg-gradient-to-br ${STEPS[currentStep].gradient}`}
         >
           <button onClick={completeSetup} className="absolute top-8 right-8 z-50 text-white/50 hover:text-white text-sm font-bold uppercase tracking-widest transition-colors">
             Skip
