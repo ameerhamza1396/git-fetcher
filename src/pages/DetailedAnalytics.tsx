@@ -8,10 +8,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Target, BookOpen, TrendingUp, TrendingDown, Lock, Loader2, BarChart3, ChevronRight
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
+import { 
+  PieChart, Pie, Cell, ResponsiveContainer, 
+  LineChart, Line, XAxis, YAxis, Tooltip, 
+  AreaChart, Area 
+} from 'recharts';
 import Seo from '@/components/Seo';
 
 interface SubjectAnalytics {
@@ -21,6 +26,7 @@ interface SubjectAnalytics {
   correct: number;
   accuracy: number;
   chapters: ChapterAnalytics[];
+  color: string;
 }
 
 interface ChapterAnalytics {
@@ -29,6 +35,33 @@ interface ChapterAnalytics {
   total: number;
   correct: number;
   accuracy: number;
+  history: { date: string; accuracy: number }[];
+}
+
+interface AnswerWithMcq {
+  is_correct: boolean;
+  created_at: string;
+  mcq_id: string;
+  mcqs: {
+    id: string;
+    chapter_id: string;
+    chapters: {
+      id: string;
+      name: string;
+      subject_id: string;
+      subjects: {
+        id: string;
+        name: string;
+        year: string;
+        color: string | null;
+      };
+    };
+  } | null;
+}
+
+interface UserProfile {
+  plan: string | null;
+  year: string | null;
 }
 
 const DetailedAnalytics = () => {
@@ -45,26 +78,29 @@ const DetailedAnalytics = () => {
     enabled: !!user?.id,
   });
 
-  const userPlan = (profile as any)?.plan?.toLowerCase() || 'free';
+  const profileData = profile as unknown as UserProfile | null;
+  const userPlan = profileData?.plan?.toLowerCase() || 'free';
   const isPremium = userPlan === 'premium' || userPlan === 'iconic';
-  const userYear = (profile as any)?.year || null;
+  const userYear = profileData?.year || null;
 
   const { data: analytics, isLoading } = useQuery<SubjectAnalytics[]>({
     queryKey: ['detailed-analytics', user?.id, userYear],
     queryFn: async () => {
       if (!user?.id) return [];
 
-      const { data: answers, error } = await supabase
+      const { data: answersRaw, error } = await supabase
         .from('user_answers')
-        .select('is_correct, mcq_id, mcqs(id, chapter_id, chapters(id, name, subject_id, subjects(id, name, year)))')
-        .eq('user_id', user.id);
+        .select('is_correct, created_at, mcq_id, mcqs(id, chapter_id, chapters(id, name, subject_id, subjects(id, name, year, color)))')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true });
 
-      if (error || !answers) return [];
-
+      if (error || !answersRaw) return [];
+      
+      const answers = answersRaw as unknown as AnswerWithMcq[];
       const subjectMap: Record<string, SubjectAnalytics> = {};
 
       for (const ans of answers) {
-        const mcq = ans.mcqs as any;
+        const mcq = ans.mcqs;
         if (!mcq?.chapters?.subjects) continue;
 
         const subject = mcq.chapters.subjects;
@@ -80,6 +116,7 @@ const DetailedAnalytics = () => {
             correct: 0,
             accuracy: 0,
             chapters: [],
+            color: subject.color || '#3B82F6',
           };
         }
 
@@ -88,11 +125,27 @@ const DetailedAnalytics = () => {
 
         let chap = subjectMap[subject.id].chapters.find(c => c.chapter_id === chapter.id);
         if (!chap) {
-          chap = { chapter_id: chapter.id, chapter_name: chapter.name, total: 0, correct: 0, accuracy: 0 };
+          chap = { chapter_id: chapter.id, chapter_name: chapter.name, total: 0, correct: 0, accuracy: 0, history: [] };
           subjectMap[subject.id].chapters.push(chap);
         }
+        
         chap.total++;
         if (ans.is_correct) chap.correct++;
+        
+        // Tracking history for line chart (daily average or rolling)
+        const dateKey = new Date(ans.created_at).toLocaleDateString();
+        const existingDay = chap.history.find(h => h.date === dateKey);
+        if (existingDay) {
+          // Update day average
+          const dayAnswers = answers.filter(a => 
+            new Date(a.created_at).toLocaleDateString() === dateKey && 
+            a.mcqs?.chapters?.id === chapter.id
+          );
+          const dayCorrect = dayAnswers.filter(a => a.is_correct).length;
+          existingDay.accuracy = Math.round((dayCorrect / dayAnswers.length) * 100);
+        } else {
+          chap.history.push({ date: dateKey, accuracy: ans.is_correct ? 100 : 0 });
+        }
       }
 
       const result = Object.values(subjectMap).map(s => ({
@@ -101,6 +154,7 @@ const DetailedAnalytics = () => {
         chapters: s.chapters.map(c => ({
           ...c,
           accuracy: c.total > 0 ? Math.round((c.correct / c.total) * 100) : 0,
+          history: c.history.slice(-10), // Keep last 10 days
         })).sort((a, b) => b.total - a.total),
       }));
 
@@ -226,7 +280,7 @@ const DetailedAnalytics = () => {
             </Card>
           )}
 
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {visibleSubjects?.map((subject, idx) => (
               <SubjectCard key={subject.subject_id} subject={subject} isPremium={isPremium} index={idx} />
             ))}
@@ -273,8 +327,12 @@ const SubjectCard = ({ subject, isPremium, index }: { subject: SubjectAnalytics;
   const [expanded, setExpanded] = useState(false);
   const navigate = useNavigate();
 
-  const accuracyColor = subject.accuracy >= 70 ? 'text-emerald-500' : subject.accuracy >= 40 ? 'text-amber-500' : 'text-destructive';
-  const progressColor = subject.accuracy >= 70 ? 'bg-emerald-500' : subject.accuracy >= 40 ? 'bg-amber-500' : 'bg-destructive';
+  const data = [
+    { name: 'Correct', value: subject.correct },
+    { name: 'Incorrect', value: subject.total - subject.correct },
+  ];
+
+  const COLORS = [subject.color || '#3B82F6', '#E2E8F0'];
 
   const handleToggle = () => {
     if (!isPremium) {
@@ -286,35 +344,80 @@ const SubjectCard = ({ subject, isPremium, index }: { subject: SubjectAnalytics;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: index * 0.1 }}
     >
-      <Card className="border border-border/40 bg-card/80 overflow-hidden">
-        <button
-          onClick={handleToggle}
-          className="w-full p-4 flex items-center gap-3 text-left"
-        >
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-bold text-foreground truncate pr-2">{subject.subject_name}</p>
-              <span className={`text-lg font-black ${accuracyColor} shrink-0`}>{subject.accuracy}%</span>
+      <Card className="border border-border/40 bg-card/80 backdrop-blur-xl overflow-hidden hover:shadow-xl transition-all duration-300 group rounded-[2rem]">
+        <div className="p-6">
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            {/* Donut Chart Section */}
+            <div className="relative w-32 h-32 shrink-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={data}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={38}
+                    outerRadius={50}
+                    paddingAngle={5}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {data.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex items-center justify-center flex-col">
+                <span className="text-xl font-black text-foreground leading-none">{subject.accuracy}%</span>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase mt-1">Accuracy</span>
+              </div>
             </div>
-            <div className="flex items-center gap-3 text-[11px] text-muted-foreground mb-2">
-              <span>{subject.total} attempted</span>
-              <span>·</span>
-              <span>{subject.correct} correct</span>
-            </div>
-            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-              <div className={`h-full rounded-full ${progressColor} transition-all`} style={{ width: `${subject.accuracy}%` }} />
+
+            {/* Content Section */}
+            <div className="flex-1 min-w-0 text-center sm:text-left">
+              <h3 className="text-lg font-black text-foreground mb-1 group-hover:text-primary transition-colors truncate">
+                {subject.subject_name}
+              </h3>
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 mt-3">
+                <div className="text-center sm:text-left">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Attempted</p>
+                  <p className="text-sm font-black text-foreground">{subject.total}</p>
+                </div>
+                <div className="text-center sm:text-left">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Correct</p>
+                  <p className="text-sm font-black text-emerald-500">{subject.correct}</p>
+                </div>
+                <div className="text-center sm:text-left">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Success Rate</p>
+                  <p className="text-sm font-black text-primary">{subject.accuracy}%</p>
+                </div>
+              </div>
+              
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleToggle}
+                className="mt-4 w-full sm:w-auto rounded-xl bg-muted/50 hover:bg-muted text-xs font-bold uppercase tracking-wider gap-2 px-6"
+              >
+                {isPremium ? (
+                  <>
+                    {expanded ? 'Hide Breakdown' : 'View Topic Breakdown'}
+                    <ChevronRight className={`w-3.5 h-3.5 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3.5 h-3.5 mr-1" />
+                    Unlock Topics
+                  </>
+                )}
+              </Button>
             </div>
           </div>
-          {isPremium ? (
-            <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform shrink-0 ${expanded ? 'rotate-90' : ''}`} />
-          ) : (
-            <Lock className="w-4 h-4 text-muted-foreground shrink-0" />
-          )}
-        </button>
+        </div>
 
         <AnimatePresence>
           {expanded && isPremium && (
@@ -322,26 +425,55 @@ const SubjectCard = ({ subject, isPremium, index }: { subject: SubjectAnalytics;
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden"
+              className="bg-muted/30 border-t border-border/30"
             >
-              <div className="px-4 pb-4 space-y-2 border-t border-border/30 pt-3">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Topic Breakdown</p>
-                {subject.chapters.map((ch) => {
-                  const chColor = ch.accuracy >= 70 ? 'text-emerald-500' : ch.accuracy >= 40 ? 'text-amber-500' : 'text-destructive';
-                  return (
-                    <div key={ch.chapter_id} className="flex items-center justify-between py-1.5">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium text-foreground truncate">{ch.chapter_name}</p>
-                        <p className="text-[10px] text-muted-foreground">{ch.total} Qs · {ch.correct} correct</p>
+              <div className="p-6 space-y-6">
+                <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Topic Trends (Last 10 Days)</h4>
+                
+                <div className="grid grid-cols-1 gap-4">
+                  {subject.chapters.map((ch) => (
+                    <Card key={ch.chapter_id} className="border border-border/20 bg-background/50 p-4 rounded-2xl">
+                      <div className="flex flex-col md:flex-row items-center gap-4">
+                        <div className="flex-1 min-w-0">
+                          <h5 className="text-xs font-bold text-foreground truncate">{ch.chapter_name}</h5>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase">{ch.accuracy}% Accuracy</span>
+                            <span className="text-[10px] text-muted-foreground decoration-dot">•</span>
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase">{ch.total} Questions</span>
+                          </div>
+                        </div>
+                        
+                        {/* Chapter Line Chart */}
+                        <div className="w-full md:w-48 h-12">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={ch.history}>
+                              <defs>
+                                <linearGradient id={`colorAcc-${ch.chapter_id}`} x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor={subject.color} stopOpacity={0.8}/>
+                                  <stop offset="95%" stopColor={subject.color} stopOpacity={0}/>
+                                </linearGradient>
+                              </defs>
+                              <Area 
+                                type="monotone" 
+                                dataKey="accuracy" 
+                                stroke={subject.color} 
+                                fillOpacity={1} 
+                                fill={`url(#colorAcc-${ch.chapter_id})`} 
+                                strokeWidth={2}
+                              />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </div>
                       </div>
-                      <span className={`text-sm font-bold ${chColor} shrink-0 ml-2`}>{ch.accuracy}%</span>
+                    </Card>
+                  ))}
+                  
+                  {subject.chapters.length === 0 && (
+                    <div className="py-8 text-center">
+                      <p className="text-xs text-muted-foreground">No chapter data currently available.</p>
                     </div>
-                  );
-                })}
-                {subject.chapters.length === 0 && (
-                  <p className="text-xs text-muted-foreground">No topic data available</p>
-                )}
+                  )}
+                </div>
               </div>
             </motion.div>
           )}

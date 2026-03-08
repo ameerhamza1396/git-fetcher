@@ -42,6 +42,72 @@ const LAST_ATTEMPTED_MCQ_KEY = 'lastAttemptedMCQIndex';
 const LAST_ATTEMPTED_SUBJECT_KEY = 'lastAttemptedMCQSubject';
 const LAST_ATTEMPTED_CHAPTER_KEY = 'lastAttemptedMCQChapter';
 
+// The new key for the list of saved sessions shown in the dashboard widget
+const SAVED_SESSIONS_LIST_KEY = 'mcq_saved_sessions';
+
+export interface SavedMCQSession {
+  subjectId: string;
+  chapterId: string;
+  lastIndex: number;
+  timestamp: string;
+}
+
+const updateSavedSessionsList = async (userId: string | undefined, subjectId: string, chapterId: string, lastIndex: number) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const data = localStorage.getItem(SAVED_SESSIONS_LIST_KEY);
+    let sessions: SavedMCQSession[] = data ? JSON.parse(data) : [];
+
+    // Remove existing entry for this chapter
+    sessions = sessions.filter(s => s.chapterId !== chapterId);
+
+    // Add updated or new entry to the front
+    sessions.unshift({
+      subjectId,
+      chapterId,
+      lastIndex,
+      timestamp: new Date().toISOString()
+    });
+
+    // Keep only the most recent 5
+    if (sessions.length > 5) {
+      sessions = sessions.slice(0, 5);
+    }
+
+    localStorage.setItem(SAVED_SESSIONS_LIST_KEY, JSON.stringify(sessions));
+
+    // Async push to Supabase
+    if (userId) {
+      await supabase
+        .from('profiles')
+        .update({ in_progress_mcqs: sessions })
+        .eq('id', userId);
+    }
+  } catch (e) {
+    console.error("Failed to update saved sessions array", e);
+  }
+};
+
+const removeSavedSessionFromList = async (userId: string | undefined, chapterId: string) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const data = localStorage.getItem(SAVED_SESSIONS_LIST_KEY);
+    if (!data) return;
+    let sessions: SavedMCQSession[] = JSON.parse(data);
+    sessions = sessions.filter(s => s.chapterId !== chapterId);
+    localStorage.setItem(SAVED_SESSIONS_LIST_KEY, JSON.stringify(sessions));
+
+    if (userId) {
+      await supabase
+        .from('profiles')
+        .update({ in_progress_mcqs: sessions })
+        .eq('id', userId);
+    }
+  } catch (e) {
+    console.error("Failed to remove saved session from array", e);
+  }
+};
+
 // --- Upgrade Account Modal ---
 const UpgradeAccountModal = ({ isOpen, onClose, onUpgradeClick }) => (
   <Dialog open={isOpen} onOpenChange={onClose}>
@@ -300,8 +366,11 @@ export const MCQDisplay = ({
       localStorage.setItem(LAST_ATTEMPTED_MCQ_KEY, currentQuestionIndex.toString());
       localStorage.setItem(LAST_ATTEMPTED_SUBJECT_KEY, subject);
       localStorage.setItem(LAST_ATTEMPTED_CHAPTER_KEY, chapter);
+      
+      // Update the robust tracked array used by the 3D dashboard widget
+      updateSavedSessionsList(user?.id, subject, chapter, currentQuestionIndex);
     }
-  }, [currentQuestionIndex, subject, chapter, loading, mcqs.length]);
+  }, [currentQuestionIndex, subject, chapter, loading, mcqs.length, user?.id]);
 
   useEffect(() => {
     const checkSavedStatus = async () => {
@@ -389,6 +458,7 @@ export const MCQDisplay = ({
         localStorage.removeItem(LAST_ATTEMPTED_MCQ_KEY);
         localStorage.removeItem(LAST_ATTEMPTED_SUBJECT_KEY);
         localStorage.removeItem(LAST_ATTEMPTED_CHAPTER_KEY);
+        removeSavedSessionFromList(user?.id, chapter);
       }
       onBack();
     }

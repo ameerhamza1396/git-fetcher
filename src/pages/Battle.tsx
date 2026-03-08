@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
 import Seo from '@/components/Seo';
+import PageSkeleton from '@/components/skeletons/PageSkeleton';
 
 type BattleState = 'lobby' | 'room' | 'game' | 'results';
 
@@ -107,11 +108,7 @@ const Battle: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-24 h-24 object-contain animate-pulse" />
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   if (!user) {

@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 import { Typewriter } from 'react-simple-typewriter';
 import { useAuth } from '@/hooks/useAuth';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 const Teams = () => {
   const { user } = useAuth();
@@ -37,59 +39,23 @@ const Teams = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // --- Data with Position Vacant for non-founder/non-contributor roles ---
+  // --- Data from Supabase ---
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: ['team_members'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('team_members')
+        .select('*')
+        .order('order_index', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    }
+  });
 
-  const coreTeam = [
-    {
-      name: 'Position Vacant',
-      role: 'Academics Head',
-      img: '/teampage/user.png',
-    },
-    {
-      name: 'Position Vacant',
-      role: 'Marketing Head',
-      img: '/teampage/user.png',
-    },
-  ];
-
-  const extendedTeam = [
-    {
-      name: 'Position Vacant',
-      role: 'Social Media Head',
-      img: '/teampage/user.png',
-    },
-    {
-      name: 'Position Vacant',
-      role: 'Graphics Head',
-      img: '/teampage/user.png',
-    },
-    {
-      name: 'Position Vacant',
-      role: 'Content Head',
-      img: '/teampage/user.png',
-    },
-    {
-      name: 'Position Vacant',
-      role: 'HR Head',
-      img: '/teampage/user.png',
-    },
-  ];
-
-  const contributors = [
-    'Muhammad Muzammil (Batch 11 SMBBMC)',
-    'Muhammad Irfan (Batch 11 SMBBMC)',
-    'Abdul Hadi Ansari (Batch 12 SMBBMC)',
-    'Hammad Faridi (Batch 12 SMBBMC)',
-    'Manhil Mushtaq (Batch 13 SMBBMC)',
-    'Hira Khan (Batch 14 SMBBMC)',
-    'Mohsin Jan (Batch 15 SMBBMC)',
-    'Tania Ratani (Batch 15 SMBBMC)',
-  ];
-
-  const specialThanks = [
-    '✨ Dr Rahima Shakir',
-    '✨ Hafiz Abdul Ahad',
-  ];
+  const coreTeam = teamMembers.filter(m => m.category === 'core');
+  const extendedTeam = teamMembers.filter(m => m.category === 'extended');
+  const contributors = teamMembers.filter(m => m.category === 'contributor');
+  const specialThanks = teamMembers.filter(m => m.category === 'special_thanks');
 
   // --- Render Function ---
 
@@ -186,19 +152,36 @@ const Teams = () => {
             {coreTeam.map((member, i) => (
               <div
                 key={i}
-                className="group text-center transform hover:scale-110 transition duration-500"
+                className="group text-center transform hover:scale-110 transition duration-500 flex flex-col items-center"
               >
                 <img
-                  src={member.img}
-                  alt={member.name}
+                  src={member.image_url || '/teampage/user.png'}
+                  alt={member.name || 'Vacant'}
                   className="w-32 h-32 rounded-full mx-auto object-cover shadow-lg group-hover:shadow-purple-400/50 transition-shadow"
                 />
-                <h3 className="mt-4 text-xl font-semibold text-gray-900 dark:text-white">
-                  {member.name}
-                </h3>
-                <p className="text-purple-600 dark:text-purple-400">
-                  {member.role}
-                </p>
+                
+                {member.name ? (
+                  <>
+                    <h3 className="mt-4 text-xl font-semibold text-gray-900 dark:text-white">
+                      {member.name}
+                    </h3>
+                    <p className="text-purple-600 dark:text-purple-400">
+                      {member.role}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-4 text-purple-600 dark:text-purple-400 font-medium">
+                      {member.role}
+                    </p>
+                    <Link
+                      to="/summerinternship2025"
+                      className="mt-2 text-xs font-bold px-4 py-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                    >
+                      Apply for Position
+                    </Link>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -211,17 +194,32 @@ const Teams = () => {
             {extendedTeam.map((member, i) => (
               <div
                 key={i}
-                className="group text-center hover:scale-110 transition-transform duration-500"
+                className="group text-center hover:scale-110 transition-transform duration-500 flex flex-col items-center"
               >
                 <img
-                  src={member.img}
-                  alt={member.name}
+                  src={member.image_url || '/teampage/user.png'}
+                  alt={member.name || 'Vacant'}
                   className="w-28 h-28 rounded-full mx-auto object-cover shadow-lg group-hover:shadow-blue-400/50 transition-shadow"
                 />
-                <h3 className="mt-3 text-lg font-semibold text-gray-900 dark:text-white">
-                  {member.name}
-                </h3>
-                <p className="text-blue-600 dark:text-blue-400">{member.role}</p>
+                
+                {member.name ? (
+                  <>
+                    <h3 className="mt-3 text-lg font-semibold text-gray-900 dark:text-white">
+                      {member.name}
+                    </h3>
+                    <p className="text-blue-600 dark:text-blue-400">{member.role}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-3 text-sm text-blue-600 dark:text-blue-400 font-medium">{member.role}</p>
+                    <Link
+                      to="/summerinternship2025"
+                      className="mt-2 text-[10px] font-bold px-3 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-colors"
+                    >
+                      Apply for Position
+                    </Link>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -230,7 +228,7 @@ const Teams = () => {
         {/* Collaboration Request Button */}
         <div className="text-center my-16">
           <Link
-            to="/collaborate" // Assuming you'd have a route for this
+            to="/summerinternship2025"
             className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-full shadow-xl text-white bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 dark:from-pink-400 dark:to-purple-500 dark:hover:from-pink-500 dark:hover:to-purple-600 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800"
           >
             <Zap className="w-5 h-5 mr-2" />
@@ -239,31 +237,35 @@ const Teams = () => {
         </div>
 
         {/* Contributors */}
-        <div className="mb-20 text-center">
-          <h2 className="text-4xl font-bold text-primary mb-10">Contributors</h2>
-          <div className="flex flex-wrap justify-center gap-6">
-            {contributors.map((contrib, i) => (
-              <span
-                key={i}
-                className="px-4 py-2 text-foreground rounded-full bg-accent shadow hover:shadow-lg hover:scale-105 transition-all"
-              >
-                {contrib}
-              </span>
-            ))}
+        {contributors.length > 0 && (
+          <div className="mb-20 text-center">
+            <h2 className="text-4xl font-bold text-primary mb-10">Contributors</h2>
+            <div className="flex flex-wrap justify-center gap-6">
+              {contributors.map((contrib, i) => (
+                <span
+                  key={i}
+                  className="px-4 py-2 text-foreground rounded-full bg-accent shadow hover:shadow-lg hover:scale-105 transition-all text-sm font-medium"
+                >
+                  {contrib.name}
+                </span>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Special Thanks */}
-        <div className="text-center mb-10">
-          <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-yellow-500 mb-6">
-            Special Thanks To
-          </h2>
-          {specialThanks.map((thanks, i) => (
-            <p key={i} className="text-lg text-gray-700 dark:text-gray-300">
-              {thanks}
-            </p>
-          ))}
-        </div>
+        {specialThanks.length > 0 && (
+          <div className="text-center mb-10">
+            <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-yellow-500 mb-6">
+              Special Thanks To
+            </h2>
+            {specialThanks.map((thanks, i) => (
+              <p key={i} className="text-lg text-gray-700 dark:text-gray-300 font-medium mb-2">
+                {thanks.name}
+              </p>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Footer */}

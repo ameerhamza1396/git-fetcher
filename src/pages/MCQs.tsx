@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
 import Seo from '@/components/Seo';
 import { Lock } from 'lucide-react';
+import PageSkeleton from '@/components/skeletons/PageSkeleton';
 
 type Screen = 'subjects' | 'chapters' | 'settings' | 'quiz';
 
@@ -33,6 +34,36 @@ const MCQs = () => {
   });
 
   const { user, loading: authLoading } = useAuth();
+  const location = useLocation();
+
+  useEffect(() => {
+    const handleLocationState = async () => {
+      if (location.state?.autoResume && location.state?.resumeData) {
+        const { subjectId, chapterId } = location.state.resumeData;
+        
+        try {
+          // Fetch subject and chapter objects from Supabase
+          const [{ data: subject }, { data: chapter }] = await Promise.all([
+            supabase.from('subjects').select('*').eq('id', subjectId).single(),
+            supabase.from('chapters').select('*').eq('id', chapterId).single(),
+          ]);
+
+          if (subject && chapter) {
+            setSelectedSubject(subject as Subject);
+            setSelectedChapter(chapter as Chapter);
+            setCurrentScreen('quiz');
+          }
+        } catch (error) {
+          console.error("Failed to fetch resume data:", error);
+        }
+        
+        // Clear state to prevent infinite auto-resume on reload
+        window.history.replaceState({}, document.title)
+      }
+    };
+    
+    handleLocationState();
+  }, [location.state]);
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['profile', user?.id],
@@ -137,11 +168,7 @@ const MCQs = () => {
   };
 
   if (authLoading || profileLoading) {
-    return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background">
-        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-24 h-24 object-contain animate-pulse" />
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   if (!user) {

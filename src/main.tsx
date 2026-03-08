@@ -1,28 +1,42 @@
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App.tsx';
-import './index.css';
-import { HelmetProvider } from 'react-helmet-async';
-import { StatusBar } from '@capacitor/status-bar';
-import { Capacitor } from '@capacitor/core';
-import { setupIonicReact } from '@ionic/react';
-import { CapacitorUpdater } from '@capgo/capacitor-updater';
-import { App as CapacitorApp } from '@capacitor/app';
+import React, { useEffect, useState } from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App.tsx";
+import "./index.css";
+import { HelmetProvider } from "react-helmet-async";
+
+import { StatusBar } from "@capacitor/status-bar";
+import { Capacitor } from "@capacitor/core";
+import { App as CapacitorApp } from "@capacitor/app";
+
+import { setupIonicReact } from "@ionic/react";
+import { CapacitorUpdater } from "@capgo/capacitor-updater";
+
+import UpdaterUI from "./components/UpdaterUI";
+import { runOTAUpdate } from "./Updater";
+import { supabase } from "@/integrations/supabase/client";
 
 setupIonicReact({
-  mode: 'md',
+  mode: "md",
   scrollAssist: true,
   scrollPadding: true
 });
 
-const VERSION_MANIFEST = "https://pxjvltgarzvoptdfdkxq.supabase.co/storage/v1/object/public/app-updates/version.json";
-
-const checkForRemoteUpdates = async () => {
+const checkForRemoteUpdates = async setUI => {
   try {
-    const res = await fetch(VERSION_MANIFEST, { cache: "no-store" });
-    if (!res.ok) throw new Error("Failed to fetch version manifest");
+    const { data: remote, error } = await supabase
+      .from('app_updates')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    const remote = await res.json();
+    if (error) throw error;
+
+    if (!remote) {
+      console.log("No active update rollout found");
+      return;
+    }
 
     const builtin = await CapacitorUpdater.getBuiltinVersion();
     const next = await CapacitorUpdater.getNextBundle();
@@ -36,46 +50,63 @@ const checkForRemoteUpdates = async () => {
 
     console.log(`New version detected ${remote.version}`);
 
-    const downloaded = await CapacitorUpdater.download({
-      url: remote.url,
-      version: remote.version
-    });
-
-    await CapacitorUpdater.set(downloaded);
-
+    await runOTAUpdate(remote, setUI);
   } catch (err) {
     console.warn("OTA update skipped:", err);
   }
 };
 
-const initNativeFeatures = async () => {
-  if (!Capacitor.isNativePlatform()) return;
+const Root = () => {
+  const [updateUI, setUpdateUI] = useState({
+    visible: false,
+    progress: 0,
+    size: null,
+    title: "",
+    message: "",
+    features: [],
+    critical: false,
+    status: "idle",
+    error: null as string | null
+  });
 
-  try {
-    await CapacitorUpdater.notifyAppReady();
+  const initNativeFeatures = async () => {
+    if (!Capacitor.isNativePlatform()) return;
 
-    await StatusBar.setOverlaysWebView({ overlay: true });
+    try {
+      await CapacitorUpdater.notifyAppReady();
 
-    await checkForRemoteUpdates();
+      await StatusBar.setOverlaysWebView({ overlay: true });
 
-    CapacitorApp.addListener("appStateChange", async ({ isActive }) => {
-      if (isActive) {
-        await checkForRemoteUpdates();
-      }
-    });
+      await checkForRemoteUpdates(setUpdateUI);
 
-  } catch (e) {
-    console.error("Native initialization failed:", e);
-  }
+      CapacitorApp.addListener("appStateChange", async ({ isActive }) => {
+        if (isActive) {
+          await checkForRemoteUpdates(setUpdateUI);
+        }
+      });
+    } catch (e) {
+      console.error("Native initialization failed:", e);
+    }
+  };
+
+  useEffect(() => {
+    initNativeFeatures();
+  }, []);
+
+  return (
+    <>
+      <UpdaterUI {...updateUI} />
+
+      <HelmetProvider>
+        <App />
+      </HelmetProvider>
+    </>
+  );
 };
-
-initNativeFeatures();
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <HelmetProvider>
-      <App />
-    </HelmetProvider>
+    <Root />
   </React.StrictMode>
 );
 

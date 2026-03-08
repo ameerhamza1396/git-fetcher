@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,7 +15,6 @@ import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 
-const MDR_RATE = 0.025;
 const EASYPAISA_API_URL = "https://medmacs.app/api/pay-easypaisa";
 
 const Checkout = () => {
@@ -103,8 +103,7 @@ const Checkout = () => {
     const basePrice = basePriceStr ? parseFloat(basePriceStr) : 0;
     const validityDisplay = validity.toLowerCase() === 'yearly' ? 'Validity: 365 Days' : 'Validity: 30 Days';
     const priceAfterPromo = discountedPrice !== null ? discountedPrice : basePrice;
-    const mdrTax = paymentMethod === 'payfast' ? priceAfterPromo * MDR_RATE : 0;
-    const grandTotal = priceAfterPromo + mdrTax;
+    const grandTotal = priceAfterPromo;
     const isPayFastDisabled = grandTotal < 20;
 
     useEffect(() => {
@@ -225,16 +224,39 @@ const Checkout = () => {
             </header>
 
             <main className="container mx-auto px-4 py-8 max-w-lg mt-[var(--header-height)]">
-                <div className="text-center mb-8">
+                <motion.div 
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="text-center mb-8"
+                >
                     <h1 className="text-2xl md:text-4xl font-black tracking-tight text-foreground uppercase italic">
                         Complete <span className="text-blue-600">Payment</span>
                     </h1>
                     <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] mt-2">Secure checkout</p>
-                </div>
+                </motion.div>
 
-                <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white shadow-2xl p-1 mb-6">
-                    <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
-                    <div className="relative z-10 bg-white/10 backdrop-blur-xl rounded-[1.8rem] p-6 border border-white/10">
+                {/* Animated Container for Staggered Children */}
+                <motion.div
+                    initial="hidden"
+                    animate="visible"
+                    variants={{
+                        hidden: { opacity: 0 },
+                        visible: {
+                            opacity: 1,
+                            transition: {
+                                staggerChildren: 0.15
+                            }
+                        }
+                    }}
+                >
+                    {/* Order Summary Card */}
+                    <motion.div 
+                        variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } } }}
+                        className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-blue-600/90 via-indigo-600/90 to-blue-800/90 text-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/10 p-1 mb-6"
+                    >
+                        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.2) 20px, rgba(255,255,255,0.2) 40px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
+                        <div className="relative z-10 bg-white/10 backdrop-blur-md rounded-[1.8rem] p-6 border border-white/10 shadow-inner">
                         <h2 className="text-lg font-black uppercase tracking-tight mb-4">Order Summary</h2>
                         <div className="flex justify-between items-start mb-3">
                             <div>
@@ -249,21 +271,19 @@ const Checkout = () => {
                                 <span>- PKR {(basePrice - priceAfterPromo).toFixed(2)}</span>
                             </div>
                         )}
-                        {mdrTax > 0 && (
-                            <div className="flex justify-between text-white/60 text-xs mb-3">
-                                <span>PayFast Tax (2.5%)</span>
-                                <span>+ PKR {mdrTax.toFixed(2)}</span>
-                            </div>
-                        )}
                         <div className="pt-4 border-t border-white/20 flex justify-between items-center">
                             <span className="text-xs font-bold uppercase tracking-widest text-white/70">Grand Total</span>
                             <span className="text-3xl font-black">PKR {grandTotal.toFixed(2)}</span>
                         </div>
                     </div>
-                </div>
+                    </motion.div>
 
-                <div className="relative overflow-hidden rounded-[1.5rem] bg-gradient-to-br from-slate-500 via-slate-600 to-slate-700 text-white shadow-xl p-4 mb-6">
-                    <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
+                    {/* Promo Code Card */}
+                    <motion.div 
+                        variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } } }}
+                        className="relative overflow-hidden rounded-[1.5rem] bg-slate-800/90 dark:bg-slate-900/90 text-white shadow-lg border border-white/5 p-4 mb-6"
+                    >
+                        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
                     <div className="relative z-10">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-2">Promo Code</p>
                         <div className="flex gap-2">
@@ -273,14 +293,23 @@ const Checkout = () => {
                             </Button>
                         </div>
                         {promoCodeError && <p className="text-red-300 text-xs mt-2">{promoCodeError}</p>}
+                        {promoCodeError && <p className="text-red-400 text-xs mt-2">{promoCodeError}</p>}
                     </div>
-                </div>
+                    </motion.div>
 
-                <div className="space-y-3 mb-6">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Payment Method</p>
-                    <div onClick={() => setPaymentMethod('easypaisa')}
-                        className={`relative overflow-hidden rounded-[1.5rem] p-4 shadow-xl cursor-pointer transition-all duration-300 ${paymentMethod === 'easypaisa' ? 'bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700 text-white' : 'bg-gradient-to-br from-slate-400 via-slate-500 to-slate-600 text-white/80'}`}>
-                        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
+                    {/* Payment Methods */}
+                    <motion.div 
+                        variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } } }}
+                        className="space-y-3 mb-6"
+                    >
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Payment Method</p>
+                        <motion.div 
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => setPaymentMethod('easypaisa')}
+                            className={`relative overflow-hidden rounded-[1.5rem] p-4 shadow-md cursor-pointer transition-colors duration-300 border ${paymentMethod === 'easypaisa' ? 'bg-emerald-600/90 border-emerald-500 text-white' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'}`}
+                        >
+                            <div className="absolute inset-0 opacity-5" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)', display: paymentMethod === 'easypaisa' ? 'block' : 'none' }} />
                         <div className="relative z-10">
                             <div className="flex items-center gap-3">
                                 <Wallet className="w-5 h-5" />
@@ -289,40 +318,63 @@ const Checkout = () => {
                             {paymentMethod === 'easypaisa' && (
                                 <div className="mt-3 animate-in fade-in zoom-in-95">
                                     <label className="text-[10px] font-bold uppercase tracking-widest opacity-70">Mobile Account Number</label>
-                                    <Input placeholder="03XXXXXXXXX" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))} maxLength={11} className="bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-xl h-11 mt-1" />
+                                    <Input placeholder="03XXXXXXXXX" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))} maxLength={11} className={`bg-white/10 text-white placeholder:text-white/50 rounded-xl h-11 mt-1 border-white/20`} />
                                 </div>
                             )}
                         </div>
-                    </div>
+                        </motion.div>
 
-                    <div onClick={() => !isPayFastDisabled && setPaymentMethod('payfast')}
-                        className={`relative overflow-hidden rounded-[1.5rem] p-4 shadow-xl transition-all duration-300 ${isPayFastDisabled ? 'opacity-50 grayscale cursor-not-allowed' : 'cursor-pointer'} ${paymentMethod === 'payfast' ? 'bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white' : 'bg-gradient-to-br from-slate-400 via-slate-500 to-slate-600 text-white/80'}`}>
-                        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
+                        <motion.div 
+                            whileHover={{ scale: !isPayFastDisabled ? 1.02 : 1 }}
+                            whileTap={{ scale: !isPayFastDisabled ? 0.98 : 1 }}
+                            onClick={() => !isPayFastDisabled && setPaymentMethod('payfast')}
+                            className={`relative overflow-hidden rounded-[1.5rem] p-4 shadow-md transition-colors duration-300 border ${isPayFastDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 text-slate-400' : 'cursor-pointer'} ${paymentMethod === 'payfast' ? 'bg-blue-600/90 border-blue-500 text-white' : (!isPayFastDisabled ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300' : '')}`}
+                        >
+                            <div className="absolute inset-0 opacity-5" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)', display: paymentMethod === 'payfast' ? 'block' : 'none' }} />
                         <div className="relative z-10 flex items-center gap-3">
                             <CreditCard className="w-5 h-5" />
                             <div>
                                 <span className="font-black text-sm uppercase">Cards / Bank (PayFast)</span>
-                                <p className="text-[10px] opacity-70">+2.5% Tax</p>
                             </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+
+                    {/* Terms and Button */}
+                    <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } } }}>
+                        <div className="flex items-start space-x-3 p-3 mb-4 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors">
+                            <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(checked) => setAgreedToTerms(checked)} className="mt-1" />
+                            <label htmlFor="terms" className="text-xs leading-snug text-muted-foreground cursor-pointer">
+                                By continuing to pay to Medmacs/Hmacs Studios, you agree to our{' '}
+                                <Link to="/terms" className="text-blue-600 dark:text-blue-400 hover:underline font-medium transition-colors">Terms and Conditions</Link>,{' '}
+                                <Link to="/privacypolicy" className="text-blue-600 dark:text-blue-400 hover:underline font-medium transition-colors">Privacy Policy</Link>, and{' '}
+                                <Link to="/refund-policy" className="text-blue-600 dark:text-blue-400 hover:underline font-medium transition-colors">Refund Policy</Link>.
+                            </label>
                         </div>
-                    </div>
-                </div>
 
-                <div className="flex items-start space-x-3 p-3 mb-4">
-                    <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(checked) => setAgreedToTerms(checked)} className="mt-1" />
-                    <label htmlFor="terms" className="text-xs leading-snug text-muted-foreground">
-                        By continuing to pay to Medmacs/Hmacs Studios, you agree to our{' '}
-                        <Link to="/terms" className="text-primary hover:underline font-medium">Terms and Conditions</Link>,{' '}
-                        <Link to="/privacypolicy" className="text-primary hover:underline font-medium">Privacy Policy</Link>, and{' '}
-                        <Link to="/refund-policy" className="text-primary hover:underline font-medium">Refund Policy</Link>.
-                    </label>
-                </div>
+                        {error && (
+                            <motion.p 
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="text-destructive text-sm font-medium mb-4 text-center bg-destructive/10 py-2 rounded-lg"
+                            >
+                                {error}
+                            </motion.p>
+                        )}
 
-                {error && <p className="text-destructive text-sm font-medium mb-4 text-center">{error}</p>}
-
-                <Button className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl h-14 text-lg font-black uppercase tracking-widest shadow-2xl hover:scale-105 transition-all" onClick={processPayment} disabled={isLoading || isRedirecting}>
-                    {(isLoading || isRedirecting) ? <Loader2 className="animate-spin h-6 w-6" /> : `Pay PKR ${grandTotal.toFixed(2)}`}
-                </Button>
+                        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                            <Button 
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-2xl h-14 text-lg font-black uppercase tracking-widest shadow-[0_8px_30px_rgb(37,99,235,0.2)] transition-colors overflow-hidden relative" 
+                                onClick={processPayment} 
+                                disabled={isLoading || isRedirecting}
+                            >
+                                <span className="relative z-10 flex items-center justify-center">
+                                    {(isLoading || isRedirecting) ? <Loader2 className="animate-spin h-6 w-6" /> : `Pay PKR ${grandTotal.toFixed(2)}`}
+                                </span>
+                            </Button>
+                        </motion.div>
+                    </motion.div>
+                </motion.div>
             </main>
 
             {/* PAYFAST WEBVIEW MODAL */}

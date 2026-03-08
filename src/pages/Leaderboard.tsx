@@ -10,6 +10,7 @@ import { ProfileDropdown } from '@/components/ProfileDropdown';
 import React, { useState, useEffect, useRef } from 'react';
 import Seo from '@/components/Seo';
 import PlanBadge from '@/components/PlanBadge';
+import PageSkeleton from '@/components/skeletons/PageSkeleton';
 
 
 const Leaderboard = () => {
@@ -238,16 +239,7 @@ const Leaderboard = () => {
                     <CardContent className="p-4 lg:p-6 pt-0">
                         {isLoading ? (
                             <div className="space-y-4">
-                                {[...Array(10)].map((_, i) => (
-                                    <div key={i} className="flex items-center space-x-4 p-3 animate-pulse">
-                                        <div className="w-8 h-8 md:w-10 md:h-10 bg-muted rounded-full"></div>
-                                        <div className="flex-1 space-y-2">
-                                            <div className="h-3 md:h-4 bg-muted rounded w-1/4"></div>
-                                            <div className="h-2 md:h-3 bg-muted rounded w-1/6"></div>
-                                        </div>
-                                        <div className="h-3 md:h-4 bg-muted rounded w-16"></div>
-                                    </div>
-                                ))}
+                               <PageSkeleton />
                             </div>
                         ) : leaderboardData.length === 0 ? (
                             <div className="text-center py-8">

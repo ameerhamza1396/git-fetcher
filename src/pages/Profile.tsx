@@ -15,6 +15,7 @@ import Seo from '@/components/Seo';
 import ProfileAvatar from '@/components/profile/ProfileAvatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { fetchInstitutes, getInstituteDisplayName, type Institute } from '@/utils/institutes';
+import PageSkeleton from '@/components/skeletons/PageSkeleton';
 
 const planStyles = {
     free: { gradient: 'from-slate-500 via-slate-600 to-slate-700', icon: Shield, accent: 'bg-slate-300' },
@@ -115,11 +116,7 @@ const Profile = () => {
     };
 
     if (authLoading || profileLoading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-background">
-                <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-24 h-24 object-contain animate-pulse" />
-            </div>
-        );
+        return <PageSkeleton />;
     }
 
     if (profileFetchError) {

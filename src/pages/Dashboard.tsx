@@ -23,6 +23,7 @@ import { LeaderboardPreview } from '@/components/dashboard/LeaderboardPreview';
 import { StudyAnalytics } from '@/components/dashboard/StudyAnalytics';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import { useEffect, useState, useRef } from 'react';
 import AnnouncementToastManager from '@/components/ui/AnnouncementToastManager';
 import AuthErrorDisplay from '@/components/AuthErrorDisplay';
@@ -31,6 +32,7 @@ import Seo from '@/components/Seo';
 import AppExitConfirmation from '@/components/dashboard/AppExitConfirmation';
 import VersionGuard from '@/components/VersionControl';
 import ProfileAvatar from '@/components/profile/ProfileAvatar';
+import { MCQProgressWidget } from '@/components/dashboard/MCQProgressWidget';
 
 // Types
 type TermOfDay = {
@@ -132,6 +134,7 @@ const Dashboard = () => {
   const [showWhatsNew, setShowWhatsNew] = useState(false);
   const [showTermOfDay, setShowTermOfDay] = useState(false);
   const [showCaseOfDay, setShowCaseOfDay] = useState(false);
+  const [appVersion, setAppVersion] = useState<string>('Loading...');
 
   type Profile = {
     avatar_url: string;
@@ -255,6 +258,19 @@ const Dashboard = () => {
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['readAnnouncements', user?.id] }); },
   });
+
+  useEffect(() => {
+    const fetchVersion = async () => {
+      try {
+        const builtin = await CapacitorUpdater.getBuiltinVersion();
+        const next = await CapacitorUpdater.getNextBundle();
+        setAppVersion(next?.version || builtin?.version || 'Web/Dev');
+      } catch (e) {
+        setAppVersion('Web/Dev');
+      }
+    };
+    fetchVersion();
+  }, []);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -524,7 +540,7 @@ const Dashboard = () => {
             {/* Greeting - no avatar here */}
             <div className="mb-5">
               <h1 className="text-xl font-black text-foreground leading-tight">
-                Hi, <span className="text-shimmer">{displayName}</span> ✨
+                Welcome Back, <span className="text-shimmer">{displayName}</span> ✨
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5 font-medium">How's you doing today?</p>
             </div>
@@ -648,6 +664,8 @@ const Dashboard = () => {
               )}
             </div>
 
+            <MCQProgressWidget />
+
             {/* Premium Perks with animated crown */}
             <div className="flex items-center gap-2 mb-3">
               <Crown className="w-4 h-4 text-amber-500 animate-bounce-gentle" />
@@ -729,7 +747,7 @@ const Dashboard = () => {
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle className="text-xl font-black">What's New</DialogTitle>
-            <DialogDescription>Release history</DialogDescription>
+            <DialogDescription>Current Version: {appVersion}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             {[
