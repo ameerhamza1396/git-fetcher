@@ -12,6 +12,9 @@ const ConnectionStatusModal = () => {
   const toleranceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleOnline = useCallback(() => {
+    // Double check navigator.onLine to avoid false positives from browser events
+    if (!navigator.onLine) return;
+
     if (toleranceTimer.current) {
       clearTimeout(toleranceTimer.current);
       toleranceTimer.current = null;
@@ -36,8 +39,6 @@ const ConnectionStatusModal = () => {
   }, []);
 
   useEffect(() => {
-    // Only listen for actual offline/online events — do NOT check navigator.onLine
-    // on mount, as it can briefly report false during page load / iframe init.
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     return () => {
@@ -49,10 +50,31 @@ const ConnectionStatusModal = () => {
 
   const handleRetry = async () => {
     setIsRetrying(true);
+    
+    // Add a minimum delay for the animation to feel "real" and avoid flickering
+    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
+    
     try {
-      await fetch(window.location.origin, { method: 'HEAD', mode: 'no-cors' });
-      handleOnline();
-    } catch {
+      // Use a cache-busting fetch to the origin to truly verify connectivity
+      // Favicon is usually a small, safe file to check.
+      const ping = fetch(`${window.location.origin}/favicon.ico?t=${Date.now()}`, { 
+        method: 'HEAD', 
+        mode: 'no-cors',
+        cache: 'no-store'
+      });
+      
+      await Promise.all([ping, minDelay]);
+      
+      // If fetch didn't throw, we likely have connectivity.
+      // But let's also check navigator.onLine one last time.
+      if (navigator.onLine) {
+        handleOnline();
+      } else {
+        throw new Error('Still offline');
+      }
+    } catch (error) {
+      console.log('Retry failed:', error);
+      await minDelay;
       setIsRetrying(false);
     }
   };

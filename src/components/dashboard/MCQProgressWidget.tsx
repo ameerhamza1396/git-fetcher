@@ -158,7 +158,11 @@ export const MCQProgressWidget = () => {
     navigate('/mcqs', { 
       state: { 
         autoResume: true, 
-        resumeData: { subjectId: session.subjectId, chapterId: session.chapterId } 
+        resumeData: { 
+          subjectId: session.subjectId, 
+          chapterId: session.chapterId,
+          lastIndex: session.lastIndex 
+        } 
       } 
     });
   };

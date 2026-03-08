@@ -22,11 +22,14 @@ const config: CapacitorConfig = {
       launchAutoHide: true,
       androidScaleType: "CENTER_CROP",
       backgroundColor: "#ffffff"
+    },
+    CapacitorHttp: {
+      enabled: true,
     }
   },
   server: {
     androidScheme: 'https',
-    hostname: 'medmacs.app',
+    hostname: 'com.hmacs.medmacs',
     allowNavigation: [
       'ipguat.apps.net.pk',
       'ipguat2.apps.net.pk',
@@ -34,6 +37,7 @@ const config: CapacitorConfig = {
       'ipg2.apps.net.pk',
       'com.hmacs.medmacs',
       'medmacs.app',
+      '*.medmacs.app',
       'apps.net.pk',
       '*.apps.net.pk'
     ]

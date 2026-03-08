@@ -14,6 +14,7 @@ import Seo from '@/components/Seo';
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Browser } from '@capacitor/browser';
 
 const EASYPAISA_API_URL = "https://medmacs.app/api/pay-easypaisa";
 
@@ -81,20 +82,30 @@ const Checkout = () => {
                 (payload) => {
                     if (payload.new.status === 'success') {
                         setModalState('success');
-                        setShowPayFastModal(false);
                         setIsLoading(false);
+                        Browser.close().catch(() => {});
                     }
                     else if (payload.new.status === 'failed') {
                         setError(payload.new.error_message || "Transaction failed.");
                         setModalState('failure');
-                        setShowPayFastModal(false);
                         setIsLoading(false);
+                        Browser.close().catch(() => {});
                     }
                 }
             ).subscribe();
+
+        // When user closes the browser tab, do a manual status check
+        const browserListener = Browser.addListener('browserFinished', () => {
+            checkPaymentStatus();
+        });
+
         let pollInterval;
         if (modalState === 'processing') { pollInterval = setInterval(() => { checkPaymentStatus(); }, 4000); }
-        return () => { supabase.removeChannel(channel); if (pollInterval) clearInterval(pollInterval); };
+        return () => {
+            supabase.removeChannel(channel);
+            if (pollInterval) clearInterval(pollInterval);
+            browserListener.then(l => l.remove()).catch(() => {});
+        };
     }, [user, modalState]);
 
     if (!location.state) return <Navigate to="/pricing" replace />;
@@ -144,55 +155,56 @@ const Checkout = () => {
         const basketId = `ORD-${Date.now()}`;
         const finalAmount = grandTotal.toFixed(2);
         try {
+            const { data: { session } } = await supabase.auth.getSession();
             const { error: insertError } = await supabase.from('pending_payments').insert([{ user_id: user?.id, amount: finalAmount, order_id: basketId, status: 'initiated', validity, email: user?.email, plan_name: planName }]);
             if (insertError) throw new Error("Could not initialize transaction.");
 
-            const response = await fetch('https://medmacs.app/api/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: finalAmount, basketId }) });
+            const response = await fetch('https://medmacs.app/api/checkout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': session?.access_token ? `Bearer ${session.access_token}` : ''
+                },
+                body: JSON.stringify({ amount: finalAmount, basketId })
+            });
+
             const text = await response.text();
-            let data; try { data = text ? JSON.parse(text) : null; } catch { throw new Error("Payment server returned invalid response."); }
-            if (!response.ok || !data?.ACCESS_TOKEN) throw new Error(data?.message || "Failed to get payment token.");
+            let data; try { data = text ? JSON.parse(text) : null; } catch { throw new Error(`Server returned non-JSON response (${response.status}).`); }
+            if (!response.ok || !data?.ACCESS_TOKEN) throw new Error(data?.message || `Gateway error (${response.status})`);
 
-            // GENERATE AUTO-SUBMITTING HTML FOR THE WEBVIEW
+            // On Android, SUCCESS/FAILURE URLs must point to the Capacitor local server
+            // so PayFast redirects back INTO the app (not to the external website).
+            // On web, use the real domain.
+            const { Capacitor } = await import('@capacitor/core');
+            const callbackBase = Capacitor.isNativePlatform()
+                ? 'https://com.hmacs.medmacs'
+                : 'https://medmacs.app';
+
             const fields = {
-                MERCHANT_ID: "248744", Merchant_Name: "MEDMACS Pakistan", MERCHANT_USERAGENT: navigator.userAgent, TOKEN: data.ACCESS_TOKEN, PROCCODE: "00", TXNAMT: finalAmount, CUSTOMER_MOBILE_NO: mobileNumber || "03000000000",
-                CUSTOMER_EMAIL_ADDRESS: user?.email || "", SUCCESS_URL: `${window.location.origin}/payment-success?plan=${planName}&validity=${validity}`, FAILURE_URL: `${window.location.origin}/payment-failure`,
-                CHECKOUT_URL: `https://medmacs.app/api/payment-webhook`, BASKET_ID: basketId, ORDER_DATE: new Date().toISOString().slice(0, 10), SIGNATURE: "PAYMENT_REQ", VERSION: "V1.2",
-                TXNDESC: `Upgrade to ${planName} (${duration})`, CURRENCY_CODE: "PKR", P1: user?.id || "", P2: planName, P3: duration
+                MERCHANT_ID: "248744", Merchant_Name: "MEDMACS Pakistan", MERCHANT_USERAGENT: navigator.userAgent,
+                TOKEN: data.ACCESS_TOKEN, PROCCODE: "00", TXNAMT: finalAmount,
+                CUSTOMER_MOBILE_NO: mobileNumber || "03000000000",
+                CUSTOMER_EMAIL_ADDRESS: user?.email || "",
+                SUCCESS_URL: `${callbackBase}/payment-success?plan=${planName}&validity=${validity}&basket_id=${basketId}`,
+                FAILURE_URL: `${callbackBase}/payment-failure`,
+                CHECKOUT_URL: `https://medmacs.app/api/payment-webhook`,
+                BASKET_ID: basketId, ORDER_DATE: new Date().toISOString().slice(0, 10),
+                SIGNATURE: "PAYMENT_REQ", VERSION: "V1.2",
+                TXNDESC: `Upgrade to ${planName} (${duration})`, CURRENCY_CODE: "PKR",
+                P1: user?.id || "", P2: planName, P3: duration
             };
-
-            const formInputs = Object.entries(fields)
-                .map(([key, value]) => `<input type="hidden" name="${key}" value="${value}">`)
-                .join('');
-
-            const autoSubmitHtml = `
-                <html>
-                <body onload="document.forms[0].submit()">
-                    <form method="POST" action="https://ipg1.apps.net.pk/Ecommerce/api/Transaction/PostTransaction">
-                        ${formInputs}
-                    </form>
-                    <div style="display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;">
-                        <p>Loading Secure Payment Gateway...</p>
-                    </div>
-                </body>
-                </html>
-            `;
 
             const form = document.createElement("form");
             form.method = "POST";
             form.action = "https://ipg1.apps.net.pk/Ecommerce/api/Transaction/PostTransaction";
-
             Object.entries(fields).forEach(([key, value]) => {
                 const input = document.createElement("input");
-                input.type = "hidden";
-                input.name = key;
-                input.value = value as string;
+                input.type = "hidden"; input.name = key; input.value = value as string;
                 form.appendChild(input);
             });
-
             document.body.appendChild(form);
             form.submit();
 
-            setModalState('processing'); // Set to processing so Supabase listener starts
             setIsLoading(false);
         } catch (err) { setError(err.message || "An error occurred."); setIsLoading(false); }
     };

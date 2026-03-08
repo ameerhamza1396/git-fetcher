@@ -24,6 +24,7 @@ const MCQs = () => {
   const [currentScreen, setCurrentScreen] = useState<Screen>('subjects');
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
+  const [initialIndex, setInitialIndex] = useState(0);
   const [timerEnabled, setTimerEnabled] = useState(false);
   const [timePerQuestion, setTimePerQuestion] = useState(30);
   const [headerVisible, setHeaderVisible] = useState(true);
@@ -51,6 +52,9 @@ const MCQs = () => {
           if (subject && chapter) {
             setSelectedSubject(subject as Subject);
             setSelectedChapter(chapter as Chapter);
+            if (location.state.resumeData.lastIndex !== undefined) {
+              setInitialIndex(location.state.resumeData.lastIndex);
+            }
             setCurrentScreen('quiz');
           }
         } catch (error) {
@@ -116,6 +120,7 @@ const MCQs = () => {
   const handleStartQuiz = (timerEnabledValue: boolean, timePerQuestionValue: number) => {
     setTimerEnabled(timerEnabledValue);
     setTimePerQuestion(timePerQuestionValue);
+    setInitialIndex(0); // Reset for manual start
     setCurrentScreen('quiz');
   };
 
@@ -161,7 +166,16 @@ const MCQs = () => {
       case 'settings':
         return selectedSubject && selectedChapter ? <QuizSettingsScreen subject={selectedSubject} chapter={selectedChapter} onStartQuiz={handleStartQuiz} onBack={handleBackToChapters} /> : null;
       case 'quiz':
-        return selectedSubject && selectedChapter ? <MCQDisplay subject={selectedSubject.id} chapter={selectedChapter.id} onBack={handleBackToSettings} timerEnabled={timerEnabled} timePerQuestion={timePerQuestion} /> : null;
+        return selectedSubject && selectedChapter ? (
+          <MCQDisplay 
+            subject={selectedSubject.id} 
+            chapter={selectedChapter.id} 
+            onBack={handleBackToSettings} 
+            timerEnabled={timerEnabled} 
+            timePerQuestion={timePerQuestion}
+            initialIndex={initialIndex}
+          />
+        ) : null;
       default:
         return <SubjectSelectionScreen onSubjectSelect={handleSubjectSelect} />;
     }

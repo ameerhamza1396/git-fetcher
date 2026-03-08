@@ -22,6 +22,7 @@ interface MCQDisplayProps {
   onBack: () => void;
   timerEnabled?: boolean;
   timePerQuestion?: number;
+  initialIndex?: number;
 }
 
 interface ShuffledMCQ extends Omit<MCQ, 'options'> {
@@ -55,10 +56,28 @@ export interface SavedMCQSession {
 const updateSavedSessionsList = async (userId: string | undefined, subjectId: string, chapterId: string, lastIndex: number) => {
   if (typeof window === 'undefined') return;
   try {
-    const data = localStorage.getItem(SAVED_SESSIONS_LIST_KEY);
-    let sessions: SavedMCQSession[] = data ? JSON.parse(data) : [];
+    // 1. Get current sessions (prioritize cloud if logged in)
+    let sessions: SavedMCQSession[] = [];
+    
+    if (userId) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('in_progress_mcqs')
+        .eq('id', userId)
+        .single();
+      
+      if (profile?.in_progress_mcqs) {
+        sessions = profile.in_progress_mcqs as unknown as SavedMCQSession[];
+      }
+    }
 
-    // Remove existing entry for this chapter
+    if (sessions.length === 0) {
+      const localData = localStorage.getItem(SAVED_SESSIONS_LIST_KEY);
+      sessions = localData ? JSON.parse(localData) : [];
+    }
+
+    // 2. Merge/Update the list
+    // Remove existing entry for this chapter to avoid duplicates
     sessions = sessions.filter(s => s.chapterId !== chapterId);
 
     // Add updated or new entry to the front
@@ -74,9 +93,10 @@ const updateSavedSessionsList = async (userId: string | undefined, subjectId: st
       sessions = sessions.slice(0, 5);
     }
 
+    // 3. Persist to Local Storage
     localStorage.setItem(SAVED_SESSIONS_LIST_KEY, JSON.stringify(sessions));
 
-    // Async push to Supabase
+    // 4. Persist to Supabase if logged in
     if (userId) {
       await supabase
         .from('profiles')
@@ -91,12 +111,32 @@ const updateSavedSessionsList = async (userId: string | undefined, subjectId: st
 const removeSavedSessionFromList = async (userId: string | undefined, chapterId: string) => {
   if (typeof window === 'undefined') return;
   try {
-    const data = localStorage.getItem(SAVED_SESSIONS_LIST_KEY);
-    if (!data) return;
-    let sessions: SavedMCQSession[] = JSON.parse(data);
+    let sessions: SavedMCQSession[] = [];
+
+    if (userId) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('in_progress_mcqs')
+        .eq('id', userId)
+        .single();
+      
+      if (profile?.in_progress_mcqs) {
+        sessions = profile.in_progress_mcqs as unknown as SavedMCQSession[];
+      }
+    }
+
+    if (sessions.length === 0) {
+      const localData = localStorage.getItem(SAVED_SESSIONS_LIST_KEY);
+      sessions = localData ? JSON.parse(localData) : [];
+    }
+
+    // Filter out the completed chapter
     sessions = sessions.filter(s => s.chapterId !== chapterId);
+    
+    // Update Local Storage
     localStorage.setItem(SAVED_SESSIONS_LIST_KEY, JSON.stringify(sessions));
 
+    // Update Supabase
     if (userId) {
       await supabase
         .from('profiles')
@@ -228,7 +268,8 @@ export const MCQDisplay = ({
   chapter,
   onBack,
   timerEnabled = false,
-  timePerQuestion = 30
+  timePerQuestion = 30,
+  initialIndex = 0
 }: MCQDisplayProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -331,6 +372,12 @@ export const MCQDisplay = ({
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      // If initialIndex is provided (e.g. from Dashboard resume), use it
+      if (initialIndex > 0) {
+        setCurrentQuestionIndex(initialIndex);
+        return;
+      }
+
       const lastSubject = localStorage.getItem(LAST_ATTEMPTED_SUBJECT_KEY);
       const lastChapter = localStorage.getItem(LAST_ATTEMPTED_CHAPTER_KEY);
       const lastIndex = localStorage.getItem(LAST_ATTEMPTED_MCQ_KEY);
@@ -344,7 +391,7 @@ export const MCQDisplay = ({
         setCurrentQuestionIndex(0);
       }
     }
-  }, [subject, chapter]);
+  }, [subject, chapter, initialIndex]);
 
   useEffect(() => {
     const loadMCQs = async () => {
