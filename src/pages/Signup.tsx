@@ -305,7 +305,7 @@ const Signup = () => {
   if (!mounted) return null;
 
   return (
-    <div className="min-h-screen w-full flex flex-col relative overflow-hidden bg-gradient-to-br from-[hsl(168,80%,20%)] via-[hsl(190,60%,14%)] to-[hsl(220,60%,12%)]">
+    <div className="fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-[hsl(168,80%,20%)] via-[hsl(190,60%,14%)] to-[hsl(220,60%,12%)]">
 
       <Seo
         title="Sign Up"
@@ -360,7 +360,7 @@ const Signup = () => {
         </div>
       </motion.div>
 
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-5 pb-[env(safe-area-inset-bottom)]">
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-5 pb-[env(safe-area-inset-bottom)] overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}

@@ -202,7 +202,7 @@ const DrSultanChat: React.FC = () => {
   if (authLoading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
 
   return (
-    <div className="h-screen w-full flex overflow-hidden bg-background">
+    <div className="fixed inset-0 w-full flex overflow-hidden bg-background">
       <Seo title="Dr. Ahroid | AI Tutor" />
 
       {/* DELETE MODAL */}
