@@ -210,9 +210,13 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName }: F
   );
 
   return (
-    <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950 flex flex-col overflow-y-auto">
+    <div className="fixed inset-0 z-[100] bg-background flex flex-col overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
+
       {/* Header */}
-      <header className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
+      <header className={`fixed top-0 left-0 right-0 z-50 bg-background/50 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="container mx-auto px-4 py-3 flex justify-between items-center max-w-7xl">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" className="hidden lg:flex w-9 h-9 p-0" onClick={() => setIsPanelOpen(!isPanelOpen)}>
@@ -256,12 +260,21 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName }: F
         </AnimatePresence>
 
         {/* Main Content */}
-        <main className={`flex-grow flex flex-col items-center px-4 py-8 mt-[var(--header-height)] pb-[env(safe-area-inset-bottom)] overflow-y-auto ${isPanelOpen ? 'lg:ml-64' : ''}`}>
-          <div className="text-center mb-6 space-y-1">
+        <main className={`flex-grow flex flex-col items-center px-4 py-8 mt-20 pb-[env(safe-area-inset-bottom)] overflow-y-auto w-full transition-all duration-300 ${isPanelOpen ? 'lg:ml-64' : ''}`}>
+          <div className="text-center mb-8 space-y-2 w-full max-w-2xl">
             {subjectName && (
-              <p className="text-primary text-xs uppercase tracking-[0.2em] font-bold">{subjectName}</p>
+              <Badge variant="outline" className="text-primary border-primary/30 uppercase tracking-[0.2em] font-black text-[10px] py-1 px-3 bg-primary/5">
+                {subjectName}
+              </Badge>
             )}
-            <p className="text-foreground text-lg font-black">Question {currentQuestionIndex + 1} <span className="text-muted-foreground font-medium text-sm">of {totalQuestions}</span></p>
+            <h1 className="text-foreground text-2xl font-black tracking-tight">Question {currentQuestionIndex + 1} <span className="text-muted-foreground/40 font-bold ml-2">/ {totalQuestions}</span></h1>
+            <div className="w-full h-1 bg-muted/30 rounded-full overflow-hidden mt-4">
+              <motion.div 
+                className="h-full bg-primary" 
+                initial={{ width: 0 }}
+                animate={{ width: `${((currentQuestionIndex + 1) / totalQuestions) * 100}%` }}
+              />
+            </div>
           </div>
 
           <AnimatePresence mode="wait">
@@ -316,9 +329,9 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName }: F
             )}
           </AnimatePresence>
 
-          <div className="mt-6 text-center space-y-0.5">
-            <p className="text-muted-foreground/50 text-xs uppercase tracking-widest font-medium">Best of luck</p>
-            <p className="text-foreground/70 text-sm font-bold truncate max-w-[200px] mx-auto">{displayUsername}</p>
+          <div className="mt-12 text-center space-y-2 opacity-40">
+            <p className="text-[10px] uppercase font-black tracking-[0.4em] text-muted-foreground">Medmacs Exam Engine</p>
+            <p className="text-[10px] font-bold text-foreground truncate max-w-[200px] mx-auto uppercase tracking-widest">{displayUsername}</p>
           </div>
         </main>
       </div>

@@ -1,10 +1,10 @@
 // @ts-nocheck
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, BookmarkX, Moon, Sun, ChevronDown, ChevronUp, Loader2, CheckCircle } from 'lucide-react';
+import { ArrowLeft, BookmarkX, Moon, Sun, ChevronDown, ChevronUp, Loader2, CheckCircle, Trash2, RefreshCw } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -12,12 +12,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { useToast } from '@/hooks/use-toast';
-import { ProfileDropdown } from '@/components/ProfileDropdown'; // NEW: Import ProfileDropdown
-import Seo from '@/components/Seo'; // Import the Seo component
+import { ProfileDropdown } from '@/components/ProfileDropdown';
+import Seo from '@/components/Seo';
 import PlanBadge from '@/components/PlanBadge';
 
-
-// Assuming MCQ interface is available from mcqData or defined here
 interface MCQ {
   id: string;
   question: string;
@@ -25,293 +23,271 @@ interface MCQ {
   correct_answer: string;
   explanation: string;
   chapter: string;
-  subject: string; // Ensure this matches your database schema
+  subject: string;
 }
 
 const SavedMCQsPage = () => {
-  const { theme, setTheme } = useTheme();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-
-  // State to manage expanded MCQ
   const [expandedMcqId, setExpandedMcqId] = useState<string | null>(null);
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const lastScrollY = useRef(0);
 
-  // Get user profile data for plan badge and avatar
+  // Scroll-hide header
+  const handleScroll = useCallback(() => {
+    const currentY = window.scrollY;
+    if (currentY > 80 && currentY > lastScrollY.current) {
+      setHeaderVisible(false);
+    } else {
+      setHeaderVisible(true);
+    }
+    lastScrollY.current = currentY;
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
+
   const { data: profile } = useQuery({
     queryKey: ['profile', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('plan, avatar_url') // Select avatar_url here
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching profile:', error);
-        return null;
-      }
+      const { data, error } = await supabase.from('profiles').select('plan, avatar_url').eq('id', user.id).maybeSingle();
+      if (error) return null;
       return data;
     },
     enabled: !!user?.id
   });
 
-  // Fetch saved MCQs
   const { data: savedMcqs, isLoading, isError, error } = useQuery<MCQ[], Error>({
     queryKey: ['savedMcqs', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-
-      // First, fetch the mcq_ids from the 'saved_mcqs' table for the current user
-      const { data: savedMcqIdsData, error: savedMcqIdsError } = await supabase
-        .from('saved_mcqs')
-        .select('mcq_id')
-        .eq('user_id', user.id);
-
-      if (savedMcqIdsError) {
-        throw savedMcqIdsError;
-      }
-
-      const mcqIds = savedMcqIdsData.map(item => item.mcq_id);
-
-      if (mcqIds.length === 0) {
-        return []; // No saved MCQs
-      }
-
-      // Then, fetch the full MCQ details from the 'mcqs' table using the collected mcq_ids
-      const { data: mcqDetails, error: mcqDetailsError } = await supabase
-        .from('mcqs')
-        .select('*')
-        .in('id', mcqIds); // Use .in() to fetch multiple MCQs by their IDs
-
-      if (mcqDetailsError) {
-        throw mcqDetailsError;
-      }
-
+      const { data: savedIds, error: idsErr } = await supabase.from('saved_mcqs').select('mcq_id').eq('user_id', user.id);
+      if (idsErr) throw idsErr;
+      const mcqIds = savedIds.map(item => item.mcq_id);
+      if (mcqIds.length === 0) return [];
+      const { data: mcqDetails, error: detailsErr } = await supabase.from('mcqs').select('*').in('id', mcqIds);
+      if (detailsErr) throw detailsErr;
       return mcqDetails as MCQ[];
     },
-    enabled: !!user?.id, // Only run this query if the user is logged in
-    staleTime: 5 * 60 * 1000, // Data considered fresh for 5 minutes
-    cacheTime: 10 * 60 * 1000, // Data kept in cache for 10 minutes
+    enabled: !!user?.id,
   });
 
-  // Mutation for unsaving an MCQ
   const unsaveMCQMutation = useMutation({
     mutationFn: async (mcqId: string) => {
       if (!user?.id) throw new Error("User not authenticated.");
-      const { error } = await supabase
-        .from('saved_mcqs')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('mcq_id', mcqId);
+      const { error } = await supabase.from('saved_mcqs').delete().eq('user_id', user.id).eq('mcq_id', mcqId);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['savedMcqs', user?.id] }); // Invalidate and refetch saved MCQs
-      // Collapse the unsaved MCQ if it was expanded
+      queryClient.invalidateQueries({ queryKey: ['savedMcqs', user?.id] });
       setExpandedMcqId(null); 
-      toast({
-        title: "MCQ Unsaved",
-        description: "This question has been removed from your saved list.",
-        variant: "default", // Or a specific success variant
-      });
-    },
-    onError: (err) => {
-      console.error("Error unsaving MCQ:", err);
-      toast({
-        title: "Error",
-        description: `Failed to unsave MCQ: ${err.message || 'Unknown error'}`,
-        variant: "destructive",
-      });
+      toast({ title: "MCQ Unsaved", description: "This question has been removed from your saved list." });
     }
   });
 
-  const handleToggleExpand = (mcqId: string) => {
-    setExpandedMcqId(prevId => (prevId === mcqId ? null : mcqId));
-  };
+  const handleToggleExpand = (mcqId: string) => setExpandedMcqId(prevId => (prevId === mcqId ? null : mcqId));
 
   const handleUnsaveMcq = (mcqId: string) => {
-    // Using toast for confirmation instead of window.confirm
     toast({
       title: "Unsave Question?",
-      description: "Are you sure you want to remove this question from your saved list?",
+      description: "Remove this question from your saved list?",
       action: (
         <Button 
-          variant="destructive" 
+          variant="destructive" size="sm" 
           onClick={() => unsaveMCQMutation.mutate(mcqId)}
           disabled={unsaveMCQMutation.isLoading}
         >
-          {unsaveMCQMutation.isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          {unsaveMCQMutation.isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
           Yes, Unsave
         </Button>
       ),
-      duration: 5000, // Keep toast visible for 5 seconds for user to act
     });
   };
 
   return (
-    <div className="min-h-screen w-full bg-white dark:bg-gray-900">
-      <Seo
-        title="Saved MCQs"
-        description="Access and review your saved MCQs on Medmacs App. Organize your favorite or challenging questions for focused revision."
-        canonical="https://medistics.app/saved-mcqs"
-      />
-      {/* Header */}
-    <header className="absolute top-0 left-0 right-0 z-50 bg-white/30 dark:bg-gray-900/30 
-    backdrop-blur-md border-b border-purple-200/50 dark:border-purple-800/50 
-    pt-[env(safe-area-inset-top)]">  
-            <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
-          <Link to="/dashboard" className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors">
+    <div className="min-h-screen w-full bg-background bg-mesh pb-28 overflow-x-hidden relative">
+      <Seo title="Saved MCQs" description="Access and review your saved MCQs on Medmacs App." canonical="https://medmacs.app/saved-mcqs" />
+      
+      {/* Floating gradient orbs */}
+      <div className="orb orb-1" />
+      <div className="orb orb-2" />
+      <div className="orb orb-3" />
+
+      {/* Glass Header */}
+      <header className={`fixed top-0 left-0 right-0 z-50 bg-background/60 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
+        <div className="container mx-auto px-4 py-3 flex justify-between items-center max-w-7xl">
+          <Link to="/dashboard" className="flex items-center gap-1.5 text-primary hover:text-primary/80 transition-colors">
             <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">Back to Dashboard</span>
+            <span className="text-sm font-semibold">Dashboard</span>
           </Link>
 
-          <div className="flex items-center space-x-3">
-            {/* Replace with your actual logo path */}
-            <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs Logo" className="w-8 h-8 object-contain" />
-            <span className="text-xl font-bold text-gray-900 dark:text-white">Saved MCQs</span>
+          <div className="flex items-center gap-2">
+            <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-6 h-6" />
+            <span className="text-sm font-black text-foreground tracking-tight hidden sm:inline">Saved MCQs</span>
           </div>
 
-          <div className="flex items-center space-x-3">
-            <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-9 h-9 p-0 hover:scale-110 transition-transform duration-200">
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-            <PlanBadge plan={profile?.plan} />
+          <div className="flex items-center gap-3">
             <ProfileDropdown />
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 lg:px-8 py-8 max-w-7xl mt-[calc(45px+env(safe-area-inset-top))] overscroll-y-contain">
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-6 text-center">
-          📚 Your Saved MCQs
-        </h1>
+      <div className="container mx-auto px-4 py-8 max-w-3xl mt-[var(--header-height)]">
+        <header className="mb-10 text-center animate-fade-in">
+          <h1 className="text-3xl font-black text-foreground uppercase italic tracking-tight">
+            📚 Saved <span className="text-shimmer">Questions</span>
+          </h1>
+          <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-[0.3em] mt-2">
+            Review your bookmarked MCQs
+          </p>
+        </header>
 
         {isLoading && (
-          <div className="flex justify-center items-center h-48">
-            <Loader2 className="h-8 w-8 animate-spin text-purple-600 dark:text-purple-400" />
-            <p className="ml-2 text-gray-600 dark:text-gray-400">Loading your saved questions...</p>
+          <div className="flex flex-col items-center justify-center py-20 animate-pulse">
+            <div className="w-16 h-16 rounded-3xl bg-primary/10 flex items-center justify-center mb-4">
+              <RefreshCw className="w-8 h-8 text-primary animate-spin" />
+            </div>
+            <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Loading knowledge...</p>
           </div>
         )}
 
         {isError && (
-          <div className="text-center text-red-500 dark:text-red-400">
-            <p>Error loading saved MCQs: {error?.message || 'Unknown error'}</p>
-            <p>Please try again later.</p>
+          <div className="text-center p-8 bg-destructive/5 rounded-3xl border border-destructive/20 animate-alive">
+              <div className="w-12 h-12 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+                <BookmarkX className="w-6 h-6 text-destructive" />
+              </div>
+              <p className="text-sm font-bold text-destructive">Error loading saved MCQs: {error?.message}</p>
           </div>
         )}
 
-        {!user && !isLoading && (
-          <Card className="bg-gradient-to-br from-purple-100/70 via-purple-50/50 to-pink-50/30 dark:from-purple-900/30 dark:via-purple-800/20 dark:to-pink-900/10 border-purple-200 dark:border-purple-800 backdrop-blur-sm mx-auto max-w-md">
-            <CardContent className="text-center py-6 sm:py-8">
-              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-4">
-                Please log in to view your saved MCQs.
-              </p>
-              <Link to="/login">
-                <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-sm sm:text-base">
-                  Log In
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        )}
-
         {user && !isLoading && savedMcqs && savedMcqs.length === 0 && (
-          <Card className="bg-gradient-to-br from-purple-100/70 via-purple-50/50 to-pink-50/30 dark:from-purple-900/30 dark:via-purple-800/20 dark:to-pink-900/10 border-purple-200 dark:border-purple-800 backdrop-blur-sm mx-auto max-w-md">
-            <CardContent className="text-center py-6 sm:py-8">
-              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                You haven't saved any MCQs yet. Start solving quizzes to save questions!
-              </p>
-            </CardContent>
-          </Card>
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-24 px-6 border border-dashed border-border/60 rounded-[2.5rem] bg-card/40 backdrop-blur-sm">
+            <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-6">
+              <BookmarkX className="w-10 h-10 text-muted-foreground/40" />
+            </div>
+            <h3 className="text-lg font-bold text-foreground mb-2">No saved questions yet</h3>
+            <p className="text-sm text-muted-foreground mb-8 max-w-xs mx-auto">Start practicing and bookmark questions you'd like to review later.</p>
+            <Button asChild className="rounded-2xl font-black h-12 px-8 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
+              <Link to="/mcqs">Start Practicing</Link>
+            </Button>
+          </motion.div>
         )}
 
         {user && savedMcqs && savedMcqs.length > 0 && (
-          <div className="space-y-6">
-            {savedMcqs.map((mcq) => (
-              <Card 
-                key={mcq.id} 
-                className="bg-gradient-to-br from-purple-100/70 via-purple-50/50 to-pink-50/30 dark:from-purple-900/30 dark:via-purple-800/20 dark:to-pink-900/10 border-purple-200 dark:border-purple-800 backdrop-blur-sm"
-              >
-                <CardHeader className="px-4 sm:px-6 py-4 sm:py-6 flex flex-row justify-between items-start">
-                  <div className="flex-grow">
-                    <CardTitle className="text-base sm:text-lg leading-relaxed text-gray-900 dark:text-white mb-2">
-                      {mcq.question}
-                    </CardTitle>
-                    {/* Display subject name, with a fallback for null/empty values */}
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700">
-                      {mcq.subject || 'Unknown Subject'}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center space-x-2 ml-4">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleUnsaveMcq(mcq.id)}
-                      className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                      title="Unsave Question"
-                      disabled={unsaveMCQMutation.isLoading}
-                    >
-                      {unsaveMCQMutation.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <BookmarkX className="h-5 w-5" />}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleToggleExpand(mcq.id)}
-                      className="text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400"
-                      title={expandedMcqId === mcq.id ? "Collapse" : "Expand"}
-                    >
-                      {expandedMcqId === mcq.id ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                    </Button>
-                  </div>
-                </CardHeader>
-                <AnimatePresence>
-                  {expandedMcqId === mcq.id && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
-                        <div className="space-y-2 sm:space-y-3 mb-4">
-                          {mcq.options.map((option, index) => (
-                            <div 
-                              key={index} 
-                              className={`w-full p-3 sm:p-4 text-left border-2 rounded-lg text-sm sm:text-base 
-                                ${option === mcq.correct_answer 
-                                  ? 'bg-green-50 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-400' 
-                                  : 'bg-gray-50 dark:bg-gray-800/50 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400'
-                                }`}
-                            >
-                              {String.fromCharCode(65 + index)}. {option}
-                              {option === mcq.correct_answer && <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 ml-2 inline-block float-right" />}
+          <div className="space-y-4">
+            <AnimatePresence mode="popLayout">
+              {savedMcqs.map((mcq, idx) => (
+                <motion.div
+                  key={mcq.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ delay: idx * 0.05 }}
+                  layout
+                >
+                  <Card className={`overflow-hidden border-border/40 shadow-sm transition-all duration-300 transform-gpu alive-card ${expandedMcqId === mcq.id ? 'ring-2 ring-primary bg-card/90' : 'bg-card/50 hover:bg-card/80 backdrop-blur-sm shadow-black/5 hover:shadow-black/10'}`}>
+                    <CardHeader className="p-5 flex flex-row justify-between items-start gap-4">
+                      <div className="flex-grow space-y-3">
+                         <div className="flex items-center gap-2">
+                           <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest bg-primary/5 text-primary border-primary/20 rounded-sm">
+                             {mcq.subject || 'Medical'}
+                           </Badge>
+                         </div>
+                        <h2 className="text-[15px] font-bold text-foreground leading-relaxed">
+                          {mcq.question}
+                        </h2>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0 pt-1">
+                        <Button
+                          variant="ghost" size="icon"
+                          onClick={() => handleUnsaveMcq(mcq.id)}
+                          className="w-8 h-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-xl transition-all"
+                        >
+                          <BookmarkX className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost" size="icon"
+                          onClick={() => handleToggleExpand(mcq.id)}
+                          className={`w-8 h-8 rounded-xl transition-all ${expandedMcqId === mcq.id ? 'bg-primary text-white hover:bg-primary/90 rotate-180' : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'}`}
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    
+                    <AnimatePresence>
+                      {expandedMcqId === mcq.id && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                        >
+                          <CardContent className="px-5 pb-6 pt-0">
+                            <div className="space-y-2 mt-2">
+                              {mcq.options.map((option, index) => {
+                                const isCorrect = option === mcq.correct_answer;
+                                return (
+                                  <div 
+                                    key={index} 
+                                    className={`relative p-3.5 rounded-2xl border-2 transition-all duration-200 group flex items-center justify-between ${
+                                      isCorrect 
+                                        ? 'bg-primary/5 border-primary shadow-sm shadow-primary/10' 
+                                        : 'bg-muted/30 border-transparent hover:border-border'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <div className={`w-6 h-6 rounded-lg text-[10px] font-black flex items-center justify-center shrink-0 ${isCorrect ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}>
+                                        {String.fromCharCode(65 + index)}
+                                      </div>
+                                      <span className={`text-sm font-medium ${isCorrect ? 'text-foreground' : 'text-muted-foreground'}`}>{option}</span>
+                                    </div>
+                                    {isCorrect && (
+                                       <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="shrink-0 bg-primary/20 p-1 rounded-full">
+                                          <CheckCircle className="w-4 h-4 text-primary" />
+                                       </motion.div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
-                          ))}
-                        </div>
-                        {mcq.explanation && (
-                          <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                            <h4 className="font-semibold text-blue-900 dark:text-blue-200 mb-2 text-sm sm:text-base">Explanation:</h4>
-                            <p className="text-blue-800 dark:text-blue-300 text-sm sm:text-base">{mcq.explanation}</p>
-                          </div>
-                        )}
-                      </CardContent>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </Card>
-            ))}
+                            
+                            {mcq.explanation && (
+                              <motion.div 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="mt-6 p-4 rounded-3xl bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/20 dark:to-blue-950/20 border border-indigo-200/50 dark:border-indigo-800/30"
+                              >
+                                <div className="flex items-baseline gap-2 mb-2">
+                                  <div className="w-1.5 h-4 bg-indigo-500 rounded-full" />
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Deep Insights</span>
+                                </div>
+                                <p className="text-sm font-medium text-indigo-900/80 dark:text-indigo-200/80 leading-relaxed italic">
+                                  "{mcq.explanation}"
+                                </p>
+                              </motion.div>
+                            )}
+                          </CardContent>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </Card>
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
         )}
       </div>
 
       {/* Footer */}
-      <div className="text-center pt-6 pb-4">
-        <p className="text-[10px] text-muted-foreground font-medium">A Project by Hmacs Studios.</p>
-        <p className="text-[10px] text-muted-foreground mt-1">© 2026 Hmacs Studios. All rights reserved</p>
-      </div>
-      
+      <footer className="text-center pt-10 pb-28 opacity-50">
+        <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Medmacs Intelligence Core</p>
+        <p className="text-[8px] font-bold text-muted-foreground mt-1">© 2026 Hmacs Studios.</p>
+      </footer>
     </div>
   );
 };

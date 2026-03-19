@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/components/ui/use-toast'; // Assuming you have a toast system
-import { ArrowLeft, Moon, Sun, Upload, User, Mail, Phone, Briefcase, Lightbulb, FileImage, CreditCard, Loader2, RefreshCw } from 'lucide-react'; // Added RefreshCw for CAPTCHA refresh
+import { ArrowLeft, Moon, Sun, Upload, User, Mail, Phone, Briefcase, Lightbulb, FileImage, CreditCard, Loader2, RefreshCw, CheckCircle, Sparkles } from 'lucide-react'; // Added RefreshCw for CAPTCHA refresh, CheckCircle, Sparkles
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
@@ -32,7 +32,6 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp
 
 const InternshipApplication = () => {
   const { toast } = useToast();
-  const { theme, setTheme } = useTheme();
   const { user } = useAuth();
 
   // Form states
@@ -41,8 +40,8 @@ const InternshipApplication = () => {
   const [contactNumber, setContactNumber] = useState('');
   const [gender, setGender] = useState('');
   const [skillExperience, setSkillExperience] = useState('');
-  const [whyJoinMedistics, setWhyJoinMedistics] = useState('');
-  const [userSkills, setUserSkills] = useState('');
+  const [whyJoinMedmacs, setWhyJoinMedmacs] = useState('');
+  const [otherSkills, setOtherSkills] = useState('');
   const [skillsToApply, setSkillsToApply] = useState<string[]>([]);
   const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
   const [cnicStudentCardFile, setCnicStudentCardFile] = useState<File | null>(null);
@@ -65,6 +64,11 @@ const InternshipApplication = () => {
     setCaptchaValue(result);
     setUserCaptchaInput(''); // Clear user input on refresh
   };
+
+  // Scroll to top on mount
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   // Prefill name and email from logged-in user and generate CAPTCHA on mount if not logged in
   useEffect(() => {
@@ -201,8 +205,8 @@ const InternshipApplication = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Basic validation (removed userSkills from this check)
-    if (!name || !email || !contactNumber || !gender || !skillExperience || !whyJoinMedistics || skillsToApply.length === 0 || !profilePictureFile || !cnicStudentCardFile) {
+    // Basic validation
+    if (!name || !email || !contactNumber || !gender || !skillExperience || !whyJoinMedmacs || skillsToApply.length === 0 || !profilePictureFile || !cnicStudentCardFile) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields and upload both pictures.",
@@ -242,7 +246,7 @@ const InternshipApplication = () => {
       return;
     }
 
-    if (whyJoinMedistics.length < 70 || whyJoinMedistics.length > 500) {
+    if (whyJoinMedmacs.length < 70 || whyJoinMedmacs.length > 500) {
       toast({
         title: "Validation Error",
         description: "Why join Medmacs? must be between 70 and 500 characters.",
@@ -252,8 +256,8 @@ const InternshipApplication = () => {
       return;
     }
 
-    // New validation for userSkills (optional but with max length)
-    if (userSkills.length > 500) {
+    // New validation for otherSkills (optional but with max length)
+    if (otherSkills.length > 500) {
       toast({
         title: "Validation Error",
         description: "Other Relevant Skills must be maximum 500 characters.",
@@ -283,8 +287,8 @@ const InternshipApplication = () => {
           contact_number: contactNumber,
           gender,
           skill_experience: skillExperience,
-          why_join_medistics: whyJoinMedistics,
-          user_skills: userSkills,
+          why_join_medistics: whyJoinMedmacs,
+          user_skills: otherSkills,
           skills_to_apply: skillsToApply, // Stored as JSONB array
           profile_picture_url: profilePicUrl,
           cnic_student_card_url: cnicStudentUrl,
@@ -307,8 +311,8 @@ const InternshipApplication = () => {
       setContactNumber('');
       setGender('');
       setSkillExperience('');
-      setWhyJoinMedistics('');
-      setUserSkills('');
+      setWhyJoinMedmacs('');
+      setOtherSkills('');
       setSkillsToApply([]);
       setProfilePictureFile(null);
       setCnicStudentCardFile(null);
@@ -334,268 +338,287 @@ const InternshipApplication = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-white via-purple-50/30 to-pink-50/30 dark:bg-gradient-to-br dark:from-gray-900 dark:via-purple-900/10 dark:to-pink-900/10">
+    <div className="min-h-screen w-full bg-background relative overflow-x-hidden">
       <Seo
-        title="Summer Internship 2025"
+        title="Join Medmacs Program"
         description="Apply for the Medmacs App Summer Internship Program 2025. Gain hands-on experience in a dynamic EdTech environment."
         canonical="https://medmacs.app/summerinternship2025"
       />
+
+      {/* Modern Live Background */}
+      <div className="fixed inset-0 z-0 bg-[#020617]">
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-[#2dd4bf]/20 rounded-full blur-[120px] animate-pulse pointer-events-none" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-[#0ea5e9]/15 rounded-full blur-[120px] animate-pulse pointer-events-none" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-[0.03] pointer-events-none" style={{
+          backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(255,255,255,0.2) 40px, rgba(255,255,255,0.2) 41px)`
+        }} />
+      </div>
+
       {/* Header */}
-    <header className="absolute top-0 left-0 right-0 z-50 bg-white/30 dark:bg-gray-900/30 
-    backdrop-blur-md border-b border-purple-200/50 dark:border-purple-800/50 
-    pt-[env(safe-area-inset-top)]">  
-            <div className="container mx-auto px-3 sm:px-4 lg:px-8 py-3 sm:py-4 flex justify-between items-center max-w-full">
-          <Link to="/dashboard" className="flex items-center space-x-1 sm:space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors">
-            <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-            <span className="hidden sm:inline">Back to Dashboard</span> {/* Hidden on mobile */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-[#020617]/40 backdrop-blur-2xl border-b border-white/5 pt-[env(safe-area-inset-top)]">
+        <div className="container mx-auto px-4 lg:px-8 py-3 flex justify-between items-center max-w-7xl">
+          <Link to="/dashboard" className="flex items-center space-x-2 text-white/50 hover:text-[#2dd4bf] transition-colors group">
+            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+            <span className="hidden sm:inline font-bold text-sm">Dashboard</span>
           </Link>
 
-          <div className="flex items-center space-x-2 sm:space-x-3">
-            <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medistics Logo" className="w-6 h-6 sm:w-8 sm:h-8 object-contain" />
-            <span className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white hidden sm:inline">Internship Application</span>
-            <span className="text-sm font-bold text-gray-900 dark:text-white sm:hidden">Internship</span>
+          <div className="flex items-center space-x-3">
+            <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-8 h-8 object-contain animate-float" />
+            <span className="text-xl font-black tracking-tight text-white hidden sm:inline uppercase italic">Collaborate</span>
+            <span className="text-sm font-black text-white sm:hidden italic">Collaborate</span>
           </div>
 
-          <div className="flex items-center space-x-2 sm:space-x-3">
-            <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-8 h-8 sm:w-9 sm:h-9 p-0 hover:scale-110 transition-transform duration-200">
-              {theme === "dark" ? <Sun className="h-3 w-3 sm:h-4 sm:w-4" /> : <Moon className="h-3 w-3 sm:h-4 sm:w-4" />}
+          <div className="flex items-center space-x-2 sm:space-x-4">
+            <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-10 h-10 p-0 text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-all">
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
             <PlanBadge plan={profile?.plan} />
-              {/* NEW: Replaced hardcoded avatar with ProfileDropdown */}
-              <ProfileDropdown />
+            <ProfileDropdown />
           </div>
         </div>
       </header>
 
             
 
-      <div className="container mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8 max-w-3xl">
-        <Card className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-purple-200 dark:border-purple-800 shadow-lg mt-[calc(55px+env(safe-area-inset-top))] overscroll-y-contain">
-          <CardHeader className="text-center pb-4">
-            <CardTitle className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-              Apply for Internship
+      <div className="relative z-10 container mx-auto px-4 lg:px-8 py-12 max-w-3xl pt-[calc(100px+env(safe-area-inset-top))]">
+        <Card className="bg-white/[0.03] backdrop-blur-3xl border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] rounded-[2.5rem] overflow-hidden">
+          <CardHeader className="text-center pb-8 border-b border-white/5 bg-gradient-to-b from-white/[0.02] to-transparent pt-10">
+            <div className="mx-auto w-20 h-20 bg-gradient-to-br from-[#2dd4bf] to-[#0ea5e9] rounded-3xl flex items-center justify-center mb-6 shadow-2xl shadow-[#2dd4bf]/20 animate-float">
+              <Briefcase className="w-10 h-10 text-white" />
+            </div>
+            <CardTitle className="text-4xl font-black text-white tracking-tight italic">
+              Apply for <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#2dd4bf] to-[#67e8f9]">Internship</span>
             </CardTitle>
-            <CardDescription className="text-gray-600 dark:text-gray-400">
-              Fill out the form below to submit your application.
+            <CardDescription className="text-xs font-bold text-white/40 mt-3 uppercase tracking-[0.3em]">
+              Summer 2025 Program
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Name */}
-              <div>
-                <Label htmlFor="name" className="flex items-center gap-2 mb-2 text-gray-700 dark:text-gray-300">
-                  <User className="w-4 h-4" /> Name
-                </Label>
-                <Input
-                  id="name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your Full Name"
-                  required
-                  className="rounded-md border border-purple-300 dark:border-purple-700 focus:ring-purple-500 focus:border-purple-500"
-                  disabled={!!user?.user_metadata?.full_name} // Disable if prefilled
-                />
-              </div>
+          <CardContent className="p-8 sm:p-10">
+            <form onSubmit={handleSubmit} className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Name */}
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="flex items-center gap-2 text-white/50 text-[10px] font-black uppercase tracking-widest pl-1">
+                    <User className="w-3.5 h-3.5" /> Full Name
+                  </Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="John Doe"
+                    required
+                    className="bg-white/[0.05] border-white/10 text-white focus:border-[#2dd4bf]/50 focus:ring-[#2dd4bf]/20 h-14 rounded-2xl transition-all"
+                    disabled={!!user?.user_metadata?.full_name}
+                  />
+                </div>
 
-              {/* Email */}
-              <div>
-                <Label htmlFor="email" className="flex items-center gap-2 mb-2 text-gray-700 dark:text-gray-300">
-                  <Mail className="w-4 h-4" /> Email
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your.email@example.com"
-                  required
-                  className="rounded-md border border-purple-300 dark:border-purple-700 focus:ring-purple-500 focus:border-purple-500"
-                  disabled={!!user?.email} // Disable if prefilled
-                />
-              </div>
+                {/* Email */}
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="flex items-center gap-2 text-white/50 text-[10px] font-black uppercase tracking-widest pl-1">
+                    <Mail className="w-3.5 h-3.5" /> Email Address
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="john@example.com"
+                    required
+                    className="bg-white/[0.05] border-white/10 text-white focus:border-[#2dd4bf]/50 focus:ring-[#2dd4bf]/20 h-14 rounded-2xl transition-all"
+                    disabled={!!user?.email}
+                  />
+                </div>
 
-              {/* Contact Number */}
-              <div>
-                <Label htmlFor="contact_number" className="flex items-center gap-2 mb-2 text-gray-700 dark:text-gray-300">
-                  <Phone className="w-4 h-4" /> Contact Number
-                </Label>
-                <Input
-                  id="contact_number"
-                  type="tel"
-                  value={contactNumber}
-                  onChange={(e) => setContactNumber(e.target.value)}
-                  placeholder="+1234567890"
-                  required
-                  className="rounded-md border border-purple-300 dark:border-purple-700 focus:ring-purple-500 focus:border-purple-500"
-                />
-              </div>
+                {/* Contact Number */}
+                <div className="space-y-2">
+                  <Label htmlFor="contact_number" className="flex items-center gap-2 text-white/50 text-[10px] font-black uppercase tracking-widest pl-1">
+                    <Phone className="w-3.5 h-3.5" /> Contact Number
+                  </Label>
+                  <Input
+                    id="contact_number"
+                    type="tel"
+                    value={contactNumber}
+                    onChange={(e) => setContactNumber(e.target.value)}
+                    placeholder="+91 XXXXX XXXXX"
+                    required
+                    className="bg-white/[0.05] border-white/10 text-white focus:border-[#2dd4bf]/50 focus:ring-[#2dd4bf]/20 h-14 rounded-2xl transition-all"
+                  />
+                </div>
 
-              {/* Gender */}
-              <div>
-                <Label className="flex items-center gap-2 mb-2 text-gray-700 dark:text-gray-300">
-                  <User className="w-4 h-4" /> Gender
-                </Label>
-                <RadioGroup value={gender} onValueChange={setGender} required className="flex space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="Male" id="gender-male" />
-                    <Label htmlFor="gender-male">Male</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="Female" id="gender-female" />
-                    <Label htmlFor="gender-female">Female</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="Other" id="gender-other" />
-                    <Label htmlFor="gender-other">Other</Label>
-                  </div>
-                </RadioGroup>
+                {/* Gender */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-white/50 text-[10px] font-black uppercase tracking-widest pl-1">
+                    <User className="w-3.5 h-3.5" /> Gender Identity
+                  </Label>
+                  <RadioGroup value={gender} onValueChange={setGender} required className="flex p-1 bg-white/[0.05] border border-white/10 rounded-2xl h-14 items-center px-4">
+                    <div className="flex-1 flex items-center justify-center space-x-2">
+                      <RadioGroupItem value="Male" id="gender-male" className="border-white/20 text-[#2dd4bf] focus-visible:ring-[#2dd4bf]" />
+                      <Label htmlFor="gender-male" className="text-white/70 text-sm font-bold cursor-pointer">Male</Label>
+                    </div>
+                    <div className="w-[1px] h-6 bg-white/10 mx-2" />
+                    <div className="flex-1 flex items-center justify-center space-x-2">
+                      <RadioGroupItem value="Female" id="gender-female" className="border-white/20 text-[#2dd4bf] focus-visible:ring-[#2dd4bf]" />
+                      <Label htmlFor="gender-female" className="text-white/70 text-sm font-bold cursor-pointer">Female</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
               </div>
 
               {/* Skills to Apply For */}
-              <div>
-                <Label className="flex items-center gap-2 mb-2 text-gray-700 dark:text-gray-300">
-                  <Briefcase className="w-4 h-4" /> Skills to Apply For
+              <div className="space-y-3">
+                <Label className="flex items-center gap-2 text-white/50 text-[10px] font-black uppercase tracking-widest pl-1">
+                  <Briefcase className="w-3.5 h-3.5" /> Expertise Domains
                 </Label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-white/[0.02] border border-white/10 rounded-3xl">
                   {['Academics & Content', 'Tech & AI', 'Marketing & Social Media', 'Digital Content'].map(skill => (
-                    <div key={skill} className="flex items-center space-x-2">
+                    <div key={skill} className={`flex items-center space-x-3 p-3 rounded-2xl transition-all ${skillsToApply.includes(skill) ? 'bg-[#2dd4bf]/10 border-[#2dd4bf]/30' : 'bg-transparent border-transparent'} border`}>
                       <Checkbox
                         id={`skill-${skill.toLowerCase().replace(/[^a-z0-9]/g, '')}`}
                         checked={skillsToApply.includes(skill)}
                         onCheckedChange={(checked) => handleSkillsToApplyChange(skill, checked as boolean)}
+                        className="border-white/20 data-[state=checked]:bg-[#2dd4bf] data-[state=checked]:border-[#2dd4bf]"
                       />
-                      <Label htmlFor={`skill-${skill.toLowerCase().replace(/[^a-z0-9]/g, '')}`}>{skill}</Label>
+                      <Label htmlFor={`skill-${skill.toLowerCase().replace(/[^a-z0-9]/g, '')}`} className="text-white/80 text-xs font-bold cursor-pointer select-none">{skill}</Label>
                     </div>
                   ))}
                 </div>
-                {skillsToApply.length === 0 && (
-                  <p className="text-red-500 text-sm mt-1">Please select at least one skill.</p>
-                )}
               </div>
 
-              {/* Why do you want to join Medistics as an Intern? */}
-              <div>
-                <Label htmlFor="why_join_medistics" className="flex items-center gap-2 mb-2 text-gray-700 dark:text-gray-300">
-                  <Lightbulb className="w-4 h-4" /> Why do you want to join Medmacs as an Intern?
+              {/* Why join Medmacs? */}
+              <div className="space-y-3">
+                <Label htmlFor="why_join_medistics" className="flex items-center gap-2 text-white/50 text-[10px] font-black uppercase tracking-widest pl-1">
+                  <Lightbulb className="w-3.5 h-3.5" /> Why join Medmacs?
                 </Label>
-                <Textarea
-                  id="why_join_medistics"
-                  value={whyJoinMedistics}
-                  onChange={(e) => setWhyJoinMedistics(e.target.value)}
-                  placeholder="Minimum 70 characters, maximum 500 characters."
-                  rows={5}
-                  minLength={70}
-                  maxLength={500}
-                  required
-                  className="rounded-md border border-purple-300 dark:border-purple-700 focus:ring-purple-500 focus:border-purple-500"
-                />
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  {whyJoinMedistics.length} / 500 characters (Min: 70)
-                </p>
-                {whyJoinMedistics.length > 0 && (whyJoinMedistics.length < 70 || whyJoinMedistics.length > 500) && (
-                  <p className="text-red-500 text-sm">Please enter between 70 and 500 characters.</p>
-                )}
+                <div className="relative">
+                  <Textarea
+                    id="why_join_medistics"
+                    value={whyJoinMedmacs}
+                    onChange={(e) => setWhyJoinMedmacs(e.target.value)}
+                    placeholder="Tell us what excites you about our mission..."
+                    rows={4}
+                    minLength={70}
+                    maxLength={500}
+                    required
+                    className="bg-white/[0.05] border-white/10 text-white focus:border-[#2dd4bf]/50 focus:ring-[#2dd4bf]/20 rounded-2xl p-4 transition-all resize-none leading-relaxed text-sm"
+                  />
+                  <div className={`absolute bottom-3 right-3 text-[10px] font-bold px-2 py-1 rounded-md ${whyJoinMedmacs.length < 70 ? 'bg-orange-500/20 text-orange-400' : 'bg-[#2dd4bf]/20 text-[#2dd4bf]'}`}>
+                    {whyJoinMedmacs.length}/500
+                  </div>
+                </div>
               </div>
 
-              {/* Tell us about your relevant skills and experience. */}
-              <div>
-                <Label htmlFor="skill_experience" className="flex items-center gap-2 mb-2 text-gray-700 dark:text-gray-300">
-                  <Briefcase className="w-4 h-4" /> Tell us about your relevant skills and experience.
+              {/* Skill & Experience */}
+              <div className="space-y-3">
+                <Label htmlFor="skill_experience" className="flex items-center gap-2 text-white/50 text-[10px] font-black uppercase tracking-widest pl-1">
+                  <Briefcase className="w-3.5 h-3.5" /> Relevant Background
                 </Label>
-                <Textarea
-                  id="skill_experience"
-                  value={skillExperience}
-                  onChange={(e) => setSkillExperience(e.target.value)}
-                  placeholder="Minimum 70 characters, maximum 500 characters."
-                  rows={5}
-                  minLength={70}
-                  maxLength={500}
-                  required
-                  className="rounded-md border border-purple-300 dark:border-purple-700 focus:ring-purple-500 focus:border-purple-500"
-                />
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  {skillExperience.length} / 500 characters (Min: 70)
-                </p>
-                {skillExperience.length > 0 && (skillExperience.length < 70 || skillExperience.length > 500) && (
-                  <p className="text-red-500 text-sm">Please enter between 70 and 500 characters.</p>
-                )}
+                <div className="relative">
+                  <Textarea
+                    id="skill_experience"
+                    value={skillExperience}
+                    onChange={(e) => setSkillExperience(e.target.value)}
+                    placeholder="Describe your previous roles, projects or skills..."
+                    rows={4}
+                    minLength={70}
+                    maxLength={500}
+                    required
+                    className="bg-white/[0.05] border-white/10 text-white focus:border-[#2dd4bf]/50 focus:ring-[#2dd4bf]/20 rounded-2xl p-4 transition-all resize-none leading-relaxed text-sm"
+                  />
+                  <div className={`absolute bottom-3 right-3 text-[10px] font-bold px-2 py-1 rounded-md ${skillExperience.length < 70 ? 'bg-orange-500/20 text-orange-400' : 'bg-[#2dd4bf]/20 text-[#2dd4bf]'}`}>
+                    {skillExperience.length}/500
+                  </div>
+                </div>
               </div>
 
-              {/* User Skills (General) */}
-              <div>
-                <Label htmlFor="user_skills" className="flex items-center gap-2 mb-2 text-gray-700 dark:text-gray-300">
-                  <Lightbulb className="w-4 h-4" /> Other Relevant Skills (Optional, Max: 500 characters)
+              {/* Other Skills */}
+              <div className="space-y-2">
+                <Label htmlFor="user_skills" className="flex items-center gap-2 text-white/50 text-[10px] font-black uppercase tracking-widest pl-1">
+                  <Sparkles className="w-3.5 h-3.5" /> Additional Skills
                 </Label>
-                <Textarea
+                <Input
                   id="user_skills"
-                  value={userSkills}
-                  onChange={(e) => setUserSkills(e.target.value)}
-                  placeholder="List any other skills you possess that might be relevant."
-                  rows={3}
-                  maxLength={500} // Added maxLength
-                  className="rounded-md border border-purple-300 dark:border-purple-700 focus:ring-purple-500 focus:border-purple-500"
+                  value={otherSkills}
+                  onChange={(e) => setOtherSkills(e.target.value)}
+                  placeholder="Programming, Design, Languages, etc."
+                  maxLength={500}
+                  className="bg-white/[0.05] border-white/10 text-white focus:border-[#2dd4bf]/50 focus:ring-[#2dd4bf]/20 h-14 rounded-2xl transition-all"
                 />
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  {userSkills.length} / 500 characters
-                </p>
-                {userSkills.length > 500 && (
-                  <p className="text-red-500 text-sm">Please enter maximum 500 characters.</p>
-                )}
               </div>
 
-              {/* Profile Picture Upload */}
-              <div>
-                <Label htmlFor="profile_picture" className="flex items-center gap-2 mb-2 text-gray-700 dark:text-gray-300">
-                  <FileImage className="w-4 h-4" /> Profile Picture
-                </Label>
-                <Input
-                  id="profile_picture"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleProfilePictureChange} // Use the new handler
-                  required
-                  className="block w-full text-sm text-gray-900 dark:text-gray-100
-                    file:mr-4 file:py-2 file:px-4
-                    file:rounded-full file:border-0
-                    file:text-sm file:font-semibold
-                    file:bg-purple-50 file:text-purple-700
-                    hover:file:bg-purple-100
-                    py-2 min-h-[44px] cursor-pointer" /* Added py-2 and min-h-[44px] for height */
-                />
-                {profilePictureFile && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Selected: {profilePictureFile.name}</p>}
-                {profilePictureUploading && <p className="text-sm text-purple-600 dark:text-purple-400 mt-1 flex items-center"><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading profile picture...</p>}
+              {/* Uploads Container */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-6 bg-white/[0.03] border border-white/10 rounded-[2rem]">
+                {/* Profile Picture */}
+                <div className="space-y-4">
+                  <Label className="text-white/50 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 pl-1">
+                    <FileImage className="w-3.5 h-3.5" /> Profile Image
+                  </Label>
+                  <label className="group relative flex flex-col items-center justify-center h-48 border-2 border-dashed border-white/10 hover:border-[#2dd4bf]/30 rounded-[1.5rem] bg-white/[0.02] cursor-pointer transition-all overflow-hidden text-center p-4">
+                    <input type="file" className="hidden" accept="image/*" onChange={handleProfilePictureChange} required />
+                    {profilePictureFile ? (
+                      <div className="relative w-full h-full">
+                        <img src={URL.createObjectURL(profilePictureFile)} alt="Preview" className="w-full h-full object-cover rounded-[1rem] opacity-40" />
+                        <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
+                          <CheckCircle className="w-8 h-8 text-[#2dd4bf] mb-2" />
+                          <p className="text-white text-[10px] font-black truncate w-full px-2">{profilePictureFile.name}</p>
+                          <p className="text-[#2dd4bf] text-[9px] font-bold mt-1 uppercase">Replace Image</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-[#2dd4bf]/10 transition-all">
+                          <Upload className="w-5 h-5 text-white/30 group-hover:text-[#2dd4bf]" />
+                        </div>
+                        <p className="text-white/60 text-xs font-bold leading-tight">Click to upload<br/><span className="text-white/20 text-[10px]">JPG, PNG or WebP</span></p>
+                      </>
+                    )}
+                    {profilePictureUploading && (
+                      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 text-[#2dd4bf] animate-spin" />
+                      </div>
+                    )}
+                  </label>
+                </div>
+
+                {/* Identity Doc */}
+                <div className="space-y-4">
+                  <Label className="text-white/50 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 pl-1">
+                    <CreditCard className="w-3.5 h-3.5" /> Student Identity
+                  </Label>
+                  <label className="group relative flex flex-col items-center justify-center h-48 border-2 border-dashed border-white/10 hover:border-[#2dd4bf]/30 rounded-[1.5rem] bg-white/[0.02] cursor-pointer transition-all overflow-hidden text-center p-4">
+                    <input type="file" className="hidden" accept="image/*" onChange={handleCnicStudentCardChange} required />
+                    {cnicStudentCardFile ? (
+                      <div className="relative w-full h-full">
+                        <img src={URL.createObjectURL(cnicStudentCardFile)} alt="Preview" className="w-full h-full object-cover rounded-[1rem] opacity-40" />
+                        <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
+                          <CheckCircle className="w-8 h-8 text-[#2dd4bf] mb-2" />
+                          <p className="text-white text-[10px] font-black truncate w-full px-2">{cnicStudentCardFile.name}</p>
+                          <p className="text-[#2dd4bf] text-[9px] font-bold mt-1 uppercase">Replace Doc</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-[#2dd4bf]/10 transition-all">
+                          <FileImage className="w-5 h-5 text-white/30 group-hover:text-[#2dd4bf]" />
+                        </div>
+                        <p className="text-white/60 text-xs font-bold leading-tight">Identity/CNIC<br/><span className="text-white/20 text-[10px]">JPG, PNG or WebP</span></p>
+                      </>
+                    )}
+                    {cnicStudentCardUploading && (
+                      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 text-[#2dd4bf] animate-spin" />
+                      </div>
+                    )}
+                  </label>
+                </div>
               </div>
 
-              {/* CNIC/Student Card Upload */}
-              <div>
-                <Label htmlFor="cnic_student_card" className="flex items-center gap-2 mb-2 text-gray-700 dark:text-gray-300">
-                  <CreditCard className="w-4 h-4" /> CNIC / Student Card Picture
-                </Label>
-                <Input
-                  id="cnic_student_card"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleCnicStudentCardChange} // Use the new handler
-                  required
-                  className="block w-full text-sm text-gray-900 dark:text-gray-100
-                    file:mr-4 file:py-2 file:px-4
-                    file:rounded-full file:border-0
-                    file:text-sm file:font-semibold
-                    file:bg-purple-50 file:text-purple-700
-                    hover:file:bg-purple-100
-                    py-2 min-h-[44px] cursor-pointer" /* Added py-2 and min-h-[44px] for height */
-                />
-                {cnicStudentCardFile && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Selected: {cnicStudentCardFile.name}</p>}
-                {cnicStudentCardUploading && <p className="text-sm text-purple-600 dark:text-purple-400 mt-1 flex items-center"><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading CNIC/Student Card...</p>}
-              </div>
-
-              {/* Local CAPTCHA for non-logged-in users */}
+              {/* CAPTCHA */}
               {!user && (
-                <div className="flex flex-col items-center justify-center py-4 border rounded-lg p-4 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Please verify you are not a robot:</p>
-                  <div className="flex items-center space-x-3 mb-3">
-                    <div className="text-2xl font-bold tracking-widest text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900 px-4 py-2 rounded-md select-none border border-purple-300 dark:border-purple-700">
+                <div className="flex flex-col items-center justify-center py-8 p-6 bg-[#2dd4bf]/5 border border-[#2dd4bf]/10 rounded-[2rem] gap-4">
+                  <p className="text-[10px] font-black text-[#2dd4bf] uppercase tracking-[0.2em] mb-1">Human Verification</p>
+                  <div className="flex items-center gap-4">
+                    <div className="text-3xl font-black italic tracking-[0.3em] text-white bg-white/5 px-8 py-4 rounded-2xl border border-white/10 shadow-inner select-none">
                       {captchaValue}
                     </div>
                     <Button
@@ -603,35 +626,35 @@ const InternshipApplication = () => {
                       variant="outline"
                       size="icon"
                       onClick={generateCaptcha}
-                      className="w-9 h-9 rounded-full text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-800 border-purple-300 dark:border-purple-700"
+                      className="w-12 h-12 rounded-xl border-white/10 bg-white/5 text-[#2dd4bf] hover:bg-[#2dd4bf]/10 hover:border-[#2dd4bf]/30 transition-all"
                     >
-                      <RefreshCw className="w-4 h-4" />
+                      <RefreshCw className="w-5 h-5" />
                     </Button>
                   </div>
                   <Input
                     type="text"
                     value={userCaptchaInput}
                     onChange={(e) => setUserCaptchaInput(e.target.value)}
-                    placeholder="Enter CAPTCHA"
-                    className="w-full max-w-xs text-center rounded-md border border-purple-300 dark:border-purple-700 focus:ring-purple-500 focus:border-purple-500"
+                    placeholder="Type the characters above"
+                    className="w-full max-w-xs text-center rounded-2xl border-white/10 bg-white/5 text-white focus:border-[#2dd4bf]/50 focus:ring-[#2dd4bf]/20 h-12 font-bold tracking-widest placeholder:text-white/20 placeholder:font-normal placeholder:tracking-normal"
                   />
-                  {userCaptchaInput.length > 0 && userCaptchaInput.toLowerCase() !== captchaValue.toLowerCase() && (
-                    <p className="text-red-500 text-sm mt-2">Incorrect CAPTCHA. Please try again.</p>
-                  )}
                 </div>
               )}
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-300 ease-in-out transform hover:scale-[1.01]"
+                className="w-full h-16 bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] hover:from-[#2dd4bf]/90 hover:to-[#0ea5e9]/90 text-white font-black text-sm uppercase tracking-[0.2em] rounded-2.5xl shadow-2xl shadow-[#2dd4bf]/20 transition-all duration-500 transform hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 group overflow-hidden relative"
                 disabled={isSubmitting || profilePictureUploading || cnicStudentCardUploading || (!user && userCaptchaInput.toLowerCase() !== captchaValue.toLowerCase())}
               >
-                {isSubmitting ? (
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                ) : (
-                  <Upload className="w-5 h-5 mr-2" />
-                )}
-                {isSubmitting ? 'Submitting Application...' : 'Submit Application'}
+                <div className="absolute inset-0 bg-white/10 group-hover:translate-x-full transition-transform duration-1000 ease-in-out -translate-x-full" />
+                <div className="relative flex items-center justify-center">
+                  {isSubmitting ? (
+                    <Loader2 className="w-6 h-6 mr-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-5 h-5 mr-3 animate-pulse" />
+                  )}
+                  {isSubmitting ? 'Processing Application...' : 'Send Application'}
+                </div>
               </Button>
             </form>
           </CardContent>
@@ -639,13 +662,25 @@ const InternshipApplication = () => {
       </div>
 
       {/* Footer */}
-      <footer className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-purple-200 dark:border-purple-800 py-4 mt-8">
-        <div className="container mx-auto px-3 sm:px-4 lg:px-8 text-center text-sm text-gray-600 dark:text-gray-400">
-          <p>A Project by Hmacs Studios.</p>
-          <p>© 2025 Medmacs. All rights reserved.</p>
+      <footer className="py-12 border-t border-white/5 mt-12 bg-white/[0.01] relative z-10">
+        <div className="container mx-auto px-4 text-center">
+          <p className="text-[10px] font-black uppercase tracking-[0.5em] text-white/5 mb-3">A Project by Hmacs Studios</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/10">© 2026 Medmacs App all rights reserved</p>
         </div>
       </footer>
-      
+
+      <style>{`
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10px); }
+        }
+        .rounded-2.5xl {
+          border-radius: 1.25rem;
+        }
+      `}</style>
     </div>
   );
 };

@@ -1,37 +1,75 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { App } from "@capacitor/app";
+import { toast } from "sonner";
 
 export default function BackButtonHandler() {
     const location = useLocation();
     const navigate = useNavigate();
 
+    // Use refs so the listener callback always reads the latest values
+    // without needing to re-register the listener on every path change.
+    const locationRef = useRef(location.pathname);
+    const navigateRef = useRef(navigate);
+    const lastTapTime = useRef<number>(0);
+    const EXIT_WINDOW = 2000;
+
+    // Keep refs up to date on every render
+    locationRef.current = location.pathname;
+    navigateRef.current = navigate;
+
     useEffect(() => {
-        // App.addListener returns a Promise<PluginListenerHandle>, keep the promise and remove the listener after it resolves
-        const listenerPromise = App.addListener("backButton", ({ canGoBack }) => {
-            // EXEMPT DASHBOARD FROM OVERRIDE
-            if (location.pathname === "/dashboard") {
+        console.log("[BackHandler] Registering single back button listener");
+        
+        let isActive = true;
+        let backButtonListener: any = null;
+
+        App.addListener("backButton", ({ canGoBack }) => {
+            const pathname = locationRef.current;
+            const nav = navigateRef.current;
+
+            console.log(`[BackHandler] Back pressed. Path=[${pathname}], canGoBack=[${canGoBack}]`);
+
+            // DASHBOARD: double-tap to exit
+            if (pathname === "/dashboard") {
+                const now = Date.now();
+                if (now - lastTapTime.current < EXIT_WINDOW) {
+                    console.log("[BackHandler] Second tap -> Exiting app");
+                    App.exitApp();
+                } else {
+                    console.log("[BackHandler] First tap -> Toast");
+                    lastTapTime.current = now;
+                    toast("Press back again to exit Medmacs", {
+                        position: "bottom-center",
+                        duration: 2000,
+                    });
+                }
                 return;
             }
 
-            // If page can go back → go back
+            // All other pages: navigate back
             if (canGoBack) {
-                navigate(-1);
+                nav(-1);
             } else {
-                // Optional fall-back: go to dashboard instead of closing
-                navigate("/dashboard");
+                nav("/dashboard");
             }
+        }).then((listener) => {
+            if (!isActive) {
+                listener.remove();
+            } else {
+                backButtonListener = listener;
+                console.log("[BackHandler] Listener registered.");
+            }
+        }).catch((err) => {
+            console.error("[BackHandler] Failed to register listener:", err);
         });
 
         return () => {
-            // Ensure the listener is removed once the promise resolves
-            listenerPromise.then((listener) => {
-                listener.remove();
-            }).catch(() => {
-                // ignore errors during cleanup
-            });
+            isActive = false;
+            backButtonListener?.remove();
+            console.log("[BackHandler] Listener removed.");
         };
-    }, [location.pathname, navigate]);
+    }, []); // Empty deps: register only ONCE on mount
 
     return null;
 }

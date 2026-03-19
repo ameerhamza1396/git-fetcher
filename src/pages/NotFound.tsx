@@ -7,7 +7,6 @@ import { useTheme } from 'next-themes';
 import Seo from '@/components/Seo'; // Import the Seo component
 
 const NotFound = () => {
-  const { theme, setTheme } = useTheme();
 
   return (
     <div className="min-h-screen w-full bg-white dark:bg-gray-900 flex items-center justify-center p-4">
@@ -23,18 +22,6 @@ const NotFound = () => {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Home
           </Link>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="w-9 h-9 p-0 hover:scale-110 transition-transform duration-200"
-          >
-            {theme === "dark" ? (
-              <Sun className="h-4 w-4" />
-            ) : (
-              <Moon className="h-4 w-4" />
-            )}
-          </Button>
         </div>
 
         <Card className="bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 shadow-xl animate-scale-in">

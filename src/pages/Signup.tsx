@@ -125,7 +125,7 @@ const InputField = ({
         }
         className={`${Icon ? "pl-10" : "pl-3.5"} ${showToggle ? "pr-10" : ""}
         bg-white/[0.08] border-white/10 text-white placeholder:text-white/25
-        focus:border-[hsl(168,80%,50%)]/50 focus:ring-[hsl(168,80%,50%)]/20
+        focus:border-[#2dd4bf]/50 focus:ring-[#2dd4bf]/20
         h-12 rounded-xl ${error ? "border-red-400/50" : ""}`}
       />
 
@@ -305,7 +305,7 @@ const Signup = () => {
   if (!mounted) return null;
 
   return (
-    <div className="fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-[hsl(168,80%,20%)] via-[hsl(190,60%,14%)] to-[hsl(220,60%,12%)]">
+    <div className="fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-[#0a2e2e] via-[#0f172a] to-[#020617]">
 
       <Seo
         title="Sign Up"
@@ -323,9 +323,9 @@ const Signup = () => {
       />
 
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 right-0 w-96 h-96 bg-[hsl(168,80%,40%)]/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute top-1/3 -left-32 w-80 h-80 bg-[hsl(280,60%,50%)]/12 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1.5s" }} />
-        <div className="absolute -bottom-32 right-1/4 w-72 h-72 bg-[hsl(200,80%,50%)]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "0.8s" }} />
+        <div className="absolute -top-40 right-0 w-96 h-96 bg-[#2dd4bf]/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-1/3 -left-32 w-80 h-80 bg-[#67e8f9]/12 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1.5s" }} />
+        <div className="absolute -bottom-32 right-1/4 w-72 h-72 bg-[#0ea5e9]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "0.8s" }} />
         <div className="absolute inset-0 opacity-[0.03]" style={{
           backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.5) 20px, rgba(255,255,255,0.5) 21px)`
         }} />
@@ -375,7 +375,7 @@ const Signup = () => {
               transition={{ delay: 0.2 }}
               className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md rounded-full px-4 py-1.5 mb-3 border border-white/10"
             >
-              <span className="text-[hsl(168,80%,60%)] text-xs font-semibold uppercase tracking-widest">
+              <span className="text-[#2dd4bf] text-xs font-semibold uppercase tracking-widest">
                 Get Started
               </span>
             </motion.div>
@@ -447,7 +447,7 @@ const Signup = () => {
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-[hsl(168,80%,36%)] to-[hsl(180,70%,38%)] hover:from-[hsl(168,80%,32%)] hover:to-[hsl(180,70%,34%)] text-white rounded-xl h-12 font-bold text-sm tracking-wide shadow-lg shadow-[hsl(168,80%,36%)]/20 transition-all duration-300"
+                className="w-full bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] hover:from-[#2dd4bf]/90 hover:to-[#0ea5e9]/90 text-white rounded-xl h-12 font-bold text-sm tracking-wide shadow-lg shadow-[#0ea5e9]/20 transition-all duration-300"
                 disabled={loading || Object.keys(validationErrors).length > 0}
               >
                 {loading
@@ -475,7 +475,7 @@ const Signup = () => {
               Already have an account?{" "}
               <Link
                 to="/login"
-                className="text-[hsl(168,80%,60%)] font-semibold hover:text-[hsl(168,80%,70%)] transition-colors"
+                className="text-[#2dd4bf] font-semibold hover:text-[#2dd4bf]/80 transition-colors"
               >
                 Sign in
               </Link>

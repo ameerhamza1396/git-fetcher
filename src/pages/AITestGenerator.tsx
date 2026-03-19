@@ -152,10 +152,14 @@ const AITestGenerator: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950">
+        <div className="fixed inset-0 z-[100] bg-background flex flex-col overflow-hidden">
             <Seo title="AI Test Generator" description="Create custom AI practice tests on Medmacs App." canonical="https://medistics.app/ai/test-generator" />
+            
+            {/* Background decoration */}
+            <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
 
-            <header ref={headerRef} className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
+            <header ref={headerRef} className={`fixed top-0 left-0 right-0 z-[110] bg-background/50 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
                 <div className="container mx-auto px-4 py-4 flex justify-between items-center max-w-7xl">
                     <Link to="/dashboard"><Button variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110"><ArrowLeft className="h-5 w-5" /></Button></Link>
                     <div className="flex items-center gap-2">
@@ -168,7 +172,8 @@ const AITestGenerator: React.FC = () => {
                 </div>
             </header>
 
-            <main className="container mx-auto px-4 py-8 max-w-2xl mt-[var(--header-height)]">
+            <main className="flex-grow flex flex-col items-center px-4 py-8 mt-20 pb-[env(safe-area-inset-bottom)] overflow-y-auto w-full relative z-10">
+                <div className="w-full max-w-2xl">
                 {/* No Access */}
                 {!hasAccess && (
                     <div className="text-center py-16 space-y-6">
@@ -384,6 +389,7 @@ const AITestGenerator: React.FC = () => {
                         </div>
                     </div>
                 )}
+                </div>
             </main>
         </div>
     );

@@ -34,14 +34,6 @@ export default function AdminHeader({ userEmail }) {
 
         {/* Theme Toggle, Admin Badge, and User Initials */}
         <div className="flex items-center space-x-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="w-9 h-9 p-0 hover:scale-110 transition-transform duration-200"
-          >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
           <Badge
             variant="secondary"
             className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700"

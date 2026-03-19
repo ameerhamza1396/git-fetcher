@@ -74,7 +74,6 @@ const planStyles: { [key: string]: { gradient: string; accent: string; icon: any
 
 const Pricing = () => {
     const { user, isLoading: isAuthLoading } = useAuth();
-    const { theme, setTheme } = useTheme();
     const [isMonthly, setIsMonthly] = useState(true);
     const [currency, setCurrency] = useState<'PKR' | 'USD'>('PKR');
     const [activePlanId, setActivePlanId] = useState<string>('free');
@@ -266,9 +265,6 @@ const Pricing = () => {
                                 </button>
                             ))}
                         </div>
-                        <Button variant="ghost" size="sm" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="w-9 h-9 p-0">
-                            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                        </Button>
                         {user ? <ProfileDropdown /> : <Link to="/login"><Button size="sm">Sign In</Button></Link>}
                     </div>
                 </div>

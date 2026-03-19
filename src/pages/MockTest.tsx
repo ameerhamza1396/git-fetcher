@@ -25,7 +25,6 @@ import Seo from '@/components/Seo'; // Import the Seo component
 
 const MockTest = () => {
   const { user } = useAuth();
-  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -543,18 +542,6 @@ const MockTest = () => {
           </div>
 
           <div className="flex items-center space-x-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="w-9 h-9 p-0 hover:scale-110 transition-transform duration-200"
-            >
-              {theme === "dark" ? (
-                <Sun className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
-              )}
-            </Button>
             {userPlan ? (
               <Badge className={getPlanBadgeClasses(userPlan)}>
                 {userPlan.charAt(0).toUpperCase() + userPlan.slice(1)} Plan

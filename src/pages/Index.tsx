@@ -224,18 +224,19 @@ export default function Welcome() {
               delay: 0.1
             }
           }}
-          className="fixed inset-0 flex flex-col items-center justify-center bg-[#0a2e2e] overflow-hidden"
+          className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#0a2e2e] via-[#0f172a] to-[#020617] overflow-hidden"
         >
           {/* Help/Revisit Button */}
           <button
             onClick={restartWizard}
-            className="absolute top-8 right-8 z-50 text-teal-100/40 hover:text-teal-400 transition-colors p-2"
+            className="absolute top-8 right-8 z-50 text-cyan-100/40 hover:text-cyan-400 transition-colors p-2"
             title="Revisit App Tour"
           >
             <HelpCircle className="w-7 h-7" />
           </button>
 
-          <div className="absolute top-[-10%] left-[-10%] w-72 h-72 bg-teal-500/30 rounded-full blur-[80px]" />
+          <div className="absolute top-[-10%] left-[-10%] w-72 h-72 bg-[#2dd4bf]/30 rounded-full blur-[80px]" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-[#0ea5e9]/20 rounded-full blur-[100px]" />
 
           <div className="relative z-10 flex flex-col items-center w-full max-w-sm px-8">
             <motion.img
@@ -243,12 +244,12 @@ export default function Welcome() {
               src={welcomeMascot} alt="Mascot" className="w-40 h-auto drop-shadow-2xl animate-[float_4s_ease-in-out_infinite]"
             />
             <div className="text-center mt-8">
-              <h1 className="text-4xl font-extrabold text-white">Medmacs<span className="text-teal-400">.App</span></h1>
-              <p className="text-teal-100/70 text-sm uppercase mt-2 font-bold tracking-widest">Master the MBBS Journey</p>
+              <h1 className="text-4xl font-extrabold text-white">Medmacs<span className="text-[#2dd4bf]">.App</span></h1>
+              <p className="text-cyan-100/70 text-sm uppercase mt-2 font-bold tracking-widest">Master the MBBS Journey</p>
             </div>
             <div className="mt-12 w-full flex flex-col gap-4">
-              <button onClick={() => navigate("/signup")} className="w-full py-4 bg-teal-500 text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-transform">Create Account</button>
-              <button onClick={() => navigate("/login")} className="w-full py-4 bg-white/10 border border-white/20 text-white font-semibold rounded-2xl active:scale-95 transition-transform">Login</button>
+              <button onClick={() => navigate("/signup")} className="w-full py-4 bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-transform">Create Account</button>
+              <button onClick={() => navigate("/login")} className="w-full py-4 bg-white/10 border border-white/20 text-white font-semibold rounded-2xl active:scale-95 transition-transform backdrop-blur-md">Login</button>
             </div>
           </div>
           <style>{`@keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-15px); } }`}</style>

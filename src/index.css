@@ -75,7 +75,7 @@ ion-content::part(scroll) {
     --popover: 0 0% 100%;
     --popover-foreground: 220 25% 10%;
 
-    --primary: 168 80% 36%;
+    --primary: 173 80% 40%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 210 25% 93%;
@@ -84,26 +84,26 @@ ion-content::part(scroll) {
     --muted: 210 20% 94%;
     --muted-foreground: 215 15% 50%;
 
-    --accent: 168 60% 92%;
-    --accent-foreground: 168 80% 26%;
+    --accent: 187 92% 95%;
+    --accent-foreground: 187 92% 30%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 214 25% 90%;
     --input: 214 25% 90%;
-    --ring: 168 80% 36%;
+    --ring: 199 89% 48%;
 
     --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 168 80% 36%;
+    --sidebar-primary: 173 80% 40%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 168 60% 95%;
-    --sidebar-accent-foreground: 168 80% 26%;
+    --sidebar-accent: 187 92% 95%;
+    --sidebar-accent-foreground: 187 92% 30%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 168 80% 36%;
+    --sidebar-ring: 199 89% 48%;
   }
 
   .dark {
@@ -116,7 +116,7 @@ ion-content::part(scroll) {
     --popover: 224 25% 10%;
     --popover-foreground: 210 30% 94%;
 
-    --primary: 168 75% 42%;
+    --primary: 173 80% 45%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 224 20% 16%;
@@ -126,22 +126,22 @@ ion-content::part(scroll) {
     --muted-foreground: 215 15% 58%;
 
     --accent: 224 20% 16%;
-    --accent-foreground: 168 75% 50%;
+    --accent-foreground: 187 92% 60%;
 
     --destructive: 0 62% 35%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 224 20% 18%;
     --input: 224 20% 18%;
-    --ring: 168 75% 42%;
+    --ring: 199 89% 48%;
     --sidebar-background: 224 30% 8%;
     --sidebar-foreground: 210 30% 90%;
-    --sidebar-primary: 168 75% 42%;
+    --sidebar-primary: 173 80% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 224 20% 14%;
-    --sidebar-accent-foreground: 168 75% 50%;
+    --sidebar-accent-foreground: 187 92% 60%;
     --sidebar-border: 224 20% 14%;
-    --sidebar-ring: 168 75% 42%;
+    --sidebar-ring: 199 89% 48%;
   }
 }
 
@@ -556,7 +556,7 @@ ion-content::part(scroll) {
 
 /* Spiral conic gradient background */
 .bg-gradient-spiral {
-  background: conic-gradient(at center, #0d9488, #7e22ce, #0d9488);
+  background: conic-gradient(at center, #2dd4bf, #0ea5e9, #2dd4bf);
   background-size: 200% 200%;
 }
 
@@ -628,7 +628,7 @@ ion-content::part(scroll) {
 .orb-2 {
   width: 180px;
   height: 180px;
-  background: hsl(168 80% 50% / 0.4);
+  background: hsl(173 80% 50% / 0.4);
   bottom: 200px;
   left: -50px;
   animation: orb-float-2 10s ease-in-out infinite;
@@ -704,9 +704,9 @@ ion-content::part(scroll) {
   background: linear-gradient(
     110deg,
     hsl(var(--primary)) 0%,
-    hsl(168 80% 60%) 45%,
+    hsl(173 80% 60%) 45%,
     hsl(var(--primary)) 55%,
-    hsl(250 70% 60%) 100%
+    hsl(187 92% 60%) 100%
   );
   background-size: 250% 100%;
   -webkit-background-clip: text;
@@ -734,15 +734,15 @@ ion-content::part(scroll) {
 .bg-mesh {
   background-image: 
     radial-gradient(at 20% 30%, hsl(var(--primary) / 0.06) 0%, transparent 50%),
-    radial-gradient(at 80% 70%, hsl(250 70% 60% / 0.04) 0%, transparent 50%),
-    radial-gradient(at 50% 50%, hsl(168 80% 50% / 0.03) 0%, transparent 60%);
+    radial-gradient(at 80% 70%, hsl(187 92% 60% / 0.04) 0%, transparent 50%),
+    radial-gradient(at 50% 50%, hsl(173 80% 50% / 0.03) 0%, transparent 60%);
 }
 
 .dark .bg-mesh {
   background-image: 
     radial-gradient(at 20% 30%, hsl(var(--primary) / 0.08) 0%, transparent 50%),
-    radial-gradient(at 80% 70%, hsl(250 70% 60% / 0.06) 0%, transparent 50%),
-    radial-gradient(at 50% 50%, hsl(168 80% 50% / 0.04) 0%, transparent 60%);
+    radial-gradient(at 80% 70%, hsl(187 92% 60% / 0.06) 0%, transparent 50%),
+    radial-gradient(at 50% 50%, hsl(173 80% 50% / 0.04) 0%, transparent 60%);
 }
 
 /* Pulse ring for icons */

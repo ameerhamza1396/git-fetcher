@@ -109,7 +109,7 @@ const ContactUsPage = () => {
         { icon: Phone, label: 'WhatsApp', value: '03242456162', href: 'tel:+923242456162', gradient: 'from-emerald-600 via-teal-600 to-cyan-700' },
         { icon: Instagram, label: 'Instagram', value: '@medmacs.app', href: 'https://www.instagram.com/medmacs.app', gradient: 'from-rose-600 via-pink-600 to-fuchsia-700' },
         { icon: Facebook, label: 'Facebook', value: 'medmacsapp', href: 'https://www.facebook.com/medmacsapp', gradient: 'from-blue-700 via-blue-600 to-indigo-700' },
-        { icon: Linkedin, label: 'LinkedIn', value: 'ameerhamza.exe', href: 'https://www.linkedin.com/in/ameerhamza.exe/', gradient: 'from-sky-600 via-blue-600 to-indigo-700' },
+        { icon: Linkedin, label: 'LinkedIn', value: 'dr-ameerhamza', href: 'https://www.linkedin.com/in/dr-ameerhamza/', gradient: 'from-sky-600 via-blue-600 to-indigo-700' },
     ];
 
     return (

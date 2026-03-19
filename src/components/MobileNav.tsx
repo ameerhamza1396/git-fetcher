@@ -2,13 +2,11 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, X, Trophy, Sword, Target, Bot, Home, LogIn, UserPlus, Moon, Sun } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { Menu, X, Trophy, Sword, Target, Bot, Home, LogIn, UserPlus } from 'lucide-react';
 
 const MobileNav = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
-  const { theme, setTheme } = useTheme();
 
   // Function to scroll to a section. This needs to be defined or passed as a prop if it's external.
   // For this example, I'm providing a basic implementation.
@@ -49,18 +47,6 @@ const MobileNav = () => {
                 Medmacs
               </span>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="w-9 h-9 p-0 hover:scale-110 transition-transform duration-200"
-            >
-              {theme === "dark" ? (
-                <Sun className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
-              )}
-            </Button>
           </div>
           
           <nav className="flex-1 space-y-4">

@@ -603,7 +603,13 @@ export const MCQDisplay = ({
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-3">
+    <div className="fixed inset-0 z-[100] bg-background flex flex-col overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
+      
+      <div className="flex-grow flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+        <div className="w-full max-w-2xl relative">
       {/* Main quiz card - vibrant glassmorphic */}
       <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary/10 via-blue-500/5 to-violet-500/10 backdrop-blur-2xl border border-primary/20 shadow-2xl p-1.5">
         {/* Vibrant pattern overlay */}
@@ -684,11 +690,6 @@ export const MCQDisplay = ({
                     >
                       {soundEnabled ? '🔊' : '🔇'}
                       <span className="ml-2">{soundEnabled ? 'Disable Sound' : 'Enable Sound'}</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="text-sm cursor-pointer">
-                      {theme === 'dark' ? <Sun className="w-4 h-4 mr-2" /> : <Moon className="w-4 h-4 mr-2" />}
-                      {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => setShowLeaveModal(true)} className="text-sm cursor-pointer text-destructive">
@@ -851,6 +852,8 @@ export const MCQDisplay = ({
       <UpgradeAccountModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} onUpgradeClick={handleUpgradeClick} />
       <LeaveTestModal isOpen={showLeaveModal} onClose={() => setShowLeaveModal(false)} onConfirm={onBack} />
       <ReportMCQModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} onSubmit={handleReportSubmit} isSubmitting={isReportSubmitting} />
+        </div>
+      </div>
     </div>
   );
 };

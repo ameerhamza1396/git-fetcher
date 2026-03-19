@@ -28,11 +28,99 @@
   <link rel="manifest" href="./manifest.json" />
   <meta name="theme-color" content="#4f46e5" />
   <link rel="apple-touch-icon" href="./icons/icon-192x192.png" />
+  <style>
+    #splash-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(-45deg, #2dd4bf, #67e8f9, #0ea5e9, #4f46e5);
+      background-size: 400% 400%;
+      animation: gradient 15s ease infinite;
+      overflow: hidden;
+    }
 
+    @keyframes gradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .splash-logo {
+      width: 100px;
+      height: 100px;
+      animation: pulse-slow 3s ease-in-out infinite;
+      filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.4));
+    }
+
+    @keyframes pulse-slow {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.1); opacity: 0.8; }
+    }
+
+    .splash-footer {
+      position: absolute;
+      bottom: 40px;
+      text-align: center;
+      color: white;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    .splash-footer p:first-child {
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.4em;
+      opacity: 0.6;
+      margin-bottom: 8px;
+    }
+
+    .splash-footer p:last-child {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      opacity: 0.4;
+    }
+
+    #root:not(:empty) + #splash-screen {
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.5s ease-out, visibility 0.5s;
+    }
+  </style>
 </head>
 
 <body>
   <div id="root"></div>
+  <div id="splash-screen">
+    <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" class="splash-logo" />
+    <div class="splash-footer">
+      <p>A Project by HMACS Studios</p>
+      <p>© 2026 Medmacs App all rights reserved</p>
+    </div>
+  </div>
+
+  <script>
+    // Hide splash screen when React app is mounted
+    const observer = new MutationObserver((mutations) => {
+      const root = document.getElementById('root');
+      if (root && root.children.length > 0) {
+        const splash = document.getElementById('splash-screen');
+        if (splash) {
+          splash.style.opacity = '0';
+          setTimeout(() => {
+            splash.style.display = 'none';
+          }, 500);
+          observer.disconnect();
+        }
+      }
+    });
+    observer.observe(document.getElementById('root'), { childList: true });
+  </script>
 
   <!-- Scripts -->
   <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->

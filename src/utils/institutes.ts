@@ -9,6 +9,11 @@ export interface Institute {
   image_url: string | null;
   enabled: boolean;
   years: string[];
+  dashboard_components?: {
+    mcqs: boolean;
+    seqs: boolean;
+    viva: boolean;
+  };
 }
 
 // Cache for institutes

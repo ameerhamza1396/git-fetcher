@@ -232,14 +232,6 @@ const IndexHeader: React.FC = () => {
                 </nav>
 
                 <div className="flex items-center space-x-3">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                        className="hidden md:flex w-10 h-10 p-0 hover:scale-110 rounded-full"
-                    >
-                        {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-                    </Button>
                     <div className="hidden md:flex items-center space-x-3">
                         <Link to="/login">
                             <Button variant="ghost" className="hover:scale-105 rounded-full">

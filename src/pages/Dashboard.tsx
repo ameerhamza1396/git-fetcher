@@ -12,7 +12,7 @@ import {
   TrendingUp, Award, Briefcase, BellRing, Bookmark, ScrollText,
   Home, User, Settings, ChevronRight, LogOut, Lock, CreditCard,
   Megaphone, BarChart3, Sun, Moon, ArrowRight, Crown, Mail,
-  Receipt, Shield, FileText, RefreshCw, Sparkles, Stethoscope, PieChart, Info, Star,
+  Receipt, Shield, FileText, RefreshCw, Sparkles, Stethoscope, PieChart, Info, Star, Loader2, Microscope,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
@@ -23,16 +23,15 @@ import { LeaderboardPreview } from '@/components/dashboard/LeaderboardPreview';
 import { StudyAnalytics } from '@/components/dashboard/StudyAnalytics';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import { useEffect, useState, useRef } from 'react';
 import AnnouncementToastManager from '@/components/ui/AnnouncementToastManager';
 import AuthErrorDisplay from '@/components/AuthErrorDisplay';
 import Seo from '@/components/Seo';
 
-import AppExitConfirmation from '@/components/dashboard/AppExitConfirmation';
 import VersionGuard from '@/components/VersionControl';
 import ProfileAvatar from '@/components/profile/ProfileAvatar';
 import { MCQProgressWidget } from '@/components/dashboard/MCQProgressWidget';
+import { fetchInstitutes, getInstituteByCode } from '@/utils/institutes';
 
 // Types
 type TermOfDay = {
@@ -104,7 +103,7 @@ const CaseOfDayCard = ({ caseOfDay }: { caseOfDay: CaseOfDay }) => {
 const ActionCard = ({ action, isExternal = false, fixedHeight = false }: any) => {
   const content = (
     <div className={`relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br ${action.gradient} shadow-lg shadow-black/5 dark:shadow-black/20 active:scale-[0.97] transition-all duration-150 alive-card ${fixedHeight ? 'h-[120px]' : ''}`}>
-      <div className="absolute -right-3 -bottom-3 opacity-10">
+      <div className="absolute -right-3 -bottom-3 opacity-15">
         <action.icon className={`w-20 h-20 ${action.iconColor}`} />
       </div>
       <div className="relative z-10">
@@ -123,6 +122,88 @@ const ActionCard = ({ action, isExternal = false, fixedHeight = false }: any) =>
   return <Link to={action.disabled ? '#' : action.link} className={action.disabled ? 'opacity-50 pointer-events-none' : ''}>{content}</Link>;
 };
 
+const InstituteDetailCard = ({ institute }: { institute: any }) => {
+  if (!institute) return null;
+  
+  return (
+    <div className="relative overflow-hidden rounded-[2rem] h-32 mb-6 group shadow-xl">
+      {institute.image_url ? (
+        <img 
+          src={institute.image_url} 
+          alt={institute.name} 
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+        />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-[#2dd4bf] to-[#0ea5e9]" />
+      )}
+      <div className="absolute inset-0 bg-black/40 group-hover:bg-black/30 transition-colors" />
+      <div className="relative z-10 h-full flex flex-col justify-end p-6">
+        <div className="flex items-center gap-2 mb-1">
+          <Stethoscope className="w-4 h-4 text-[#2dd4bf]" />
+          <span className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em]">Your Institute</span>
+        </div>
+        <h3 className="text-lg font-black text-white tracking-tight leading-tight">{institute.name}</h3>
+      </div>
+    </div>
+  );
+};
+
+const DashboardReviewCard = ({ onComplete }: { onComplete: () => void }) => {
+  const [step, setStep] = useState<'prompt' | 'feedback'>('prompt');
+  const [rating, setRating] = useState(0);
+
+  const handleStarClick = (i: number) => {
+    setRating(i);
+    setStep('feedback');
+  };
+
+  return (
+    <Card className="border-0 shadow-2xl bg-gradient-to-br from-[#0f172a] to-[#020617] rounded-[2rem] overflow-hidden mb-6 relative group">
+      <div className="absolute top-0 right-0 w-32 h-32 bg-[#2dd4bf]/10 rounded-full blur-3xl -mr-16 -mt-16 animate-pulse" />
+      <CardContent className="p-6 relative z-10">
+        {step === 'prompt' ? (
+          <div className="text-center py-2">
+            <h3 className="text-lg font-black text-white mb-2 italic">Enjoying Medmacs?</h3>
+            <p className="text-white/50 text-xs mb-4">Tap to rate your experience!</p>
+            <div className="flex justify-center gap-2">
+              {[1, 2, 3, 4, 5].map(i => (
+                <button
+                  key={i}
+                  onClick={() => handleStarClick(i)}
+                  className="w-10 h-10 rounded-xl bg-white/5 hover:bg-[#2dd4bf]/20 transition-all active:scale-90 flex items-center justify-center border border-white/5 hover:border-[#2dd4bf]/30"
+                >
+                  <Star className={`w-5 h-5 ${i <= rating ? 'fill-[#2dd4bf] text-[#2dd4bf]' : 'text-white/20'}`} />
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-2 animate-in fade-in zoom-in-95 duration-300">
+            <h3 className="text-lg font-black text-white mb-2 italic">You're the Best! 🚀</h3>
+            <p className="text-white/50 text-xs mb-4 leading-relaxed">Could you spare a moment to review us on Play Store?</p>
+            <div className="flex flex-col gap-2">
+              <a 
+                href="https://play.google.com/store/apps/details?id=com.hmacs.medmacs" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="w-full py-3 bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] text-white font-bold rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-[#0ea5e9]/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                Rate on Play Store <ArrowRight className="w-3.5 h-3.5" />
+              </a>
+              <button 
+                onClick={onComplete}
+                className="w-full py-2 text-white/40 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors"
+              >
+                I've already reviewed!
+              </button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -135,6 +216,12 @@ const Dashboard = () => {
   const [showTermOfDay, setShowTermOfDay] = useState(false);
   const [showCaseOfDay, setShowCaseOfDay] = useState(false);
   const [appVersion, setAppVersion] = useState<string>('Loading...');
+  const [reviewCompleted, setReviewCompleted] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('medmacs_dashboard_review_completed') === 'true';
+    }
+    return false;
+  });
 
   type Profile = {
     avatar_url: string;
@@ -203,6 +290,29 @@ const Dashboard = () => {
     },
   });
 
+  const { data: whatsNewContent, isLoading: whatsNewLoading } = useQuery({
+    queryKey: ['whats-new'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('setting_value')
+        .eq('setting_name', 'whats_new')
+        .maybeSingle();
+      
+      if (error) {
+        console.error("Error fetching What's New:", error);
+        return [];
+      }
+      
+      try {
+        return data?.setting_value ? JSON.parse(data.setting_value) : [];
+      } catch (e) {
+        console.error("Error parsing What's New JSON:", e);
+        return [];
+      }
+    },
+  });
+
   const { data: readAnnouncements } = useQuery({
     queryKey: ['readAnnouncements', user?.id],
     queryFn: async () => {
@@ -250,6 +360,18 @@ const Dashboard = () => {
     },
   });
 
+  const { data: instituteData } = useQuery({
+    queryKey: ['instituteData', (profile as any)?.institute],
+    queryFn: async () => {
+      if (!(profile as any)?.institute) return null;
+      const institutes = await fetchInstitutes();
+      return getInstituteByCode((profile as any).institute, institutes);
+    },
+    enabled: !!(profile as any)?.institute
+  });
+
+  const dashboardComponents = instituteData?.dashboard_components || { mcqs: true, seqs: false, viva: false };
+
   const markAsReadMutation = useMutation({
     mutationFn: async (announcementIds: string[]) => {
       if (!user?.id || !announcementIds?.length) return;
@@ -260,16 +382,7 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
-    const fetchVersion = async () => {
-      try {
-        const builtin = await CapacitorUpdater.getBuiltinVersion();
-        const next = await CapacitorUpdater.getNextBundle();
-        setAppVersion(next?.version || builtin?.version || 'Web/Dev');
-      } catch (e) {
-        setAppVersion('Web/Dev');
-      }
-    };
-    fetchVersion();
+    setAppVersion('7.1.0'); // Fixed version for Play Store checks
   }, []);
 
   useEffect(() => {
@@ -306,6 +419,11 @@ const Dashboard = () => {
     { title: 'AI Chatbot', description: 'Instant AI tutor', icon: Zap, link: '/ai/chatbot', gradient: 'from-amber-400 to-orange-500', iconColor: 'text-yellow-100' },
     { title: 'Full-Length Paper', description: 'Timed mixed exams', icon: ScrollText, link: '/flp', gradient: 'from-teal-500 to-emerald-600', iconColor: 'text-teal-200' },
   ];
+
+  const instituteModules = [
+    { title: 'Practice SEQs', description: 'Subjective questions', icon: FileText, link: '/seqs', gradient: 'from-indigo-600 to-violet-700', iconColor: 'text-indigo-200', enabled: dashboardComponents.seqs },
+    { title: 'Viva & Practicals', description: 'Ace your practicals', icon: Microscope, link: '/practicals', gradient: 'from-fuchsia-600 to-pink-700', iconColor: 'text-fuchsia-100', enabled: dashboardComponents.viva },
+  ].filter(m => m.enabled);
 
   const displayName = profile?.full_name || profile?.username || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Medmacs User';
   const rawUserPlan = profile?.plan?.toLowerCase() || 'free';
@@ -540,7 +658,7 @@ const Dashboard = () => {
             {/* Greeting - no avatar here */}
             <div className="mb-5">
               <h1 className="text-xl font-black text-foreground leading-tight">
-                Welcome Back, <span className="text-shimmer">{displayName}</span> ✨
+                Hi, <span className="text-shimmer">{displayName}</span> ✨
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5 font-medium">How's you doing today?</p>
             </div>
@@ -666,6 +784,29 @@ const Dashboard = () => {
 
             <MCQProgressWidget />
 
+            {/* Institute Modules */}
+            {instituteModules.length > 0 && (
+              <div className="mt-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <BookOpen className="w-4 h-4 text-primary animate-pulse-slow" />
+                  <h2 className="text-sm font-bold text-foreground">Study Modules</h2>
+                </div>
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  {instituteModules.map((action, i) => <ActionCard key={i} action={action} />)}
+                </div>
+              </div>
+            )}
+
+            {/* Review or Institute Card */}
+            {reviewCompleted ? (
+              <InstituteDetailCard institute={instituteData} />
+            ) : (
+              <DashboardReviewCard onComplete={() => {
+                setReviewCompleted(true);
+                localStorage.setItem('medmacs_dashboard_review_completed', 'true');
+              }} />
+            )}
+
             {/* Premium Perks with animated crown */}
             <div className="flex items-center gap-2 mb-3">
               <Crown className="w-4 h-4 text-amber-500 animate-bounce-gentle" />
@@ -740,8 +881,6 @@ const Dashboard = () => {
         {renderTabContent()}
       </div>
 
-      <AppExitConfirmation showExitConfirm={showExitConfirm} setShowExitConfirm={setShowExitConfirm} />
-
       {/* What's New Dialog */}
       <Dialog open={showWhatsNew} onOpenChange={setShowWhatsNew}>
         <DialogContent className="sm:max-w-[400px]">
@@ -750,19 +889,26 @@ const Dashboard = () => {
             <DialogDescription>Current Version: {appVersion}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            {[
-              { version: 'v6.1', title: 'First Public Release', desc: 'Updated UI, bug fixes and optimizations' },
-              { version: 'v6.0', title: 'Beta Release', desc: 'Major feature additions and improvements' },
-              { version: 'v5.0', title: 'Alpha Release', desc: 'Initial internal testing build' },
-            ].map((r, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-muted/50">
-                <Badge className="bg-primary/15 text-primary border-0 text-xs font-bold shrink-0">{r.version}</Badge>
-                <div>
-                  <p className="text-sm font-bold text-foreground">{r.title}</p>
-                  <p className="text-xs text-muted-foreground">{r.desc}</p>
-                </div>
+            {whatsNewLoading ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-3">
+                <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest">Fetching updates...</p>
               </div>
-            ))}
+            ) : whatsNewContent && whatsNewContent.length > 0 ? (
+              whatsNewContent.map((r, i) => (
+                <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-muted/50">
+                  <Badge className="bg-primary/15 text-primary border-0 text-xs font-bold shrink-0">{r.version}</Badge>
+                  <div>
+                    <p className="text-sm font-bold text-foreground">{r.title}</p>
+                    <p className="text-xs text-muted-foreground">{r.desc || r.description}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-sm text-muted-foreground">No recent updates found.</p>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

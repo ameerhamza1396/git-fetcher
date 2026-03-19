@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Clock, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { MCQProgressSkeleton } from '../skeletons/MCQProgressSkeleton';
 
 // Defines the shape of the saved session per Subject/Chapter in localStorage
 export interface SavedMCQSession {
@@ -152,7 +153,8 @@ export const MCQProgressWidget = () => {
     enabled: sessions.length > 0
   });
 
-  if (isLoading || !chaptersData || chaptersData.length === 0) return null;
+  if (isLoading) return <MCQProgressSkeleton />;
+  if (!chaptersData || chaptersData.length === 0) return null;
 
   const handleResume = (session: SavedMCQSession) => {
     navigate('/mcqs', { 

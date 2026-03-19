@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Moon, Sun, Microscope, Sparkles } from 'lucide-react';
+import { ArrowLeft, Moon, Sun, FileText, Sparkles } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
@@ -10,7 +10,7 @@ import Seo from '@/components/Seo';
 import PlanBadge from '@/components/PlanBadge';
 import { motion } from 'framer-motion';
 
-const Practicals = () => {
+const SEQs = () => {
     const { user } = useAuth();
 
     const { data: profile } = useQuery({
@@ -31,9 +31,9 @@ const Practicals = () => {
     return (
         <div className="min-h-screen w-full bg-background overflow-hidden relative">
             <Seo
-                title="Viva & Practicals"
-                description="Access high-yield Viva and Practical resources curated for your institute."
-                canonical="https://medmacs.app/practicals"
+                title="Practice SEQs"
+                description="Practice Short Essay Questions curated for your medical exams."
+                canonical="https://medmacs.app/seqs"
             />
 
             {/* Background Decorations */}
@@ -56,7 +56,7 @@ const Practicals = () => {
                             className="w-8 h-8 object-contain"
                         />
                         <span className="text-xl font-black tracking-tight text-foreground">
-                            Viva & <span className="text-primary text-shimmer">Practicals</span>
+                            Practice <span className="text-primary text-shimmer">SEQs</span>
                         </span>
                     </div>
                     <div className="flex items-center space-x-3">
@@ -75,7 +75,7 @@ const Practicals = () => {
                     <div className="relative inline-block mb-8">
                         <div className="absolute inset-0 bg-primary blur-2xl opacity-20 rounded-full animate-pulse" />
                         <div className="relative bg-gradient-to-br from-primary to-accent p-6 rounded-[2.5rem] shadow-2xl">
-                            <Microscope className="w-16 h-16 text-white" />
+                            <FileText className="w-16 h-16 text-white" />
                         </div>
                         <motion.div 
                             animate={{ rotate: 360 }}
@@ -87,10 +87,10 @@ const Practicals = () => {
                     </div>
 
                     <h1 className="text-4xl md:text-5xl font-black text-foreground mb-6 tracking-tight italic">
-                        Coming <span className="text-primary text-shimmer">Soon</span>
+                        Coming <span className="text-primary">Soon</span>
                     </h1>
                     <p className="text-lg md:text-xl text-muted-foreground leading-relaxed mb-10 font-medium">
-                        High-yield <span className="text-foreground font-bold underline decoration-primary decoration-4 underline-offset-4">Viva & Practical</span> resources are arriving soon. Prepare to ace your exams!
+                        We are curating a high-yield collection of <span className="text-foreground font-bold underline decoration-primary decoration-4 underline-offset-4">SEQs</span> for your institute. Stay tuned!
                     </p>
 
                     <Link to="/dashboard">
@@ -111,4 +111,4 @@ const Practicals = () => {
     );
 };
 
-export default Practicals;
+export default SEQs;

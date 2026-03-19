@@ -17,7 +17,7 @@ import { ProfileDropdown } from '@/components/ProfileDropdown'; // NEW: Import P
 import Seo from '@/components/Seo'; // Import the Seo component
 
 const TeachingAmbassadors = () => {
-    const { theme, setTheme } = useTheme();
+    const { theme } = useTheme();
     const { user } = useAuth(); // Still use useAuth to get user if they are logged in
 
     // Form state
@@ -216,15 +216,6 @@ const TeachingAmbassadors = () => {
                     </div>
 
                     <div className="flex items-center space-x-3">
-                        <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-9 h-9 p-0 hover:scale-110 transition-transform duration-200">
-                            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                        </Button>
-                        <Badge
-                            variant="secondary"
-                            className={`hidden sm:flex ${currentPlanColorClasses.light} ${currentPlanColorClasses.dark}`}
-                        >
-                            {userPlanDisplayName}
-                        </Badge>
                             {/* NEW: Replaced hardcoded avatar with ProfileDropdown */}
                             <ProfileDropdown />
                     </div>

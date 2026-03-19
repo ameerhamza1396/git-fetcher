@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, useTheme } from 'next-themes';
 import { Toaster } from '@/components/ui/toaster';
+import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import { IonContent, IonPage } from '@ionic/react';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { Capacitor } from '@capacitor/core';
@@ -30,7 +31,6 @@ import NotFound from '@/pages/NotFound';
 import ChangePassword from '@/pages/ChangePassword';
 import MockTest from '@/pages/MockTest';
 import TestCompletionPage from '@/pages/TestCompletion';
-import Classroom from '@/pages/Classroom';
 import VerifyEmail from '@/pages/VerifyEmail';
 import UsernamePage from '@/pages/UsernamePage';
 import AllSetPage from '@/pages/AllSetPage';
@@ -51,10 +51,10 @@ import SelectYear from '@/pages/SelectYear';
 import Teams from '@/pages/Team';
 import InstallApp from '@/pages/InstallApp';
 import Practicals from '@/pages/Practicals';
+import SEQs from '@/pages/SEQs';
 import PracticalNotesDetails from "@/components/PracticalNotes/PracticalNotesDetails";
 import RedeemCode from '@/pages/RedeemCode';
 import PurchaseHistory from '@/pages/PurchaseHistory';
-import { VideoCallProvider } from '@/video-sdk/VideoCallProvider';
 import PaymentFailure from "@/pages/PaymentFailure.tsx";
 import PaymentSuccess from "@/pages/PaymentSuccess.tsx";
 import Setup from "@/pages/SetupPage";
@@ -99,8 +99,7 @@ function App() {
               behind the status bar is dark as soon as the app loads.
           */}
           <div className="App min-h-screen w-full bg-background text-foreground transition-colors duration-300">
-            <VideoCallProvider>
-              <ScrollToTop />
+            <ScrollToTop />
               <BackHandler />
               <ConnectionStatusModal />
               <Routes>
@@ -124,7 +123,6 @@ function App() {
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/terms" element={<TermsAndConditions />} />
                 <Route path="/checkout" element={<Checkout />} />
-                <Route path="/classroom" element={<Classroom />} />
                 <Route path="/welcome-new-user" element={<Setup />} />
                 <Route path="/all-set" element={<AllSetPage />} />
                 <Route path="/settings/username" element={<UsernamePage />} />
@@ -145,6 +143,7 @@ function App() {
                 <Route path="/teams" element={<Teams />} />
                 <Route path="/install-app" element={<InstallApp />} />
                 <Route path="/practicals" element={<Practicals />} />
+                <Route path="/seqs" element={<SEQs />} />
                 <Route path="/practical-notes" element={<Practicals />} />
                 <Route path="/practical-notes/subject/:id" element={<PracticalNotesDetails />} />
                 <Route path="/redeem" element={<RedeemCode />} />
@@ -155,9 +154,9 @@ function App() {
                 <Route path="/detailed-analytics" element={<DetailedAnalytics />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </VideoCallProvider>
-            <Toaster />
-          </div>
+              <Toaster />
+              <SonnerToaster position="bottom-center" />
+            </div>
         </Router>
       </ThemeProvider>
     </QueryClientProvider>

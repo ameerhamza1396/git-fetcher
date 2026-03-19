@@ -35,7 +35,7 @@ const Login = () => {
   if (!mounted) return null;
 
   return (
-    <div className="fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-[hsl(168,80%,20%)] via-[hsl(180,60%,15%)] to-[hsl(200,70%,12%)]">
+    <div className="fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-[#0a2e2e] via-[#0f172a] to-[#020617]">
       <Seo
         title="Login"
         description="Log in to your Medmacs App account to access personalized MDCAT preparation tools, MCQs, AI study assistant, and more."
@@ -44,9 +44,9 @@ const Login = () => {
 
       {/* Animated background orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-32 -left-32 w-96 h-96 bg-[hsl(168,80%,40%)]/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute top-1/2 -right-32 w-80 h-80 bg-[hsl(200,80%,50%)]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        <div className="absolute -bottom-24 left-1/3 w-72 h-72 bg-[hsl(280,60%,50%)]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#2dd4bf]/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-1/2 -right-32 w-80 h-80 bg-[#0ea5e9]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute -bottom-24 left-1/3 w-72 h-72 bg-[#67e8f9]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
         {/* Diagonal pattern overlay */}
         <div className="absolute inset-0 opacity-[0.03]" style={{
           backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.5) 20px, rgba(255,255,255,0.5) 21px)`
@@ -89,7 +89,7 @@ const Login = () => {
               transition={{ delay: 0.2 }}
               className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md rounded-full px-4 py-1.5 mb-4 border border-white/10"
             >
-              <span className="text-[hsl(168,80%,60%)] text-xs font-semibold uppercase tracking-widest">Welcome back</span>
+              <span className="text-[#2dd4bf] text-xs font-semibold uppercase tracking-widest">Welcome back</span>
             </motion.div>
             <h1 className="text-white text-3xl font-black tracking-tight">Sign in to your account</h1>
             <p className="text-white/50 text-sm mt-2">Continue your learning journey</p>
@@ -106,7 +106,7 @@ const Login = () => {
                     id="email" type="email" placeholder="Enter your email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="pl-10 bg-white/[0.08] border-white/10 text-white placeholder:text-white/25 focus:border-[hsl(168,80%,50%)]/50 focus:ring-[hsl(168,80%,50%)]/20 h-12 rounded-xl"
+                    className="pl-10 bg-white/[0.08] border-white/10 text-white placeholder:text-white/25 focus:border-[#2dd4bf]/50 focus:ring-[#2dd4bf]/20 h-12 rounded-xl"
                     required
                   />
                 </div>
@@ -120,7 +120,7 @@ const Login = () => {
                     id="password" type={showPassword ? "text" : "password"} placeholder="Enter your password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="pl-10 pr-10 bg-white/[0.08] border-white/10 text-white placeholder:text-white/25 focus:border-[hsl(168,80%,50%)]/50 focus:ring-[hsl(168,80%,50%)]/20 h-12 rounded-xl"
+                    className="pl-10 pr-10 bg-white/[0.08] border-white/10 text-white placeholder:text-white/25 focus:border-[#2dd4bf]/50 focus:ring-[#2dd4bf]/20 h-12 rounded-xl"
                     required
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-3.5 text-white/30 hover:text-white/60 transition-colors">
@@ -130,14 +130,14 @@ const Login = () => {
               </div>
 
               <div className="flex items-center justify-end">
-                <Link to="/forgot-password" className="text-xs text-[hsl(168,80%,60%)] hover:text-[hsl(168,80%,70%)] transition-colors font-medium">
+                <Link to="/forgot-password" university-colors className="text-xs text-[#2dd4bf] hover:text-[#2dd4bf]/80 transition-colors font-medium">
                   Forgot password?
                 </Link>
               </div>
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-[hsl(168,80%,36%)] to-[hsl(180,70%,38%)] hover:from-[hsl(168,80%,32%)] hover:to-[hsl(180,70%,34%)] text-white rounded-xl h-12 font-bold text-sm tracking-wide shadow-lg shadow-[hsl(168,80%,36%)]/20 transition-all duration-300 hover:shadow-xl hover:shadow-[hsl(168,80%,36%)]/30"
+                className="w-full bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] hover:from-[#2dd4bf]/90 hover:to-[#0ea5e9]/90 text-white rounded-xl h-12 font-bold text-sm tracking-wide shadow-lg shadow-[#0ea5e9]/20 transition-all duration-300 hover:shadow-xl hover:shadow-[#0ea5e9]/30"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -158,7 +158,7 @@ const Login = () => {
 
             <p className="text-center text-white/40 text-sm mt-5">
               Don't have an account?{" "}
-              <Link to="/signup" className="text-[hsl(168,80%,60%)] font-semibold hover:text-[hsl(168,80%,70%)] transition-colors">Create account</Link>
+              <Link to="/signup" className="text-[#2dd4bf] font-semibold hover:text-[#2dd4bf]/80 transition-colors">Create account</Link>
             </p>
           </div>
         </motion.div>

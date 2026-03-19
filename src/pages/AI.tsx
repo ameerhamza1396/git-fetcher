@@ -14,7 +14,6 @@ import Seo from '@/components/Seo'; // Import the Seo component
 import PlanBadge from '@/components/PlanBadge';
 
 const AI = () => {
-  const { theme, setTheme } = useTheme();
   const { user } = useAuth();
 
   // Get user profile data
@@ -64,11 +63,6 @@ const AI = () => {
           </div>
 
           <div className="flex items-center space-x-3">
-            <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-9 h-9 p-0 hover:scale-110 transition-transform duration-200">
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-            {/* Dynamic Plan Badge with dynamic colors */}
-            <PlanBadge plan={profile?.plan} />
             {/* NEW: Replaced hardcoded avatar with ProfileDropdown */}
             <ProfileDropdown />
           </div>
