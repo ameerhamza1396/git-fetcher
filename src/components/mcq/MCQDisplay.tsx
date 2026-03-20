@@ -461,11 +461,30 @@ export const MCQDisplay = ({
     }
   };
 
+  // Capacitor back button handler
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let listenerHandle: any = null;
+    import('@capacitor/app').then(({ App }) => {
+      App.addListener('backButton', () => {
+        setShowLeaveModal(true);
+      }).then(handle => { listenerHandle = handle; });
+    });
+    return () => { listenerHandle?.remove?.(); };
+  }, []);
+
   const handleAnswerSelect = (answer: string) => {
     if (showExplanation) return;
     setSelectedAnswer(answer);
     setShowHelpToast(false);
     if (helpToastTimerRef.current) clearTimeout(helpToastTimerRef.current);
+    // Auto-submit if enabled
+    if (autoSubmitEnabled) {
+      // Use setTimeout to let state update first
+      setTimeout(() => {
+        handleSubmitAnswerDirect(answer);
+      }, 300);
+    }
   };
 
   const handleSubmitAnswer = async (timeUp = false) => {
