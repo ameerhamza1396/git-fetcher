@@ -10,6 +10,10 @@ import Seo from "@/components/Seo";
 import UpgradeAccountModal from "@/components/UpgradeAccountModal";
 import FlpTestPage from "@/components/FLPs/FlpTestPage";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface MCQ {
   id: string;
@@ -167,6 +171,7 @@ const FLP = () => {
 
   const handleFLPQuizFinish = (score: number, totalQuestions: number) => {
     setShowQuiz(false);
+    localStorage.removeItem(FLP_PROGRESS_KEY);
     toast({ title: "FLP Quiz Finished!", description: `You scored ${score} out of ${totalQuestions}.`, duration: 5000 });
     setFetchedMcqs([]);
     setSelectedMcqCount(null);
