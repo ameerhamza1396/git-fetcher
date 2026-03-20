@@ -300,6 +300,10 @@ export const MCQDisplay = ({
     if (typeof window !== 'undefined') return localStorage.getItem('mcqSoundDisabled') !== 'true';
     return true;
   });
+  const [autoSubmitEnabled, setAutoSubmitEnabled] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('mcqAutoSubmitDisabled') !== 'true';
+    return true;
+  });
   const [dailySubmissionsCount, setDailySubmissionsCount] = useState(0);
   const [lastSubmissionResetDate, setLastSubmissionResetDate] = useState<string | null>(null);
 
