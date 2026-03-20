@@ -87,6 +87,45 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName }: F
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Capacitor back button handler
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let listenerHandle: any = null;
+    import('@capacitor/app').then(({ App }) => {
+      App.addListener('backButton', () => {
+        setShowLeaveDialog(true);
+      }).then(handle => { listenerHandle = handle; });
+    });
+    return () => { listenerHandle?.remove?.(); };
+  }, []);
+
+  // FLP localStorage progress save
+  const FLP_PROGRESS_KEY = 'flp_in_progress';
+  
+  const saveFLPProgress = () => {
+    if (isQuizEnded || shuffledMcqs.length === 0) return;
+    const progress = {
+      mcqIds: shuffledMcqs.map(m => m.id),
+      userAnswers,
+      currentQuestionIndex,
+      totalTimeLeft,
+      subjectName,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(FLP_PROGRESS_KEY, JSON.stringify(progress));
+  };
+
+  const clearFLPProgress = () => {
+    localStorage.removeItem(FLP_PROGRESS_KEY);
+  };
+
+  // Save progress on every answer change and question navigation
+  useEffect(() => {
+    if (shuffledMcqs.length > 0 && !isQuizEnded) {
+      saveFLPProgress();
+    }
+  }, [userAnswers, currentQuestionIndex, totalTimeLeft, shuffledMcqs.length, isQuizEnded]);
+
   useEffect(() => {
     if (mcqs && mcqs.length > 0) {
       const initialShuffled = mcqs.map(mcq => {
