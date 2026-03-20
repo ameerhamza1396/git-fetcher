@@ -328,5 +328,6 @@ export const AITestGenerator: React.FC = () => {
         </div>
       </div>
     </div>
+    </div>
   );
 };

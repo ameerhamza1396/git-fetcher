@@ -201,6 +201,20 @@ const FLP = () => {
       <Seo title="Full-Length Papers (FLP)" description="Attempt full-length papers on Medmacs App." canonical="https://medmacs.app/flp" />
       <UpgradeAccountModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} onUpgradeClick={() => { setShowUpgradeModal(false); navigate("/pricing"); }} />
 
+      {/* Resume FLP dialog */}
+      <AlertDialog open={showResumeDialog} onOpenChange={setShowResumeDialog}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resume Test?</AlertDialogTitle>
+            <AlertDialogDescription>You have an unfinished Full-Length Paper. Would you like to continue from where you left off?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleDismissResume}>Start Fresh</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResumeTest} className="bg-primary text-primary-foreground">Resume Test</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Fetching overlay */}
       <AnimatePresence>
         {isFetchingMcqs && (
