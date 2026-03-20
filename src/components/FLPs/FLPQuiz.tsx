@@ -15,6 +15,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { FLPResults } from '@/components/FLPResults';
+import { Capacitor } from '@capacitor/core';
 
 interface MCQ {
   id: string;
@@ -67,6 +68,7 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName }: F
   const [currentTestResultId, setCurrentTestResultId] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [showUnattemptedDialog, setShowUnattemptedDialog] = useState(false);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
   const [unattemptedCount, setUnattemptedCount] = useState(0);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const lastScrollY = useRef(0);
