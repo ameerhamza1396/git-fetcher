@@ -216,7 +216,8 @@ export const AITestGenerator: React.FC = () => {
   const progress = ((currentIndex + 1) / questions.length) * 100;
 
   return (
-    <div className="max-w-2xl mx-auto px-3">
+    <div className="fixed inset-0 overflow-y-auto bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+    <div className="max-w-2xl mx-auto px-3 py-4">
       {/* Progress & Timer Header */}
       <div className="mb-6 space-y-3">
         <div className="flex justify-between items-end">
