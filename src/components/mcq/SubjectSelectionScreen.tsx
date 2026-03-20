@@ -48,44 +48,47 @@ export const SubjectSelectionScreen = ({ onSubjectSelect }: SubjectSelectionScre
         {loading ? (
           Array.from({ length: 3 }).map((_, i) => <SubjectCardSkeleton key={i} />)
         ) : (
-          subjects.map((subject, index) => (
-            <motion.div
-              key={subject.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.08 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setSelectedSubject(subject)}
-              className="cursor-pointer"
-            >
-              <div className={`relative overflow-hidden rounded-[2rem] p-1 shadow-2xl transition-all duration-300 ${
-                selectedSubject?.id === subject.id
-                  ? 'bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700'
-                  : 'bg-gradient-to-br from-slate-400 via-slate-500 to-slate-600'
-              }`}>
-                {/* Pattern */}
-                <div className="absolute inset-0 opacity-10" style={{
-                  backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`,
-                  maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
-                }} />
+          subjects.map((subject, index) => {
+            // Grey out subjects with no description (placeholder) - we don't have mcq_count on subjects
+            // but we keep them selectable
+            return (
+              <motion.div
+                key={subject.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.08 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setSelectedSubject(subject)}
+                className="cursor-pointer"
+              >
+                <div className={`relative overflow-hidden rounded-[2rem] p-1 shadow-2xl transition-all duration-300 ${
+                  selectedSubject?.id === subject.id
+                    ? 'bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700'
+                    : 'bg-gradient-to-br from-slate-400 via-slate-500 to-slate-600'
+                }`}>
+                  <div className="absolute inset-0 opacity-10" style={{
+                    backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`,
+                    maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
+                  }} />
 
-                <div className="relative z-10 bg-white/10 backdrop-blur-xl rounded-[1.8rem] p-5 border border-white/10 flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center text-2xl border border-white/20 flex-shrink-0">
-                    {subject.icon || '📚'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-black text-white tracking-tight">{subject.name}</h3>
-                    <p className="text-white/60 text-xs mt-0.5 truncate">{subject.description}</p>
-                  </div>
-                  {selectedSubject?.id === subject.id && (
-                    <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center flex-shrink-0">
-                      <div className="w-3 h-3 rounded-full bg-indigo-600" />
+                  <div className="relative z-10 bg-white/10 backdrop-blur-xl rounded-[1.8rem] p-5 border border-white/10 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center text-2xl border border-white/20 flex-shrink-0">
+                      {subject.icon || '📚'}
                     </div>
-                  )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-black text-white tracking-tight">{subject.name}</h3>
+                      <p className="text-white/60 text-xs mt-0.5 truncate">{subject.description}</p>
+                    </div>
+                    {selectedSubject?.id === subject.id && (
+                      <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center flex-shrink-0">
+                        <div className="w-3 h-3 rounded-full bg-indigo-600" />
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))
+              </motion.div>
+            );
+          })
         )}
       </div>
 

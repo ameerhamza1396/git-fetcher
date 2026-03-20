@@ -176,14 +176,20 @@ const Dashboard = () => {
       const uniqueDates = [...new Set(answerDates)].sort().reverse();
       let currentStreak = 0;
       const today = new Date().toDateString();
-      const yesterday = new Date(Date.now() - 86400000).toDateString();
-      if (uniqueDates.includes(today) || uniqueDates.includes(yesterday)) {
-        for (let i = 0; i < uniqueDates.length; i++) {
-          const date = new Date(uniqueDates[i]);
-          const expectedDate = new Date();
-          expectedDate.setDate(expectedDate.getDate() - i);
-          if (date.toDateString() === expectedDate.toDateString()) currentStreak++;
-          else break;
+      if (uniqueDates.length > 0) {
+        const isTodayActive = uniqueDates.includes(today);
+        let checkDate = new Date();
+        if (!isTodayActive) {
+          checkDate = new Date(Date.now() - 86400000);
+        }
+        while (true) {
+          if (uniqueDates.includes(checkDate.toDateString())) {
+            currentStreak++;
+            checkDate.setDate(checkDate.getDate() - 1);
+          } else {
+            break;
+          }
+          if (currentStreak > 365) break;
         }
       }
       const { data: battles } = await supabase.from('battle_results').select('*').eq('user_id', user.id);
