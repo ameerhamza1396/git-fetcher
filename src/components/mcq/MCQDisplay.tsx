@@ -656,7 +656,8 @@ export const MCQDisplay = ({
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-3">
+    <div className="fixed inset-0 overflow-y-auto bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+    <div className="max-w-3xl mx-auto px-3 py-4">
       {/* Main quiz card - vibrant glassmorphic */}
       <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary/10 via-blue-500/5 to-violet-500/10 backdrop-blur-2xl border border-primary/20 shadow-2xl p-1.5">
         {/* Vibrant pattern overlay */}
@@ -737,6 +738,19 @@ export const MCQDisplay = ({
                     >
                       {soundEnabled ? '🔊' : '🔇'}
                       <span className="ml-2">{soundEnabled ? 'Disable Sound' : 'Enable Sound'}</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => {
+                        const newVal = !autoSubmitEnabled;
+                        setAutoSubmitEnabled(newVal);
+                        localStorage.setItem('mcqAutoSubmitDisabled', String(!newVal));
+                        toast({ title: newVal ? 'Auto-Submit Enabled' : 'Auto-Submit Disabled', description: newVal ? 'Answers will be submitted automatically on selection.' : 'You will need to press Submit manually.' });
+                      }}
+                      className="text-sm cursor-pointer"
+                    >
+                      <Zap className="w-4 h-4 mr-2" />
+                      {autoSubmitEnabled ? 'Disable Auto-Submit' : 'Enable Auto-Submit'}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="text-sm cursor-pointer">
@@ -845,7 +859,7 @@ export const MCQDisplay = ({
                 ) : <div />}
 
                 <div className="flex space-x-2">
-                  {!showExplanation && selectedAnswer && (
+                  {!showExplanation && selectedAnswer && !autoSubmitEnabled && (
                     <Button
                       onClick={() => handleSubmitAnswer()}
                       className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-bold text-sm px-6"
