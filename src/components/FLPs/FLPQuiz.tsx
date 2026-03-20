@@ -188,6 +188,7 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName }: F
       if (insertError) throw insertError;
       setCurrentTestResultId((insertedResult as any).id);
       setIsQuizEnded(true);
+      clearFLPProgress();
       toast({ title: autoSubmit ? "Time's Up! Test Submitted." : "Test Submitted!", description: `You scored ${finalScore}/${totalQuestions}.`, duration: 3000 });
       navigate(`/results/flp/${(insertedResult as any).id}`);
     } catch (err: any) {
@@ -251,7 +252,7 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName }: F
   );
 
   return (
-    <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950 flex flex-col overflow-y-auto">
+    <div className="fixed inset-0 overflow-y-auto bg-background flex flex-col">
       {/* Header */}
       <header className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="container mx-auto px-4 py-3 flex justify-between items-center max-w-7xl">
@@ -373,6 +374,20 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName }: F
           <AlertDialogFooter>
             <AlertDialogCancel>Go Back</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmSubmission} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">Submit Anyway</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Leave confirmation dialog */}
+      <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave Test?</AlertDialogTitle>
+            <AlertDialogDescription>Your progress has been saved. You can resume this test later from where you left off.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continue Test</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setShowLeaveDialog(false); onFinish(0, totalQuestions); }} className="bg-destructive text-destructive-foreground">Leave Test</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
