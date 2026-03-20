@@ -516,6 +516,35 @@ export const MCQDisplay = ({
     if (helpToastTimerRef.current) clearTimeout(helpToastTimerRef.current);
   };
 
+  // Direct submit with explicit answer (for auto-submit)
+  const handleSubmitAnswerDirect = async (directAnswer: string) => {
+    if (!currentMCQ || !user || showExplanation) return;
+    if (userPlanForChatbot === 'free') {
+      const isNewDay = isNewDayPKT(lastSubmissionResetDate);
+      let currentSubmissions = dailySubmissionsCount;
+      let currentResetDate = lastSubmissionResetDate;
+      if (isNewDay) { currentSubmissions = 0; currentResetDate = new Date().toISOString(); }
+      if (currentSubmissions >= 50) { setShowUpgradeModal(true); return; }
+      const { error: updateError } = await supabase.from('profiles').update({ daily_mcq_submissions: currentSubmissions + 1, last_submission_reset_date: currentResetDate }).eq('id', user.id);
+      if (updateError) { console.error('Error updating daily submissions:', updateError); toast({ title: "Error", description: "Failed to update daily submission count.", variant: "destructive" }); return; }
+      setDailySubmissionsCount(currentSubmissions + 1);
+      setLastSubmissionResetDate(currentResetDate);
+    }
+    const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+    const isCorrect = directAnswer === currentMCQ.correct_answer;
+    if (soundEnabled) {
+      if (isCorrect) playCorrectSound();
+      else playIncorrectSound();
+    }
+    if (isCorrect) setScore(prev => prev + 1);
+    try {
+      await supabase.from('user_answers').insert({ user_id: user.id, mcq_id: currentMCQ.id, selected_answer: directAnswer, is_correct: isCorrect, time_taken: timeTaken });
+    } catch (error) { console.error('Error saving answer:', error); }
+    setShowExplanation(true);
+    setShowHelpToast(false);
+    if (helpToastTimerRef.current) clearTimeout(helpToastTimerRef.current);
+  };
+
   const handleNextQuestion = () => {
     if (currentQuestionIndex < totalQuestions - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
