@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Clock, CheckCircle, XCircle, Timer, Bot, MessageSquare, X, Bookmark, BookmarkCheck, Crown, LogOut, AlertTriangle, MoreVertical, Flag, BotOff, Moon, Sun } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Timer, Bot, MessageSquare, X, Bookmark, BookmarkCheck, Crown, LogOut, AlertTriangle, MoreVertical, Flag, BotOff, Moon, Sun, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { fetchMCQsByChapter, MCQ } from '@/utils/mcqData';
@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
 import { useTheme } from 'next-themes';
+import { Capacitor } from '@capacitor/core';
 
 interface MCQDisplayProps {
   subject: string;
@@ -299,6 +300,10 @@ export const MCQDisplay = ({
     if (typeof window !== 'undefined') return localStorage.getItem('mcqSoundDisabled') !== 'true';
     return true;
   });
+  const [autoSubmitEnabled, setAutoSubmitEnabled] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('mcqAutoSubmitDisabled') !== 'true';
+    return true;
+  });
   const [dailySubmissionsCount, setDailySubmissionsCount] = useState(0);
   const [lastSubmissionResetDate, setLastSubmissionResetDate] = useState<string | null>(null);
 
@@ -456,11 +461,30 @@ export const MCQDisplay = ({
     }
   };
 
+  // Capacitor back button handler
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let listenerHandle: any = null;
+    import('@capacitor/app').then(({ App }) => {
+      App.addListener('backButton', () => {
+        setShowLeaveModal(true);
+      }).then(handle => { listenerHandle = handle; });
+    });
+    return () => { listenerHandle?.remove?.(); };
+  }, []);
+
   const handleAnswerSelect = (answer: string) => {
     if (showExplanation) return;
     setSelectedAnswer(answer);
     setShowHelpToast(false);
     if (helpToastTimerRef.current) clearTimeout(helpToastTimerRef.current);
+    // Auto-submit if enabled
+    if (autoSubmitEnabled) {
+      // Use setTimeout to let state update first
+      setTimeout(() => {
+        handleSubmitAnswerDirect(answer);
+      }, 300);
+    }
   };
 
   const handleSubmitAnswer = async (timeUp = false) => {
@@ -486,6 +510,35 @@ export const MCQDisplay = ({
     if (isCorrect && !timeUp) setScore(prev => prev + 1);
     try {
       await supabase.from('user_answers').insert({ user_id: user.id, mcq_id: currentMCQ.id, selected_answer: answer || 'No answer (time up)', is_correct: isCorrect, time_taken: timeTaken });
+    } catch (error) { console.error('Error saving answer:', error); }
+    setShowExplanation(true);
+    setShowHelpToast(false);
+    if (helpToastTimerRef.current) clearTimeout(helpToastTimerRef.current);
+  };
+
+  // Direct submit with explicit answer (for auto-submit)
+  const handleSubmitAnswerDirect = async (directAnswer: string) => {
+    if (!currentMCQ || !user || showExplanation) return;
+    if (userPlanForChatbot === 'free') {
+      const isNewDay = isNewDayPKT(lastSubmissionResetDate);
+      let currentSubmissions = dailySubmissionsCount;
+      let currentResetDate = lastSubmissionResetDate;
+      if (isNewDay) { currentSubmissions = 0; currentResetDate = new Date().toISOString(); }
+      if (currentSubmissions >= 50) { setShowUpgradeModal(true); return; }
+      const { error: updateError } = await supabase.from('profiles').update({ daily_mcq_submissions: currentSubmissions + 1, last_submission_reset_date: currentResetDate }).eq('id', user.id);
+      if (updateError) { console.error('Error updating daily submissions:', updateError); toast({ title: "Error", description: "Failed to update daily submission count.", variant: "destructive" }); return; }
+      setDailySubmissionsCount(currentSubmissions + 1);
+      setLastSubmissionResetDate(currentResetDate);
+    }
+    const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+    const isCorrect = directAnswer === currentMCQ.correct_answer;
+    if (soundEnabled) {
+      if (isCorrect) playCorrectSound();
+      else playIncorrectSound();
+    }
+    if (isCorrect) setScore(prev => prev + 1);
+    try {
+      await supabase.from('user_answers').insert({ user_id: user.id, mcq_id: currentMCQ.id, selected_answer: directAnswer, is_correct: isCorrect, time_taken: timeTaken });
     } catch (error) { console.error('Error saving answer:', error); }
     setShowExplanation(true);
     setShowHelpToast(false);
@@ -603,7 +656,8 @@ export const MCQDisplay = ({
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-3">
+    <div className="fixed inset-0 overflow-y-auto bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+    <div className="max-w-3xl mx-auto px-3 py-4">
       {/* Main quiz card - vibrant glassmorphic */}
       <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary/10 via-blue-500/5 to-violet-500/10 backdrop-blur-2xl border border-primary/20 shadow-2xl p-1.5">
         {/* Vibrant pattern overlay */}
@@ -684,6 +738,19 @@ export const MCQDisplay = ({
                     >
                       {soundEnabled ? '🔊' : '🔇'}
                       <span className="ml-2">{soundEnabled ? 'Disable Sound' : 'Enable Sound'}</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => {
+                        const newVal = !autoSubmitEnabled;
+                        setAutoSubmitEnabled(newVal);
+                        localStorage.setItem('mcqAutoSubmitDisabled', String(!newVal));
+                        toast({ title: newVal ? 'Auto-Submit Enabled' : 'Auto-Submit Disabled', description: newVal ? 'Answers will be submitted automatically on selection.' : 'You will need to press Submit manually.' });
+                      }}
+                      className="text-sm cursor-pointer"
+                    >
+                      <Zap className="w-4 h-4 mr-2" />
+                      {autoSubmitEnabled ? 'Disable Auto-Submit' : 'Enable Auto-Submit'}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="text-sm cursor-pointer">
@@ -792,7 +859,7 @@ export const MCQDisplay = ({
                 ) : <div />}
 
                 <div className="flex space-x-2">
-                  {!showExplanation && selectedAnswer && (
+                  {!showExplanation && selectedAnswer && !autoSubmitEnabled && (
                     <Button
                       onClick={() => handleSubmitAnswer()}
                       className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-bold text-sm px-6"
@@ -851,6 +918,7 @@ export const MCQDisplay = ({
       <UpgradeAccountModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} onUpgradeClick={handleUpgradeClick} />
       <LeaveTestModal isOpen={showLeaveModal} onClose={() => setShowLeaveModal(false)} onConfirm={onBack} />
       <ReportMCQModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} onSubmit={handleReportSubmit} isSubmitting={isReportSubmitting} />
+    </div>
     </div>
   );
 };

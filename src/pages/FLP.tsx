@@ -10,6 +10,10 @@ import Seo from "@/components/Seo";
 import UpgradeAccountModal from "@/components/UpgradeAccountModal";
 import FlpTestPage from "@/components/FLPs/FlpTestPage";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface MCQ {
   id: string;
@@ -28,6 +32,8 @@ interface Subject {
   color?: string;
 }
 
+const FLP_PROGRESS_KEY = 'flp_in_progress';
+
 const FLP = () => {
   const { user, isLoading: isAuthLoading } = useAuth();
   const navigate = useNavigate();
@@ -41,6 +47,7 @@ const FLP = () => {
   const [showQuiz, setShowQuiz] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [selectedSubjectName, setSelectedSubjectName] = useState('');
+  const [showResumeDialog, setShowResumeDialog] = useState(false);
 
   // Subject loading
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -62,6 +69,51 @@ const FLP = () => {
       return () => clearInterval(interval);
     }
   }, [isFetchingMcqs]);
+
+  // Check for saved FLP progress on mount
+  useEffect(() => {
+    if (!user) return;
+    const saved = localStorage.getItem(FLP_PROGRESS_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Only offer resume if saved within last 24 hours
+        if (parsed.mcqIds?.length > 0 && Date.now() - parsed.timestamp < 86400000) {
+          setShowResumeDialog(true);
+        } else {
+          localStorage.removeItem(FLP_PROGRESS_KEY);
+        }
+      } catch { localStorage.removeItem(FLP_PROGRESS_KEY); }
+    }
+  }, [user]);
+
+  const handleResumeTest = async () => {
+    setShowResumeDialog(false);
+    const saved = localStorage.getItem(FLP_PROGRESS_KEY);
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved);
+      const mcqIds: string[] = parsed.mcqIds;
+      setIsFetchingMcqs(true);
+      if (parsed.subjectName) setSelectedSubjectName(parsed.subjectName);
+      const { data: mcqsData, error } = await supabase.from("mcqs").select("*").in("id", mcqIds);
+      if (error || !mcqsData) throw error || new Error("No data");
+      // Maintain original order
+      const ordered = mcqIds.map(id => mcqsData.find(m => m.id === id)).filter(Boolean) as MCQ[];
+      setFetchedMcqs(ordered);
+      setShowQuiz(true);
+    } catch (e: any) {
+      toast({ title: "Error", description: "Could not resume test.", variant: "destructive" });
+      localStorage.removeItem(FLP_PROGRESS_KEY);
+    } finally {
+      setIsFetchingMcqs(false);
+    }
+  };
+
+  const handleDismissResume = () => {
+    setShowResumeDialog(false);
+    localStorage.removeItem(FLP_PROGRESS_KEY);
+  };
 
   // Fetch subjects when reaching step 2
   useEffect(() => {
@@ -119,6 +171,7 @@ const FLP = () => {
 
   const handleFLPQuizFinish = (score: number, totalQuestions: number) => {
     setShowQuiz(false);
+    localStorage.removeItem(FLP_PROGRESS_KEY);
     toast({ title: "FLP Quiz Finished!", description: `You scored ${score} out of ${totalQuestions}.`, duration: 5000 });
     setFetchedMcqs([]);
     setSelectedMcqCount(null);
@@ -147,6 +200,20 @@ const FLP = () => {
     <div className="fixed inset-0 overflow-hidden">
       <Seo title="Full-Length Papers (FLP)" description="Attempt full-length papers on Medmacs App." canonical="https://medmacs.app/flp" />
       <UpgradeAccountModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} onUpgradeClick={() => { setShowUpgradeModal(false); navigate("/pricing"); }} />
+
+      {/* Resume FLP dialog */}
+      <AlertDialog open={showResumeDialog} onOpenChange={setShowResumeDialog}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resume Test?</AlertDialogTitle>
+            <AlertDialogDescription>You have an unfinished Full-Length Paper. Would you like to continue from where you left off?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleDismissResume}>Start Fresh</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResumeTest} className="bg-primary text-primary-foreground">Resume Test</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Fetching overlay */}
       <AnimatePresence>

@@ -59,39 +59,46 @@ export const ChapterSelectionScreen = ({
       <div className="grid grid-cols-1 gap-3">
         {loading
           ? Array.from({ length: 6 }).map((_, i) => <ChapterCardSkeleton key={i} />)
-          : allChapters.map((ch, idx) => (
-            <motion.div
-              key={ch.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.04 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setSelectedChapter(ch)}
-              className="cursor-pointer"
-            >
-              <div className={`relative overflow-hidden rounded-[1.5rem] p-1 shadow-xl transition-all duration-300 ${
-                selectedChapter?.id === ch.id
-                  ? 'bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700'
-                  : 'bg-gradient-to-br from-slate-400 via-slate-500 to-slate-600'
-              }`}>
-                <div className="absolute inset-0 opacity-10" style={{
-                  backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`,
-                  maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
-                }} />
+          : allChapters.map((ch, idx) => {
+            const hasNoQuestions = !ch.mcq_count || ch.mcq_count === 0;
+            return (
+              <motion.div
+                key={ch.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.04 }}
+                whileTap={hasNoQuestions ? {} : { scale: 0.98 }}
+                onClick={() => { if (!hasNoQuestions) setSelectedChapter(ch); }}
+                className={hasNoQuestions ? 'cursor-not-allowed' : 'cursor-pointer'}
+              >
+                <div className={`relative overflow-hidden rounded-[1.5rem] p-1 shadow-xl transition-all duration-300 ${
+                  hasNoQuestions
+                    ? 'bg-gradient-to-br from-slate-300 via-slate-400 to-slate-500 opacity-50'
+                    : selectedChapter?.id === ch.id
+                      ? 'bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700'
+                      : 'bg-gradient-to-br from-slate-400 via-slate-500 to-slate-600'
+                }`}>
+                  <div className="absolute inset-0 opacity-10" style={{
+                    backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`,
+                    maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
+                  }} />
 
-                <div className="relative z-10 bg-white/10 backdrop-blur-xl rounded-[1.3rem] px-4 py-3.5 border border-white/10 flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0 border border-white/20">
-                    <BookOpen className="w-4 h-4 text-white" />
+                  <div className="relative z-10 bg-white/10 backdrop-blur-xl rounded-[1.3rem] px-4 py-3.5 border border-white/10 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0 border border-white/20">
+                      <BookOpen className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-bold text-white">Practice Test {ch.chapter_number}</h3>
+                      <p className="text-white/50 text-xs truncate">{hasNoQuestions ? 'Coming Soon' : ch.name}</p>
+                    </div>
+                    <span className="text-white/40 text-xs font-bold flex-shrink-0">
+                      {hasNoQuestions ? 'Coming Soon' : `${ch.mcq_count} Qs`}
+                    </span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-bold text-white">Practice Test {ch.chapter_number}</h3>
-                    <p className="text-white/50 text-xs truncate">{ch.name}</p>
-                  </div>
-                  <span className="text-white/40 text-xs font-bold flex-shrink-0">{ch.mcq_count || 0} Qs</span>
                 </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
       </div>
 
       {selectedChapter && (
