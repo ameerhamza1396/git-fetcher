@@ -273,10 +273,8 @@ const Dashboard = () => {
           else break;
         }
       }
-      const { data: battles } = await supabase.from('battle_results').select('*').eq('user_id', user.id);
-      const battlesWon = battles?.filter(b => b.rank === 1)?.length || 0;
-      const rankPoints = correctAnswers * 10 + currentStreak * 5 + accuracy;
-      return { totalQuestions, correctAnswers, accuracy, currentStreak, rankPoints, battlesWon, totalBattles: battles?.length || 0 };
+      const { count: savedCount } = await supabase.from('saved_mcqs').select('*', { count: 'exact', head: true }).eq('user_id', user.id);
+      return { totalQuestions, correctAnswers, accuracy, savedQuestions: savedCount || 0, rankPoints: 0, battlesWon: battles?.filter(b => b.rank === 1)?.length || 0, totalBattles: battles?.length || 0 };
     },
     enabled: !!user?.id
   });
@@ -672,10 +670,10 @@ const Dashboard = () => {
               >
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                    <Flame className="w-4 h-4 text-orange-500" /> {userStats?.currentStreak || 0} day streak
+                    <Bookmark className="w-4 h-4 text-primary" /> {userStats?.savedQuestions || 0} Saved Questions
                   </span>
-                  <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 text-[10px] px-2 font-bold shadow-sm">
-                    {(userStats?.currentStreak || 0) > 0 ? '🔥 On Fire!' : 'Start!'}
+                  <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-0 text-[10px] px-2 font-bold shadow-sm">
+                    Keep context!
                   </Badge>
                 </div>
                 <Progress value={userStats?.accuracy || 0} className="h-2.5 mb-2" />

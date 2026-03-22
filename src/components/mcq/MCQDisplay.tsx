@@ -112,7 +112,7 @@ const ModalContent = ({ children, className = '', ...props }) => (
   <DialogPrimitive.Portal>
     <ModalOverlay />
     <DialogPrimitive.Content
-      className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[201] w-full focus:outline-none
+      className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[201] w-[calc(100%-2rem)] max-w-[400px] focus:outline-none
         data-[state=open]:animate-in data-[state=closed]:animate-out
         data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0
         data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95
@@ -133,7 +133,7 @@ const MCQSettingsModal = ({
   quickSubmit, toggleQuickSubmit,
   soundEnabled, toggleSound,
   aiPopupsDisabled, toggleAiPopups,
-  onReport, isPremium
+  onReport, isPremium, theme, setTheme
 }) => (
   <DialogPrimitive.Root open={isOpen} onOpenChange={onClose}>
     <ModalContent className="sm:max-w-[400px] mx-4">
@@ -197,6 +197,20 @@ const MCQSettingsModal = ({
               </div>
             </div>
             <Switch checked={soundEnabled} onCheckedChange={toggleSound} className="data-[state=checked]:bg-violet-500 shrink-0" />
+          </div>
+
+          {/* Theme Toggle */}
+          <div className="flex items-center justify-between p-4 rounded-2xl bg-zinc-500/10 border border-zinc-500/20">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-zinc-500 to-zinc-600 flex items-center justify-center shadow-lg shrink-0">
+                {theme === 'dark' ? <Moon className="w-5 h-5 text-white" /> : <Sun className="w-5 h-5 text-white" />}
+              </div>
+              <div>
+                <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Dark Mode</p>
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-widest font-black">{theme === 'dark' ? 'ON' : 'OFF'}</p>
+              </div>
+            </div>
+            <Switch checked={theme === 'dark'} onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')} className="data-[state=checked]:bg-zinc-800" />
           </div>
 
           <div className="grid grid-cols-1 gap-3 pt-2">
@@ -604,13 +618,28 @@ export const MCQDisplay = ({
 
   if (loading || profileLoading) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-background via-background to-primary/10 flex flex-col items-center justify-center p-8 overscroll-none">
-        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
-          <Loader2 className="w-16 h-16 text-primary" />
-        </motion.div>
-        <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="text-xs font-black uppercase tracking-widest text-muted-foreground mt-4">
-          Loading Test...
-        </motion.p>
+      <div className="fixed inset-0 bg-background flex flex-col px-6 pt-[max(1rem,env(safe-area-inset-top))] overscroll-none">
+        {/* Header Skeleton */}
+        <div className="flex justify-between items-center mb-8">
+          <div className="space-y-2">
+            <div className="h-3 w-20 bg-muted rounded-full animate-pulse" />
+            <div className="h-6 w-12 bg-muted rounded-lg animate-pulse" />
+          </div>
+          <div className="flex gap-2">
+            <div className="w-10 h-10 rounded-2xl bg-muted animate-pulse" />
+            <div className="w-10 h-10 rounded-2xl bg-muted animate-pulse" />
+          </div>
+        </div>
+        {/* Progress Bar Skeleton */}
+        <div className="h-2 w-full bg-muted rounded-full mb-8 animate-pulse" />
+        {/* Question Card Skeleton */}
+        <div className="h-48 w-full bg-muted/40 rounded-3xl mb-8 animate-pulse" />
+        {/* Options Skeleton */}
+        <div className="space-y-3">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-16 w-full bg-muted/30 rounded-2xl animate-pulse" />
+          ))}
+        </div>
       </div>
     );
   }
@@ -875,6 +904,8 @@ export const MCQDisplay = ({
         }}
         onReport={() => { setShowSettingsModal(false); setShowReportModal(true); }}
         isPremium={isPremium}
+        theme={theme}
+        setTheme={setTheme}
       />
       <LeaveTestModal isOpen={showLeaveModal} onClose={() => setShowLeaveModal(false)} onConfirm={() => { setShowLeaveModal(false); onBack(); }} />
       <ReportMCQModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} onSubmit={handleReportSubmit} isSubmitting={isReportSubmitting} />
@@ -888,6 +919,9 @@ export const MCQDisplay = ({
           explanationContext={currentMCQ.explanation || ''}
           currentAnswer={selectedAnswer}
           correctAnswer={currentMCQ.correct_answer}
+          userPlan={userPlanForChatbot}
+          isHidden={showExplanation} // Hide Dr Ahroid floating button when next/prev buttons are shown
+          onOpen={() => setIsChatbotOpen(true)}
         />
       )}
     </div>

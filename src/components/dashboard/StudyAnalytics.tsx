@@ -8,7 +8,8 @@ import {
   TrendingUp,
   Brain,
   Award,
-  Zap
+  Zap,
+  Bookmark
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -118,6 +119,11 @@ export const StudyAnalytics = () => {
         .select('*')
         .eq('user_id', user.id);
 
+      const { count: savedCount } = await supabase
+        .from('saved_mcqs')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
       const totalQuestions = allAnswers?.length || 0;
       const correctAnswers = allAnswers?.filter(a => a.is_correct)?.length || 0;
       const weeklyQuestions = recentAnswers?.length || 0;
@@ -161,10 +167,10 @@ export const StudyAnalytics = () => {
         weeklyQuestions,
         weeklyAccuracy,
         avgTime,
-        currentStreak,
         testsGenerated: aiTests?.length || 0,
         battlesPlayed: battles?.length || 0,
-        battlesWon: battles?.filter(b => b.rank === 1)?.length || 0
+        battlesWon: battles?.filter(b => b.rank === 1)?.length || 0,
+        savedCount: savedCount || 0
       };
     },
     enabled: !!user?.id
@@ -212,13 +218,13 @@ export const StudyAnalytics = () => {
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
-                <Calendar className="w-4 h-4 text-white" />
+                <Bookmark className="w-4 h-4 text-white" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                  {analytics.currentStreak}
+                  {analytics.savedCount}
                 </p>
-                <p className="text-xs text-muted-foreground">Day Streak</p>
+                <p className="text-xs text-muted-foreground">Saved Qs</p>
               </div>
             </div>
           </CardContent>

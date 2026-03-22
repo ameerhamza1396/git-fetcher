@@ -77,7 +77,7 @@ const DrSultanChat: React.FC = () => {
     enabled: !!user?.id
   });
 
-  const canUseChat = profile?.plan?.toLowerCase() === 'premium';
+  const canUseChat = profile?.plan?.toLowerCase() === 'premium' || profile?.plan?.toLowerCase() === 'iconic';
 
   // --- 2. MUTATIONS ---
   const deleteSessionMutation = useMutation({
@@ -199,62 +199,105 @@ const DrSultanChat: React.FC = () => {
     rec.start();
   };
 
+  const copyToClipboard = (text: string, index: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
   if (authLoading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
 
   return (
-    <div className="fixed inset-0 w-full flex overflow-hidden bg-background">
+    <div className="fixed inset-0 w-full flex overflow-hidden bg-[#F8FAFC] dark:bg-gray-950">
       <Seo title="Dr. Ahroid | AI Tutor" />
 
       {/* DELETE MODAL */}
       <AlertDialog open={!!sessionToDelete} onOpenChange={() => setSessionToDelete(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-3xl border-border bg-background">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Session?</AlertDialogTitle>
-            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+            <AlertDialogTitle className="font-black italic uppercase">Delete Session?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">This session and all its messages will be permanently removed.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => sessionToDelete && deleteSessionMutation.mutate(sessionToDelete)} className="bg-red-600">Delete</AlertDialogAction>
+            <AlertDialogCancel className="rounded-2xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => sessionToDelete && deleteSessionMutation.mutate(sessionToDelete)} className="bg-destructive hover:bg-destructive/90 rounded-2xl font-bold">Delete Session</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       {/* SIDEBAR */}
-      <aside className={`fixed lg:relative z-50 w-72 h-full bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 flex flex-col`}>
-        <div className="p-4 border-b flex justify-between items-center bg-white dark:bg-gray-900">
-          <span className="font-bold text-purple-600 text-sm">STUDY HISTORY</span>
-          <Button variant="ghost" size="icon" onClick={startNewChat}><PlusCircle className="w-5 h-5" /></Button>
+      <aside className={`fixed lg:relative z-50 w-80 h-full bg-white dark:bg-zinc-900 border-r border-border transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 flex flex-col shadow-2xl`}>
+        <div className="p-6 border-b flex justify-between items-center bg-white dark:bg-zinc-900">
+           <div className="flex flex-col">
+              <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-1">Study History</span>
+              <span className="text-xl font-black italic uppercase leading-none">Your <span className="text-primary">Chats</span></span>
+           </div>
+          <Button variant="ghost" size="icon" onClick={startNewChat} className="rounded-xl hover:bg-primary/10 hover:text-primary"><PlusCircle className="w-6 h-6" /></Button>
         </div>
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
           {chatHistory?.map((chat) => (
             <div key={chat.id} className="group relative">
-              <button onClick={() => loadSession(chat)} className={`w-full text-left p-3 rounded-xl text-sm border ${currentSessionId === chat.id ? 'bg-purple-50 dark:bg-purple-900/30 border-purple-200' : 'border-transparent hover:bg-gray-100'}`}>
-                <div className="font-semibold truncate">{chat.session_name || "New Chat"}</div>
-                <div className="text-[10px] opacity-60">{new Date(chat.created_at).toLocaleDateString()}</div>
+              <button 
+                onClick={() => loadSession(chat)} 
+                className={`w-full text-left p-4 rounded-2xl transition-all duration-300 border-2 ${
+                  currentSessionId === chat.id 
+                  ? 'bg-primary/5 border-primary shadow-lg shadow-primary/5' 
+                  : 'border-transparent hover:bg-secondary/50 hover:border-border/60'
+                }`}
+              >
+                <div className={`font-bold text-sm truncate uppercase tracking-tight mb-1 ${currentSessionId === chat.id ? 'text-primary' : 'text-foreground'}`}>
+                  {chat.session_name || "New Consultation"}
+                </div>
+                <div className="flex items-center gap-2 opacity-60">
+                   <Clock className="w-3 h-3" />
+                   <span className="text-[10px] font-bold uppercase">{new Date(chat.created_at).toLocaleDateString()}</span>
+                </div>
               </button>
-              <button onClick={(e) => { e.stopPropagation(); setSessionToDelete(chat.id); }} className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-2"><Trash2 className="w-4 h-4 text-gray-400" /></button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setSessionToDelete(chat.id); }} 
+                className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-2 hover:text-destructive transition-all"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             </div>
           ))}
+          {(!chatHistory || chatHistory.length === 0) && (
+            <div className="text-center py-10 px-6">
+               <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center opacity-40">
+                  <MessageSquare className="w-6 h-6" />
+               </div>
+               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest leading-relaxed">No sessions found.<br/>Start a new consult!</p>
+            </div>
+          )}
         </div>
-        <div className="p-4 border-t">
-          <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            Mode
+
+        <div className="p-4 border-t bg-secondary/30">
+          <Button variant="outline" className="w-full justify-start gap-3 rounded-2xl h-12 border-border shadow-sm hover:scale-[1.02] transition-transform" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+            {theme === 'dark' ? <Sun className="w-4 h-4 text-orange-500" /> : <Moon className="w-4 h-4 text-indigo-500" />}
+            <span className="text-xs font-bold uppercase tracking-widest">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
           </Button>
         </div>
       </aside>
 
       {/* MAIN CHAT AREA */}
       <main className="flex-1 flex flex-col min-h-0 relative">
-        {/* HEADER: Updated Profile Dropdown to Right */}
-        <header className="sticky top-0 z-30 w-full bg-white/80 dark:bg-gray-950/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 px-4 py-3 flex items-center justify-between pt-[env(safe-area-inset-top)]">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsSidebarOpen(true)}>
+        <header className="sticky top-0 z-30 w-full bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl border-b border-border px-6 py-4 flex items-center justify-between pt-[max(1rem,env(safe-area-inset-top))]">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" className="lg:hidden rounded-xl" onClick={() => setIsSidebarOpen(true)}>
               <Menu className="w-6 h-6" />
             </Button>
-            <div className="flex flex-col">
-              <CardTitle className="text-base font-bold">Dr. Ahroid</CardTitle>
-              <span className="text-[10px] text-green-500 font-bold uppercase">AI Medical Tutor</span>
+            <div className="flex items-center gap-3">
+               <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center shadow-lg">
+                  <span className="text-xl">🤖</span>
+               </div>
+               <div className="flex flex-col">
+                  <CardTitle className="text-lg font-black italic uppercase tracking-tight">Dr. <span className="text-primary">Ahroid</span></CardTitle>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                    <span className="text-[10px] text-green-500 font-black uppercase tracking-[0.2em]">Always Online</span>
+                  </div>
+               </div>
             </div>
           </div>
           <div className="flex items-center">
@@ -262,69 +305,156 @@ const DrSultanChat: React.FC = () => {
           </div>
         </header>
 
-        {/* MESSAGES: Properly scrollable container */}
-        <div className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-6 scroll-smooth">
-          <div className="min-h-full flex flex-col justify-end">
+        <div className="flex-1 overflow-y-auto px-4 lg:px-12 py-8 space-y-8 scroll-smooth custom-scrollbar">
+          <div className="max-w-4xl mx-auto min-h-full flex flex-col">
             {messages.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center py-20">
-                <MessageSquare className="w-12 h-12 text-purple-600 mb-4 opacity-20" />
-                <h2 className="text-xl font-bold">Start Your Consult</h2>
-                <p className="text-sm text-muted-foreground">Ask about anatomy, pharmacology, or clinical cases.</p>
+              <div className="flex-1 flex flex-col items-center justify-center text-center py-20 px-8">
+                <div className="relative mb-8">
+                   <div className="absolute inset-0 bg-primary/20 blur-[100px] rounded-full pointer-events-none" />
+                   <div className="relative w-24 h-24 rounded-[2.5rem] bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center text-5xl shadow-2xl">
+                      🧑‍⚕️
+                   </div>
+                </div>
+                <h2 className="text-3xl font-black italic uppercase mb-2 tracking-tight">Your AI <span className="text-primary">Consultant</span></h2>
+                <p className="text-sm text-muted-foreground font-medium max-w-sm">Ask about anatomy, clinical pharmacology, surgical procedures, or recent medical test cases.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-10 w-full max-w-lg">
+                   {['Explain Osteomyelitis', 'TYPICAL ECG findings', 'Side effects of Azithromycin', 'Describe McBurney point'].map(q => (
+                     <button 
+                       key={q} 
+                       onClick={() => setInputMessage(q)}
+                       className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-border hover:border-primary hover:bg-primary/5 text-xs font-bold uppercase tracking-wider text-left transition-all hover:scale-[1.02] shadow-sm"
+                     >
+                       "{q}"
+                     </button>
+                   ))}
+                </div>
               </div>
             ) : (
-              messages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
-                  <div className={`max-w-[85%] p-4 rounded-2xl ${msg.sender === 'user' ? 'bg-purple-600 text-white rounded-tr-none' : 'bg-gray-100 dark:bg-gray-800 rounded-tl-none border'}`}>
-                    <p className="text-[15px] whitespace-pre-wrap">{msg.text}</p>
-                    <div className="mt-2 flex justify-between items-center text-[10px] opacity-50">
-                      <span>{msg.time}</span>
-                      <button onClick={() => navigator.clipboard.writeText(msg.text)}><Copy className="w-3 h-3" /></button>
+              <div className="space-y-6">
+                {messages.map((msg, i) => (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    key={i} 
+                    className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={`relative max-w-[85%] sm:max-w-[75%] p-5 rounded-3xl shadow-lg ${
+                      msg.sender === 'user' 
+                      ? 'bg-primary text-white rounded-tr-none' 
+                      : 'bg-white dark:bg-zinc-900 text-foreground border border-border/60 rounded-tl-none'
+                    }`}>
+                      <p className="text-[15px] leading-relaxed font-medium whitespace-pre-wrap">{msg.text}</p>
+                      
+                      <div className={`mt-3 pt-3 flex items-center justify-between border-t ${
+                        msg.sender === 'user' ? 'border-white/10 opacity-60' : 'border-border/30 opacity-40'
+                      }`}>
+                        <span className="text-[10px] font-black uppercase tracking-[0.1em]">{msg.time}</span>
+                        <button 
+                          onClick={() => copyToClipboard(msg.text, i)}
+                          className={`p-1.5 rounded-lg transition-all ${
+                            msg.sender === 'user' ? 'hover:bg-white/20' : 'hover:bg-muted'
+                          }`}
+                        >
+                          {copiedIndex === i ? 
+                            <span className="text-[10px] font-black uppercase tracking-widest">COPIED!</span> : 
+                            <Copy className="w-3 h-3" />
+                          }
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))
-            )}
-            {apiLoading && (
-              <div className="flex justify-start mb-4">
-                <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-2xl animate-pulse text-xs font-bold text-purple-600">THINKING...</div>
+                  </motion.div>
+                ))}
               </div>
             )}
-            <div ref={messagesEndRef} className="h-2" />
+            
+            {apiLoading && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex justify-start mb-8"
+              >
+                <div className="bg-white dark:bg-zinc-900 p-5 rounded-3xl rounded-tl-none border border-border/60 shadow-lg">
+                   <div className="flex items-center gap-3">
+                      <div className="flex space-x-1">
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                      <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Consulting Dr. Ahroid...</span>
+                   </div>
+                </div>
+              </motion.div>
+            )}
+            <div ref={messagesEndRef} className="h-4" />
           </div>
         </div>
 
-        {/* FOOTER: Fixed at bottom with safe area support */}
-        <footer className="p-4 lg:p-6 border-t bg-background pb-[max(1rem,calc(env(safe-area-inset-bottom)+60px))]">
-          {!canUseChat ? (
-            <div className="max-w-4xl mx-auto p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 rounded-2xl flex items-center justify-between">
-              <div className="flex items-center gap-3 text-sm font-semibold text-amber-800 dark:text-amber-200">
-                <Crown className="w-5 h-5 text-amber-500" /> Premium Required
-              </div>
-              <Link to="/pricing"><Button size="sm">Upgrade</Button></Link>
-            </div>
-          ) : (
-            <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex items-center gap-3">
-              <div className="relative flex-1">
-                <Input
-                  placeholder="Ask anything..."
-                  value={inputMessage}
-                  onChange={e => setInputMessage(e.target.value)}
-                  disabled={apiLoading}
-                  className="pr-12 h-14 rounded-2xl bg-gray-50 dark:bg-gray-900"
-                />
-                <button type="button" onClick={handleMicClick} className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 ${recording ? 'text-red-500 animate-pulse' : 'text-gray-400'}`}>
-                  <Mic className="w-5 h-5" />
-                </button>
-              </div>
-              <Button type="submit" disabled={apiLoading || !inputMessage.trim()} size="icon" className="h-14 w-14 rounded-2xl bg-purple-600">
-                <Send className="w-6 h-6 text-white" />
-              </Button>
-            </form>
-          )}
+        <footer className="p-4 lg:p-8 bg-background border-t border-border/60">
+          <div className="max-w-4xl mx-auto mb-[max(0px,env(safe-area-inset-bottom))]">
+            {!canUseChat ? (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-6 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border-2 border-amber-200 dark:border-amber-900/50 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl shadow-amber-500/5"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500 flex items-center justify-center shadow-lg">
+                    <Crown className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black italic uppercase tracking-tight">Premium Consult Required</h4>
+                    <p className="text-xs text-muted-foreground font-medium">Unlock full access to Dr. Ahroid & other AI features.</p>
+                  </div>
+                </div>
+                <Link to="/pricing" className="w-full sm:w-auto">
+                  <Button className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-white rounded-2xl h-12 px-8 font-black uppercase text-xs tracking-[0.2em] shadow-lg shadow-amber-500/20">
+                    Upgrade to Premium
+                  </Button>
+                </Link>
+              </motion.div>
+            ) : (
+              <form onSubmit={handleSendMessage} className="flex items-center gap-4 relative">
+                <div className="relative flex-1 group">
+                  <Input
+                    placeholder="Describe your medical query here..."
+                    value={inputMessage}
+                    onChange={e => setInputMessage(e.target.value)}
+                    disabled={apiLoading}
+                    className="h-16 pl-6 pr-14 rounded-3xl bg-secondary/30 border-2 border-transparent focus:border-primary/30 dark:bg-zinc-900 shadow-inner text-sm font-medium transition-all"
+                  />
+                  <button 
+                    type="button" 
+                    onClick={handleMicClick} 
+                    className={`absolute right-4 top-1/2 -translate-y-1/2 p-2.5 rounded-xl transition-all ${
+                      recording ? 'bg-destructive text-white animate-pulse' : 'text-muted-foreground hover:bg-secondary active:scale-95'
+                    }`}
+                  >
+                    <Mic className="w-5 h-5" />
+                  </button>
+                </div>
+                <Button 
+                  type="submit" 
+                  disabled={apiLoading || !inputMessage.trim()} 
+                  size="icon" 
+                  className="h-16 w-16 rounded-[2rem] bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all shrink-0"
+                >
+                  <Send className="w-6 h-6 text-white" />
+                </Button>
+              </form>
+            )}
+            <p className="text-[10px] text-center text-muted-foreground mt-4 uppercase font-black tracking-widest opacity-40">Medmacs Study Assistant • AI Consult V2.0</p>
+          </div>
         </footer>
       </main>
 
-      {isSidebarOpen && <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setIsSidebarOpen(false)} />}
+      {isSidebarOpen && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden" 
+          onClick={() => setIsSidebarOpen(false)} 
+        />
+      )}
     </div>
   );
 };

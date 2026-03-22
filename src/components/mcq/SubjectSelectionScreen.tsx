@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, BookOpen } from 'lucide-react';
 import { fetchSubjects, Subject } from '@/utils/mcqData';
@@ -9,8 +9,14 @@ interface SubjectSelectionScreenProps {
 }
 
 const SubjectCardSkeleton = () => (
-  <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-400 via-slate-500 to-slate-600 shadow-2xl p-1 animate-pulse">
-    <div className="bg-white/10 backdrop-blur-xl rounded-[1.8rem] p-6 border border-white/10 h-24" />
+  <div className="relative overflow-hidden rounded-3xl bg-muted/20 p-6 animate-pulse border border-border/40">
+    <div className="flex items-center gap-4">
+      <div className="w-16 h-16 rounded-2xl bg-muted" />
+      <div className="flex-1 space-y-2">
+        <div className="h-5 w-1/3 bg-muted rounded-full" />
+        <div className="h-3 w-2/3 bg-muted rounded-full" />
+      </div>
+    </div>
   </div>
 );
 
@@ -34,82 +40,111 @@ export const SubjectSelectionScreen = ({ onSubjectSelect }: SubjectSelectionScre
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-2 sm:px-0 pb-24">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground uppercase italic">
-          Choose Your <span className="text-primary">Subject</span>
+    <div className="max-w-4xl mx-auto px-4 sm:px-0 pb-32">
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center mb-12"
+      >
+        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-3 block">Step 1 of 3</span>
+        <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none">
+          Select <span className="text-primary">Subject</span>
         </h2>
-        <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] mt-2">
-          Select the subject you want to practice
+        <p className="text-muted-foreground text-sm font-medium mt-4 max-w-lg mx-auto">
+          Choose a subject to begin your practice. Each subject contains comprehensive chapters and high-yield MCQs.
         </p>
-      </div>
+      </motion.div>
 
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {loading ? (
-          Array.from({ length: 3 }).map((_, i) => <SubjectCardSkeleton key={i} />)
+          Array.from({ length: 4 }).map((_, i) => <SubjectCardSkeleton key={i} />)
         ) : (
-          subjects.map((subject, index) => (
-            <motion.div
-              key={subject.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.08 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setSelectedSubject(subject)}
-              className="cursor-pointer"
-            >
-              <div className={`relative overflow-hidden rounded-[2rem] p-1 shadow-2xl transition-all duration-300 ${
-                selectedSubject?.id === subject.id
-                  ? 'bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700'
-                  : 'bg-gradient-to-br from-slate-400 via-slate-500 to-slate-600'
-              }`}>
-                {/* Pattern */}
-                <div className="absolute inset-0 opacity-10" style={{
-                  backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`,
-                  maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
-                }} />
+          subjects.map((subject, index) => {
+            const isSelected = selectedSubject?.id === subject.id;
+            return (
+              <motion.div
+                key={subject.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.05 }}
+                whileHover={{ scale: 1.02, y: -4 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setSelectedSubject(subject)}
+                className={`group cursor-pointer relative overflow-hidden rounded-3xl border-2 p-6 transition-all duration-300 ${
+                  isSelected 
+                    ? 'border-primary bg-primary/5 shadow-2xl shadow-primary/10' 
+                    : 'border-border/40 bg-white/5 dark:bg-zinc-900/50 hover:border-primary/30 hover:bg-primary/5'
+                }`}
+              >
+                {/* Background Glow */}
+                {isSelected && (
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 blur-[60px] -mr-16 -mt-16 pointer-events-none" />
+                )}
 
-                <div className="relative z-10 bg-white/10 backdrop-blur-xl rounded-[1.8rem] p-5 border border-white/10 flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center text-2xl border border-white/20 flex-shrink-0">
+                <div className="flex items-center gap-5 relative z-10">
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-xl transition-transform duration-300 group-hover:scale-110 ${
+                    isSelected ? 'bg-primary text-white' : 'bg-muted/50 text-foreground/70'
+                  }`}>
                     {subject.icon || '📚'}
                   </div>
+                  
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-black text-white tracking-tight">{subject.name}</h3>
-                    <p className="text-white/60 text-xs mt-0.5 truncate">{subject.description}</p>
-                  </div>
-                  {selectedSubject?.id === subject.id && (
-                    <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center flex-shrink-0">
-                      <div className="w-3 h-3 rounded-full bg-indigo-600" />
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className={`text-xl font-black uppercase italic tracking-tight transition-colors ${
+                        isSelected ? 'text-primary' : 'text-foreground'
+                      }`}>
+                        {subject.name}
+                      </h3>
+                      {isSelected && (
+                        <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                      )}
                     </div>
-                  )}
+                    <p className="text-muted-foreground text-xs font-medium leading-relaxed line-clamp-2">
+                      {subject.description || `Master ${subject.name} with our structured question bank and detailed explanations.`}
+                    </p>
+                  </div>
+
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                    isSelected ? 'bg-primary text-white' : 'bg-muted opacity-0 group-hover:opacity-100'
+                  }`}>
+                    <ArrowRight className="w-4 h-4" />
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))
+              </motion.div>
+            );
+          })
         )}
       </div>
 
-      {selectedSubject && (
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-xl border-t border-border/40 z-40 pb-[calc(1rem+env(safe-area-inset-bottom))]"
-        >
-          <Button
-            onClick={handleContinue}
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:scale-[1.01] transition-all rounded-2xl h-14 uppercase font-black text-xs tracking-widest shadow-2xl"
-            size="lg"
+      <AnimatePresence>
+        {selectedSubject && (
+          <motion.div
+            initial={{ opacity: 0, y: 100 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 100 }}
+            className="fixed bottom-0 left-0 right-0 p-6 z-50 flex justify-center pointer-events-none"
           >
-            Continue with {selectedSubject.name}
-            <ArrowRight className="w-5 h-5 ml-2" />
-          </Button>
-        </motion.div>
-      )}
+            <div className="w-full max-w-md pointer-events-auto">
+              <Button
+                onClick={handleContinue}
+                className="w-full bg-primary hover:bg-primary/90 text-white shadow-2xl shadow-primary/40 rounded-2xl h-16 uppercase font-black text-sm tracking-[0.2em] group transition-all"
+                size="lg"
+              >
+                Continue to Chapters
+                <motion.div
+                  animate={{ x: [0, 5, 0] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                >
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </motion.div>
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Footer */}
-      <div className="text-center pt-6 pb-4">
-        <p className="text-[10px] text-muted-foreground font-medium">A Project by Hmacs Studios.</p>
-        <p className="text-[10px] text-muted-foreground mt-1">© 2026 Hmacs Studios. All rights reserved</p>
+      <div className="text-center pt-20 pb-10 opacity-40">
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">© 2026 Medmacs App • All rights reserved</p>
       </div>
     </div>
   );

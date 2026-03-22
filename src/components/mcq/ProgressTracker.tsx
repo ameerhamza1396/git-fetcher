@@ -1,7 +1,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Target, Trophy, TrendingUp, Flame, Clock } from 'lucide-react';
+import { Target, Trophy, TrendingUp, Flame, Clock, Bookmark } from 'lucide-react';
 
 interface ProgressTrackerProps {
   userId?: string;
@@ -18,6 +18,20 @@ export const ProgressTracker = ({ userId }: ProgressTrackerProps) => {
         .eq('user_id', userId);
       if (error) throw error;
       return data || [];
+    },
+    enabled: !!userId
+  });
+
+  const { data: savedCount } = useQuery({
+    queryKey: ['saved-mcqs-count', userId],
+    queryFn: async () => {
+      if (!userId) return 0;
+      const { count, error } = await supabase
+        .from('saved_mcqs')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      if (error) throw error;
+      return count || 0;
     },
     enabled: !!userId
   });
@@ -42,10 +56,10 @@ export const ProgressTracker = ({ userId }: ProgressTrackerProps) => {
   }
 
   const stats = [
-    { label: 'Questions Practiced', value: totalQuestions, icon: Target, gradient: 'from-blue-600 via-indigo-600 to-violet-700', glow: 'bg-blue-400' },
-    { label: 'Accuracy Rate', value: `${overallAccuracy}%`, icon: TrendingUp, gradient: 'from-emerald-600 via-teal-600 to-cyan-700', glow: 'bg-emerald-400' },
-    { label: 'Best Streak', value: bestStreak, icon: Flame, gradient: 'from-orange-500 via-red-500 to-rose-600', glow: 'bg-orange-400' },
-    { label: 'Avg. Time', value: `${avgTime}s`, icon: Clock, gradient: 'from-rose-600 via-pink-600 to-fuchsia-700', glow: 'bg-rose-400' },
+    { label: 'Total Practice', value: totalQuestions, icon: Target, gradient: 'from-blue-600 via-indigo-600 to-violet-700', glow: 'bg-blue-400' },
+    { label: 'Accuracy', value: `${overallAccuracy}%`, icon: TrendingUp, gradient: 'from-emerald-600 via-teal-600 to-cyan-700', glow: 'bg-emerald-400' },
+    { label: 'Saved MCQs', value: savedCount || 0, icon: Bookmark, gradient: 'from-orange-500 via-red-500 to-rose-600', glow: 'bg-orange-400' },
+    { label: 'Avg Time', value: `${avgTime}s`, icon: Clock, gradient: 'from-rose-600 via-pink-600 to-fuchsia-700', glow: 'bg-rose-400' },
   ];
 
   return (

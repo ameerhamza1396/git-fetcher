@@ -12,30 +12,39 @@ interface Message {
 }
 
 interface AIChatbotProps {
-  currentQuestion?: string;
-  options?: any;
+  isOpen: boolean;
+  onClose: () => void;
+  questionContext?: string;
+  explanationContext?: string;
+  currentAnswer?: string | null;
+  correctAnswer?: string;
   userPlan?: string;
+  isHidden?: boolean;
+  onOpen: () => void;
 }
 
-export const AIChatbot: React.FC<AIChatbotProps> = ({ currentQuestion, userPlan, options }) => {
-  const [isOpen, setIsOpen] = useState(false);
+export const AIChatbot: React.FC<AIChatbotProps> = ({
+  isOpen,
+  onClose,
+  questionContext,
+  explanationContext,
+  currentAnswer,
+  correctAnswer,
+  userPlan,
+  isHidden = false,
+  onOpen
+}) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const hasPremiumAccess = userPlan === 'premium';
+  const hasPremiumAccess = userPlan?.toLowerCase() === 'premium' || userPlan?.toLowerCase() === 'iconic';
   const API_BASE_URL = 'https://medmacs-ai-bot.vercel.app';
 
   const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); };
   useEffect(() => { scrollToBottom(); }, [messages]);
 
-  const formatOptions = () => {
-    if (!options) return 'No options provided';
-    if (Array.isArray(options)) return options.join(', ');
-    if (typeof options === 'object') return Object.entries(options).map(([key, value]) => `${key}: ${value}`).join(', ');
-    return String(options);
-  };
 
   const sendMessage = async (message: string) => {
     if (!hasPremiumAccess || !message.trim() || isLoading) return;
@@ -45,10 +54,12 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({ currentQuestion, userPlan,
     setIsLoading(true);
     try {
       let composedPrompt = message.trim();
-      if (currentQuestion) composedPrompt = `MCQ Question: ${currentQuestion}\nOptions: ${formatOptions()}\n\nUser Query: ${message.trim()}`;
+      if (questionContext) {
+        composedPrompt = `MCQ Question: ${questionContext}\nCorrect Answer: ${correctAnswer}\nUser Selected: ${currentAnswer || 'None'}\nExplanation Provided: ${explanationContext}\n\nUser Query: ${message.trim()}`;
+      }
       const response = await fetch(`${API_BASE_URL}/study-chat`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: composedPrompt, options }),
+        body: JSON.stringify({ question: composedPrompt }),
       });
       if (!response.ok) { const errorText = await response.text(); throw new Error(`Server responded with ${response.status}: ${errorText}`); }
       const data = await response.json();
@@ -59,16 +70,25 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({ currentQuestion, userPlan,
   };
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); sendMessage(input); };
-  const handleQuestionHelp = () => { if (hasPremiumAccess && currentQuestion) sendMessage(`Explain this MCQ:\n${currentQuestion}\nOptions: ${formatOptions()}`); };
+  const handleQuestionHelp = () => { if (hasPremiumAccess && questionContext) sendMessage(`Explain this MCQ:\n${questionContext}\nExplanation: ${explanationContext}`); };
 
   return (
     <>
-      {/* FAB */}
-      <motion.div className="fixed bottom-6 right-4 z-50" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-        <Button onClick={() => setIsOpen(true)} className="w-14 h-14 rounded-full bg-primary/80 backdrop-blur-xl hover:bg-primary/90 shadow-xl border border-primary-foreground/10">
-          <Bot className="w-6 h-6 text-primary-foreground" />
-        </Button>
-      </motion.div>
+        <motion.div 
+          className="fixed bottom-6 right-4 z-50" 
+          whileHover={{ scale: 1.1 }} 
+          whileTap={{ scale: 0.9 }}
+          initial={{ opacity: 0, scale: 0.5 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.5 }}
+        >
+          <Button 
+            onClick={onOpen}
+            className="w-14 h-14 rounded-full bg-primary/80 backdrop-blur-xl hover:bg-primary/90 shadow-xl border border-primary-foreground/10 p-0"
+          >
+            <Bot className="w-6 h-6 text-primary-foreground" />
+          </Button>
+        </motion.div>
 
       {/* Chat panel */}
       <AnimatePresence>
@@ -95,7 +115,7 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({ currentQuestion, userPlan,
                     <p className="text-[10px] text-muted-foreground">AI Study Assistant</p>
                   </div>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)} className="w-8 h-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted">
+                <Button variant="ghost" size="sm" onClick={onClose} className="w-8 h-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted">
                   <X className="w-5 h-5" />
                 </Button>
               </div>
@@ -146,7 +166,7 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({ currentQuestion, userPlan,
                 </ScrollArea>
 
                 {/* Help button */}
-                {currentQuestion && (
+                {questionContext && (
                   <div className="px-3 py-2 border-t border-border/30 flex-shrink-0">
                     <Button variant="outline" size="sm" onClick={handleQuestionHelp} className="w-full text-xs rounded-xl h-9 bg-background/40 backdrop-blur-lg border-border/30">
                       Help with current question
