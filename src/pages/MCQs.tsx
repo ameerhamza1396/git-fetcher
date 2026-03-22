@@ -41,7 +41,7 @@ const MCQs = () => {
     const handleLocationState = async () => {
       if (location.state?.autoResume && location.state?.resumeData) {
         const { subjectId, chapterId } = location.state.resumeData;
-        
+
         try {
           // Fetch subject and chapter objects from Supabase
           const [{ data: subject }, { data: chapter }] = await Promise.all([
@@ -60,12 +60,12 @@ const MCQs = () => {
         } catch (error) {
           console.error("Failed to fetch resume data:", error);
         }
-        
+
         // Clear state to prevent infinite auto-resume on reload
         window.history.replaceState({}, document.title)
       }
     };
-    
+
     handleLocationState();
   }, [location.state]);
 
@@ -144,7 +144,7 @@ const MCQs = () => {
       case 'chapters': return { label: 'Back to Subjects', action: handleBackToSubjects };
       case 'settings': return { label: 'Back to Chapters', action: handleBackToChapters };
       case 'quiz': return { label: 'Leave Test', action: () => setShowLeaveConfirm(true) };
-      default: return { label: 'Dashboard', action: () => {} };
+      default: return { label: 'Dashboard', action: () => { } };
     }
   };
 
@@ -167,11 +167,11 @@ const MCQs = () => {
         return selectedSubject && selectedChapter ? <QuizSettingsScreen subject={selectedSubject} chapter={selectedChapter} onStartQuiz={handleStartQuiz} onBack={handleBackToChapters} /> : null;
       case 'quiz':
         return selectedSubject && selectedChapter ? (
-          <MCQDisplay 
-            subject={selectedSubject.id} 
-            chapter={selectedChapter.id} 
-            onBack={handleBackToSettings} 
-            timerEnabled={timerEnabled} 
+          <MCQDisplay
+            subject={selectedSubject.id}
+            chapter={selectedChapter.id}
+            onBack={handleBackToSettings}
+            timerEnabled={timerEnabled}
             timePerQuestion={timePerQuestion}
             initialIndex={initialIndex}
           />
@@ -207,10 +207,10 @@ const MCQs = () => {
   return (
     <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950">
       <Seo title="MCQs Practice" description="Practice thousands of MCQs for MDCAT and other medical entrance exams with Medmacs App." canonical="https://medmacs.app/mcqs" />
-      
-      {/* Glass header with scroll retract */}
-      <header 
-        className={`fixed top-0 left-0 right-0 z-50 bg-background/60 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
+
+      {/* Glass header with scroll retract - hidden during quiz for immersive experience */}
+      <header
+        className={`fixed top-0 left-0 right-0 z-50 bg-background/60 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible && currentScreen !== 'quiz' ? 'translate-y-0' : '-translate-y-full'} ${currentScreen === 'quiz' ? 'pointer-events-none opacity-0' : ''}`}
       >
         <div className="container mx-auto px-3 sm:px-4 lg:px-8 py-3 sm:py-4 flex justify-between items-center max-w-full">
           {currentScreen === 'subjects' ? (

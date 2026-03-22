@@ -197,9 +197,8 @@ const Leaderboard = () => {
                         {leaderboardData.slice(0, 3).map((entry, index) => (
                             <Card
                                 key={entry.id}
-                                className={`relative overflow-hidden hover:scale-105 transition-all duration-300 animate-fade-in bg-gradient-to-br from-primary/5 to-accent border-border backdrop-blur-sm ${
-                                    index === 0 ? 'md:order-2' : index === 1 ? 'md:order-1' : 'md:order-3'
-                                }`}
+                                className={`relative overflow-hidden hover:scale-105 transition-all duration-300 animate-fade-in bg-gradient-to-br from-primary/5 to-accent border-border backdrop-blur-sm ${index === 0 ? 'md:order-2' : index === 1 ? 'md:order-1' : 'md:order-3'
+                                    }`}
                                 style={{ animationDelay: `${index * 100}ms` }}
                             >
                                 <div className={`absolute top-0 left-0 right-0 h-2 ${getRankBadge(index + 1)}`}></div>
@@ -239,7 +238,7 @@ const Leaderboard = () => {
                     <CardContent className="p-4 lg:p-6 pt-0">
                         {isLoading ? (
                             <div className="space-y-4">
-                               <PageSkeleton />
+                                <PageSkeleton />
                             </div>
                         ) : leaderboardData.length === 0 ? (
                             <div className="text-center py-8">

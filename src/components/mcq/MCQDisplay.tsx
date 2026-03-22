@@ -3,7 +3,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Clock, CheckCircle, XCircle, Timer, Bot, MessageSquare, X, Bookmark, BookmarkCheck, Crown, LogOut, AlertTriangle, MoreVertical, Flag, BotOff, Moon, Sun } from 'lucide-react';
+import {
+  Clock, CheckCircle, XCircle, Timer, Bot, MessageSquare, X, Bookmark,
+  BookmarkCheck, Crown, LogOut, AlertTriangle, MoreVertical, Flag, BotOff,
+  Moon, Sun, Zap, Sparkles, BookOpen, ChevronLeft, Loader2, Star, Award,
+  TrendingUp, Brain, Target, Shield
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { fetchMCQsByChapter, MCQ } from '@/utils/mcqData';
@@ -11,10 +16,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { AIChatbot } from './AIChatbot';
 import { useQuery } from '@tanstack/react-query';
 import { playCorrectSound, playIncorrectSound } from '@/utils/soundEffects';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
 import { useTheme } from 'next-themes';
+import { Switch } from '@/components/ui/switch';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 
 interface MCQDisplayProps {
   subject: string;
@@ -23,6 +28,7 @@ interface MCQDisplayProps {
   timerEnabled?: boolean;
   timePerQuestion?: number;
   initialIndex?: number;
+  isAiGenerated?: boolean;
 }
 
 interface ShuffledMCQ extends Omit<MCQ, 'options'> {
@@ -42,8 +48,6 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 const LAST_ATTEMPTED_MCQ_KEY = 'lastAttemptedMCQIndex';
 const LAST_ATTEMPTED_SUBJECT_KEY = 'lastAttemptedMCQSubject';
 const LAST_ATTEMPTED_CHAPTER_KEY = 'lastAttemptedMCQChapter';
-
-// The new key for the list of saved sessions shown in the dashboard widget
 const SAVED_SESSIONS_LIST_KEY = 'mcq_saved_sessions';
 
 export interface SavedMCQSession {
@@ -56,142 +60,214 @@ export interface SavedMCQSession {
 const updateSavedSessionsList = async (userId: string | undefined, subjectId: string, chapterId: string, lastIndex: number) => {
   if (typeof window === 'undefined') return;
   try {
-    // 1. Get current sessions (prioritize cloud if logged in)
     let sessions: SavedMCQSession[] = [];
-    
     if (userId) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('in_progress_mcqs')
-        .eq('id', userId)
-        .single();
-      
-      if (profile?.in_progress_mcqs) {
-        sessions = profile.in_progress_mcqs as unknown as SavedMCQSession[];
-      }
+      const { data: profile } = await supabase.from('profiles').select('in_progress_mcqs').eq('id', userId).single();
+      if (profile?.in_progress_mcqs) sessions = profile.in_progress_mcqs as unknown as SavedMCQSession[];
     }
-
     if (sessions.length === 0) {
       const localData = localStorage.getItem(SAVED_SESSIONS_LIST_KEY);
       sessions = localData ? JSON.parse(localData) : [];
     }
-
-    // 2. Merge/Update the list
-    // Remove existing entry for this chapter to avoid duplicates
     sessions = sessions.filter(s => s.chapterId !== chapterId);
-
-    // Add updated or new entry to the front
-    sessions.unshift({
-      subjectId,
-      chapterId,
-      lastIndex,
-      timestamp: new Date().toISOString()
-    });
-
-    // Keep only the most recent 5
-    if (sessions.length > 5) {
-      sessions = sessions.slice(0, 5);
-    }
-
-    // 3. Persist to Local Storage
+    sessions.unshift({ subjectId, chapterId, lastIndex, timestamp: new Date().toISOString() });
+    if (sessions.length > 5) sessions = sessions.slice(0, 5);
     localStorage.setItem(SAVED_SESSIONS_LIST_KEY, JSON.stringify(sessions));
-
-    // 4. Persist to Supabase if logged in
-    if (userId) {
-      await supabase
-        .from('profiles')
-        .update({ in_progress_mcqs: sessions })
-        .eq('id', userId);
-    }
-  } catch (e) {
-    console.error("Failed to update saved sessions array", e);
-  }
+    if (userId) await supabase.from('profiles').update({ in_progress_mcqs: sessions }).eq('id', userId);
+  } catch (e) { console.error("Failed to update saved sessions array", e); }
 };
 
 const removeSavedSessionFromList = async (userId: string | undefined, chapterId: string) => {
   if (typeof window === 'undefined') return;
   try {
     let sessions: SavedMCQSession[] = [];
-
     if (userId) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('in_progress_mcqs')
-        .eq('id', userId)
-        .single();
-      
-      if (profile?.in_progress_mcqs) {
-        sessions = profile.in_progress_mcqs as unknown as SavedMCQSession[];
-      }
+      const { data: profile } = await supabase.from('profiles').select('in_progress_mcqs').eq('id', userId).single();
+      if (profile?.in_progress_mcqs) sessions = profile.in_progress_mcqs as unknown as SavedMCQSession[];
     }
-
     if (sessions.length === 0) {
       const localData = localStorage.getItem(SAVED_SESSIONS_LIST_KEY);
       sessions = localData ? JSON.parse(localData) : [];
     }
-
-    // Filter out the completed chapter
     sessions = sessions.filter(s => s.chapterId !== chapterId);
-    
-    // Update Local Storage
     localStorage.setItem(SAVED_SESSIONS_LIST_KEY, JSON.stringify(sessions));
-
-    // Update Supabase
-    if (userId) {
-      await supabase
-        .from('profiles')
-        .update({ in_progress_mcqs: sessions })
-        .eq('id', userId);
-    }
-  } catch (e) {
-    console.error("Failed to remove saved session from array", e);
-  }
+    if (userId) await supabase.from('profiles').update({ in_progress_mcqs: sessions }).eq('id', userId);
+  } catch (e) { console.error("Failed to remove saved session from array", e); }
 };
 
-// --- Upgrade Account Modal ---
-const UpgradeAccountModal = ({ isOpen, onClose, onUpgradeClick }) => (
-  <Dialog open={isOpen} onOpenChange={onClose}>
-    <DialogContent className="sm:max-w-[425px] bg-background border-border rounded-2xl">
-      <DialogHeader className="text-center">
-        <Crown className="w-12 h-12 mx-auto text-yellow-500 mb-3" />
-        <DialogTitle className="text-2xl font-bold">Upgrade Your Account</DialogTitle>
-        <DialogDescription className="text-muted-foreground mt-2">
-          You've reached the daily limit of 50 free MCQ submissions. Upgrade to a premium plan for unlimited practice!
-        </DialogDescription>
-      </DialogHeader>
-      <DialogFooter className="flex flex-col sm:flex-row gap-3 mt-6">
-        <Button onClick={onClose} variant="outline" className="w-full sm:w-auto">Maybe Later</Button>
-        <Button onClick={onUpgradeClick} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground font-bold">Upgrade Now</Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
+// ─── Custom Modal primitives ───────────────────────────────────────────────────
+// We bypass shadcn's Dialog wrapper and use Radix primitives directly with
+// explicit z-[200]/z-[201] so they always render above the z-[100] quiz container.
+// The overlay uses a fully opaque dark background so the card beneath doesn't bleed through.
+
+const ModalOverlay = () => (
+  <DialogPrimitive.Overlay
+    className="fixed inset-0 bg-black/75 z-[200]
+      data-[state=open]:animate-in data-[state=closed]:animate-out
+      data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+  />
 );
 
-// --- Leave Test Confirmation Modal ---
-const LeaveTestModal = ({ isOpen, onClose, onConfirm }) => (
-  <Dialog open={isOpen} onOpenChange={onClose}>
-    <DialogContent className="sm:max-w-[400px] bg-background border-border rounded-2xl">
-      <DialogHeader className="text-center">
-        <div className="mx-auto mb-3 w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center">
-          <AlertTriangle className="w-7 h-7 text-destructive" />
+const ModalContent = ({ children, className = '', ...props }) => (
+  <DialogPrimitive.Portal>
+    <ModalOverlay />
+    <DialogPrimitive.Content
+      className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[201] w-full focus:outline-none
+        data-[state=open]:animate-in data-[state=closed]:animate-out
+        data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0
+        data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95
+        data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]
+        data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]
+        ${className}`}
+      {...props}
+    >
+      {children}
+    </DialogPrimitive.Content>
+  </DialogPrimitive.Portal>
+);
+
+// ─── Modals ────────────────────────────────────────────────────────────────────
+
+const MCQSettingsModal = ({
+  isOpen, onClose, onExit,
+  quickSubmit, toggleQuickSubmit,
+  soundEnabled, toggleSound,
+  aiPopupsDisabled, toggleAiPopups,
+  onReport, isPremium
+}) => (
+  <DialogPrimitive.Root open={isOpen} onOpenChange={onClose}>
+    <ModalContent className="sm:max-w-[400px] mx-4">
+      {/* Solid card — no bg-background (CSS var can be transparent) */}
+      <div className="bg-white dark:bg-zinc-900 border-2 border-primary/20 rounded-3xl overflow-hidden shadow-2xl">
+        <div className="p-6 pb-0">
+          <DialogPrimitive.Title className="flex items-center gap-2 mb-1">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center shadow-lg shrink-0">
+              <Zap className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-xl font-black italic uppercase tracking-tight bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+              Quiz Settings
+            </span>
+          </DialogPrimitive.Title>
+          <DialogPrimitive.Description className="text-sm text-zinc-500 dark:text-zinc-400 pl-10">
+            Customize your quiz experience
+          </DialogPrimitive.Description>
         </div>
-        <DialogTitle className="text-xl font-bold">Leave Test?</DialogTitle>
-        <DialogDescription className="text-muted-foreground mt-2">
-          Your progress has been saved. You can resume from where you left off next time.
-        </DialogDescription>
-      </DialogHeader>
-      <DialogFooter className="flex flex-col sm:flex-row gap-3 mt-4">
-        <Button onClick={onClose} variant="outline" className="w-full sm:w-auto">Continue Test</Button>
-        <Button onClick={onConfirm} variant="destructive" className="w-full sm:w-auto font-bold">Leave Test</Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
+
+        <div className="p-6 pt-4 space-y-3">
+          {/* Quick Submit */}
+          <div className="flex items-center justify-between p-4 rounded-2xl bg-orange-500/10 border border-orange-500/20">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-lg shrink-0">
+                <Zap className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Quick Submit</p>
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-widest font-black">Skip Submit Button</p>
+              </div>
+            </div>
+            <Switch checked={quickSubmit} onCheckedChange={toggleQuickSubmit} className="data-[state=checked]:bg-orange-500 shrink-0" />
+          </div>
+
+          {/* AI Popups */}
+          <div className="flex items-center justify-between p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-lg shrink-0">
+                <Bot className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">AI Popups</p>
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-widest font-black">{aiPopupsDisabled ? 'OFF' : 'ON'}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {!isPremium && <Crown className="w-4 h-4 text-yellow-500 animate-pulse" />}
+              <Switch checked={!aiPopupsDisabled} disabled={!isPremium} onCheckedChange={toggleAiPopups} className="data-[state=checked]:bg-blue-500" />
+            </div>
+          </div>
+
+          {/* Sound FX */}
+          <div className="flex items-center justify-between p-4 rounded-2xl bg-violet-500/10 border border-violet-500/20">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shrink-0 text-lg leading-none">
+                {soundEnabled ? '🔊' : '🔇'}
+              </div>
+              <div>
+                <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Sound FX</p>
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-widest font-black">{soundEnabled ? 'ENABLED' : 'DISABLED'}</p>
+              </div>
+            </div>
+            <Switch checked={soundEnabled} onCheckedChange={toggleSound} className="data-[state=checked]:bg-violet-500 shrink-0" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 pt-2">
+            <Button onClick={onReport} variant="outline" className="w-full rounded-2xl h-12 border-2 border-red-300 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 font-bold uppercase text-xs tracking-widest">
+              <Flag className="w-4 h-4 mr-2" /> Report Question
+            </Button>
+            <Button onClick={onExit} className="w-full rounded-2xl h-12 font-black uppercase text-xs tracking-widest bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white">
+              <LogOut className="w-4 h-4 mr-2" /> Leave Session
+            </Button>
+          </div>
+        </div>
+      </div>
+    </ModalContent>
+  </DialogPrimitive.Root>
 );
 
-// --- Report MCQ Modal ---
+const UpgradeAccountModal = ({ isOpen, onClose, onUpgradeClick }) => (
+  <DialogPrimitive.Root open={isOpen} onOpenChange={onClose}>
+    <ModalContent className="sm:max-w-[425px] mx-4">
+      <div className="bg-white dark:bg-zinc-900 border-2 border-yellow-500/30 rounded-2xl p-6 shadow-2xl">
+        <DialogPrimitive.Title className="sr-only">Upgrade Your Account</DialogPrimitive.Title>
+        <DialogPrimitive.Description className="sr-only">Upgrade to premium for unlimited MCQ practice</DialogPrimitive.Description>
+        <div className="flex flex-col items-center text-center">
+          <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }} className="mb-4">
+            <Crown className="w-16 h-16 text-yellow-500" />
+          </motion.div>
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent mb-2">
+            Upgrade Your Account
+          </h2>
+          <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6">
+            You've reached the daily limit of 50 free MCQ submissions. Upgrade to a premium plan for unlimited practice!
+          </p>
+          <div className="flex flex-col-reverse sm:flex-row gap-3 w-full sm:justify-center">
+            <Button onClick={onClose} variant="outline" className="w-full sm:w-auto rounded-xl">Maybe Later</Button>
+            <Button onClick={onUpgradeClick} className="w-full sm:w-auto bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-bold rounded-xl shadow-lg">
+              Upgrade Now
+            </Button>
+          </div>
+        </div>
+      </div>
+    </ModalContent>
+  </DialogPrimitive.Root>
+);
+
+const LeaveTestModal = ({ isOpen, onClose, onConfirm }) => (
+  <DialogPrimitive.Root open={isOpen} onOpenChange={onClose}>
+    <ModalContent className="sm:max-w-[400px] mx-4">
+      <div className="bg-white dark:bg-zinc-900 border-2 border-red-200 dark:border-red-900 rounded-2xl p-6 shadow-2xl">
+        <DialogPrimitive.Title className="sr-only">Leave Session</DialogPrimitive.Title>
+        <DialogPrimitive.Description className="sr-only">Confirm leaving the quiz session</DialogPrimitive.Description>
+        <div className="flex flex-col items-center text-center">
+          <div className="mb-4 w-16 h-16 rounded-full bg-red-100 dark:bg-red-950 flex items-center justify-center">
+            <AlertTriangle className="w-8 h-8 text-red-500" />
+          </div>
+          <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Leave Session?</h2>
+          <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6">Your progress will be saved so you can continue later.</p>
+          <div className="flex flex-col-reverse sm:flex-row gap-3 w-full">
+            <Button onClick={onClose} variant="outline" className="flex-1 rounded-xl h-12">Cancel</Button>
+            <Button onClick={onConfirm} className="flex-1 rounded-xl h-12 font-bold bg-red-600 hover:bg-red-700 text-white">Leave Test</Button>
+          </div>
+        </div>
+      </div>
+    </ModalContent>
+  </DialogPrimitive.Root>
+);
+
 const ReportMCQModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
   const [reason, setReason] = useState('');
   const [category, setCategory] = useState('');
+
+  const handleClose = () => { setReason(''); setCategory(''); onClose(); };
 
   const categories = [
     'Incorrect answer marked as correct',
@@ -210,58 +286,69 @@ const ReportMCQModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[450px] bg-background border-border rounded-2xl">
-        <DialogHeader className="text-center">
-          <div className="mx-auto mb-3 w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center">
-            <Flag className="w-7 h-7 text-destructive" />
+    <DialogPrimitive.Root open={isOpen} onOpenChange={handleClose}>
+      <ModalContent className="sm:max-w-[450px] mx-4">
+        <div className="bg-white dark:bg-zinc-900 border-2 border-red-200 dark:border-red-900 rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
+          <DialogPrimitive.Title className="sr-only">Report Question</DialogPrimitive.Title>
+          <DialogPrimitive.Description className="sr-only">Report an issue with this MCQ question</DialogPrimitive.Description>
+
+          <div className="flex flex-col items-center text-center mb-5">
+            <div className="mb-3 w-14 h-14 rounded-full bg-red-100 dark:bg-red-950 flex items-center justify-center">
+              <Flag className="w-7 h-7 text-red-500" />
+            </div>
+            <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Report Question</h2>
+            <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">Help us improve by reporting issues with this question.</p>
           </div>
-          <DialogTitle className="text-xl font-bold">Report Question</DialogTitle>
-          <DialogDescription className="text-muted-foreground mt-2">
-            Help us improve by reporting issues with this question.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 mt-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">What's wrong?</label>
-            <div className="grid grid-cols-1 gap-2">
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setCategory(cat)}
-                  className={`text-left text-sm px-3 py-2.5 rounded-xl border transition-all ${
-                    category === cat
-                      ? 'bg-primary/10 border-primary/30 text-foreground font-medium'
-                      : 'bg-muted/20 border-border/30 text-muted-foreground hover:bg-muted/40'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">What's wrong?</p>
+              <div className="grid grid-cols-1 gap-2">
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategory(cat)}
+                    className={`text-left text-sm px-3 py-2.5 rounded-xl border-2 transition-all ${category === cat
+                        ? 'bg-red-50 dark:bg-red-950 border-red-500 text-zinc-900 dark:text-zinc-100 font-medium'
+                        : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                      }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Additional details (optional)</p>
+              <Textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Provide more context about the issue..."
+                className="rounded-xl bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 resize-none text-sm"
+                rows={3}
+              />
             </div>
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Additional details (optional)</label>
-            <Textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Provide more context about the issue..."
-              className="rounded-xl bg-muted/20 border-border/30 resize-none text-sm"
-              rows={3}
-            />
+
+          <div className="flex flex-col-reverse sm:flex-row gap-3 mt-6">
+            <Button onClick={handleClose} variant="outline" className="flex-1 rounded-xl">Cancel</Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={!category || isSubmitting}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl"
+            >
+              {isSubmitting ? 'Submitting...' : 'Submit Report'}
+            </Button>
           </div>
         </div>
-        <DialogFooter className="flex flex-col sm:flex-row gap-3 mt-4">
-          <Button onClick={onClose} variant="outline" className="w-full sm:w-auto">Cancel</Button>
-          <Button onClick={handleSubmit} disabled={!category || isSubmitting} className="w-full sm:w-auto bg-destructive hover:bg-destructive/90 text-destructive-foreground font-bold">
-            {isSubmitting ? 'Submitting...' : 'Submit Report'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </ModalContent>
+    </DialogPrimitive.Root>
   );
 };
 
+// ─── Main Component ────────────────────────────────────────────────────────────
 
 export const MCQDisplay = ({
   subject,
@@ -269,7 +356,8 @@ export const MCQDisplay = ({
   onBack,
   timerEnabled = false,
   timePerQuestion = 30,
-  initialIndex = 0
+  initialIndex = 0,
+  isAiGenerated = false
 }: MCQDisplayProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -283,14 +371,19 @@ export const MCQDisplay = ({
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [score, setScore] = useState(0);
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
-  const [showHelpToast, setShowHelpToast] = useState(false);
-  const [helpToastMessage, setHelpToastMessage] = useState('');
   const helpToastTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [isCurrentMCQSaved, setIsCurrentMCQSaved] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isReportSubmitting, setIsReportSubmitting] = useState(false);
+  const [hasAttemptedAny, setHasAttemptedAny] = useState(false);
+  const [quickSubmit, setQuickSubmit] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('quickSubmitEnabled') !== 'false';
+    return true;
+  });
+  const [feedbackType, setFeedbackType] = useState<'correct' | 'incorrect' | null>(null);
   const [aiPopupsDisabled, setAiPopupsDisabled] = useState(() => {
     if (typeof window !== 'undefined') return localStorage.getItem('aiPopupsDisabled') === 'true';
     return false;
@@ -302,28 +395,11 @@ export const MCQDisplay = ({
   const [dailySubmissionsCount, setDailySubmissionsCount] = useState(0);
   const [lastSubmissionResetDate, setLastSubmissionResetDate] = useState<string | null>(null);
 
-  const helpMessages = [
-    "Hey, you look stuck. May I help you?",
-    "Things going dude or may I help you?",
-    "Hey, I am Dr. Sultan. Tap here to ask me if you need help.",
-    "Don't hesitate to ask! Dr. Ahroid is here.",
-    "Need a hint? I'm here to assist!",
-    "Feeling puzzled? Dr. Ahroid has answers!",
-    "Stuck on this one? Let's figure it out together.",
-    "I can explain this question further. Just tap me!"
-  ];
-
-  const username = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
-
-  const { data: profile, isLoading: profileLoading, refetch: refetchProfile } = useQuery({
+  const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['profileForChatbot', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('plan, daily_mcq_submissions, last_submission_reset_date')
-        .eq('id', user.id)
-        .maybeSingle();
+      const { data, error } = await supabase.from('profiles').select('plan, daily_mcq_submissions, last_submission_reset_date').eq('id', user.id).maybeSingle();
       if (error) { console.error('Error fetching profile for chatbot:', error); return null; }
       return data;
     },
@@ -331,14 +407,7 @@ export const MCQDisplay = ({
   });
 
   const userPlanForChatbot = profile?.plan?.toLowerCase() || 'free';
-  const isPremium = userPlanForChatbot === 'premium';
-
-  useEffect(() => {
-    if (profile && !profileLoading) {
-      setDailySubmissionsCount(profile.daily_mcq_submissions || 0);
-      setLastSubmissionResetDate(profile.last_submission_reset_date);
-    }
-  }, [profile, profileLoading]);
+  const isPremium = userPlanForChatbot === 'premium' || userPlanForChatbot === 'iconic';
 
   const isNewDayPKT = (lastResetDateStr: string | null): boolean => {
     if (!lastResetDateStr) return true;
@@ -351,33 +420,139 @@ export const MCQDisplay = ({
     return lastResetDateTimePKT < today12AMPKT;
   };
 
-  // --- Timer logic ---
+  const currentMCQ = mcqs[currentQuestionIndex];
+  const totalQuestions = mcqs.length;
+  const progressPercentage = totalQuestions > 0 ? ((currentQuestionIndex + 1) / totalQuestions) * 100 : 0;
+
+  const handleTimeUp = () => {
+    if (!showExplanation && !selectedAnswer) handleSubmitAnswer(true);
+  };
+
+  const handleAnswerSelect = (answer: string) => {
+    if (showExplanation) return;
+    setSelectedAnswer(answer);
+    if (quickSubmit) setTimeout(() => handleSubmitAnswer(false, answer), 150);
+  };
+
+  const handleSubmitAnswer = async (timeUp = false, providedAnswer?: string) => {
+    if (!currentMCQ || !user) return;
+    setHasAttemptedAny(true);
+
+    if (userPlanForChatbot === 'free') {
+      const isNewDay = isNewDayPKT(lastSubmissionResetDate);
+      let currentSubmissions = dailySubmissionsCount;
+      let currentResetDate = lastSubmissionResetDate;
+      if (isNewDay) { currentSubmissions = 0; currentResetDate = new Date().toISOString(); }
+      if (currentSubmissions >= 50) { setShowUpgradeModal(true); return; }
+      await supabase.from('profiles').update({ daily_mcq_submissions: currentSubmissions + 1, last_submission_reset_date: currentResetDate }).eq('id', user.id);
+      setDailySubmissionsCount(currentSubmissions + 1);
+      setLastSubmissionResetDate(currentResetDate);
+    }
+    const answer = timeUp ? '' : (providedAnswer || selectedAnswer);
+    const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+    const isCorrect = answer === currentMCQ.correct_answer;
+
+    setFeedbackType(isCorrect ? 'correct' : 'incorrect');
+    setTimeout(() => setFeedbackType(null), 1000);
+
+    if (soundEnabled) {
+      if (isCorrect && !timeUp) playCorrectSound();
+      else playIncorrectSound();
+    }
+    if (isCorrect && !timeUp) setScore(prev => prev + 1);
+    try {
+      await supabase.from('user_answers').insert({ user_id: user.id, mcq_id: currentMCQ.id, selected_answer: answer || 'No answer (time up)', is_correct: isCorrect, time_taken: timeTaken });
+    } catch (error) { console.error('Error saving answer:', error); }
+    setShowExplanation(true);
+  };
+
+  const handleNextQuestion = () => {
+    if (currentQuestionIndex < totalQuestions - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+      setSelectedAnswer(null);
+      setShowExplanation(false);
+      setTimeLeft(timePerQuestion);
+      setStartTime(Date.now());
+    } else {
+      toast({ title: "🎉 Quiz Completed!", description: `You scored ${score}/${totalQuestions}`, className: "bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0" });
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(LAST_ATTEMPTED_MCQ_KEY);
+        localStorage.removeItem(LAST_ATTEMPTED_SUBJECT_KEY);
+        localStorage.removeItem(LAST_ATTEMPTED_CHAPTER_KEY);
+        removeSavedSessionFromList(user?.id, chapter);
+      }
+      onBack();
+    }
+  };
+
+  const handleSaveMCQ = async () => {
+    if (!user || !currentMCQ?.id) return;
+    try {
+      if (isCurrentMCQSaved) {
+        await supabase.from('saved_mcqs').delete().eq('user_id', user.id).eq('mcq_id', currentMCQ.id);
+        setIsCurrentMCQSaved(false);
+        toast({ title: "📚 MCQ Unsaved", description: "Removed from your bookmarks" });
+      } else {
+        await supabase.from('saved_mcqs').insert({ user_id: user.id, mcq_id: currentMCQ.id });
+        setIsCurrentMCQSaved(true);
+        toast({ title: "⭐ MCQ Saved!", description: "Added to your bookmarks" });
+      }
+    } catch (error) { }
+  };
+
+  const handleReportSubmit = async ({ category, reason }: { category: string; reason: string }) => {
+    if (!user || !currentMCQ?.id) return;
+    setIsReportSubmitting(true);
+    try {
+      await supabase.from('reported_questions').insert({ user_id: user.id, mcq_id: currentMCQ.id, reason: `${category}${reason ? ': ' + reason : ''}`, status: 'pending' });
+      toast({ title: "✅ Report Submitted", description: "Thank you for helping us improve!" });
+      setShowReportModal(false);
+    } finally { setIsReportSubmitting(false); }
+  };
+
+  const handleUpgradeClick = () => setShowUpgradeModal(false);
+
+  useEffect(() => {
+    if (profile && !profileLoading) {
+      setDailySubmissionsCount(profile.daily_mcq_submissions || 0);
+      setLastSubmissionResetDate(profile.last_submission_reset_date);
+    }
+  }, [profile, profileLoading]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const setupBackButtonListener = async () => {
+      if (typeof window !== 'undefined') {
+        try {
+          const { Capacitor } = await import('@capacitor/core');
+          if (Capacitor.isNativePlatform()) {
+            const { App } = await import('@capacitor/app');
+            const backListener = await App.addListener('backButton', () => {
+              if (showExplanation) { handleNextQuestion(); return; }
+              setShowLeaveModal(true);
+            });
+            return () => { if (isMounted) backListener.remove(); };
+          }
+        } catch (error) { console.error('Failed to load Capacitor plugins:', error); }
+      }
+      return () => { };
+    };
+    const cleanupPromise = setupBackButtonListener();
+    return () => { isMounted = false; cleanupPromise.then(cleanup => cleanup && cleanup()); };
+  }, [showExplanation]);
+
   useEffect(() => {
     if (!timerEnabled || showExplanation || loading || mcqs.length === 0) return;
-    if (timeLeft <= 0) {
-      handleTimeUp();
-      return;
-    }
+    if (timeLeft <= 0) { handleTimeUp(); return; }
     const interval = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
+      setTimeLeft(prev => { if (prev <= 1) { clearInterval(interval); return 0; } return prev - 1; });
     }, 1000);
     return () => clearInterval(interval);
   }, [timerEnabled, showExplanation, loading, mcqs.length, timeLeft]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // If initialIndex is provided (e.g. from Dashboard resume), use it
-      if (initialIndex > 0) {
-        setCurrentQuestionIndex(initialIndex);
-        return;
-      }
-
+      if (initialIndex > 0) { setCurrentQuestionIndex(initialIndex); return; }
       const lastSubject = localStorage.getItem(LAST_ATTEMPTED_SUBJECT_KEY);
       const lastChapter = localStorage.getItem(LAST_ATTEMPTED_CHAPTER_KEY);
       const lastIndex = localStorage.getItem(LAST_ATTEMPTED_MCQ_KEY);
@@ -399,8 +574,7 @@ export const MCQDisplay = ({
       const data = await fetchMCQsByChapter(chapter);
       const shuffledMCQs = data.map(mcq => {
         const shuffledOptions = shuffleArray(mcq.options);
-        const newCorrectIndex = shuffledOptions.indexOf(mcq.correct_answer);
-        return { ...mcq, shuffledOptions, originalCorrectIndex: newCorrectIndex };
+        return { ...mcq, shuffledOptions, originalCorrectIndex: shuffledOptions.indexOf(mcq.correct_answer) };
       });
       setMcqs(shuffledMCQs);
       setLoading(false);
@@ -409,451 +583,313 @@ export const MCQDisplay = ({
   }, [chapter]);
 
   useEffect(() => {
-    if (!loading && mcqs.length > 0 && typeof window !== 'undefined') {
+    if (!loading && mcqs.length > 0 && typeof window !== 'undefined' && hasAttemptedAny) {
       localStorage.setItem(LAST_ATTEMPTED_MCQ_KEY, currentQuestionIndex.toString());
       localStorage.setItem(LAST_ATTEMPTED_SUBJECT_KEY, subject);
       localStorage.setItem(LAST_ATTEMPTED_CHAPTER_KEY, chapter);
-      
-      // Update the robust tracked array used by the 3D dashboard widget
       updateSavedSessionsList(user?.id, subject, chapter, currentQuestionIndex);
     }
-  }, [currentQuestionIndex, subject, chapter, loading, mcqs.length, user?.id]);
+  }, [currentQuestionIndex, subject, chapter, loading, mcqs.length, user?.id, hasAttemptedAny]);
 
   useEffect(() => {
     const checkSavedStatus = async () => {
       if (!user || !mcqs[currentQuestionIndex]?.id) { setIsCurrentMCQSaved(false); return; }
       try {
-        const { data, error } = await supabase.from('saved_mcqs').select('id').eq('user_id', user.id).eq('mcq_id', mcqs[currentQuestionIndex].id).single();
+        const { data } = await supabase.from('saved_mcqs').select('id').eq('user_id', user.id).eq('mcq_id', mcqs[currentQuestionIndex].id).single();
         setIsCurrentMCQSaved(!!data);
-        if (error && error.code !== 'PGRST116') console.error('Error checking saved status:', error);
-      } catch (error) { console.error('Error checking saved status:', error); setIsCurrentMCQSaved(false); }
+      } catch (error) { setIsCurrentMCQSaved(false); }
     };
     if (!loading && mcqs.length > 0) checkSavedStatus();
   }, [mcqs, currentQuestionIndex, user, loading]);
 
-  useEffect(() => {
-    if (helpToastTimerRef.current) clearTimeout(helpToastTimerRef.current);
-    setShowHelpToast(false);
-    if (user && isPremium && !aiPopupsDisabled && !selectedAnswer && !isChatbotOpen) {
-      helpToastTimerRef.current = setTimeout(() => {
-        if (!selectedAnswer && !isChatbotOpen) {
-          setHelpToastMessage(helpMessages[Math.floor(Math.random() * helpMessages.length)]);
-          setShowHelpToast(true);
-        }
-      }, 10000);
-    }
-    return () => { if (helpToastTimerRef.current) clearTimeout(helpToastTimerRef.current); };
-  }, [currentQuestionIndex, selectedAnswer, isChatbotOpen, user, isPremium, aiPopupsDisabled]);
-
-  const currentMCQ = mcqs[currentQuestionIndex];
-  const totalQuestions = mcqs.length;
-  const progressPercentage = totalQuestions > 0 ? ((currentQuestionIndex + 1) / totalQuestions) * 100 : 0;
-
-  const handleTimeUp = () => {
-    if (!showExplanation && !selectedAnswer) {
-      // Time's up — mark as wrong, show correct answer
-      handleSubmitAnswer(true);
-    }
-  };
-
-  const handleAnswerSelect = (answer: string) => {
-    if (showExplanation) return;
-    setSelectedAnswer(answer);
-    setShowHelpToast(false);
-    if (helpToastTimerRef.current) clearTimeout(helpToastTimerRef.current);
-  };
-
-  const handleSubmitAnswer = async (timeUp = false) => {
-    if (!currentMCQ || !user) return;
-    if (userPlanForChatbot === 'free') {
-      const isNewDay = isNewDayPKT(lastSubmissionResetDate);
-      let currentSubmissions = dailySubmissionsCount;
-      let currentResetDate = lastSubmissionResetDate;
-      if (isNewDay) { currentSubmissions = 0; currentResetDate = new Date().toISOString(); }
-      if (currentSubmissions >= 50) { setShowUpgradeModal(true); return; }
-      const { error: updateError } = await supabase.from('profiles').update({ daily_mcq_submissions: currentSubmissions + 1, last_submission_reset_date: currentResetDate }).eq('id', user.id);
-      if (updateError) { console.error('Error updating daily submissions:', updateError); toast({ title: "Error", description: "Failed to update daily submission count.", variant: "destructive" }); return; }
-      setDailySubmissionsCount(currentSubmissions + 1);
-      setLastSubmissionResetDate(currentResetDate);
-    }
-    const answer = timeUp ? '' : selectedAnswer;
-    const timeTaken = Math.floor((Date.now() - startTime) / 1000);
-    const isCorrect = answer === currentMCQ.correct_answer;
-    if (soundEnabled) {
-      if (isCorrect && !timeUp) playCorrectSound();
-      else playIncorrectSound();
-    }
-    if (isCorrect && !timeUp) setScore(prev => prev + 1);
-    try {
-      await supabase.from('user_answers').insert({ user_id: user.id, mcq_id: currentMCQ.id, selected_answer: answer || 'No answer (time up)', is_correct: isCorrect, time_taken: timeTaken });
-    } catch (error) { console.error('Error saving answer:', error); }
-    setShowExplanation(true);
-    setShowHelpToast(false);
-    if (helpToastTimerRef.current) clearTimeout(helpToastTimerRef.current);
-  };
-
-  const handleNextQuestion = () => {
-    if (currentQuestionIndex < totalQuestions - 1) {
-      setCurrentQuestionIndex(prev => prev + 1);
-      setSelectedAnswer(null);
-      setShowExplanation(false);
-      setTimeLeft(timePerQuestion);
-      setStartTime(Date.now());
-    } else {
-      toast({ title: "Quiz Completed!", description: `You scored ${score}/${totalQuestions} (${Math.round((score / totalQuestions) * 100)}%)` });
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(LAST_ATTEMPTED_MCQ_KEY);
-        localStorage.removeItem(LAST_ATTEMPTED_SUBJECT_KEY);
-        localStorage.removeItem(LAST_ATTEMPTED_CHAPTER_KEY);
-        removeSavedSessionFromList(user?.id, chapter);
-      }
-      onBack();
-    }
-  };
-
-  const handleHelpToastClick = () => { setShowHelpToast(false); setIsChatbotOpen(true); };
-
-  const handleSaveMCQ = async () => {
-    if (!user || !currentMCQ?.id) { toast({ title: "Authentication Required", description: "Please log in to save MCQs.", variant: "destructive" }); return; }
-    try {
-      if (isCurrentMCQSaved) {
-        const { error } = await supabase.from('saved_mcqs').delete().eq('user_id', user.id).eq('mcq_id', currentMCQ.id);
-        if (error) throw error;
-        setIsCurrentMCQSaved(false);
-        toast({ title: "MCQ Unsaved", description: "Removed from your saved list." });
-      } else {
-        const { error } = await supabase.from('saved_mcqs').insert({ user_id: user.id, mcq_id: currentMCQ.id });
-        if (error) throw error;
-        setIsCurrentMCQSaved(true);
-        toast({ title: "MCQ Saved!", description: "Added to your saved list." });
-      }
-    } catch (error: any) {
-      console.error('Error saving/unsaving MCQ:', error);
-      toast({ title: "Error", description: `Failed: ${error.message || 'Unknown error'}`, variant: "destructive" });
-    }
-  };
-
-  const handleReportSubmit = async ({ category, reason }: { category: string; reason: string }) => {
-    if (!user || !currentMCQ?.id) return;
-    setIsReportSubmitting(true);
-    try {
-      const { error } = await supabase.from('reported_questions').insert({
-        user_id: user.id,
-        mcq_id: currentMCQ.id,
-        reason: `${category}${reason ? ': ' + reason : ''}`,
-        status: 'pending',
-      });
-      if (error) throw error;
-      toast({ title: "Report Submitted", description: "Thanks for helping us improve!" });
-      setShowReportModal(false);
-    } catch (error: any) {
-      console.error('Error reporting MCQ:', error);
-      toast({ title: "Error", description: `Failed to submit report. ${error.message || ''}`, variant: "destructive" });
-    } finally {
-      setIsReportSubmitting(false);
-    }
-  };
-
-  const handleToggleAiPopups = () => {
-    if (!isPremium) {
-      toast({ title: "Premium Feature", description: "Upgrade to Premium to manage AI popups.", variant: "destructive" });
-      return;
-    }
-    const newVal = !aiPopupsDisabled;
-    setAiPopupsDisabled(newVal);
-    localStorage.setItem('aiPopupsDisabled', String(newVal));
-    toast({ title: newVal ? "AI Popups Disabled" : "AI Popups Enabled", description: newVal ? "Dr. Ahroid won't nudge you anymore." : "Dr. Ahroid will offer help when you're stuck." });
-  };
-
-  const handleUpgradeClick = () => { setShowUpgradeModal(false); };
-
-  // --- Loading skeleton ---
   if (loading || profileLoading) {
     return (
-      <div className="max-w-3xl mx-auto px-3">
-        <div className="relative overflow-hidden rounded-[2rem] bg-card/60 backdrop-blur-2xl border border-border/40 shadow-2xl p-2">
-          <div className="bg-background/30 backdrop-blur-xl rounded-[1.5rem] p-6 space-y-4">
-            <div className="w-3/4 h-6 rounded-md bg-muted animate-pulse mx-auto" />
-            <div className="w-5/6 h-4 rounded-md bg-muted animate-pulse mx-auto" />
-            <div className="space-y-3 mt-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="w-full h-14 rounded-xl bg-muted animate-pulse" />
-              ))}
-            </div>
-          </div>
-        </div>
+      <div className="fixed inset-0 bg-gradient-to-br from-background via-background to-primary/10 flex flex-col items-center justify-center p-8 overscroll-none">
+        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
+          <Loader2 className="w-16 h-16 text-primary" />
+        </motion.div>
+        <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="text-xs font-black uppercase tracking-widest text-muted-foreground mt-4">
+          Loading Test...
+        </motion.p>
       </div>
     );
   }
 
   if (!mcqs || mcqs.length === 0) {
     return (
-      <div className="max-w-3xl mx-auto px-3">
-        <div className="relative overflow-hidden rounded-[2rem] bg-card/60 backdrop-blur-2xl border border-border/40 shadow-2xl p-2">
-          <div className="bg-background/30 backdrop-blur-xl rounded-[1.5rem] p-8 text-center">
-            <img src="/images/mascots/doctor-reading.png" alt="No questions" className="w-24 h-24 mx-auto mb-4 object-contain opacity-80" />
-            <p className="text-muted-foreground mb-4">No questions available for this chapter.</p>
-            <Button onClick={onBack} variant="secondary" className="rounded-xl">
-              Leave Test
-            </Button>
-          </div>
-        </div>
+      <div className="fixed inset-0 bg-gradient-to-br from-background via-background to-primary/10 flex flex-col items-center justify-center p-8 text-center overscroll-none">
+        <div className="absolute top-[20%] left-[-10%] w-[60%] h-[60%] bg-gradient-to-r from-primary/20 to-blue-500/20 rounded-full blur-[120px] pointer-events-none animate-pulse" />
+        <motion.img initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 0.8 }} transition={{ type: "spring" }} src="/images/mascots/doctor-reading.png" alt="No questions" className="w-32 h-32 mb-6 object-contain" />
+        <h2 className="text-2xl font-black italic uppercase bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent mb-4">No Questions Found</h2>
+        <p className="text-muted-foreground mb-8 max-w-xs uppercase text-xs tracking-[0.2em] font-bold">We are still adding content for this chapter. Stay tuned!</p>
+        <Button onClick={onBack} variant="secondary" className="rounded-2xl h-14 px-10 font-black uppercase text-xs tracking-widest shadow-2xl hover:scale-105 transition-all">Leave Page</Button>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-background flex flex-col overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
-      
-      <div className="flex-grow flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-        <div className="w-full max-w-2xl relative">
-      {/* Main quiz card - vibrant glassmorphic */}
-      <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary/10 via-blue-500/5 to-violet-500/10 backdrop-blur-2xl border border-primary/20 shadow-2xl p-1.5">
-        {/* Vibrant pattern overlay */}
-        <div className="absolute inset-0 opacity-10" style={{
-          backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(59,130,246,0.2) 20px, rgba(59,130,246,0.2) 40px)`,
-          maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
-        }} />
-        {/* Accent glow */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/15 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-violet-500/10 rounded-full blur-2xl" />
+    // IMPORTANT: overflow-hidden removed — it was creating a stacking context trapping modal portals
+    <div className="fixed inset-0 z-[100] bg-gradient-to-br from-background via-background to-primary/5 flex flex-col overscroll-none touch-none select-none">
+      {/* Animated Background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-gradient-to-r from-primary/20 to-blue-500/20 rounded-full blur-[150px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-gradient-to-l from-purple-500/20 to-pink-500/20 rounded-full blur-[150px] animate-pulse delay-1000" />
+        <div className="absolute top-[50%] left-[50%] w-[80%] h-[80%] bg-gradient-to-tr from-yellow-500/10 to-orange-500/10 rounded-full blur-[200px] animate-pulse delay-2000" />
+      </div>
 
-        {/* Inner glass container */}
-        <div className="relative z-10 bg-background/50 backdrop-blur-xl rounded-[1.5rem] border border-primary/10 shadow-inner">
-          
-          {/* Quiz header inside card */}
-          <div className="px-4 sm:px-6 py-4 border-b border-border/30">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center space-x-3">
-                <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                  Q{currentQuestionIndex + 1}/{totalQuestions}
-                </span>
-                {timerEnabled && (
-                  <div className={`flex items-center space-x-1 text-sm font-mono font-bold px-2 py-1 rounded-lg transition-colors ${
-                    timeLeft <= 5 ? 'bg-destructive/20 text-destructive animate-pulse' : 
-                    timeLeft <= 10 ? 'bg-destructive/15 text-destructive' : 
-                    'bg-muted/50 text-muted-foreground'
-                  }`}>
-                    <Timer className="w-3.5 h-3.5" />
-                    <span>{timeLeft}s</span>
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center space-x-1 text-xs font-semibold text-muted-foreground">
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  <span>{score}/{currentQuestionIndex}</span>
-                </div>
-                {userPlanForChatbot === 'free' && (
-                  <div className="flex items-center space-x-1 text-xs text-muted-foreground/70">
-                    <span>{dailySubmissionsCount}/50</span>
-                  </div>
-                )}
-                {user && (
-                  <Button variant="ghost" size="icon" onClick={handleSaveMCQ} className="w-8 h-8 text-muted-foreground hover:text-foreground hover:bg-muted/50" title={isCurrentMCQSaved ? "Unsave" : "Save"}>
-                    {isCurrentMCQSaved ? <BookmarkCheck className="w-4 h-4 fill-current" /> : <Bookmark className="w-4 h-4" />}
-                  </Button>
-                )}
-                {/* 3-dot menu */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground hover:text-foreground hover:bg-muted/50">
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-52 bg-background/90 backdrop-blur-xl border-border/40 rounded-xl">
-                    <DropdownMenuItem onClick={() => setShowReportModal(true)} className="text-sm cursor-pointer">
-                      <Flag className="w-4 h-4 mr-2 text-destructive" />
-                      Report Question
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={handleToggleAiPopups}
-                      disabled={!isPremium}
-                      className={`text-sm cursor-pointer ${!isPremium ? 'opacity-50' : ''}`}
-                    >
-                      <BotOff className="w-4 h-4 mr-2" />
-                      {aiPopupsDisabled ? 'Enable AI Popups' : 'Disable AI Popups'}
-                      {!isPremium && <Crown className="w-3 h-3 ml-auto text-yellow-500" />}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        const newVal = !soundEnabled;
-                        setSoundEnabled(newVal);
-                        localStorage.setItem('mcqSoundDisabled', String(!newVal));
-                        toast({ title: newVal ? 'Sound Enabled' : 'Sound Disabled' });
-                      }}
-                      className="text-sm cursor-pointer"
-                    >
-                      {soundEnabled ? '🔊' : '🔇'}
-                      <span className="ml-2">{soundEnabled ? 'Disable Sound' : 'Enable Sound'}</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setShowLeaveModal(true)} className="text-sm cursor-pointer text-destructive">
-                      <LogOut className="w-4 h-4 mr-2" />
-                      Leave Test
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-            <Progress value={progressPercentage} className="w-full h-1.5" />
+      {/* Header */}
+      <header className="relative z-50 flex items-center justify-between px-6 pt-[max(1rem,env(safe-area-inset-top))] pb-4 bg-gradient-to-b from-background/80 to-transparent backdrop-blur-sm">
+        <div className="flex flex-col">
+          <div className="flex items-center gap-2">
+            <motion.div animate={{ rotate: [0, 5, -5, 0] }} transition={{ duration: 2, repeat: Infinity }} className="w-6 h-6 rounded-lg bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center shadow-lg">
+              <Brain className="w-3 h-3 text-white" />
+            </motion.div>
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/80">Practice Phase</span>
             {timerEnabled && (
-              <Progress value={(timeLeft / timePerQuestion) * 100} className="w-full h-1 mt-1.5" />
+              <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black tracking-widest transition-all ${timeLeft <= 5 ? 'bg-destructive/20 text-destructive animate-pulse shadow-lg shadow-destructive/20' : 'bg-primary/20 text-primary'}`}>
+                <Timer className="w-3 h-3" />
+                {timeLeft}s
+              </motion.div>
             )}
           </div>
-
-          {/* Question */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentQuestionIndex}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.3 }}
-              className="px-4 sm:px-6 py-5"
-            >
-              <h2 className="text-base sm:text-lg font-bold leading-relaxed text-foreground mb-5">
-                {currentMCQ?.question}
-              </h2>
-
-              {/* Options */}
-              <div className="space-y-2.5">
-                {currentMCQ?.shuffledOptions.map((option, index) => {
-                  const isSelected = selectedAnswer === option;
-                  const isCorrect = option === currentMCQ.correct_answer;
-                  const showResult = showExplanation;
-
-                  let optionClass = "w-full p-3.5 text-left rounded-xl transition-all duration-200 text-sm sm:text-base border ";
-                  if (showResult) {
-                    if (isCorrect) optionClass += "bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300";
-                    else if (isSelected && !isCorrect) optionClass += "bg-destructive/10 border-destructive/30 text-destructive";
-                    else optionClass += "bg-muted/30 border-border/30 text-muted-foreground/50";
-                  } else {
-                    if (isSelected) optionClass += "bg-primary/10 border-primary/30 text-foreground";
-                    else optionClass += "bg-muted/20 border-border/30 text-foreground/80 hover:bg-muted/40 hover:border-border/50";
-                  }
-
-                  return (
-                    <motion.button
-                      key={index}
-                      className={optionClass}
-                      onClick={() => handleAnswerSelect(option)}
-                      disabled={showExplanation}
-                      whileHover={!showExplanation ? { scale: 1.01 } : {}}
-                      whileTap={!showExplanation ? { scale: 0.99 } : {}}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="flex-1 font-medium">{String.fromCharCode(65 + index)}. {option}</span>
-                        {showResult && isCorrect && <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 ml-2 flex-shrink-0" />}
-                        {showResult && isSelected && !isCorrect && <XCircle className="w-4 h-4 text-destructive ml-2 flex-shrink-0" />}
-                      </div>
-                    </motion.button>
-                  );
-                })}
-              </div>
-
-              {/* Time's up indicator */}
-              {showExplanation && !selectedAnswer && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-xl flex items-center space-x-2"
-                >
-                  <Clock className="w-4 h-4 text-destructive flex-shrink-0" />
-                  <span className="text-sm font-medium text-destructive">Time's up! The correct answer is highlighted above.</span>
-                </motion.div>
-              )}
-
-              {/* Explanation */}
-              {showExplanation && currentMCQ?.explanation && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="mt-5 p-4 bg-muted/40 border border-border/30 rounded-xl"
-                >
-                  <h4 className="font-bold text-foreground/90 mb-2 text-sm uppercase tracking-wider">Explanation</h4>
-                  <p className="text-muted-foreground text-sm leading-relaxed">{currentMCQ.explanation}</p>
-                </motion.div>
-              )}
-
-              {/* Actions */}
-              <div className="flex items-center justify-between mt-5 gap-3">
-                {currentQuestionIndex > 0 ? (
-                  <Button
-                    onClick={() => { setCurrentQuestionIndex(prev => prev - 1); setSelectedAnswer(null); setShowExplanation(false); setTimeLeft(timePerQuestion); setStartTime(Date.now()); }}
-                    variant="ghost"
-                    className="text-muted-foreground hover:text-foreground hover:bg-muted/50 text-sm"
-                  >
-                    Previous
-                  </Button>
-                ) : <div />}
-
-                <div className="flex space-x-2">
-                  {!showExplanation && selectedAnswer && (
-                    <Button
-                      onClick={() => handleSubmitAnswer()}
-                      className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-bold text-sm px-6"
-                    >
-                      Submit
-                    </Button>
-                  )}
-                  {showExplanation && (
-                    <Button
-                      onClick={handleNextQuestion}
-                      className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-bold text-sm px-6"
-                    >
-                      {currentQuestionIndex < totalQuestions - 1 ? 'Next' : 'Finish'}
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {/* Good luck message - vibrant */}
-              {user && (
-                <div className="mt-6 text-center space-y-1">
-                  <p className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-500 to-violet-500 text-xs uppercase tracking-[0.3em] font-black">Best of luck</p>
-                  <p className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-500 text-base font-black truncate max-w-[250px] mx-auto">{username}</p>
-                </div>
-              )}
-            </motion.div>
-          </AnimatePresence>
+          <div className="flex items-baseline gap-2 mt-1">
+            <h1 className="text-2xl font-black tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Q{currentQuestionIndex + 1}</h1>
+            <span className="text-sm font-bold text-muted-foreground">/ {totalQuestions}</span>
+          </div>
         </div>
-      </div>
-
-      {/* Dr. Sultan's Help Toast */}
-      <AnimatePresence>
-        {showHelpToast && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-24 right-4 z-50 p-3 bg-background/90 backdrop-blur-lg rounded-xl shadow-lg border border-border flex items-center space-x-2 cursor-pointer max-w-[calc(100vw-32px)] sm:max-w-xs"
-            onClick={handleHelpToastClick}
-          >
-            <Bot className="w-5 h-5 text-primary flex-shrink-0" />
-            <span className="text-sm text-foreground flex-grow">{helpToastMessage}</span>
-            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setShowHelpToast(false); }} className="w-6 h-6 p-0">
-              <X className="w-3 h-3" />
+        <div className="flex items-center gap-2">
+          {isAiGenerated && (
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-1.5 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/30 px-3 py-1.5 rounded-full">
+              <Sparkles className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">AI Generated</span>
+            </motion.div>
+          )}
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Button variant="ghost" size="icon" onClick={handleSaveMCQ} className="w-10 h-10 rounded-2xl bg-muted/40 backdrop-blur-md hover:bg-muted/60 text-muted-foreground transition-all">
+              {isCurrentMCQSaved ? <BookmarkCheck className="w-5 h-5 fill-primary text-primary" /> : <Bookmark className="w-5 h-5" />}
             </Button>
           </motion.div>
-        )}
-      </AnimatePresence>
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Button variant="ghost" size="icon" onClick={() => setShowSettingsModal(true)} className="w-10 h-10 rounded-2xl bg-muted/40 backdrop-blur-md hover:bg-muted/60 text-muted-foreground">
+              <MoreVertical className="w-5 h-5" />
+            </Button>
+          </motion.div>
+        </div>
+      </header>
 
-      {/* AI Chatbot */}
-      {!aiPopupsDisabled && (
-        <AIChatbot currentQuestion={currentMCQ?.question} options={(currentMCQ as any)?.options} userPlan={userPlanForChatbot} />
-      )}
-
-      {/* Modals */}
-      <UpgradeAccountModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} onUpgradeClick={handleUpgradeClick} />
-      <LeaveTestModal isOpen={showLeaveModal} onClose={() => setShowLeaveModal(false)} onConfirm={onBack} />
-      <ReportMCQModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} onSubmit={handleReportSubmit} isSubmitting={isReportSubmitting} />
+      {/* Progress Bar */}
+      <div className="relative px-6 z-50 mt-2">
+        <div className="h-2 w-full bg-muted/30 rounded-full overflow-hidden shadow-inner">
+          <motion.div initial={{ width: 0 }} animate={{ width: `${progressPercentage}%` }} transition={{ duration: 0.3 }} className="h-full bg-gradient-to-r from-primary via-blue-500 to-primary rounded-full" />
         </div>
       </div>
+
+      {/* Main Content */}
+      <div className="flex-1 relative z-10 flex flex-col px-6 py-6 overflow-y-auto scrollbar-hide">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentQuestionIndex}
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ type: "spring", damping: 20, stiffness: 100 }}
+            className="flex flex-col flex-1"
+          >
+            {/* Question Card */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-8 p-6 rounded-3xl bg-gradient-to-br from-muted/20 to-muted/5 backdrop-blur-sm border border-primary/20 shadow-xl">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center shadow-lg">
+                  <Target className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-xs font-black uppercase tracking-widest text-primary">Question</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-foreground leading-[1.3] tracking-tight">{currentMCQ?.question}</h2>
+            </motion.div>
+
+            {/* Options */}
+            <div className="space-y-3">
+              {currentMCQ?.shuffledOptions.map((option, index) => {
+                const isSelected = selectedAnswer === option;
+                const isCorrect = option === currentMCQ.correct_answer;
+                let state: 'default' | 'selected' | 'correct' | 'incorrect' = 'default';
+                if (showExplanation) {
+                  if (isSelected && isCorrect) state = 'correct';
+                  else if (isSelected && !isCorrect) state = 'incorrect';
+                  else if (isCorrect) state = 'correct';
+                } else if (isSelected) state = 'selected';
+
+                let animation: any = {};
+                if (feedbackType) {
+                  if (isCorrect) animation = { scale: [1, 1.05, 1], transition: { duration: 0.4 } };
+                  else if (isSelected && !isCorrect) animation = { x: [-6, 6, -6, 6, 0], transition: { duration: 0.4 } };
+                }
+
+                const getGradient = () => {
+                  if (state === 'correct') return 'from-emerald-500/20 to-emerald-500/10 border-emerald-500/50 shadow-emerald-500/20';
+                  if (state === 'incorrect') return 'from-destructive/20 to-destructive/10 border-destructive/50 shadow-destructive/20';
+                  if (state === 'selected') return 'from-blue-500/20 to-blue-500/10 border-blue-500/50 shadow-blue-500/20';
+                  return 'from-muted/10 to-muted/5 border-border/30 hover:from-primary/10 hover:to-primary/5';
+                };
+
+                return (
+                  <motion.button
+                    key={index}
+                    onClick={() => handleAnswerSelect(option)}
+                    disabled={showExplanation}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0, ...animation }}
+                    transition={{ delay: 0.2 + (index * 0.05) }}
+                    whileHover={!showExplanation ? { scale: 1.01, x: 5 } : {}}
+                    whileTap={!showExplanation ? { scale: 0.99 } : {}}
+                    className={`group relative w-full p-5 rounded-2xl text-left border-2 transition-all duration-300 bg-gradient-to-r ${getGradient()} backdrop-blur-sm shadow-lg`}
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1 flex gap-4 items-start">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[11px] font-black transition-all shrink-0 mt-0.5 shadow-lg ${state === 'default' ? 'bg-muted/30 text-muted-foreground' :
+                            state === 'correct' ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white' :
+                              state === 'incorrect' ? 'bg-gradient-to-br from-destructive to-red-600 text-white' :
+                                'bg-gradient-to-br from-blue-500 to-blue-600 text-white'
+                          }`}>
+                          {String.fromCharCode(65 + index)}
+                        </div>
+                        <span className={`text-base font-bold leading-snug transition-colors ${state === 'default' ? 'text-foreground/80' :
+                            state === 'correct' ? 'text-emerald-700 dark:text-emerald-300' :
+                              state === 'incorrect' ? 'text-destructive' :
+                                'text-blue-600 dark:text-blue-400'
+                          }`}>{option}</span>
+                      </div>
+                      <div className="shrink-0">
+                        {showExplanation && isCorrect && (
+                          <motion.div initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring" }}>
+                            <CheckCircle className="w-6 h-6 text-emerald-500 drop-shadow-lg" />
+                          </motion.div>
+                        )}
+                        {showExplanation && isSelected && !isCorrect && (
+                          <motion.div initial={{ scale: 0, rotate: 20 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring" }}>
+                            <XCircle className="w-6 h-6 text-destructive drop-shadow-lg" />
+                          </motion.div>
+                        )}
+                      </div>
+                    </div>
+                  </motion.button>
+                );
+              })}
+            </div>
+
+            {/* Explanation */}
+            <AnimatePresence>
+              {showExplanation && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                  transition={{ type: "spring" }}
+                  className="mt-8 p-6 rounded-2xl bg-gradient-to-br from-primary/10 to-blue-500/10 border-2 border-primary/30 backdrop-blur-md shadow-2xl"
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center shadow-lg">
+                      <BookOpen className="w-4 h-4 text-white" />
+                    </div>
+                    <h4 className="text-xs font-black uppercase tracking-widest text-primary">Explanation</h4>
+                  </div>
+                  <p className="text-sm text-foreground/80 leading-relaxed font-medium">{currentMCQ?.explanation || "No explanation provided for this question."}</p>
+                  {currentMCQ?.correct_answer && (
+                    <div className="mt-4 pt-3 border-t border-primary/20">
+                      <p className="text-xs font-bold text-primary/80">✓ Correct Answer: <span className="text-foreground">{currentMCQ.correct_answer}</span></p>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Footer */}
+      <footer className="relative z-50 px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 bg-gradient-to-t from-background via-background/80 to-transparent">
+        <div className="flex items-center justify-between gap-4">
+          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                if (currentQuestionIndex > 0) {
+                  setCurrentQuestionIndex(prev => prev - 1);
+                  setSelectedAnswer(null);
+                  setShowExplanation(false);
+                  setTimeLeft(timePerQuestion);
+                  setStartTime(Date.now());
+                }
+              }}
+              disabled={currentQuestionIndex === 0}
+              className="flex-1 max-w-[120px] rounded-2xl h-14 bg-gradient-to-r from-muted/40 to-muted/20 backdrop-blur-sm text-foreground font-bold hover:shadow-lg transition-all disabled:opacity-20"
+            >
+              <ChevronLeft className="w-4 h-4 mr-2 inline" />
+              Previous
+            </Button>
+          </motion.div>
+
+          {showExplanation ? (
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="flex-1">
+              <Button onClick={handleNextQuestion} className="w-full rounded-2xl h-14 bg-gradient-to-r from-foreground to-foreground/80 text-background font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:shadow-xl transition-all">
+                {currentQuestionIndex === totalQuestions - 1 ? (<><Award className="w-4 h-4 mr-2" />Finish Quiz</>) : (<>Next Question<TrendingUp className="w-4 h-4 ml-2" /></>)}
+              </Button>
+            </motion.div>
+          ) : (
+            !quickSubmit && (
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="flex-1">
+                <Button onClick={() => handleSubmitAnswer()} disabled={!selectedAnswer} className="w-full rounded-2xl h-14 bg-gradient-to-r from-primary to-blue-600 text-primary-foreground font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/30 hover:shadow-xl transition-all disabled:opacity-50">
+                  <Shield className="w-4 h-4 mr-2" />
+                  Check Answer
+                </Button>
+              </motion.div>
+            )
+          )}
+        </div>
+      </footer>
+
+      {/* Modals */}
+      <MCQSettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        onExit={() => { setShowSettingsModal(false); setShowLeaveModal(true); }}
+        quickSubmit={quickSubmit}
+        toggleQuickSubmit={() => {
+          const newVal = !quickSubmit;
+          setQuickSubmit(newVal);
+          localStorage.setItem('quickSubmitEnabled', String(newVal));
+          toast({ title: newVal ? "⚡ Quick Submit Enabled" : "🐢 Quick Submit Disabled" });
+        }}
+        soundEnabled={soundEnabled}
+        toggleSound={() => {
+          const newVal = !soundEnabled;
+          setSoundEnabled(newVal);
+          localStorage.setItem('mcqSoundDisabled', String(!newVal));
+          toast({ title: newVal ? "🔊 Sound Effects ON" : "🔇 Sound Effects OFF" });
+        }}
+        aiPopupsDisabled={aiPopupsDisabled}
+        toggleAiPopups={() => {
+          const newVal = !aiPopupsDisabled;
+          setAiPopupsDisabled(newVal);
+          localStorage.setItem('aiPopupsDisabled', String(newVal));
+          toast({ title: newVal ? "🤖 AI Popups Disabled" : "🤖 AI Popups Enabled" });
+        }}
+        onReport={() => { setShowSettingsModal(false); setShowReportModal(true); }}
+        isPremium={isPremium}
+      />
+      <LeaveTestModal isOpen={showLeaveModal} onClose={() => setShowLeaveModal(false)} onConfirm={() => { setShowLeaveModal(false); onBack(); }} />
+      <ReportMCQModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} onSubmit={handleReportSubmit} isSubmitting={isReportSubmitting} />
+      <UpgradeAccountModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} onUpgradeClick={handleUpgradeClick} />
+
+      {currentMCQ && (
+        <AIChatbot
+          isOpen={isChatbotOpen}
+          onClose={() => setIsChatbotOpen(false)}
+          questionContext={currentMCQ.question}
+          explanationContext={currentMCQ.explanation || ''}
+          currentAnswer={selectedAnswer}
+          correctAnswer={currentMCQ.correct_answer}
+        />
+      )}
     </div>
   );
 };

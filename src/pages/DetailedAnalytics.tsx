@@ -12,10 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
-import { 
-  PieChart, Pie, Cell, ResponsiveContainer, 
-  LineChart, Line, XAxis, YAxis, Tooltip, 
-  AreaChart, Area 
+import {
+  PieChart, Pie, Cell, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, Tooltip,
+  AreaChart, Area
 } from 'recharts';
 import Seo from '@/components/Seo';
 
@@ -95,7 +95,7 @@ const DetailedAnalytics = () => {
         .order('created_at', { ascending: true });
 
       if (error || !answersRaw) return [];
-      
+
       const answers = answersRaw as unknown as AnswerWithMcq[];
       const subjectMap: Record<string, SubjectAnalytics> = {};
 
@@ -128,17 +128,17 @@ const DetailedAnalytics = () => {
           chap = { chapter_id: chapter.id, chapter_name: chapter.name, total: 0, correct: 0, accuracy: 0, history: [] };
           subjectMap[subject.id].chapters.push(chap);
         }
-        
+
         chap.total++;
         if (ans.is_correct) chap.correct++;
-        
+
         // Tracking history for line chart (daily average or rolling)
         const dateKey = new Date(ans.created_at).toLocaleDateString();
         const existingDay = chap.history.find(h => h.date === dateKey);
         if (existingDay) {
           // Update day average
-          const dayAnswers = answers.filter(a => 
-            new Date(a.created_at).toLocaleDateString() === dateKey && 
+          const dayAnswers = answers.filter(a =>
+            new Date(a.created_at).toLocaleDateString() === dateKey &&
             a.mcqs?.chapters?.id === chapter.id
           );
           const dayCorrect = dayAnswers.filter(a => a.is_correct).length;
@@ -384,22 +384,22 @@ const SubjectCard = ({ subject, isPremium, index }: { subject: SubjectAnalytics;
               </h3>
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 mt-3">
                 <div className="text-center sm:text-left">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Attempted</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Questions Solved</p>
                   <p className="text-sm font-black text-foreground">{subject.total}</p>
                 </div>
                 <div className="text-center sm:text-left">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Correct</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Correct Answers</p>
                   <p className="text-sm font-black text-emerald-500">{subject.correct}</p>
                 </div>
                 <div className="text-center sm:text-left">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Success Rate</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Overall Accuracy</p>
                   <p className="text-sm font-black text-primary">{subject.accuracy}%</p>
                 </div>
               </div>
-              
-              <Button 
-                variant="ghost" 
-                size="sm" 
+
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={handleToggle}
                 className="mt-4 w-full sm:w-auto rounded-xl bg-muted/50 hover:bg-muted text-xs font-bold uppercase tracking-wider gap-2 px-6"
               >
@@ -429,7 +429,7 @@ const SubjectCard = ({ subject, isPremium, index }: { subject: SubjectAnalytics;
             >
               <div className="p-6 space-y-6">
                 <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Topic Trends (Last 10 Days)</h4>
-                
+
                 <div className="grid grid-cols-1 gap-4">
                   {subject.chapters.map((ch) => (
                     <Card key={ch.chapter_id} className="border border-border/20 bg-background/50 p-4 rounded-2xl">
@@ -442,23 +442,23 @@ const SubjectCard = ({ subject, isPremium, index }: { subject: SubjectAnalytics;
                             <span className="text-[10px] font-bold text-muted-foreground uppercase">{ch.total} Questions</span>
                           </div>
                         </div>
-                        
+
                         {/* Chapter Line Chart */}
                         <div className="w-full md:w-48 h-12">
                           <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={ch.history}>
                               <defs>
                                 <linearGradient id={`colorAcc-${ch.chapter_id}`} x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor={subject.color} stopOpacity={0.8}/>
-                                  <stop offset="95%" stopColor={subject.color} stopOpacity={0}/>
+                                  <stop offset="5%" stopColor={subject.color} stopOpacity={0.8} />
+                                  <stop offset="95%" stopColor={subject.color} stopOpacity={0} />
                                 </linearGradient>
                               </defs>
-                              <Area 
-                                type="monotone" 
-                                dataKey="accuracy" 
-                                stroke={subject.color} 
-                                fillOpacity={1} 
-                                fill={`url(#colorAcc-${ch.chapter_id})`} 
+                              <Area
+                                type="monotone"
+                                dataKey="accuracy"
+                                stroke={subject.color}
+                                fillOpacity={1}
+                                fill={`url(#colorAcc-${ch.chapter_id})`}
                                 strokeWidth={2}
                               />
                             </AreaChart>
@@ -467,7 +467,7 @@ const SubjectCard = ({ subject, isPremium, index }: { subject: SubjectAnalytics;
                       </div>
                     </Card>
                   ))}
-                  
+
                   {subject.chapters.length === 0 && (
                     <div className="py-8 text-center">
                       <p className="text-xs text-muted-foreground">No chapter data currently available.</p>

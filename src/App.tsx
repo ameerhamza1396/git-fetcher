@@ -50,7 +50,7 @@ import UpdatePassword from '@/pages/UpdatePassword';
 import SelectYear from '@/pages/SelectYear';
 import Teams from '@/pages/Team';
 import InstallApp from '@/pages/InstallApp';
-import Practicals from '@/pages/Practicals';
+import PracticalPage from '@/pages/PracticalPage';
 import SEQs from '@/pages/SEQs';
 import PracticalNotesDetails from "@/components/PracticalNotes/PracticalNotesDetails";
 import RedeemCode from '@/pages/RedeemCode';
@@ -142,9 +142,9 @@ function App() {
                 <Route path="/select-year" element={<SelectYear />} />
                 <Route path="/teams" element={<Teams />} />
                 <Route path="/install-app" element={<InstallApp />} />
-                <Route path="/practicals" element={<Practicals />} />
+                <Route path="/practicals" element={<PracticalPage />} />
                 <Route path="/seqs" element={<SEQs />} />
-                <Route path="/practical-notes" element={<Practicals />} />
+                <Route path="/practical-notes" element={<PracticalPage />} />
                 <Route path="/practical-notes/subject/:id" element={<PracticalNotesDetails />} />
                 <Route path="/redeem" element={<RedeemCode />} />
                 <Route path="/purchase-history" element={<PurchaseHistory />} />

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
-import { ChevronLeft, PanelLeft, Clock, Menu } from 'lucide-react';
+import { ChevronLeft, PanelLeft, Clock, Menu, Zap } from 'lucide-react';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useToast } from '@/hooks/use-toast';
@@ -71,60 +71,44 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName }: F
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const lastScrollY = useRef(0);
   const [headerVisible, setHeaderVisible] = useState(true);
+  const mainContentRef = useRef<HTMLDivElement>(null);
 
   const totalQuestions = shuffledMcqs.length;
   const totalTestTime = totalQuestions * timePerQuestion;
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      setHeaderVisible(currentScrollY < lastScrollY.current || currentScrollY < 10);
-      lastScrollY.current = currentScrollY;
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  useEffect(() => {
-    if (mcqs && mcqs.length > 0) {
-      const initialShuffled = mcqs.map(mcq => {
-        const shuffledOptions = shuffleArray(mcq.options);
-        const newCorrectIndex = shuffledOptions.indexOf(mcq.correct_answer);
-        return { ...mcq, shuffledOptions, originalCorrectIndex: newCorrectIndex };
-      });
-      setShuffledMcqs(initialShuffled);
-      const initialUserAnswers: Record<string, string | null> = {};
-      initialShuffled.forEach(mcq => { initialUserAnswers[mcq.id] = null; });
-      setUserAnswers(initialUserAnswers);
-      setCurrentQuestionIndex(0);
-      setIsQuizEnded(false);
-      setCurrentTestResultId(null);
-      setTotalTimeLeft(totalTestTime);
-    }
-  }, [mcqs, timePerQuestion, totalTestTime]);
-
-  useEffect(() => {
-    if (totalTimeLeft <= 0 && !isQuizEnded && totalQuestions > 0) {
-      if (timerRef.current) clearInterval(timerRef.current);
-      submitTestToSupabase(true);
-      return;
-    }
-    if (isQuizEnded || totalQuestions === 0) {
-      if (timerRef.current) clearInterval(timerRef.current);
-      return;
-    }
-    timerRef.current = setInterval(() => { setTotalTimeLeft(prevTime => prevTime - 1); }, 1000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [totalTimeLeft, isQuizEnded, totalQuestions]);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   const currentMCQ = shuffledMcqs[currentQuestionIndex];
   const handleOptionSelect = (mcqId: string, selectedOption: string) => {
     if (isQuizEnded) return;
     setUserAnswers(prev => ({ ...prev, [mcqId]: selectedOption }));
   };
-  const goToNextQuestion = () => { if (currentQuestionIndex < totalQuestions - 1) setCurrentQuestionIndex(prev => prev + 1); };
-  const goToPreviousQuestion = () => { if (currentQuestionIndex > 0) setCurrentQuestionIndex(prev => prev - 1); };
-  const goToQuestion = (index: number) => { setCurrentQuestionIndex(index); setIsDrawerOpen(false); };
+  const goToNextQuestion = () => {
+    if (currentQuestionIndex < totalQuestions - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+      // Scroll to top when changing questions
+      if (mainContentRef.current) {
+        mainContentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  };
+  const goToPreviousQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(prev => prev - 1);
+      // Scroll to top when changing questions
+      if (mainContentRef.current) {
+        mainContentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  };
+  const goToQuestion = (index: number) => {
+    setCurrentQuestionIndex(index);
+    setIsDrawerOpen(false);
+    // Scroll to top when changing questions
+    if (mainContentRef.current) {
+      mainContentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
   const isQuestionAnswered = (mcqId: string) => userAnswers[mcqId] !== null && userAnswers[mcqId] !== undefined;
   const countUnattempted = () => shuffledMcqs ? shuffledMcqs.filter(mcq => !isQuestionAnswered(mcq.id)).length : 0;
 
@@ -168,6 +152,109 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName }: F
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  useEffect(() => {
+    const handleScroll = () => {
+      if (mainContentRef.current) {
+        const currentScrollY = mainContentRef.current.scrollTop;
+        setHeaderVisible(currentScrollY < lastScrollY.current || currentScrollY < 10);
+        lastScrollY.current = currentScrollY;
+      }
+    };
+
+    const currentRef = mainContentRef.current;
+    if (currentRef) {
+      currentRef.addEventListener('scroll', handleScroll, { passive: true });
+    }
+
+    return () => {
+      if (currentRef) {
+        currentRef.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, []);
+
+  // Fixed back button handler - using dynamic import for Capacitor
+  useEffect(() => {
+    let backListener: any = null;
+    let isMounted = true;
+
+    const setupBackButtonListener = async () => {
+      try {
+        // Check if Capacitor is available
+        const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor;
+
+        if (isCapacitor) {
+          // Dynamic import for Capacitor - only when needed
+          const { App } = await import('@capacitor/app');
+          if (!isMounted) return;
+
+          backListener = await App.addListener('backButton', () => {
+            if (!isQuizEnded) {
+              setShowExitConfirm(true);
+              return;
+            }
+            window.history.back();
+          });
+        } else {
+          // Browser environment - use popstate event
+          const handleBrowserBack = () => {
+            if (!isQuizEnded) {
+              setShowExitConfirm(true);
+              return;
+            }
+            window.history.back();
+          };
+
+          window.addEventListener('popstate', handleBrowserBack);
+          backListener = { remove: () => window.removeEventListener('popstate', handleBrowserBack) };
+        }
+      } catch (error) {
+        console.log('Back button handling not available:', error);
+      }
+    };
+
+    setupBackButtonListener();
+
+    return () => {
+      isMounted = false;
+      if (backListener && typeof backListener.remove === 'function') {
+        backListener.remove();
+      }
+    };
+  }, [isQuizEnded]);
+
+  useEffect(() => {
+    if (mcqs && mcqs.length > 0) {
+      const initialShuffled = mcqs.map(mcq => {
+        const shuffledOptions = shuffleArray(mcq.options);
+        const newCorrectIndex = shuffledOptions.indexOf(mcq.correct_answer);
+        return { ...mcq, shuffledOptions, originalCorrectIndex: newCorrectIndex };
+      });
+      setShuffledMcqs(initialShuffled);
+      const initialUserAnswers: Record<string, string | null> = {};
+      initialShuffled.forEach(mcq => { initialUserAnswers[mcq.id] = null; });
+      setUserAnswers(initialUserAnswers);
+      setCurrentQuestionIndex(0);
+      setIsQuizEnded(false);
+      setCurrentTestResultId(null);
+      setTotalTimeLeft(totalTestTime);
+    }
+  }, [mcqs, timePerQuestion, totalTestTime]);
+
+  useEffect(() => {
+    if (totalTimeLeft <= 0 && !isQuizEnded && totalQuestions > 0) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      submitTestToSupabase(true);
+      return;
+    }
+    if (isQuizEnded || totalQuestions === 0) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      return;
+    }
+    timerRef.current = setInterval(() => { setTotalTimeLeft(prevTime => prevTime - 1); }, 1000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [totalTimeLeft, isQuizEnded, totalQuestions]);
+
   if (isQuizEnded && currentTestResultId) return <FLPResults />;
 
   if (shuffledMcqs.length === 0) {
@@ -189,13 +276,12 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName }: F
       <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
         {shuffledMcqs.map((mcq, index) => (
           <Button key={mcq.id} variant="outline" size="sm"
-            className={`w-full h-10 rounded-xl text-sm font-bold transition-all ${
-              currentQuestionIndex === index
-                ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white border-transparent shadow-lg'
-                : isQuestionAnswered(mcq.id)
-                  ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
-                  : 'bg-muted text-muted-foreground'
-            }`}
+            className={`w-full h-10 rounded-xl text-sm font-bold transition-all ${currentQuestionIndex === index
+              ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white border-transparent shadow-lg'
+              : isQuestionAnswered(mcq.id)
+                ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                : 'bg-muted text-muted-foreground'
+              }`}
             onClick={() => goToQuestion(index)}>
             {index + 1}
           </Button>
@@ -210,141 +296,210 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName }: F
   );
 
   return (
-    <div className="fixed inset-0 z-[100] bg-background flex flex-col overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
+    <div className="relative min-h-screen bg-background">
+      {/* Background decoration - fixed position so it doesn't scroll */}
+      <div className="fixed top-[-20%] left-[-10%] w-[60%] h-[60%] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="fixed bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
 
-      {/* Header */}
-      <header className={`fixed top-0 left-0 right-0 z-50 bg-background/50 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
+      {/* Header - fixed position */}
+      <header className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="container mx-auto px-4 py-3 flex justify-between items-center max-w-7xl">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="hidden lg:flex w-9 h-9 p-0" onClick={() => setIsPanelOpen(!isPanelOpen)}>
+            <Button variant="ghost" size="icon" className="hidden lg:flex w-10 h-10 rounded-2xl bg-muted/40 hover:bg-muted/60" onClick={() => setIsPanelOpen(!isPanelOpen)}>
               <Menu className="h-5 w-5" />
             </Button>
             <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="lg:hidden w-9 h-9 p-0">
+                <Button variant="ghost" size="icon" className="lg:hidden w-10 h-10 rounded-2xl bg-muted/40 hover:bg-muted/60">
                   <PanelLeft className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[280px] sm:w-[350px] p-6 flex flex-col">
-                <SheetHeader><SheetTitle className="text-lg font-black">Question Map</SheetTitle></SheetHeader>
-                <div className="flex-grow overflow-y-auto mt-4"><QuestionMapGrid /></div>
+              <SheetContent side="left" className="w-[300px] p-0 border-r border-border/40 bg-background/80 backdrop-blur-2xl flex flex-col">
+                <SheetHeader className="p-6 border-b border-border/40">
+                  <SheetTitle className="text-xl font-black italic tracking-tight">Question <span className="text-blue-600">Map</span></SheetTitle>
+                </SheetHeader>
+                <div className="flex-grow overflow-y-auto p-6"><QuestionMapGrid /></div>
               </SheetContent>
             </Sheet>
             <div className="flex items-center gap-2">
-              <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-7 h-7" />
-              <span className="text-lg font-black hidden sm:inline">Full-Length Paper</span>
-              <span className="text-lg font-black sm:hidden">FLP</span>
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg">
+                <Zap className="w-4 h-4 text-white fill-white" />
+              </div>
+              <span className="text-lg font-black tracking-tight italic hidden sm:inline">Full-Length <span className="text-blue-600">Paper</span></span>
+              <span className="text-lg font-black italic sm:hidden">FLP</span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 bg-muted/40 backdrop-blur-md px-4 py-1.5 rounded-2xl border border-border/40">
+              <Clock className={`w-4 h-4 ${totalTimeLeft < 300 ? 'text-red-500 animate-pulse' : 'text-muted-foreground'}`} />
+              <span className={`text-sm font-black tabular-nums ${totalTimeLeft < 300 ? 'text-red-500' : 'text-foreground'}`}>{formatTime(totalTimeLeft)}</span>
+            </div>
             <ProfileDropdown />
           </div>
         </div>
       </header>
 
-      <div className="flex flex-grow">
+      <div className="flex relative pt-[calc(env(safe-area-inset-top)+70px)] min-h-screen">
         {/* Desktop Panel */}
         <AnimatePresence>
           {isPanelOpen && (
-            <motion.div initial={{ x: -256 }} animate={{ x: 0 }} exit={{ x: -256 }} transition={{ duration: 0.3 }}
-              className="hidden lg:flex flex-col w-64 bg-background border-r border-border flex-shrink-0 fixed top-0 pt-[calc(env(safe-area-inset-top)+60px)] h-screen z-40">
-              <div className="p-4 border-b border-border">
-                <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground">Question Map</h2>
+            <motion.div
+              initial={{ x: -288, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -288, opacity: 0 }}
+              transition={{ duration: 0.4, ease: "circOut" }}
+              className="hidden lg:flex flex-col w-72 bg-muted/5 backdrop-blur-xl border-r border-border/40 flex-shrink-0 fixed top-0 h-screen z-40"
+              style={{ top: 'calc(env(safe-area-inset-top) + 70px)' }}
+            >
+              <div className="p-6 border-b border-border/40">
+                <h2 className="text-xs font-black uppercase tracking-[0.3em] text-muted-foreground/60">Practice Navigator</h2>
               </div>
-              <div className="flex-grow overflow-y-auto p-4"><QuestionMapGrid /></div>
+              <div className="flex-grow overflow-y-auto p-6"><QuestionMapGrid /></div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Main Content */}
-        <main className={`flex-grow flex flex-col items-center px-4 py-8 mt-20 pb-[env(safe-area-inset-bottom)] overflow-y-auto w-full transition-all duration-300 ${isPanelOpen ? 'lg:ml-64' : ''}`}>
-          <div className="text-center mb-8 space-y-2 w-full max-w-2xl">
-            {subjectName && (
-              <Badge variant="outline" className="text-primary border-primary/30 uppercase tracking-[0.2em] font-black text-[10px] py-1 px-3 bg-primary/5">
-                {subjectName}
-              </Badge>
-            )}
-            <h1 className="text-foreground text-2xl font-black tracking-tight">Question {currentQuestionIndex + 1} <span className="text-muted-foreground/40 font-bold ml-2">/ {totalQuestions}</span></h1>
-            <div className="w-full h-1 bg-muted/30 rounded-full overflow-hidden mt-4">
-              <motion.div 
-                className="h-full bg-primary" 
-                initial={{ width: 0 }}
-                animate={{ width: `${((currentQuestionIndex + 1) / totalQuestions) * 100}%` }}
-              />
-            </div>
-          </div>
-
-          <AnimatePresence mode="wait">
-            {currentMCQ && (
-              <motion.div key={currentMCQ.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }} className="w-full max-w-2xl">
-                {/* Question Card */}
-                <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-500 via-slate-600 to-slate-700 text-white shadow-2xl p-1">
-                  <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
-                  <div className="relative z-10 bg-white/10 backdrop-blur-xl rounded-[1.8rem] p-6 border border-white/10">
-                    {/* Timer inside question box */}
-                    <div className="flex items-center justify-center gap-2 mb-4">
-                      <Clock className="w-4 h-4 text-white/70" />
-                      <span className={`text-lg font-black ${totalTimeLeft < 60 ? 'text-red-300 animate-pulse' : 'text-white'}`}>{formatTime(totalTimeLeft)}</span>
-                    </div>
-
-                    <p className="text-base sm:text-lg leading-relaxed font-semibold mb-6">{currentMCQ.question}</p>
-
-                    <div className="space-y-3">
-                      {currentMCQ.shuffledOptions.map((option, idx) => (
-                        <motion.div key={idx} whileTap={{ scale: 0.98 }}>
-                          <button
-                            className={`w-full text-left py-3 px-4 rounded-xl font-medium text-sm transition-all break-words whitespace-normal ${
-                              userAnswers[currentMCQ.id] === option
-                                ? 'bg-white text-slate-900 shadow-lg'
-                                : 'bg-white/10 hover:bg-white/20 text-white border border-white/10'
-                            }`}
-                            onClick={() => handleOptionSelect(currentMCQ.id, option)}>
-                            {option}
-                          </button>
-                        </motion.div>
-                      ))}
-                    </div>
-
-                    {/* Navigation inside card */}
-                    <div className="flex justify-between items-center mt-6 pt-4 border-t border-white/10">
-                      <Button onClick={goToPreviousQuestion} disabled={currentQuestionIndex === 0} variant="ghost" className="text-white hover:bg-white/10 disabled:opacity-30">
-                        <ChevronLeft className="w-4 h-4 mr-1" /> Previous
-                      </Button>
-                      {currentQuestionIndex < totalQuestions - 1 ? (
-                        <Button onClick={goToNextQuestion} className="bg-white text-slate-900 hover:bg-white/90 rounded-xl font-bold text-xs uppercase">
-                          Next <ChevronLeft className="w-4 h-4 ml-1 rotate-180" />
-                        </Button>
-                      ) : (
-                        <Button onClick={handleSubmitTest} className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-bold text-xs uppercase">
-                          Finish Test
-                        </Button>
-                      )}
-                    </div>
-                  </div>
+        {/* Main Content - Scrollable */}
+        <main
+          ref={mainContentRef}
+          className={`flex-grow flex flex-col items-center px-4 py-8 pb-[env(safe-area-inset-bottom)] overflow-y-auto w-full transition-all duration-500 ease-in-out ${isPanelOpen ? 'lg:ml-72' : ''}`}
+          style={{ height: 'calc(100vh - calc(env(safe-area-inset-top) + 70px))' }}
+        >
+          <div className="w-full max-w-2xl flex flex-col flex-1">
+            <div className="mb-10 w-full">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">Progress</span>
+                  <p className="text-sm font-black text-foreground mt-0.5">Question {currentQuestionIndex + 1} of {totalQuestions}</p>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                {subjectName && (
+                  <div className="bg-blue-500/10 border border-blue-500/20 px-3 py-1 rounded-full">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-blue-500">{subjectName}</span>
+                  </div>
+                )}
+              </div>
+              <div className="w-full h-1.5 bg-muted/40 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-blue-600 to-indigo-600"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${((currentQuestionIndex + 1) / totalQuestions) * 100}%` }}
+                  transition={{ duration: 0.5, ease: "circOut" }}
+                />
+              </div>
+            </div>
 
-          <div className="mt-12 text-center space-y-2 opacity-40">
-            <p className="text-[10px] uppercase font-black tracking-[0.4em] text-muted-foreground">Medmacs Exam Engine</p>
-            <p className="text-[10px] font-bold text-foreground truncate max-w-[200px] mx-auto uppercase tracking-widest">{displayUsername}</p>
+            <AnimatePresence mode="wait">
+              {currentMCQ && (
+                <motion.div
+                  key={currentMCQ.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                  className="flex flex-col flex-1"
+                >
+                  <h2 className="text-xl sm:text-2xl font-black text-foreground leading-[1.3] tracking-tight mb-8">
+                    {currentMCQ.question}
+                  </h2>
+
+                  <div className="space-y-4 mb-10">
+                    {currentMCQ.shuffledOptions.map((option, idx) => {
+                      const isSelected = userAnswers[currentMCQ.id] === option;
+                      return (
+                        <motion.button
+                          key={idx}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => handleOptionSelect(currentMCQ.id, option)}
+                          className={`group relative w-full p-5 rounded-3xl text-left border-2 transition-all duration-300 ${isSelected
+                              ? 'bg-blue-500/10 border-blue-500 shadow-[0_10px_30px_rgba(59,130,246,0.1)]'
+                              : 'bg-muted/10 border-transparent hover:bg-muted/20 hover:border-muted'
+                            }`}
+                        >
+                          <div className="flex items-center gap-4">
+                            <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black transition-colors shrink-0 ${isSelected ? 'bg-blue-500 text-white' : 'bg-muted/20 text-muted-foreground'
+                              }`}>
+                              {String.fromCharCode(65 + idx)}
+                            </span>
+                            <span className={`text-base font-bold leading-snug transition-colors ${isSelected ? 'text-blue-600' : 'text-foreground/80'
+                              }`}>
+                              {option}
+                            </span>
+                          </div>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Navigation Footer */}
+                  <div className="flex items-center gap-4 mt-auto pt-8 pb-4 border-t border-border/20">
+                    <Button
+                      variant="ghost"
+                      onClick={goToPreviousQuestion}
+                      disabled={currentQuestionIndex === 0}
+                      className="flex-1 max-w-[120px] rounded-2xl h-14 bg-muted/40 backdrop-blur-sm text-foreground font-bold hover:bg-muted/60 disabled:opacity-20 transition-all"
+                    >
+                      <ChevronLeft className="w-5 h-5 mr-1" /> Back
+                    </Button>
+
+                    {currentQuestionIndex < totalQuestions - 1 ? (
+                      <Button
+                        onClick={goToNextQuestion}
+                        className="flex-1 rounded-2xl h-14 bg-foreground text-background font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+                      >
+                        Next Question <ChevronLeft className="w-5 h-5 ml-1 rotate-180" />
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={handleSubmitTest}
+                        className="flex-1 rounded-2xl h-14 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+                      >
+                        Finish & Submit
+                      </Button>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="mt-8 text-center space-y-2 opacity-30 pb-8">
+              <p className="text-[10px] uppercase font-black tracking-[0.5em] text-muted-foreground">Certified Exam Environment</p>
+              <div className="flex items-center justify-center gap-2">
+                <div className="h-px w-8 bg-muted-foreground/30" />
+                <p className="text-[10px] font-bold text-foreground uppercase tracking-widest">{displayUsername}</p>
+                <div className="h-px w-8 bg-muted-foreground/30" />
+              </div>
+            </div>
           </div>
         </main>
       </div>
 
       <AlertDialog open={showUnattemptedDialog} onOpenChange={setShowUnattemptedDialog}>
-        <AlertDialogContent className="rounded-2xl">
+        <AlertDialogContent className="rounded-[2.5rem] p-8 border-border/40 bg-background/80 backdrop-blur-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Unattempted Questions</AlertDialogTitle>
-            <AlertDialogDescription>You have {unattemptedCount} question(s) unattempted. Are you sure you want to submit?</AlertDialogDescription>
+            <AlertDialogTitle className="text-2xl font-black italic tracking-tight">Unattempted <span className="text-red-500">Items</span></AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground font-medium py-2">
+              You still have <span className="text-foreground font-black underline decoration-red-500/30 underline-offset-4">{unattemptedCount}</span> question(s) left. Finishing now will mark them as incorrect.
+            </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Go Back</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSubmission} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">Submit Anyway</AlertDialogAction>
+          <AlertDialogFooter className="flex gap-3 sm:gap-3 mt-4">
+            <AlertDialogCancel className="flex-1 rounded-2xl h-12 font-bold bg-muted/20 border-transparent hover:bg-muted/40 uppercase text-xs tracking-widest">Keep Solving</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSubmission} className="flex-1 rounded-2xl h-12 font-black bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-lg shadow-rose-900/20 uppercase text-xs tracking-widest">Submit Anyway</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showExitConfirm} onOpenChange={setShowExitConfirm}>
+        <AlertDialogContent className="rounded-[2.5rem] p-8 border-border/40 bg-background/80 backdrop-blur-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-black italic tracking-tight">Leave <span className="text-blue-500">Test?</span></AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground font-medium py-2">
+              Are you sure you want to leave the test? Your current progress will not be saved for this session.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-3 sm:gap-3 mt-4">
+            <AlertDialogCancel className="flex-1 rounded-2xl h-12 font-bold bg-muted/20 border-transparent hover:bg-muted/40 uppercase text-xs tracking-widest">Continue Test</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setShowExitConfirm(false); onFinish(0, 0); }} className="flex-1 rounded-2xl h-12 font-black bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-900/20 uppercase text-xs tracking-widest">Leave Paper</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

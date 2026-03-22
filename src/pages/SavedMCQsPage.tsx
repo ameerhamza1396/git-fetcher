@@ -84,7 +84,7 @@ const SavedMCQsPage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['savedMcqs', user?.id] });
-      setExpandedMcqId(null); 
+      setExpandedMcqId(null);
       toast({ title: "MCQ Unsaved", description: "This question has been removed from your saved list." });
     }
   });
@@ -96,8 +96,8 @@ const SavedMCQsPage = () => {
       title: "Unsave Question?",
       description: "Remove this question from your saved list?",
       action: (
-        <Button 
-          variant="destructive" size="sm" 
+        <Button
+          variant="destructive" size="sm"
           onClick={() => unsaveMCQMutation.mutate(mcqId)}
           disabled={unsaveMCQMutation.isLoading}
         >
@@ -111,7 +111,7 @@ const SavedMCQsPage = () => {
   return (
     <div className="min-h-screen w-full bg-background bg-mesh pb-28 overflow-x-hidden relative">
       <Seo title="Saved MCQs" description="Access and review your saved MCQs on Medmacs App." canonical="https://medmacs.app/saved-mcqs" />
-      
+
       {/* Floating gradient orbs */}
       <div className="orb orb-1" />
       <div className="orb orb-2" />
@@ -157,10 +157,10 @@ const SavedMCQsPage = () => {
 
         {isError && (
           <div className="text-center p-8 bg-destructive/5 rounded-3xl border border-destructive/20 animate-alive">
-              <div className="w-12 h-12 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-                <BookmarkX className="w-6 h-6 text-destructive" />
-              </div>
-              <p className="text-sm font-bold text-destructive">Error loading saved MCQs: {error?.message}</p>
+            <div className="w-12 h-12 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+              <BookmarkX className="w-6 h-6 text-destructive" />
+            </div>
+            <p className="text-sm font-bold text-destructive">Error loading saved MCQs: {error?.message}</p>
           </div>
         )}
 
@@ -192,11 +192,11 @@ const SavedMCQsPage = () => {
                   <Card className={`overflow-hidden border-border/40 shadow-sm transition-all duration-300 transform-gpu alive-card ${expandedMcqId === mcq.id ? 'ring-2 ring-primary bg-card/90' : 'bg-card/50 hover:bg-card/80 backdrop-blur-sm shadow-black/5 hover:shadow-black/10'}`}>
                     <CardHeader className="p-5 flex flex-row justify-between items-start gap-4">
                       <div className="flex-grow space-y-3">
-                         <div className="flex items-center gap-2">
-                           <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest bg-primary/5 text-primary border-primary/20 rounded-sm">
-                             {mcq.subject || 'Medical'}
-                           </Badge>
-                         </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest bg-primary/5 text-primary border-primary/20 rounded-sm">
+                            {mcq.subject || 'Medical'}
+                          </Badge>
+                        </div>
                         <h2 className="text-[15px] font-bold text-foreground leading-relaxed">
                           {mcq.question}
                         </h2>
@@ -218,7 +218,7 @@ const SavedMCQsPage = () => {
                         </Button>
                       </div>
                     </CardHeader>
-                    
+
                     <AnimatePresence>
                       {expandedMcqId === mcq.id && (
                         <motion.div
@@ -232,13 +232,12 @@ const SavedMCQsPage = () => {
                               {mcq.options.map((option, index) => {
                                 const isCorrect = option === mcq.correct_answer;
                                 return (
-                                  <div 
-                                    key={index} 
-                                    className={`relative p-3.5 rounded-2xl border-2 transition-all duration-200 group flex items-center justify-between ${
-                                      isCorrect 
-                                        ? 'bg-primary/5 border-primary shadow-sm shadow-primary/10' 
+                                  <div
+                                    key={index}
+                                    className={`relative p-3.5 rounded-2xl border-2 transition-all duration-200 group flex items-center justify-between ${isCorrect
+                                        ? 'bg-primary/5 border-primary shadow-sm shadow-primary/10'
                                         : 'bg-muted/30 border-transparent hover:border-border'
-                                    }`}
+                                      }`}
                                   >
                                     <div className="flex items-center gap-3">
                                       <div className={`w-6 h-6 rounded-lg text-[10px] font-black flex items-center justify-center shrink-0 ${isCorrect ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}>
@@ -247,17 +246,17 @@ const SavedMCQsPage = () => {
                                       <span className={`text-sm font-medium ${isCorrect ? 'text-foreground' : 'text-muted-foreground'}`}>{option}</span>
                                     </div>
                                     {isCorrect && (
-                                       <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="shrink-0 bg-primary/20 p-1 rounded-full">
-                                          <CheckCircle className="w-4 h-4 text-primary" />
-                                       </motion.div>
+                                      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="shrink-0 bg-primary/20 p-1 rounded-full">
+                                        <CheckCircle className="w-4 h-4 text-primary" />
+                                      </motion.div>
                                     )}
                                   </div>
                                 );
                               })}
                             </div>
-                            
+
                             {mcq.explanation && (
-                              <motion.div 
+                              <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 className="mt-6 p-4 rounded-3xl bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/20 dark:to-blue-950/20 border border-indigo-200/50 dark:border-indigo-800/30"

@@ -124,14 +124,14 @@ const ActionCard = ({ action, isExternal = false, fixedHeight = false }: any) =>
 
 const InstituteDetailCard = ({ institute }: { institute: any }) => {
   if (!institute) return null;
-  
+
   return (
     <div className="relative overflow-hidden rounded-[2rem] h-32 mb-6 group shadow-xl">
       {institute.image_url ? (
-        <img 
-          src={institute.image_url} 
-          alt={institute.name} 
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+        <img
+          src={institute.image_url}
+          alt={institute.name}
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
         />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-[#2dd4bf] to-[#0ea5e9]" />
@@ -182,15 +182,15 @@ const DashboardReviewCard = ({ onComplete }: { onComplete: () => void }) => {
             <h3 className="text-lg font-black text-white mb-2 italic">You're the Best! 🚀</h3>
             <p className="text-white/50 text-xs mb-4 leading-relaxed">Could you spare a moment to review us on Play Store?</p>
             <div className="flex flex-col gap-2">
-              <a 
-                href="https://play.google.com/store/apps/details?id=com.hmacs.medmacs" 
-                target="_blank" 
+              <a
+                href="https://play.google.com/store/apps/details?id=com.hmacs.medmacs"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-3 bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] text-white font-bold rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-[#0ea5e9]/20 active:scale-95 transition-all flex items-center justify-center gap-2"
               >
                 Rate on Play Store <ArrowRight className="w-3.5 h-3.5" />
               </a>
-              <button 
+              <button
                 onClick={onComplete}
                 className="w-full py-2 text-white/40 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors"
               >
@@ -298,12 +298,12 @@ const Dashboard = () => {
         .select('setting_value')
         .eq('setting_name', 'whats_new')
         .maybeSingle();
-      
+
       if (error) {
         console.error("Error fetching What's New:", error);
         return [];
       }
-      
+
       try {
         return data?.setting_value ? JSON.parse(data.setting_value) : [];
       } catch (e) {
@@ -657,7 +657,7 @@ const Dashboard = () => {
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             {/* Greeting - no avatar here */}
             <div className="mb-5">
-              <h1 className="text-xl font-black text-foreground leading-tight">
+              <h1 className="text-2xl sm:text-3xl font-black text-foreground leading-tight">
                 Hi, <span className="text-shimmer">{displayName}</span> ✨
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5 font-medium">How's you doing today?</p>
@@ -929,7 +929,7 @@ const Dashboard = () => {
                   </div>
                   <div>
                     <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Term of the Day</p>
-                    <h3 className="text-2xl font-black text-white">{termOfDay.term}</h3>
+                    <h3 className="text-3xl font-black text-white">{termOfDay.term}</h3>
                   </div>
                 </div>
                 <p className="text-white/80 text-sm leading-relaxed">{termOfDay.definition}</p>

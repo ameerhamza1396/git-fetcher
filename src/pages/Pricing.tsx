@@ -195,8 +195,8 @@ const Pricing = () => {
     const activeStyle = planStyles[activePlanId] || planStyles.free;
     const ActiveFallingIcon = activePlanId === 'premium' ? Star
         : activePlanId === 'iconic' ? Crown
-        : activePlanId === 'pro' ? Zap
-        : Shield;
+            : activePlanId === 'pro' ? Zap
+                : Shield;
 
     return (
         <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950 relative overflow-x-hidden">

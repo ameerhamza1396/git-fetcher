@@ -66,7 +66,7 @@ const SEQs = () => {
             </header>
 
             <main className="container mx-auto px-4 flex flex-col items-center justify-center min-h-screen pt-[calc(80px+env(safe-area-inset-top))]">
-                <motion.div 
+                <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6 }}
@@ -77,7 +77,7 @@ const SEQs = () => {
                         <div className="relative bg-gradient-to-br from-primary to-accent p-6 rounded-[2.5rem] shadow-2xl">
                             <FileText className="w-16 h-16 text-white" />
                         </div>
-                        <motion.div 
+                        <motion.div
                             animate={{ rotate: 360 }}
                             transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
                             className="absolute -top-2 -right-2 bg-yellow-400 p-2 rounded-full shadow-lg"
