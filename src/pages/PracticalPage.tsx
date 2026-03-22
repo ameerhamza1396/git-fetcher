@@ -215,7 +215,7 @@ const PracticalPage = () => {
                 {!hasInstitute && (
                     <div className="p-4 rounded-2xl bg-yellow-500/10 border border-yellow-500/20 text-yellow-600 dark:text-yellow-400 text-sm font-medium flex items-center space-x-3 backdrop-blur-md">
                         <School className="w-5 h-5 shrink-0" />
-                        <span>Please set your institute in profile to see relevant content.</span>
+                        <span>Content is still in the phase of rolling out for your academic year. Stay tuned.</span>
                     </div>
                 )}
               </div>

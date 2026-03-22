@@ -7,7 +7,7 @@ import {
   Clock, CheckCircle, XCircle, Timer, Bot, MessageSquare, X, Bookmark,
   BookmarkCheck, Crown, LogOut, AlertTriangle, MoreVertical, Flag, BotOff,
   Moon, Sun, Zap, Sparkles, BookOpen, ChevronLeft, Loader2, Star, Award,
-  TrendingUp, Brain, Target, Shield
+  TrendingUp, Brain, Target, Shield, Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
@@ -133,7 +133,7 @@ const MCQSettingsModal = ({
   quickSubmit, toggleQuickSubmit,
   soundEnabled, toggleSound,
   aiPopupsDisabled, toggleAiPopups,
-  onReport, isPremium, theme, setTheme
+  onReport, isPremium, theme, setTheme, onReset
 }) => (
   <DialogPrimitive.Root open={isOpen} onOpenChange={onClose}>
     <ModalContent className="sm:max-w-[400px] mx-4">
@@ -214,7 +214,10 @@ const MCQSettingsModal = ({
           </div>
 
           <div className="grid grid-cols-1 gap-3 pt-2">
-            <Button onClick={onReport} variant="outline" className="w-full rounded-2xl h-12 border-2 border-red-300 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 font-bold uppercase text-xs tracking-widest">
+            <Button onClick={onReset} variant="outline" className="w-full rounded-2xl h-12 border-2 border-orange-200 dark:border-orange-900/30 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950 font-bold uppercase text-xs tracking-widest">
+              <Trash2 className="w-4 h-4 mr-2" /> Reset Session
+            </Button>
+            <Button onClick={onReport} variant="outline" className="w-full rounded-2xl h-12 border-2 border-red-300 dark:border-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 font-bold uppercase text-xs tracking-widest">
               <Flag className="w-4 h-4 mr-2" /> Report Question
             </Button>
             <Button onClick={onExit} className="w-full rounded-2xl h-12 font-black uppercase text-xs tracking-widest bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white">
@@ -398,6 +401,7 @@ export const MCQDisplay = ({
     return true;
   });
   const [feedbackType, setFeedbackType] = useState<'correct' | 'incorrect' | null>(null);
+  const [answeredQuestions, setAnsweredQuestions] = useState<Record<string, { selectedAnswer: string }>>({});
   const [aiPopupsDisabled, setAiPopupsDisabled] = useState(() => {
     if (typeof window !== 'undefined') return localStorage.getItem('aiPopupsDisabled') === 'true';
     return false;
@@ -474,10 +478,36 @@ export const MCQDisplay = ({
       else playIncorrectSound();
     }
     if (isCorrect && !timeUp) setScore(prev => prev + 1);
+    setAnsweredQuestions(prev => ({ ...prev, [currentMCQ.id]: { selectedAnswer: answer || 'No answer (time up)' } }));
     try {
       await supabase.from('user_answers').insert({ user_id: user.id, mcq_id: currentMCQ.id, selected_answer: answer || 'No answer (time up)', is_correct: isCorrect, time_taken: timeTaken });
     } catch (error) { console.error('Error saving answer:', error); }
     setShowExplanation(true);
+  };
+
+  const handleResetSession = async () => {
+    if (!user) return;
+    try {
+      // Clear states
+      setCurrentQuestionIndex(0);
+      setAnsweredQuestions({});
+      setScore(0);
+      setSelectedAnswer(null);
+      setShowExplanation(false);
+      setTimeLeft(timePerQuestion);
+      setStartTime(Date.now());
+      
+      // Clear persistence
+      localStorage.removeItem(LAST_ATTEMPTED_MCQ_KEY);
+      localStorage.removeItem(LAST_ATTEMPTED_SUBJECT_KEY);
+      localStorage.removeItem(LAST_ATTEMPTED_CHAPTER_KEY);
+      await removeSavedSessionFromList(user.id, chapter);
+      
+      toast({ title: "Session Reset", description: "You're back at the first question." });
+      setShowSettingsModal(false);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to reset session", variant: "destructive" });
+    }
   };
 
   const handleNextQuestion = () => {
@@ -565,36 +595,65 @@ export const MCQDisplay = ({
   }, [timerEnabled, showExplanation, loading, mcqs.length, timeLeft]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      if (initialIndex > 0) { setCurrentQuestionIndex(initialIndex); return; }
-      const lastSubject = localStorage.getItem(LAST_ATTEMPTED_SUBJECT_KEY);
-      const lastChapter = localStorage.getItem(LAST_ATTEMPTED_CHAPTER_KEY);
-      const lastIndex = localStorage.getItem(LAST_ATTEMPTED_MCQ_KEY);
-      if (lastSubject === subject && lastChapter === chapter && lastIndex !== null) {
-        const parsedIndex = parseInt(lastIndex, 10);
-        if (!isNaN(parsedIndex) && parsedIndex >= 0) setCurrentQuestionIndex(parsedIndex);
-      } else {
-        localStorage.removeItem(LAST_ATTEMPTED_MCQ_KEY);
-        localStorage.removeItem(LAST_ATTEMPTED_SUBJECT_KEY);
-        localStorage.removeItem(LAST_ATTEMPTED_CHAPTER_KEY);
-        setCurrentQuestionIndex(0);
-      }
+    const qId = currentMCQ?.id;
+    if (qId && answeredQuestions[qId]) {
+      setSelectedAnswer(answeredQuestions[qId].selectedAnswer);
+      setShowExplanation(true);
+    } else {
+      setSelectedAnswer(null);
+      setShowExplanation(false);
     }
+  }, [currentQuestionIndex, mcqs, answeredQuestions]);
+
+  useEffect(() => {
+    // Only fetch logic here, initialIndex handled within loadMCQs
   }, [subject, chapter, initialIndex]);
 
   useEffect(() => {
     const loadMCQs = async () => {
       setLoading(true);
       const data = await fetchMCQsByChapter(chapter);
+      
+      // Load previous answers for this chapter
+      let firstUnattemptedIndex = 0;
+      if (user?.id) {
+        const { data: previousAnswers } = await supabase
+          .from('user_answers')
+          .select('mcq_id, selected_answer')
+          .eq('user_id', user.id)
+          .in('mcq_id', data.map(m => m.id));
+
+        if (previousAnswers) {
+          const answerMap = {};
+          previousAnswers.forEach(ans => {
+            answerMap[ans.mcq_id] = { selectedAnswer: ans.selected_answer };
+          });
+          setAnsweredQuestions(answerMap);
+          
+          // Find the first index that hasn't been answered
+          const foundIndex = data.findIndex(m => !answerMap[m.id]);
+          if (foundIndex !== -1) firstUnattemptedIndex = foundIndex;
+          else firstUnattemptedIndex = data.length - 1; // All answered, go to last
+        }
+      }
+
       const shuffledMCQs = data.map(mcq => {
         const shuffledOptions = shuffleArray(mcq.options);
         return { ...mcq, shuffledOptions, originalCorrectIndex: shuffledOptions.indexOf(mcq.correct_answer) };
       });
       setMcqs(shuffledMCQs);
+      
+      // NEW: Scroll to nearest unattempted
+      if (initialIndex > 0) {
+        setCurrentQuestionIndex(initialIndex);
+      } else {
+        setCurrentQuestionIndex(firstUnattemptedIndex);
+      }
+      
       setLoading(false);
     };
     loadMCQs();
-  }, [chapter]);
+  }, [chapter, user?.id]);
 
   useEffect(() => {
     if (!loading && mcqs.length > 0 && typeof window !== 'undefined' && hasAttemptedAny) {
@@ -660,11 +719,16 @@ export const MCQDisplay = ({
     // IMPORTANT: overflow-hidden removed — it was creating a stacking context trapping modal portals
     <div className="fixed inset-0 z-[100] bg-gradient-to-br from-background via-background to-primary/5 flex flex-col overscroll-none touch-none select-none">
       {/* Animated Background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1, delay: 0.2 }}
+        className="absolute inset-0 overflow-hidden pointer-events-none"
+      >
         <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-gradient-to-r from-primary/20 to-blue-500/20 rounded-full blur-[150px] animate-pulse" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-gradient-to-l from-purple-500/20 to-pink-500/20 rounded-full blur-[150px] animate-pulse delay-1000" />
         <div className="absolute top-[50%] left-[50%] w-[80%] h-[80%] bg-gradient-to-tr from-yellow-500/10 to-orange-500/10 rounded-full blur-[200px] animate-pulse delay-2000" />
-      </div>
+      </motion.div>
 
       {/* Header */}
       <header className="relative z-50 flex items-center justify-between px-6 pt-[max(1rem,env(safe-area-inset-top))] pb-4 bg-gradient-to-b from-background/80 to-transparent backdrop-blur-sm">
@@ -842,9 +906,8 @@ export const MCQDisplay = ({
               variant="ghost"
               onClick={() => {
                 if (currentQuestionIndex > 0) {
-                  setCurrentQuestionIndex(prev => prev - 1);
-                  setSelectedAnswer(null);
-                  setShowExplanation(false);
+                  const prevIndex = currentQuestionIndex - 1;
+                  setCurrentQuestionIndex(prevIndex);
                   setTimeLeft(timePerQuestion);
                   setStartTime(Date.now());
                 }
@@ -881,6 +944,7 @@ export const MCQDisplay = ({
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
         onExit={() => { setShowSettingsModal(false); setShowLeaveModal(true); }}
+        onReset={handleResetSession}
         quickSubmit={quickSubmit}
         toggleQuickSubmit={() => {
           const newVal = !quickSubmit;
