@@ -909,8 +909,8 @@ export const MCQDisplay = ({
         )}
       </AnimatePresence>
 
-      {/* AI Chatbot */}
-      {!aiPopupsDisabled && (
+      {/* AI Chatbot - hide during explanation/continue phase */}
+      {!aiPopupsDisabled && !showExplanation && (
         <AIChatbot currentQuestion={currentMCQ?.question} options={(currentMCQ as any)?.options} userPlan={userPlanForChatbot} />
       )}
 
