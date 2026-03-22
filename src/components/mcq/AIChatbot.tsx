@@ -74,21 +74,25 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
 
   return (
     <>
-        <motion.div 
-          className="fixed bottom-6 right-4 z-50" 
-          whileHover={{ scale: 1.1 }} 
-          whileTap={{ scale: 0.9 }}
-          initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.5 }}
-        >
-          <Button 
-            onClick={onOpen}
-            className="w-14 h-14 rounded-full bg-primary/80 backdrop-blur-xl hover:bg-primary/90 shadow-xl border border-primary-foreground/10 p-0"
+      <AnimatePresence>
+        {!isHidden && (
+          <motion.div 
+            className="fixed bottom-6 right-4 z-50" 
+            whileHover={{ scale: 1.1 }} 
+            whileTap={{ scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.5, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.5, y: 20 }}
           >
-            <Bot className="w-6 h-6 text-primary-foreground" />
-          </Button>
-        </motion.div>
+            <Button 
+              onClick={onOpen}
+              className="w-14 h-14 rounded-full bg-primary/80 backdrop-blur-xl hover:bg-primary/90 shadow-xl border border-primary-foreground/10 p-0"
+            >
+              <Bot className="w-6 h-6 text-primary-foreground" />
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Chat panel */}
       <AnimatePresence>

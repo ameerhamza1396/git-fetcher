@@ -920,7 +920,7 @@ export const MCQDisplay = ({
           currentAnswer={selectedAnswer}
           correctAnswer={currentMCQ.correct_answer}
           userPlan={userPlanForChatbot}
-          isHidden={showExplanation} // Hide Dr Ahroid floating button when next/prev buttons are shown
+          isHidden={showExplanation || !quickSubmit} // Hide when navigation (next/prev) or submit buttons are visible
           onOpen={() => setIsChatbotOpen(true)}
         />
       )}
