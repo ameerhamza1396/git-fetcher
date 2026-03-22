@@ -88,7 +88,11 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
               onClick={onOpen}
               className="w-14 h-14 rounded-full bg-primary/80 backdrop-blur-xl hover:bg-primary/90 shadow-xl border border-primary-foreground/10 p-0"
             >
-              <Bot className="w-6 h-6 text-primary-foreground" />
+              <img 
+              src="/mascots/Mascot12.png" 
+              alt="Dr. Ahroid" 
+              className="w-full h-full object-contain rounded-full" 
+            />
             </Button>
           </motion.div>
         )}
@@ -111,8 +115,8 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
               
               <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+12px)] pb-3 border-b border-border/20">
                 <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Bot className="w-4 h-4 text-primary" />
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
+                    <img src="/mascots/Mascot12.png" alt="Dr. Ahroid" className="w-full h-full object-contain" />
                   </div>
                   <div>
                     <span className="text-sm font-bold text-foreground">Dr. Ahroid</span>
@@ -131,8 +135,8 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
                 <ScrollArea className="flex-1 px-4 py-4">
                   {messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                      <div className="w-16 h-16 rounded-full bg-primary/10 backdrop-blur-lg flex items-center justify-center mb-4">
-                        <Bot className="w-8 h-8 text-primary opacity-60" />
+                      <div className="w-16 h-16 rounded-full bg-primary/10 backdrop-blur-lg flex items-center justify-center mb-4 overflow-hidden">
+                        <img src="/mascots/Mascot12.png" alt="Dr. Ahroid" className="w-full h-full object-contain opacity-80" />
                       </div>
                       <p className="text-sm font-medium text-foreground">Ask me anything!</p>
                       <p className="text-xs text-muted-foreground mt-1">I'm Dr. Ahroid, your MBBS tutor.</p>

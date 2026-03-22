@@ -288,8 +288,8 @@ const DrSultanChat: React.FC = () => {
               <Menu className="w-6 h-6" />
             </Button>
             <div className="flex items-center gap-3">
-               <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center shadow-lg">
-                  <span className="text-xl">🤖</span>
+               <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center shadow-lg overflow-hidden p-1">
+                  <img src="/mascots/Mascot12.png" alt="Dr. Ahroid" className="w-full h-full object-contain" />
                </div>
                <div className="flex flex-col">
                   <CardTitle className="text-lg font-black italic uppercase tracking-tight">Dr. <span className="text-primary">Ahroid</span></CardTitle>
@@ -311,8 +311,8 @@ const DrSultanChat: React.FC = () => {
               <div className="flex-1 flex flex-col items-center justify-center text-center py-20 px-8">
                 <div className="relative mb-8">
                    <div className="absolute inset-0 bg-primary/20 blur-[100px] rounded-full pointer-events-none" />
-                   <div className="relative w-24 h-24 rounded-[2.5rem] bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center text-5xl shadow-2xl">
-                      🧑‍⚕️
+                   <div className="relative w-24 h-24 rounded-[2.5rem] bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center shadow-2xl p-3 overflow-hidden">
+                      <img src="/mascots/Mascot12.png" alt="Dr. Ahroid" className="w-full h-full object-contain" />
                    </div>
                 </div>
                 <h2 className="text-3xl font-black italic uppercase mb-2 tracking-tight">Your AI <span className="text-primary">Consultant</span></h2>
