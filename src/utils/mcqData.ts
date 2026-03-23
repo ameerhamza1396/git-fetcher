@@ -119,7 +119,7 @@ export const getUserStats = async (userId: string) => {
       .eq('user_id', userId);
 
     if (answersError) {
-      return { totalQuestions: 0, correctAnswers: 0, accuracy: 0, averageTime: 0, bestStreak: 0 };
+      return { totalQuestions: 0, correctAnswers: 0, accuracy: 0, averageTime: 0, bestStreak: 0, savedQuestions: 0 };
     }
 
     const totalQuestions = answers?.length || 0;
@@ -129,19 +129,64 @@ export const getUserStats = async (userId: string) => {
       ? Math.round(answers.reduce((sum, a) => sum + (a.time_taken || 0), 0) / answers.length)
       : 0;
 
-    let currentStreak = 0;
     let bestStreak = 0;
+    let currentCorrectStreak = 0;
     answers?.forEach(answer => {
       if (answer.is_correct) {
-        currentStreak++;
-        bestStreak = Math.max(bestStreak, currentStreak);
+        currentCorrectStreak++;
+        bestStreak = Math.max(bestStreak, currentCorrectStreak);
       } else {
-        currentStreak = 0;
+        currentCorrectStreak = 0;
       }
     });
 
-    return { totalQuestions, correctAnswers, accuracy, averageTime, bestStreak };
+    // Calculate consecutive days streak
+    const calculateCurrentStreak = (answersData: any[]) => {
+      if (!answersData || answersData.length === 0) return 0;
+      
+      const answerDates = [...new Set(answersData.map(a => {
+        const date = new Date(a.created_at);
+        return date.toLocaleDateString("en-US", { timeZone: "Asia/Karachi" });
+      }))].sort().reverse();
+
+      if (answerDates.length === 0) return 0;
+
+      const today = new Date();
+      const todayPKT = new Date(today.toLocaleString("en-US", { timeZone: "Asia/Karachi" }));
+      todayPKT.setHours(0, 0, 0, 0);
+      
+      const yesterday = new Date(todayPKT);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      const mostRecentDate = new Date(answerDates[0]);
+      const isToday = mostRecentDate.getTime() === todayPKT.getTime();
+      const isYesterday = mostRecentDate.getTime() === yesterday.getTime();
+
+      if (!isToday && !isYesterday) return 0;
+
+      let streak = 1;
+      let currentDate = new Date(mostRecentDate);
+
+      for (let i = 1; i < answerDates.length; i++) {
+        const prevDate = new Date(answerDates[i]);
+        const expectedPrevDate = new Date(currentDate);
+        expectedPrevDate.setDate(expectedPrevDate.getDate() - 1);
+
+        if (prevDate.getTime() === expectedPrevDate.getTime()) {
+          streak++;
+          currentDate = prevDate;
+        } else {
+          break;
+        }
+      }
+
+      return streak;
+    };
+
+    const currentStreak = calculateCurrentStreak(answers || []);
+
+    return { totalQuestions, correctAnswers, accuracy, averageTime, bestStreak, savedQuestions: currentStreak };
   } catch {
-    return { totalQuestions: 0, correctAnswers: 0, accuracy: 0, averageTime: 0, bestStreak: 0 };
+    return { totalQuestions: 0, correctAnswers: 0, accuracy: 0, averageTime: 0, bestStreak: 0, savedQuestions: 0 };
   }
 };

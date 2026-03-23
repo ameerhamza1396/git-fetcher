@@ -254,29 +254,58 @@ const Dashboard = () => {
     queryKey: ['user-stats', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data: answers, error: answersError } = await supabase.from('user_answers').select('id, is_correct, time_taken, created_at').eq('user_id', user.id);
-      if (answersError) return { totalQuestions: 0, correctAnswers: 0, accuracy: 0, currentStreak: 0, rankPoints: 0, battlesWon: 0, totalBattles: 0 };
+      
+      const { data: answers, error: answersError } = await supabase
+        .from('user_answers')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (answersError) {
+        return { totalQuestions: 0, correctAnswers: 0, accuracy: 0, currentStreak: 0, rankPoints: 0, battlesWon: 0, totalBattles: 0, savedQuestions: 0 };
+      }
+
       const totalQuestions = answers?.length || 0;
       const correctAnswers = answers?.filter(a => a.is_correct)?.length || 0;
       const accuracy = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+
       const answerDates = answers?.map(a => new Date(a.created_at).toDateString()) || [];
       const uniqueDates = [...new Set(answerDates)].sort().reverse();
+
       let currentStreak = 0;
       const today = new Date().toDateString();
       const yesterday = new Date(Date.now() - 86400000).toDateString();
+
       if (uniqueDates.includes(today) || uniqueDates.includes(yesterday)) {
         for (let i = 0; i < uniqueDates.length; i++) {
           const date = new Date(uniqueDates[i]);
           const expectedDate = new Date();
           expectedDate.setDate(expectedDate.getDate() - i);
-          if (date.toDateString() === expectedDate.toDateString()) currentStreak++;
-          else break;
+          if (date.toDateString() === expectedDate.toDateString()) {
+            currentStreak++;
+          } else {
+            break;
+          }
         }
       }
-      const { count: savedCount } = await supabase.from('saved_mcqs').select('*', { count: 'exact', head: true }).eq('user_id', user.id);
-      return { totalQuestions, correctAnswers, accuracy, savedQuestions: savedCount || 0, rankPoints: 0, battlesWon: battles?.filter(b => b.rank === 1)?.length || 0, totalBattles: battles?.length || 0 };
+
+      const { data: battles } = await supabase
+        .from('battle_results')
+        .select('*')
+        .eq('user_id', user.id);
+
+      const { count: savedCount } = await supabase
+        .from('saved_mcqs')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      const battlesWon = battles?.filter(b => b.rank === 1)?.length || 0;
+      const rankPoints = correctAnswers * 10 + currentStreak * 5 + accuracy;
+
+      return { totalQuestions, correctAnswers, accuracy, currentStreak, rankPoints, battlesWon, totalBattles: battles?.length || 0, savedQuestions: savedCount || 0 };
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    retry: 1,
+    staleTime: 1000 * 60 * 5,
   });
 
   const { data: announcements, isLoading: announcementsLoading } = useQuery({
@@ -407,7 +436,7 @@ const Dashboard = () => {
 
   const quickActions = [
     { title: 'Practice MCQs', description: 'Test your knowledge', icon: BookOpen, link: '/mcqs', gradient: 'from-blue-500 to-indigo-600', iconColor: 'text-blue-200' },
-    { title: 'Saved MCQs', description: 'Review bookmarks', icon: Bookmark, link: '/saved-mcqs', gradient: 'from-emerald-500 to-teal-600', iconColor: 'text-emerald-200' },
+    { title: 'Saved MCQs', description: 'Review bookmarks', icon: Bookmark, link: '/saved-mcqs', gradient: 'from-teal-500 to-emerald-600', iconColor: 'text-teal-100' },
     { title: 'Battle Arena', description: 'Compete with friends', icon: Swords, link: '/battle', gradient: 'from-orange-500 to-red-500', iconColor: 'text-orange-100' },
     { title: 'Collaborate', description: 'Open now! Apply for Medmacs', icon: Briefcase, link: '/summerinternship2025', gradient: 'from-rose-500 to-pink-600', iconColor: 'text-rose-100' },
   ];
@@ -670,10 +699,10 @@ const Dashboard = () => {
               >
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                    <Bookmark className="w-4 h-4 text-primary" /> {userStats?.savedQuestions || 0} Saved Questions
+                    <Flame className="w-4 h-4 text-orange-500" /> {userStats?.currentStreak || 0} day streak
                   </span>
                   <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-0 text-[10px] px-2 font-bold shadow-sm">
-                    Keep context!
+                    Keep it up!
                   </Badge>
                 </div>
                 <Progress value={userStats?.accuracy || 0} className="h-2.5 mb-2" />

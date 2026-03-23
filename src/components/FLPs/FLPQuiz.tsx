@@ -42,6 +42,9 @@ interface FLPQuizProps {
   onFinish: (score: number, totalQuestions: number) => void;
   timePerQuestion?: number;
   subjectName?: string;
+  initialIndex?: number;
+  initialAnswers?: Record<string, string | null>;
+  initialTimeLeft?: number;
 }
 
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -53,7 +56,18 @@ const shuffleArray = <T,>(array: T[]): T[] => {
   return shuffled;
 };
 
-export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName }: FLPQuizProps) => {
+const FLP_STORAGE_KEY = 'flp_session';
+
+interface FLPSessionData {
+  shuffledMcqs: ShuffledMCQ[];
+  currentQuestionIndex: number;
+  userAnswers: Record<string, string | null>;
+  totalTimeLeft: number;
+  subjectName?: string;
+  savedAt: number;
+}
+
+export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, initialIndex, initialAnswers, initialTimeLeft }: FLPQuizProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -72,6 +86,8 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName }: F
   const lastScrollY = useRef(0);
   const [headerVisible, setHeaderVisible] = useState(true);
   const mainContentRef = useRef<HTMLDivElement>(null);
+  const [isRestored, setIsRestored] = useState(false);
+  const [isNewSession, setIsNewSession] = useState(false);
 
   const totalQuestions = shuffledMcqs.length;
   const totalTestTime = totalQuestions * timePerQuestion;
@@ -231,13 +247,21 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName }: F
         return { ...mcq, shuffledOptions, originalCorrectIndex: newCorrectIndex };
       });
       setShuffledMcqs(initialShuffled);
-      const initialUserAnswers: Record<string, string | null> = {};
-      initialShuffled.forEach(mcq => { initialUserAnswers[mcq.id] = null; });
-      setUserAnswers(initialUserAnswers);
-      setCurrentQuestionIndex(0);
       setIsQuizEnded(false);
       setCurrentTestResultId(null);
-      setTotalTimeLeft(totalTestTime);
+      setIsRestored(true);
+      
+      if (initialIndex !== undefined && initialAnswers !== undefined && initialTimeLeft !== undefined) {
+        setUserAnswers(initialAnswers);
+        setCurrentQuestionIndex(initialIndex);
+        setTotalTimeLeft(initialTimeLeft);
+      } else {
+        const initialUserAnswers: Record<string, string | null> = {};
+        initialShuffled.forEach(mcq => { initialUserAnswers[mcq.id] = null; });
+        setUserAnswers(initialUserAnswers);
+        setCurrentQuestionIndex(0);
+        setTotalTimeLeft(totalTestTime);
+      }
     }
   }, [mcqs, timePerQuestion, totalTestTime]);
 
@@ -254,6 +278,30 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName }: F
     timerRef.current = setInterval(() => { setTotalTimeLeft(prevTime => prevTime - 1); }, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [totalTimeLeft, isQuizEnded, totalQuestions]);
+
+  useEffect(() => {
+    if (shuffledMcqs.length > 0 && !isQuizEnded && user) {
+      const sessionData: FLPSessionData = {
+        shuffledMcqs,
+        currentQuestionIndex,
+        userAnswers,
+        totalTimeLeft,
+        subjectName,
+        savedAt: Date.now(),
+      };
+      try {
+        localStorage.setItem(FLP_STORAGE_KEY, JSON.stringify(sessionData));
+      } catch (e) { console.error("Failed to save FLP session", e); }
+    }
+  }, [shuffledMcqs, currentQuestionIndex, userAnswers, totalTimeLeft, isQuizEnded, user]);
+
+  useEffect(() => {
+    if (shuffledMcqs.length > 0 && !isRestored) {
+      try {
+        localStorage.removeItem(FLP_STORAGE_KEY);
+      } catch (e) { console.error("Failed to clear FLP session", e); }
+    }
+  }, [isRestored, shuffledMcqs.length]);
 
   if (isQuizEnded && currentTestResultId) return <FLPResults />;
 

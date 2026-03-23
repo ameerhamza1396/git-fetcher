@@ -30,6 +30,11 @@ export default function BackButtonHandler() {
 
             console.log(`[BackHandler] Back pressed. Path=[${pathname}], canGoBack=[${canGoBack}]`);
 
+            // MCQ Routes: let the MCQDisplay component handle the back button
+            if (pathname.startsWith("/mcqs")) {
+                return;
+            }
+
             // DASHBOARD: double-tap to exit
             if (pathname === "/dashboard") {
                 const now = Date.now();

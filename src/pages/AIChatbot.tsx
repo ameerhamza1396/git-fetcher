@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from 'next-themes';
-import { Moon, Sun, Send, Mic, MessageSquare, Menu, Copy, PlusCircle, Trash2, AlertTriangle, Crown } from 'lucide-react';
+import { Moon, Sun, Send, Mic, MessageSquare, Menu, Copy, Clock, PlusCircle, Trash2, AlertTriangle, Crown } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { CardTitle } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
 import Seo from '@/components/Seo';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertDialog,
   AlertDialogAction,

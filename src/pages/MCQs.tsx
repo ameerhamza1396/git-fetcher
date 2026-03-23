@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { SubjectSelectionScreen } from '@/components/mcq/SubjectSelectionScreen';
 import { ChapterSelectionScreen } from '@/components/mcq/ChapterSelectionScreen';
 import { QuizSettingsScreen } from '@/components/mcq/QuizSettingsScreen';
@@ -260,20 +260,18 @@ const MCQs = () => {
 
         {/* Leave Test Confirmation */}
         <Dialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
-          <DialogContent className="sm:max-w-[400px] bg-background border-border rounded-2xl">
-            <DialogHeader className="text-center">
-              <div className="mx-auto mb-3 w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center">
-                <AlertTriangle className="w-7 h-7 text-destructive" />
+          <DialogContent className="sm:max-w-[400px] bg-white dark:bg-zinc-900 border-2 border-red-200 dark:border-red-900 rounded-3xl overflow-hidden shadow-2xl p-0 fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <div className="flex flex-col items-center text-center p-6">
+              <div className="mb-4 w-16 h-16 rounded-full bg-red-100 dark:bg-red-950 flex items-center justify-center">
+                <AlertTriangle className="w-8 h-8 text-red-500" />
               </div>
-              <DialogTitle className="text-xl font-bold">Leave Test?</DialogTitle>
-              <DialogDescription className="text-muted-foreground mt-2">
-                Your progress has been saved. You can resume from where you left off next time.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="flex flex-col sm:flex-row gap-3 mt-4">
-              <Button onClick={() => setShowLeaveConfirm(false)} variant="outline" className="w-full sm:w-auto">Continue Test</Button>
-              <Button onClick={() => { setShowLeaveConfirm(false); handleBackToSettings(); }} variant="destructive" className="w-full sm:w-auto font-bold">Leave Test</Button>
-            </DialogFooter>
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Leave Test?</h2>
+              <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6">Your progress has been saved. You can resume from where you left off next time.</p>
+              <div className="flex flex-col-reverse sm:flex-row gap-3 w-full">
+                <Button onClick={() => setShowLeaveConfirm(false)} variant="outline" className="flex-1 rounded-xl h-12">Continue Test</Button>
+                <Button onClick={() => { setShowLeaveConfirm(false); handleBackToSettings(); }} className="flex-1 rounded-xl h-12 font-bold bg-red-600 hover:bg-red-700 text-white">Leave Test</Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

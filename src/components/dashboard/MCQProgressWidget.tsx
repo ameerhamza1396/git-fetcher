@@ -35,6 +35,27 @@ const GET_SAVED_SESSIONS = async (userId: string): Promise<SavedMCQSession[]> =>
   }
 };
 
+// Get completed MCQ count for a chapter
+const GET_COMPLETED_COUNT = async (userId: string, chapterId: string): Promise<number> => {
+  try {
+    const { count, error } = await supabase
+      .from('user_answers')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('mcq_id', 
+        supabase
+          .from('mcqs')
+          .select('id')
+          .eq('chapter_id', chapterId)
+      );
+    
+    if (error) return 0;
+    return count || 0;
+  } catch (e) {
+    return 0;
+  }
+};
+
 const DonutChart3D = ({ percentage, colorClass, gradientId }: { percentage: number, colorClass: string, gradientId: string }) => {
   const radius = 35;
   const circumference = 2 * Math.PI * radius;
@@ -113,7 +134,7 @@ export const MCQProgressWidget = () => {
   }, [userData?.id]);
 
   const { data: chaptersData, isLoading } = useQuery({
-    queryKey: ['mcq-progress-chapters', sessions.map(s => s.chapterId)],
+    queryKey: ['mcq-progress-chapters', sessions.map(s => s.chapterId), userData?.id],
     queryFn: async () => {
       if (sessions.length === 0) return [];
       
@@ -132,13 +153,43 @@ export const MCQProgressWidget = () => {
         .select('id, name, color')
         .in('id', subjectIds);
 
+      // Fetch answered MCQs for the user
+      const { data: answeredMCQs } = await supabase
+        .from('user_answers')
+        .select('mcq_id')
+        .eq('user_id', userData?.id);
+
+      // Create a set of answered MCQ IDs
+      const answeredSet = new Set(answeredMCQs?.map(a => a.mcq_id) || []);
+
+      // Fetch all MCQs for the chapters
+      const { data: allMCQs } = await supabase
+        .from('mcqs')
+        .select('id, chapter_id')
+        .in('chapter_id', chapterIds);
+
       if (chError || subError) return [];
 
       return sessions.map(session => {
         const chapter = chapters?.find(c => c.id === session.chapterId);
         const subject = subjects?.find(s => s.id === session.subjectId);
-        const totalMCQs = chapter?.mcqs?.[0]?.count || 1; // Prevent div by 0
-        const percentage = Math.min((session.lastIndex / totalMCQs) * 100, 100);
+        const totalMCQs = chapter?.mcqs?.[0]?.count || 1;
+
+        // Count completed MCQs for this chapter
+        const chapterMCQs = allMCQs?.filter(m => m.chapter_id === session.chapterId) || [];
+        const completedMCQs = chapterMCQs.filter(m => answeredSet.has(m.id)).length;
+
+        // Find first unattempted MCQ index
+        let resumeIndex = 0;
+        for (let i = 0; i < chapterMCQs.length; i++) {
+          if (!answeredSet.has(chapterMCQs[i].id)) {
+            resumeIndex = i;
+            break;
+          }
+          resumeIndex = i + 1;
+        }
+
+        const percentage = totalMCQs > 0 ? Math.min((completedMCQs / totalMCQs) * 100, 100) : 0;
 
         return {
           ...session,
@@ -146,24 +197,26 @@ export const MCQProgressWidget = () => {
           subjectName: subject?.name || 'Unknown Subject',
           subjectColor: subject?.color || 'bg-primary',
           totalMCQs,
+          completedMCQs,
+          resumeIndex,
           percentage
         };
-      }).filter(s => s.percentage < 100); // Only show incomplete ones
+      }).filter(s => s.completedMCQs < s.totalMCQs); // Only show incomplete ones
     },
-    enabled: sessions.length > 0
+    enabled: sessions.length > 0 && !!userData?.id
   });
 
   if (isLoading) return <MCQProgressSkeleton />;
   if (!chaptersData || chaptersData.length === 0) return null;
 
-  const handleResume = (session: SavedMCQSession) => {
+  const handleResume = (session: any) => {
     navigate('/mcqs', { 
       state: { 
         autoResume: true, 
         resumeData: { 
           subjectId: session.subjectId, 
           chapterId: session.chapterId,
-          lastIndex: session.lastIndex 
+          lastIndex: session.resumeIndex 
         } 
       } 
     });
@@ -208,7 +261,7 @@ export const MCQProgressWidget = () => {
                 </h3>
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-semibold text-muted-foreground bg-background/50 px-2 py-0.5 rounded-full">
-                    {item.lastIndex} / {item.totalMCQs} completed
+                    {item.completedMCQs} / {item.totalMCQs} completed
                   </span>
                 </div>
               </div>

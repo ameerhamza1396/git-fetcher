@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Crown, ArrowLeft, ArrowRight, ScrollText, Zap, Loader2, ChevronLeft, Sparkles } from "lucide-react";
+import { Crown, ArrowLeft, ArrowRight, ScrollText, Zap, Loader2, ChevronLeft, Sparkles, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ import Seo from "@/components/Seo";
 import UpgradeAccountModal from "@/components/UpgradeAccountModal";
 import FlpTestPage from "@/components/FLPs/FlpTestPage";
 import { motion, AnimatePresence } from "framer-motion";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface MCQ {
   id: string;
@@ -27,6 +28,17 @@ interface Subject {
   icon?: string;
   color?: string;
 }
+
+interface FLPSessionData {
+  shuffledMcqs: any[];
+  currentQuestionIndex: number;
+  userAnswers: Record<string, string | null>;
+  totalTimeLeft: number;
+  subjectName?: string;
+  savedAt: number;
+}
+
+const FLP_STORAGE_KEY = 'flp_session';
 
 const FLP = () => {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -46,6 +58,31 @@ const FLP = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+
+  const [savedSession, setSavedSession] = useState<FLPSessionData | null>(null);
+  const [showResumeDialog, setShowResumeDialog] = useState(false);
+  const [initialQuizState, setInitialQuizState] = useState<{ currentIndex: number; userAnswers: Record<string, string | null>; totalTimeLeft: number } | null>(null);
+
+  useEffect(() => {
+    if (user && wizardStep === 0) {
+      try {
+        const saved = localStorage.getItem(FLP_STORAGE_KEY);
+        if (saved) {
+          const sessionData: FLPSessionData = JSON.parse(saved);
+          const hoursSinceSaved = (Date.now() - sessionData.savedAt) / (1000 * 60 * 60);
+          if (hoursSinceSaved < 24) {
+            setSavedSession(sessionData);
+            setShowResumeDialog(true);
+          } else {
+            localStorage.removeItem(FLP_STORAGE_KEY);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load FLP session", e);
+        localStorage.removeItem(FLP_STORAGE_KEY);
+      }
+    }
+  }, [user, wizardStep]);
 
   // Fetching messages
   const fetchMessages = [
@@ -95,6 +132,32 @@ const FLP = () => {
     return `${count} min`;
   };
 
+  const handleResumeSession = () => {
+    if (!savedSession) return;
+    try {
+      localStorage.removeItem(FLP_STORAGE_KEY);
+    } catch (e) {}
+    setFetchedMcqs(savedSession.shuffledMcqs);
+    setSelectedSubjectName(savedSession.subjectName || '');
+    setSelectedMcqCount(savedSession.shuffledMcqs.length);
+    setShowQuiz(true);
+    setInitialQuizState({
+      currentIndex: savedSession.currentQuestionIndex,
+      userAnswers: savedSession.userAnswers,
+      totalTimeLeft: savedSession.totalTimeLeft,
+    });
+    setShowResumeDialog(false);
+  };
+
+  const handleStartFresh = () => {
+    try {
+      localStorage.removeItem(FLP_STORAGE_KEY);
+    } catch (e) {}
+    setSavedSession(null);
+    setShowResumeDialog(false);
+    setWizardStep(1);
+  };
+
   const handleStartTest = async () => {
     if (!user || !selectedSubject || selectedMcqCount === null) return;
     setIsFetchingMcqs(true);
@@ -111,6 +174,7 @@ const FLP = () => {
       const shuffled = shuffleArray(mcqsData as MCQ[]);
       if (shuffled.length < selectedMcqCount) { toast({ title: "Not Enough Questions", description: `Only ${shuffled.length} available.`, variant: "warning" }); setIsFetchingMcqs(false); return; }
       setFetchedMcqs(shuffled.slice(0, selectedMcqCount));
+      setInitialQuizState(null);
       setShowQuiz(true);
     } catch (err) {
       toast({ title: "Error", description: err?.message || "Failed to prepare test.", variant: "destructive" });
@@ -119,13 +183,14 @@ const FLP = () => {
 
   const handleFLPQuizFinish = (score: number, totalQuestions: number) => {
     setShowQuiz(false);
+    setInitialQuizState(null);
     toast({ title: "FLP Quiz Finished!", description: `You scored ${score} out of ${totalQuestions}.`, duration: 5000 });
     setFetchedMcqs([]);
     setSelectedMcqCount(null);
     setWizardStep(0);
   };
 
-  if (showQuiz && fetchedMcqs.length > 0) return <FlpTestPage mcqs={fetchedMcqs} onFinish={handleFLPQuizFinish} subjectName={selectedSubjectName} />;
+  if (showQuiz && fetchedMcqs.length > 0) return <FlpTestPage mcqs={fetchedMcqs} onFinish={handleFLPQuizFinish} subjectName={selectedSubjectName} initialIndex={initialQuizState?.currentIndex} initialAnswers={initialQuizState?.userAnswers} initialTimeLeft={initialQuizState?.totalTimeLeft} />;
 
   if (isAuthLoading) {
     return (
@@ -147,6 +212,36 @@ const FLP = () => {
     <div className="fixed inset-0 overflow-hidden">
       <Seo title="Full-Length Papers (FLP)" description="Attempt full-length papers on Medmacs App." canonical="https://medmacs.app/flp" />
       <UpgradeAccountModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} onUpgradeClick={() => { setShowUpgradeModal(false); navigate("/pricing"); }} />
+
+      <AlertDialog open={showResumeDialog} onOpenChange={setShowResumeDialog}>
+        <AlertDialogContent className="rounded-[2.5rem] p-8 border-border/40 bg-background/80 backdrop-blur-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-black italic tracking-tight">Resume <span className="text-blue-500">Session?</span></AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground font-medium py-2">
+              You have an unfinished test session. Would you like to continue where you left off?
+            </AlertDialogDescription>
+            {savedSession && (
+              <div className="mt-2 p-3 bg-muted/30 rounded-xl">
+                <p className="text-sm font-medium text-foreground">
+                  <span className="font-bold">{savedSession.shuffledMcqs.length}</span> MCQs - {savedSession.subjectName || 'Subject'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Question {savedSession.currentQuestionIndex + 1} of {savedSession.shuffledMcqs.length} |
+                  Time remaining: {Math.floor(savedSession.totalTimeLeft / 60)}:{String(savedSession.totalTimeLeft % 60).padStart(2, '0')}
+                </p>
+              </div>
+            )}
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-3 sm:gap-3 mt-4">
+            <AlertDialogCancel onClick={handleStartFresh} className="flex-1 rounded-2xl h-12 font-bold bg-muted/20 border-transparent hover:bg-muted/40 uppercase text-xs tracking-widest">
+              <RotateCcw className="w-4 h-4 mr-2" /> Start Fresh
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleResumeSession} className="flex-1 rounded-2xl h-12 font-black bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-900/20 uppercase text-xs tracking-widest">
+              <ArrowRight className="w-4 h-4 mr-2" /> Resume
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Fetching overlay */}
       <AnimatePresence>

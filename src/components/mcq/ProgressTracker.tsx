@@ -1,7 +1,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Target, Trophy, TrendingUp, Flame, Clock, Bookmark } from 'lucide-react';
+import { Target, Trophy, TrendingUp, Flame, Clock } from 'lucide-react';
 
 interface ProgressTrackerProps {
   userId?: string;
@@ -22,20 +22,6 @@ export const ProgressTracker = ({ userId }: ProgressTrackerProps) => {
     enabled: !!userId
   });
 
-  const { data: savedCount } = useQuery({
-    queryKey: ['saved-mcqs-count', userId],
-    queryFn: async () => {
-      if (!userId) return 0;
-      const { count, error } = await supabase
-        .from('saved_mcqs')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
-      if (error) throw error;
-      return count || 0;
-    },
-    enabled: !!userId
-  });
-
   const totalQuestions = answers?.length || 0;
   const totalCorrect = answers?.filter(a => a.is_correct).length || 0;
   const overallAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
@@ -44,21 +30,55 @@ export const ProgressTracker = ({ userId }: ProgressTrackerProps) => {
   const timeTakenArr = answers?.filter(a => a.time_taken != null).map(a => a.time_taken) || [];
   const avgTime = timeTakenArr.length > 0 ? Math.round(timeTakenArr.reduce((s, t) => s + t, 0) / timeTakenArr.length) : 0;
 
-  // Best streak
-  let bestStreak = 0;
-  let currentStreak = 0;
-  if (answers) {
-    const sorted = [...answers].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-    for (const a of sorted) {
-      if (a.is_correct) { currentStreak++; bestStreak = Math.max(bestStreak, currentStreak); }
-      else { currentStreak = 0; }
+  // Calculate current streak (consecutive days with MCQ practice)
+  const calculateCurrentStreak = (answersData: any[]) => {
+    if (!answersData || answersData.length === 0) return 0;
+    
+    const answerDates = [...new Set(answersData.map(a => {
+      const date = new Date(a.created_at);
+      return date.toLocaleDateString("en-US", { timeZone: "Asia/Karachi" });
+    }))].sort().reverse();
+
+    if (answerDates.length === 0) return 0;
+
+    const today = new Date();
+    const todayPKT = new Date(today.toLocaleString("en-US", { timeZone: "Asia/Karachi" }));
+    todayPKT.setHours(0, 0, 0, 0);
+    
+    const yesterday = new Date(todayPKT);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const mostRecentDate = new Date(answerDates[0]);
+    const isToday = mostRecentDate.getTime() === todayPKT.getTime();
+    const isYesterday = mostRecentDate.getTime() === yesterday.getTime();
+
+    if (!isToday && !isYesterday) return 0;
+
+    let streak = 1;
+    let currentDate = new Date(mostRecentDate);
+
+    for (let i = 1; i < answerDates.length; i++) {
+      const prevDate = new Date(answerDates[i]);
+      const expectedPrevDate = new Date(currentDate);
+      expectedPrevDate.setDate(expectedPrevDate.getDate() - 1);
+
+      if (prevDate.getTime() === expectedPrevDate.getTime()) {
+        streak++;
+        currentDate = prevDate;
+      } else {
+        break;
+      }
     }
-  }
+
+    return streak;
+  };
+
+  const currentStreak = calculateCurrentStreak(answers || []);
 
   const stats = [
     { label: 'Total Practice', value: totalQuestions, icon: Target, gradient: 'from-blue-600 via-indigo-600 to-violet-700', glow: 'bg-blue-400' },
     { label: 'Accuracy', value: `${overallAccuracy}%`, icon: TrendingUp, gradient: 'from-emerald-600 via-teal-600 to-cyan-700', glow: 'bg-emerald-400' },
-    { label: 'Saved MCQs', value: savedCount || 0, icon: Bookmark, gradient: 'from-orange-500 via-red-500 to-rose-600', glow: 'bg-orange-400' },
+    { label: 'Current Streak', value: `${currentStreak} days`, icon: Flame, gradient: 'from-orange-500 via-red-500 to-rose-600', glow: 'bg-orange-400' },
     { label: 'Avg Time', value: `${avgTime}s`, icon: Clock, gradient: 'from-rose-600 via-pink-600 to-fuchsia-700', glow: 'bg-rose-400' },
   ];
 

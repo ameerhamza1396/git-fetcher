@@ -116,9 +116,9 @@ const ModalContent = ({ children, className = '', ...props }) => (
         data-[state=open]:animate-in data-[state=closed]:animate-out
         data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0
         data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95
-        data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]
-        data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]
+        data-[state=open]:duration-200
         ${className}`}
+      style={{ margin: '0 auto' }}
       {...props}
     >
       {children}
@@ -136,7 +136,7 @@ const MCQSettingsModal = ({
   onReport, isPremium, theme, setTheme, onReset
 }) => (
   <DialogPrimitive.Root open={isOpen} onOpenChange={onClose}>
-    <ModalContent className="sm:max-w-[400px] mx-4">
+    <ModalContent className="sm:max-w-[400px]">
       {/* Solid card — no bg-background (CSS var can be transparent) */}
       <div className="bg-white dark:bg-zinc-900 border-2 border-primary/20 rounded-3xl overflow-hidden shadow-2xl">
         <div className="p-6 pb-0">
@@ -232,7 +232,7 @@ const MCQSettingsModal = ({
 
 const UpgradeAccountModal = ({ isOpen, onClose, onUpgradeClick }) => (
   <DialogPrimitive.Root open={isOpen} onOpenChange={onClose}>
-    <ModalContent className="sm:max-w-[425px] mx-4">
+    <ModalContent className="sm:max-w-[425px]">
       <div className="bg-white dark:bg-zinc-900 border-2 border-yellow-500/30 rounded-2xl p-6 shadow-2xl">
         <DialogPrimitive.Title className="sr-only">Upgrade Your Account</DialogPrimitive.Title>
         <DialogPrimitive.Description className="sr-only">Upgrade to premium for unlimited MCQ practice</DialogPrimitive.Description>
@@ -260,11 +260,9 @@ const UpgradeAccountModal = ({ isOpen, onClose, onUpgradeClick }) => (
 
 const LeaveTestModal = ({ isOpen, onClose, onConfirm }) => (
   <DialogPrimitive.Root open={isOpen} onOpenChange={onClose}>
-    <ModalContent className="sm:max-w-[400px] mx-4">
-      <div className="bg-white dark:bg-zinc-900 border-2 border-red-200 dark:border-red-900 rounded-2xl p-6 shadow-2xl">
-        <DialogPrimitive.Title className="sr-only">Leave Session</DialogPrimitive.Title>
-        <DialogPrimitive.Description className="sr-only">Confirm leaving the quiz session</DialogPrimitive.Description>
-        <div className="flex flex-col items-center text-center">
+    <ModalContent className="sm:max-w-[400px]">
+      <div className="bg-white dark:bg-zinc-900 border-2 border-red-200 dark:border-red-900 rounded-3xl overflow-hidden shadow-2xl">
+        <div className="flex flex-col items-center text-center p-6">
           <div className="mb-4 w-16 h-16 rounded-full bg-red-100 dark:bg-red-950 flex items-center justify-center">
             <AlertTriangle className="w-8 h-8 text-red-500" />
           </div>
@@ -304,7 +302,7 @@ const ReportMCQModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
 
   return (
     <DialogPrimitive.Root open={isOpen} onOpenChange={handleClose}>
-      <ModalContent className="sm:max-w-[450px] mx-4">
+      <ModalContent className="sm:max-w-[450px]">
         <div className="bg-white dark:bg-zinc-900 border-2 border-red-200 dark:border-red-900 rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
           <DialogPrimitive.Title className="sr-only">Report Question</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">Report an issue with this MCQ question</DialogPrimitive.Description>
@@ -381,6 +379,7 @@ export const MCQDisplay = ({
   const { theme, setTheme } = useTheme();
   const [mcqs, setMcqs] = useState<ShuffledMCQ[]>([]);
   const [loading, setLoading] = useState(true);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
@@ -610,6 +609,12 @@ export const MCQDisplay = ({
   }, [subject, chapter, initialIndex]);
 
   useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [currentQuestionIndex]);
+
+  useEffect(() => {
     const loadMCQs = async () => {
       setLoading(true);
       const data = await fetchMCQsByChapter(chapter);
@@ -778,7 +783,7 @@ export const MCQDisplay = ({
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 relative z-10 flex flex-col px-6 py-6 overflow-y-auto scrollbar-hide">
+      <div ref={contentRef} className="flex-1 relative z-10 flex flex-col px-6 py-6 overflow-y-auto scrollbar-hide">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentQuestionIndex}
