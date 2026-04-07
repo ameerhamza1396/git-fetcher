@@ -41,59 +41,33 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: linear-gradient(-45deg, #2dd4bf, #67e8f9, #0ea5e9, #4f46e5);
-      background-size: 400% 400%;
-      animation: gradient 15s ease infinite;
-      overflow: hidden;
-    }
-
-    @keyframes gradient {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
+      background: #ffffff;
     }
 
     .splash-logo {
-      width: 100px;
-      height: 100px;
-      animation: pulse-slow 3s ease-in-out infinite;
-      filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.4));
-    }
-
-    @keyframes pulse-slow {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.1); opacity: 0.8; }
+      width: 64px;
+      height: 64px;
     }
 
     .splash-footer {
       position: absolute;
-      bottom: 40px;
+      bottom: 32px;
       text-align: center;
-      color: white;
+      color: #666;
       font-family: system-ui, -apple-system, sans-serif;
     }
 
-    .splash-footer p:first-child {
+    .splash-footer p {
       font-size: 10px;
-      font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: 0.4em;
-      opacity: 0.6;
-      margin-bottom: 8px;
-    }
-
-    .splash-footer p:last-child {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.2em;
-      opacity: 0.4;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
     }
 
     #root:not(:empty) + #splash-screen {
       opacity: 0;
       visibility: hidden;
-      transition: opacity 0.5s ease-out, visibility 0.5s;
+      transition: opacity 0.3s ease-out, visibility 0.3s;
     }
   </style>
 </head>
@@ -103,8 +77,7 @@
   <div id="splash-screen">
     <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" class="splash-logo" />
     <div class="splash-footer">
-      <p>A Project by HMACS Studios</p>
-      <p>© 2026 Medmacs App all rights reserved</p>
+      <p>Medmacs App</p>
     </div>
   </div>
 

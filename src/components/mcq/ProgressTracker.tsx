@@ -2,13 +2,52 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Target, Trophy, TrendingUp, Flame, Clock } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface ProgressTrackerProps {
   userId?: string;
 }
 
+const CountUpNumber = ({ target, suffix = '', duration = 1000 }: { target: number; suffix?: string; duration?: number }) => {
+  const [count, setCount] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(true);
+
+  useEffect(() => {
+    setCount(0);
+    setIsAnimating(true);
+    const startTime = Date.now();
+    const startValue = 0;
+    const endValue = target;
+
+    const animate = () => {
+      const now = Date.now();
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(startValue + (endValue - startValue) * easeOut);
+      setCount(current);
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        setIsAnimating(false);
+      }
+    };
+
+    requestAnimationFrame(animate);
+  }, [target, duration]);
+
+  if (isAnimating) {
+    return (
+      <div className="h-8 w-16 bg-white/20 rounded animate-pulse mx-auto" />
+    );
+  }
+
+  return <>{count}{suffix}</>;
+};
+
 export const ProgressTracker = ({ userId }: ProgressTrackerProps) => {
-  const { data: answers } = useQuery({
+  const { data: answers, isLoading } = useQuery({
     queryKey: ['user-answers-progress', userId],
     queryFn: async () => {
       if (!userId) return [];
@@ -37,7 +76,7 @@ export const ProgressTracker = ({ userId }: ProgressTrackerProps) => {
     const answerDates = [...new Set(answersData.map(a => {
       const date = new Date(a.created_at);
       return date.toLocaleDateString("en-US", { timeZone: "Asia/Karachi" });
-    }))].sort().reverse();
+    }))];
 
     if (answerDates.length === 0) return 0;
 
@@ -48,17 +87,22 @@ export const ProgressTracker = ({ userId }: ProgressTrackerProps) => {
     const yesterday = new Date(todayPKT);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    const mostRecentDate = new Date(answerDates[0]);
-    const isToday = mostRecentDate.getTime() === todayPKT.getTime();
-    const isYesterday = mostRecentDate.getTime() === yesterday.getTime();
+    const dateObjects = answerDates.map(d => {
+      const [month, day, year] = d.split('/');
+      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    }).sort((a, b) => b.getTime() - a.getTime());
+
+    const mostRecent = dateObjects[0];
+    const isToday = mostRecent.getTime() === todayPKT.getTime();
+    const isYesterday = mostRecent.getTime() === yesterday.getTime();
 
     if (!isToday && !isYesterday) return 0;
 
     let streak = 1;
-    let currentDate = new Date(mostRecentDate);
+    let currentDate = new Date(mostRecent);
 
-    for (let i = 1; i < answerDates.length; i++) {
-      const prevDate = new Date(answerDates[i]);
+    for (let i = 1; i < dateObjects.length; i++) {
+      const prevDate = new Date(dateObjects[i]);
       const expectedPrevDate = new Date(currentDate);
       expectedPrevDate.setDate(expectedPrevDate.getDate() - 1);
 
@@ -77,9 +121,9 @@ export const ProgressTracker = ({ userId }: ProgressTrackerProps) => {
 
   const stats = [
     { label: 'Total Practice', value: totalQuestions, icon: Target, gradient: 'from-blue-600 via-indigo-600 to-violet-700', glow: 'bg-blue-400' },
-    { label: 'Accuracy', value: `${overallAccuracy}%`, icon: TrendingUp, gradient: 'from-emerald-600 via-teal-600 to-cyan-700', glow: 'bg-emerald-400' },
-    { label: 'Current Streak', value: `${currentStreak} days`, icon: Flame, gradient: 'from-orange-500 via-red-500 to-rose-600', glow: 'bg-orange-400' },
-    { label: 'Avg Time', value: `${avgTime}s`, icon: Clock, gradient: 'from-rose-600 via-pink-600 to-fuchsia-700', glow: 'bg-rose-400' },
+    { label: 'Accuracy', value: overallAccuracy, suffix: '%', icon: TrendingUp, gradient: 'from-emerald-600 via-teal-600 to-cyan-700', glow: 'bg-emerald-400' },
+    { label: 'Current Streak', value: currentStreak, suffix: ' days', icon: Flame, gradient: 'from-orange-500 via-red-500 to-rose-600', glow: 'bg-orange-400' },
+    { label: 'Avg Time', value: avgTime, suffix: 's', icon: Clock, gradient: 'from-rose-600 via-pink-600 to-fuchsia-700', glow: 'bg-rose-400' },
   ];
 
   return (
@@ -99,7 +143,9 @@ export const ProgressTracker = ({ userId }: ProgressTrackerProps) => {
                 </div>
               </div>
             </div>
-            <div className="text-xl sm:text-2xl font-black">{stat.value}</div>
+            <div className="text-xl sm:text-2xl font-black">
+              <CountUpNumber target={stat.value} suffix={stat.suffix} />
+            </div>
             <div className="text-white/50 text-[10px] uppercase tracking-widest font-bold mt-1">{stat.label}</div>
           </div>
         </div>

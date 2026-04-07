@@ -7,6 +7,14 @@
       "destination": "/sitemap.xml"
     },
     {
+      "source": "/api/seq_ai",
+      "destination": "/api/seq_ai.ts"
+    },
+    {
+      "source": "/api/reference",
+      "destination": "/api/reference.ts"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

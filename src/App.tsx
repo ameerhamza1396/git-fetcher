@@ -17,6 +17,7 @@ import Login from '@/pages/Login';
 import Signup from '@/pages/Signup';
 import Dashboard from '@/pages/Dashboard';
 import MCQs from '@/pages/MCQs';
+import { MCQSubjectSelectionPage, MCQChapterSelectionPage, MCQSettingsPage, MCQQuizPage } from '@/pages/mcq';
 import Battle from '@/pages/Battle';
 import AI from '@/pages/AI';
 import AITestGeneratorPage from '@/pages/AITestGenerator';
@@ -45,6 +46,7 @@ import ContactUsPage from '@/pages/ContactUsPage';
 import FLP from '@/pages/FLP';
 import FLPResults from '@/pages/FLPResults';
 import FLPResultDetail from '@/components/FLPResultDetail';
+import FLPTestPage from '@/pages/flp/FLPTestPage';
 import ForgotPassword from '@/pages/ForgotPassword';
 import UpdatePassword from '@/pages/UpdatePassword';
 import SelectYear from '@/pages/SelectYear';
@@ -52,6 +54,7 @@ import Teams from '@/pages/Team';
 import InstallApp from '@/pages/InstallApp';
 import PracticalPage from '@/pages/PracticalPage';
 import SEQs from '@/pages/SEQs';
+import { SEQSubjectSelectionPage, SEQChapterSelectionPage, SEQQuizPage } from '@/pages/seq';
 import PracticalNotesDetails from "@/components/PracticalNotes/PracticalNotesDetails";
 import RedeemCode from '@/pages/RedeemCode';
 import PurchaseHistory from '@/pages/PurchaseHistory';
@@ -59,6 +62,10 @@ import PaymentFailure from "@/pages/PaymentFailure.tsx";
 import PaymentSuccess from "@/pages/PaymentSuccess.tsx";
 import Setup from "@/pages/SetupPage";
 import DetailedAnalytics from "@/pages/DetailedAnalytics";
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import BlockedUserOverlay from '@/components/auth/BlockedUserOverlay';
+import { useQuery } from '@tanstack/react-query';
 
 
 const queryClient = new QueryClient();
@@ -83,6 +90,50 @@ const StatusBarHandler = () => {
   return null;
 };
 
+/**
+ * UserRestrictionHandler:
+ * Monitors the current user's restriction status and displays the BlockedUserOverlay if needed.
+ */
+const UserRestrictionHandler = () => {
+  const { user, signOut } = useAuth();
+
+  const { data: restrictionDetails, isLoading } = useQuery({
+    queryKey: ['profile-restriction', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('restriction_details')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching restriction status:', error);
+        return null;
+      }
+      
+      // Cast the JSONB to our expected type
+      return data?.restriction_details as any;
+    },
+    enabled: !!user?.id,
+    refetchInterval: 60000, // Check every minute
+  });
+
+  if (isLoading || !restrictionDetails || !restrictionDetails.user_restricted) {
+    return null;
+  }
+
+  // Check if restriction is still active based on duration
+  if (restrictionDetails.duration) {
+    const unlockDate = new Date(restrictionDetails.duration);
+    if (unlockDate < new Date()) {
+      return null;
+    }
+  }
+
+  return <BlockedUserOverlay details={restrictionDetails} onSignOut={signOut} userId={user.id} />;
+};
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -102,12 +153,16 @@ function App() {
             <ScrollToTop />
               <BackHandler />
               <ConnectionStatusModal />
+              <UserRestrictionHandler />
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/mcqs" element={<MCQs />} />
+                <Route path="/mcqs" element={<MCQSubjectSelectionPage />} />
+                <Route path="/mcqs/chapter/:subjectId" element={<MCQChapterSelectionPage />} />
+                <Route path="/mcqs/settings/:subjectId/:chapterId" element={<MCQSettingsPage />} />
+                <Route path="/mcqs/quiz/:subjectId/:chapterId" element={<MCQQuizPage />} />
                 <Route path="/battle" element={<Battle />} />
                 <Route path="/ai" element={<AI />} />
                 <Route path="/ai/test-generator" element={<AITestGeneratorPage />} />
@@ -135,6 +190,7 @@ function App() {
                 <Route path="/announcements" element={<Announcements />} />
                 <Route path="/contact-us" element={<ContactUsPage />} />
                 <Route path="/flp" element={<FLP />} />
+                <Route path="/flp/test" element={<FLPTestPage />} />
                 <Route path="/flp-result" element={<FLPResults />} />
                 <Route path="/results/flp/:id" element={<FLPResultDetail />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -143,7 +199,9 @@ function App() {
                 <Route path="/teams" element={<Teams />} />
                 <Route path="/install-app" element={<InstallApp />} />
                 <Route path="/practicals" element={<PracticalPage />} />
-                <Route path="/seqs" element={<SEQs />} />
+                <Route path="/seqs" element={<SEQSubjectSelectionPage />} />
+                <Route path="/seqs/chapter/:subjectId" element={<SEQChapterSelectionPage />} />
+                <Route path="/seqs/quiz/:subjectId/:chapterId" element={<SEQQuizPage />} />
                 <Route path="/practical-notes" element={<PracticalPage />} />
                 <Route path="/practical-notes/subject/:id" element={<PracticalNotesDetails />} />
                 <Route path="/redeem" element={<RedeemCode />} />

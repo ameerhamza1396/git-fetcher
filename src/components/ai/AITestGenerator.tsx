@@ -140,7 +140,7 @@ export const AITestGenerator: React.FC = () => {
   if (testSubmitted && questions) {
     return (
       <div className="max-w-xl mx-auto px-3">
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="rounded-[2rem] bg-gradient-to-br from-primary/10 via-blue-500/5 to-violet-500/10 backdrop-blur-2xl border border-primary/20 p-8 text-center space-y-6">
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="rounded-[2rem] bg-gradient-to-br from-primary/10 via-teal-500/5 to-emerald-500/10 backdrop-blur-2xl border border-primary/20 p-8 text-center space-y-6">
           <h2 className="text-2xl font-black">Test Completed!</h2>
           <div className="flex justify-around items-center">
             <div>
@@ -148,7 +148,7 @@ export const AITestGenerator: React.FC = () => {
               <p className="text-xs text-muted-foreground uppercase">Score</p>
             </div>
             <div>
-              <p className="text-4xl font-black text-violet-500">{formatTime(seconds)}</p>
+              <p className="text-4xl font-black text-teal-500">{formatTime(seconds)}</p>
               <p className="text-xs text-muted-foreground uppercase">Time</p>
             </div>
           </div>
@@ -168,7 +168,7 @@ export const AITestGenerator: React.FC = () => {
         {/* ... (Keep your existing Initial Form code here) ... */}
         <div className="relative z-10 bg-background/50 backdrop-blur-xl rounded-[1.5rem] border border-primary/10 p-6 space-y-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-violet-500 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-emerald-500 flex items-center justify-center">
               <Brain className="h-5 w-5 text-white" />
             </div>
             <h2 className="text-lg font-black">AI Test Generator</h2>
@@ -200,7 +200,7 @@ export const AITestGenerator: React.FC = () => {
                 </Select>
               </div>
             </div>
-            <Button onClick={handleGenerateTest} disabled={isGenerating || !topic.trim()} className="w-full bg-gradient-to-r from-primary to-violet-500 text-white rounded-2xl h-12 font-black uppercase text-xs tracking-widest shadow-xl">
+            <Button onClick={handleGenerateTest} disabled={isGenerating || !topic.trim()} className="w-full bg-gradient-to-r from-primary to-emerald-500 text-white rounded-2xl h-12 font-black uppercase text-xs tracking-widest shadow-xl">
               {isGenerating ? 'Generating...' : 'Generate AI Test'}
             </Button>
           </div>
@@ -234,7 +234,7 @@ export const AITestGenerator: React.FC = () => {
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${progress}%` }}
-            className="h-full bg-gradient-to-r from-primary to-violet-500"
+            className="h-full bg-gradient-to-r from-primary to-emerald-500"
           />
         </div>
       </div>
@@ -303,7 +303,7 @@ export const AITestGenerator: React.FC = () => {
                     Next Question
                   </Button>
                 ) : (
-                  <Button onClick={handleSubmitFinal} className="w-full h-12 rounded-xl bg-gradient-to-r from-primary to-violet-500 text-white font-bold">
+                  <Button onClick={handleSubmitFinal} className="w-full h-12 rounded-xl bg-gradient-to-r from-primary to-emerald-500 text-white font-bold">
                     Finish Test
                   </Button>
                 )

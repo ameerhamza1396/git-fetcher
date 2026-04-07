@@ -199,13 +199,38 @@ const Pricing = () => {
                 : Shield;
 
     return (
-        <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950 relative overflow-x-hidden">
+        <div className="min-h-screen w-full bg-[#FAFAFA] dark:bg-[#020617] relative overflow-x-hidden selection:bg-blue-500/30">
             <Seo title="Pricing Plans" />
 
-            {/* Subtle animated orbs — fixed, no color changes */}
+            {/* Premium Animated Background Layer */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+                {/* Floating Mesh Objects */}
+                <motion.div 
+                    animate={{ 
+                        x: [0, 100, 0], 
+                        y: [0, 50, 0],
+                        rotate: [0, 120, 0]
+                    }}
+                    transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+                    className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] rounded-full bg-blue-500/10 blur-[120px] dark:bg-blue-900/10"
+                />
+                <motion.div 
+                    animate={{ 
+                        x: [0, -120, 0], 
+                        y: [0, 80, 0],
+                        rotate: [0, -90, 0]
+                    }}
+                    transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+                    className="absolute bottom-[10%] -right-[10%] w-[60%] h-[60%] rounded-full bg-purple-500/10 blur-[120px] dark:bg-purple-900/10"
+                />
+
+                {/* Ambient Dynamic Glow */}
+                <div className={`absolute inset-0 transition-all duration-1000 opacity-20 dark:opacity-10`} 
+                     style={{ background: `radial-gradient(circle at 50% 50%, ${activeStyle.glow.replace('bg-', '')}, transparent 70%)` }} 
+                />
+                
                 {/* Falling Icons */}
-                {Array.from({ length: 10 }).map((_, i) => (
+                {Array.from({ length: 8 }).map((_, i) => (
                     <motion.div
                         key={`icon-${i}`}
                         initial={{
@@ -230,21 +255,12 @@ const Pricing = () => {
                         <ActiveFallingIcon size={Math.random() * 32 + 16} />
                     </motion.div>
                 ))}
-                <motion.div
-                    animate={{ y: [0, -30, 0], scale: [1, 1.1, 1], opacity: [0.08, 0.2, 0.08] }}
-                    transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-                    className="absolute top-1/4 -left-32 w-96 h-96 bg-blue-500/20 rounded-full blur-[120px]"
-                />
-                <motion.div
-                    animate={{ y: [0, 40, 0], scale: [1, 1.2, 1], opacity: [0.08, 0.2, 0.08] }}
-                    transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-                    className="absolute bottom-1/3 -right-32 w-96 h-96 bg-purple-500/20 rounded-full blur-[120px]"
-                />
             </div>
 
             {/* Header */}
-            <header className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
-                <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
+            {/* Header - More Compact & Glassy */}
+            <header className={`fixed top-0 left-0 right-0 z-50 bg-background/40 backdrop-blur-3xl pt-[env(safe-area-inset-top)] transition-transform duration-500 ${headerVisible ? 'translate-y-0' : '-translate-y-full'} border-b border-white/10`}>
+                <div className="container mx-auto px-5 py-3 flex justify-between items-center max-w-7xl">
                     <div className="flex items-center space-x-3">
                         <Button variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110" onClick={() => window.history.back()}>
                             <ArrowLeft className="h-5 w-5" />
@@ -273,29 +289,32 @@ const Pricing = () => {
             <main className="relative z-10 container mx-auto px-4 lg:px-8 py-10 max-w-2xl mt-[var(--header-height)]">
                 {/* Hero Title */}
                 <motion.div
-                    className="text-center mb-10"
-                    initial={{ opacity: 0, y: 20 }}
+                    className="text-center mb-12"
+                    initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4 }}
+                    transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                 >
-                    <h1 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 dark:text-white mb-3 italic uppercase">
-                        Choose Your <span className="text-blue-600 dark:text-blue-400">Path</span>
+                    <div className="inline-block px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 mb-6">
+                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600 dark:text-blue-400">Premium Access</span>
+                    </div>
+                    <h1 className="text-4xl md:text-6xl font-black tracking-tight text-slate-900 dark:text-white mb-4 italic uppercase leading-[0.9]">
+                        Choose Your <br/><span className="text-blue-600 dark:text-blue-400">Path</span>
                     </h1>
-                    <p className="text-slate-500 dark:text-slate-400 font-medium max-w-xl mx-auto mb-6 uppercase text-xs tracking-[0.2em]">
-                        High-performance plans for future medical professionals
+                    <p className="text-slate-500 dark:text-slate-400 font-bold max-w-xl mx-auto mb-10 uppercase text-[10px] tracking-[0.2em] opacity-80">
+                        High-performance plans for <br/>future medical professionals
                     </p>
 
-                    {/* Monthly / Yearly Toggle */}
-                    <div className="inline-flex items-center p-1 bg-slate-200/50 dark:bg-slate-800/50 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-slate-700">
+                    {/* Monthly / Yearly Toggle - Premium Glass Style */}
+                    <div className="inline-flex items-center p-1.5 bg-white/40 dark:bg-slate-900/40 backdrop-blur-2xl rounded-3xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.05)]">
                         <button
                             onClick={() => setIsMonthly(true)}
-                            className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isMonthly ? 'bg-white dark:bg-gray-700 shadow-xl text-blue-600' : 'text-slate-500'}`}
+                            className={`px-10 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all duration-500 ${isMonthly ? 'bg-white dark:bg-slate-800 shadow-xl text-blue-600 scale-105' : 'text-slate-500 hover:text-slate-700'}`}
                         >
                             Monthly
                         </button>
                         <button
                             onClick={() => setIsMonthly(false)}
-                            className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${!isMonthly ? 'bg-white dark:bg-gray-700 shadow-xl text-blue-600' : 'text-slate-500'}`}
+                            className={`px-10 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all duration-500 ${!isMonthly ? 'bg-white dark:bg-slate-800 shadow-xl text-blue-600 scale-105' : 'text-slate-500 hover:text-slate-700'}`}
                         >
                             Yearly
                         </button>
@@ -424,8 +443,8 @@ const Pricing = () => {
                     })}
                 </div>
 
-                <p className="text-center text-xs text-slate-400 dark:text-slate-600 mt-10 pb-8 uppercase tracking-widest">
-                    All prices in {currency} · Secure checkout
+                <p className="text-center text-[10px] text-slate-400 dark:text-slate-600 mt-14 pb-12 uppercase tracking-[0.4em] font-black opacity-50">
+                    All prices in {currency} · Secure checkout · Cancel anytime
                 </p>
             </main>
         </div>

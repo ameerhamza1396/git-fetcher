@@ -201,7 +201,7 @@ export const MCQProgressWidget = () => {
           resumeIndex,
           percentage
         };
-      }).filter(s => s.completedMCQs < s.totalMCQs); // Only show incomplete ones
+      }).filter(s => s.completedMCQs > 0 && s.completedMCQs < s.totalMCQs); // Only show incomplete ones with at least 1 attempted
     },
     enabled: sessions.length > 0 && !!userData?.id
   });
@@ -210,14 +210,10 @@ export const MCQProgressWidget = () => {
   if (!chaptersData || chaptersData.length === 0) return null;
 
   const handleResume = (session: any) => {
-    navigate('/mcqs', { 
+    navigate(`/mcqs/quiz/${session.subjectId}/${session.chapterId}`, { 
       state: { 
         autoResume: true, 
-        resumeData: { 
-          subjectId: session.subjectId, 
-          chapterId: session.chapterId,
-          lastIndex: session.resumeIndex 
-        } 
+        startIndex: session.resumeIndex 
       } 
     });
   };

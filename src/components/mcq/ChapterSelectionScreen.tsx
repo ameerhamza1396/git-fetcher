@@ -49,27 +49,34 @@ export const ChapterSelectionScreen = ({
   }, [subject, userProfile]);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-0 pb-32">
+    <div>
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-10"
+        className="text-center mb-4 px-4"
       >
         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-3 block">Step 2 of 3</span>
-        <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none">
-          Select <span className="text-primary">Chapter</span>
-        </h2>
-        <div className="mt-4 flex flex-col items-center gap-2">
-           <p className="text-muted-foreground text-sm font-bold uppercase tracking-widest">{subject.name}</p>
-           <p className="text-muted-foreground/60 text-[10px] font-medium uppercase tracking-[0.2em]">
-            {userProfile?.plan === 'free'
-              ? 'Free daily limits apply'
-              : 'Unlimited Premium Access'}
-          </p>
-        </div>
       </motion.div>
+      <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md pt-[env(safe-area-inset-top)]">
+        <div className="max-w-4xl mx-auto px-4 sm:px-0">
+          <div className="pt-4 pb-3">
+            <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
+              Select <span className="live-gradient-text">Chapter</span>
+            </h2>
+            <div className="mt-2 flex flex-col items-center gap-1">
+               <p className="text-muted-foreground text-sm font-bold uppercase tracking-widest">{subject.name}</p>
+               <p className="text-muted-foreground/60 text-[10px] font-medium uppercase tracking-[0.2em]">
+                 {userProfile?.plan === 'free'
+                   ? 'Free daily limits apply'
+                   : 'Unlimited Premium Access'}
+               </p>
+            </div>
+          </div>
+        </div>
+        <div className="h-4 bg-gradient-to-b from-background/80 to-transparent pointer-events-none" />
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="max-w-4xl mx-auto px-4 sm:px-0 pb-32 grid grid-cols-1 md:grid-cols-2 gap-4">
         {loading ? (
           Array.from({ length: 6 }).map((_, i) => <ChapterCardSkeleton key={i} />)
         ) : (
@@ -138,7 +145,7 @@ export const ChapterSelectionScreen = ({
             initial={{ opacity: 0, y: 100 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 100 }}
-            className="fixed bottom-0 left-0 right-0 p-6 z-50 flex justify-center pointer-events-none"
+            className="fixed bottom-0 left-0 right-0 p-6 pb-[env(safe-area-inset-bottom)] z-50 flex justify-center pointer-events-none"
           >
             <div className="w-full max-w-md pointer-events-auto">
               <Button

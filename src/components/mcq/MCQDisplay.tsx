@@ -7,10 +7,12 @@ import {
   Clock, CheckCircle, XCircle, Timer, Bot, MessageSquare, X, Bookmark,
   BookmarkCheck, Crown, LogOut, AlertTriangle, MoreVertical, Flag, BotOff,
   Moon, Sun, Zap, Sparkles, BookOpen, ChevronLeft, Loader2, Star, Award,
-  TrendingUp, Brain, Target, Shield, Trash2
+  TrendingUp, Brain, Target, Shield, ShieldAlert, Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
+import { useReferenceSearch } from '@/hooks/useReferenceSearch';
 import { fetchMCQsByChapter, MCQ } from '@/utils/mcqData';
 import { supabase } from '@/integrations/supabase/client';
 import { AIChatbot } from './AIChatbot';
@@ -230,12 +232,12 @@ const MCQSettingsModal = ({
   </DialogPrimitive.Root>
 );
 
-const UpgradeAccountModal = ({ isOpen, onClose, onUpgradeClick }) => (
+const UpgradeAccountModal = ({ isOpen, onClose, onUpgradeClick, message }) => (
   <DialogPrimitive.Root open={isOpen} onOpenChange={onClose}>
     <ModalContent className="sm:max-w-[425px]">
       <div className="bg-white dark:bg-zinc-900 border-2 border-yellow-500/30 rounded-2xl p-6 shadow-2xl">
         <DialogPrimitive.Title className="sr-only">Upgrade Your Account</DialogPrimitive.Title>
-        <DialogPrimitive.Description className="sr-only">Upgrade to premium for unlimited MCQ practice</DialogPrimitive.Description>
+        <DialogPrimitive.Description className="sr-only">Upgrade to premium for unlimited access</DialogPrimitive.Description>
         <div className="flex flex-col items-center text-center">
           <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }} className="mb-4">
             <Crown className="w-16 h-16 text-yellow-500" />
@@ -244,7 +246,7 @@ const UpgradeAccountModal = ({ isOpen, onClose, onUpgradeClick }) => (
             Upgrade Your Account
           </h2>
           <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6">
-            You've reached the daily limit of 50 free MCQ submissions. Upgrade to a premium plan for unlimited practice!
+            {message}
           </p>
           <div className="flex flex-col-reverse sm:flex-row gap-3 w-full sm:justify-center">
             <Button onClick={onClose} variant="outline" className="w-full sm:w-auto rounded-xl">Maybe Later</Button>
@@ -325,8 +327,8 @@ const ReportMCQModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
                     type="button"
                     onClick={() => setCategory(cat)}
                     className={`text-left text-sm px-3 py-2.5 rounded-xl border-2 transition-all ${category === cat
-                        ? 'bg-red-50 dark:bg-red-950 border-red-500 text-zinc-900 dark:text-zinc-100 font-medium'
-                        : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                      ? 'bg-red-50 dark:bg-red-950 border-red-500 text-zinc-900 dark:text-zinc-100 font-medium'
+                      : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700'
                       }`}
                   >
                     {cat}
@@ -411,6 +413,10 @@ export const MCQDisplay = ({
   });
   const [dailySubmissionsCount, setDailySubmissionsCount] = useState(0);
   const [lastSubmissionResetDate, setLastSubmissionResetDate] = useState<string | null>(null);
+  const [showUpgradeBanner, setShowUpgradeBanner] = useState(false);
+  const [upgradeModalMessage, setUpgradeModalMessage] = useState("Upgrade to premium for unlimited access!");
+  const { search, loading: isSearchingReference, error: referenceError, data: referenceData, setData: setReferenceData } = useReferenceSearch();
+  const referenceResults = referenceData?.results || [];
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['profileForChatbot', user?.id],
@@ -460,7 +466,7 @@ export const MCQDisplay = ({
       let currentSubmissions = dailySubmissionsCount;
       let currentResetDate = lastSubmissionResetDate;
       if (isNewDay) { currentSubmissions = 0; currentResetDate = new Date().toISOString(); }
-      if (currentSubmissions >= 50) { setShowUpgradeModal(true); return; }
+      if (currentSubmissions >= 50) { setUpgradeModalMessage("You've reached the daily limit of 50 free MCQ submissions. Upgrade to a premium plan for unlimited practice!"); setShowUpgradeModal(true); return; }
       await supabase.from('profiles').update({ daily_mcq_submissions: currentSubmissions + 1, last_submission_reset_date: currentResetDate }).eq('id', user.id);
       setDailySubmissionsCount(currentSubmissions + 1);
       setLastSubmissionResetDate(currentResetDate);
@@ -495,13 +501,13 @@ export const MCQDisplay = ({
       setShowExplanation(false);
       setTimeLeft(timePerQuestion);
       setStartTime(Date.now());
-      
+
       // Clear persistence
       localStorage.removeItem(LAST_ATTEMPTED_MCQ_KEY);
       localStorage.removeItem(LAST_ATTEMPTED_SUBJECT_KEY);
       localStorage.removeItem(LAST_ATTEMPTED_CHAPTER_KEY);
       await removeSavedSessionFromList(user.id, chapter);
-      
+
       toast({ title: "Session Reset", description: "You're back at the first question." });
       setShowSettingsModal(false);
     } catch (error) {
@@ -554,6 +560,16 @@ export const MCQDisplay = ({
   };
 
   const handleUpgradeClick = () => setShowUpgradeModal(false);
+
+  const handleSearchReference = () => {
+    if (!currentMCQ) return;
+    if (userPlanForChatbot === 'free') {
+      setShowUpgradeBanner(true);
+      setTimeout(() => setShowUpgradeBanner(false), 5000);
+      return;
+    }
+    search(currentMCQ.question, 3);
+  };
 
   useEffect(() => {
     if (profile && !profileLoading) {
@@ -618,7 +634,7 @@ export const MCQDisplay = ({
     const loadMCQs = async () => {
       setLoading(true);
       const data = await fetchMCQsByChapter(chapter);
-      
+
       // Load previous answers for this chapter
       let firstUnattemptedIndex = 0;
       if (user?.id) {
@@ -634,7 +650,7 @@ export const MCQDisplay = ({
             answerMap[ans.mcq_id] = { selectedAnswer: ans.selected_answer };
           });
           setAnsweredQuestions(answerMap);
-          
+
           // Find the first index that hasn't been answered
           const foundIndex = data.findIndex(m => !answerMap[m.id]);
           if (foundIndex !== -1) firstUnattemptedIndex = foundIndex;
@@ -647,14 +663,14 @@ export const MCQDisplay = ({
         return { ...mcq, shuffledOptions, originalCorrectIndex: shuffledOptions.indexOf(mcq.correct_answer) };
       });
       setMcqs(shuffledMCQs);
-      
+
       // NEW: Scroll to nearest unattempted
       if (initialIndex > 0) {
         setCurrentQuestionIndex(initialIndex);
       } else {
         setCurrentQuestionIndex(firstUnattemptedIndex);
       }
-      
+
       setLoading(false);
     };
     loadMCQs();
@@ -680,29 +696,21 @@ export const MCQDisplay = ({
     if (!loading && mcqs.length > 0) checkSavedStatus();
   }, [mcqs, currentQuestionIndex, user, loading]);
 
+  useEffect(() => {
+    setReferenceData(null);
+  }, [currentQuestionIndex, setReferenceData]);
+
   if (loading || profileLoading) {
     return (
-      <div className="fixed inset-0 bg-background flex flex-col px-6 pt-[max(1rem,env(safe-area-inset-top))] overscroll-none">
-        {/* Header Skeleton */}
-        <div className="flex justify-between items-center mb-8">
+      <div className="fixed inset-0 z-[100] bg-background flex flex-col">
+        <div className="h-14 bg-slate-100 dark:bg-slate-800 animate-pulse" />
+        <div className="flex-1 p-4 space-y-4">
+          <div className="h-24 bg-slate-100 dark:bg-slate-800 rounded-lg animate-pulse" />
           <div className="space-y-2">
-            <div className="h-3 w-20 bg-muted rounded-full animate-pulse" />
-            <div className="h-6 w-12 bg-muted rounded-lg animate-pulse" />
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="h-16 bg-slate-100 dark:bg-slate-800 rounded-lg animate-pulse" />
+            ))}
           </div>
-          <div className="flex gap-2">
-            <div className="w-10 h-10 rounded-2xl bg-muted animate-pulse" />
-            <div className="w-10 h-10 rounded-2xl bg-muted animate-pulse" />
-          </div>
-        </div>
-        {/* Progress Bar Skeleton */}
-        <div className="h-2 w-full bg-muted rounded-full mb-8 animate-pulse" />
-        {/* Question Card Skeleton */}
-        <div className="h-48 w-full bg-muted/40 rounded-3xl mb-8 animate-pulse" />
-        {/* Options Skeleton */}
-        <div className="space-y-3">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-16 w-full bg-muted/30 rounded-2xl animate-pulse" />
-          ))}
         </div>
       </div>
     );
@@ -710,102 +718,68 @@ export const MCQDisplay = ({
 
   if (!mcqs || mcqs.length === 0) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-background via-background to-primary/10 flex flex-col items-center justify-center p-8 text-center overscroll-none">
-        <div className="absolute top-[20%] left-[-10%] w-[60%] h-[60%] bg-gradient-to-r from-primary/20 to-blue-500/20 rounded-full blur-[120px] pointer-events-none animate-pulse" />
-        <motion.img initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 0.8 }} transition={{ type: "spring" }} src="/images/mascots/doctor-reading.png" alt="No questions" className="w-32 h-32 mb-6 object-contain" />
-        <h2 className="text-2xl font-black italic uppercase bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent mb-4">No Questions Found</h2>
-        <p className="text-muted-foreground mb-8 max-w-xs uppercase text-xs tracking-[0.2em] font-bold">We are still adding content for this chapter. Stay tuned!</p>
-        <Button onClick={onBack} variant="secondary" className="rounded-2xl h-14 px-10 font-black uppercase text-xs tracking-widest shadow-2xl hover:scale-105 transition-all">Leave Page</Button>
+      <div className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+          <BookOpen className="w-10 h-10 text-slate-400" />
+        </div>
+        <h2 className="text-xl font-semibold text-foreground mb-2">No Questions Found</h2>
+        <p className="text-sm text-muted-foreground mb-6 max-w-xs">Content for this chapter is being added. Check back soon!</p>
+        <Button onClick={onBack} variant="outline" className="rounded-lg">Go Back</Button>
       </div>
     );
   }
 
   return (
-    // IMPORTANT: overflow-hidden removed — it was creating a stacking context trapping modal portals
-    <div className="fixed inset-0 z-[100] bg-gradient-to-br from-background via-background to-primary/5 flex flex-col overscroll-none touch-none select-none">
-      {/* Animated Background */}
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1, delay: 0.2 }}
-        className="absolute inset-0 overflow-hidden pointer-events-none"
-      >
-        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-gradient-to-r from-primary/20 to-blue-500/20 rounded-full blur-[150px] animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-gradient-to-l from-purple-500/20 to-pink-500/20 rounded-full blur-[150px] animate-pulse delay-1000" />
-        <div className="absolute top-[50%] left-[50%] w-[80%] h-[80%] bg-gradient-to-tr from-yellow-500/10 to-orange-500/10 rounded-full blur-[200px] animate-pulse delay-2000" />
-      </motion.div>
-
+    <div className="fixed inset-0 z-[100] bg-background flex flex-col">
       {/* Header */}
-      <header className="relative z-50 flex items-center justify-between px-6 pt-[max(1rem,env(safe-area-inset-top))] pb-4 bg-gradient-to-b from-background/80 to-transparent backdrop-blur-sm">
-        <div className="flex flex-col">
-          <div className="flex items-center gap-2">
-            <motion.div animate={{ rotate: [0, 5, -5, 0] }} transition={{ duration: 2, repeat: Infinity }} className="w-6 h-6 rounded-lg bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center shadow-lg">
-              <Brain className="w-3 h-3 text-white" />
-            </motion.div>
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/80">Practice Phase</span>
-            {timerEnabled && (
-              <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black tracking-widest transition-all ${timeLeft <= 5 ? 'bg-destructive/20 text-destructive animate-pulse shadow-lg shadow-destructive/20' : 'bg-primary/20 text-primary'}`}>
-                <Timer className="w-3 h-3" />
-                {timeLeft}s
-              </motion.div>
-            )}
-          </div>
-          <div className="flex items-baseline gap-2 mt-1">
-            <h1 className="text-2xl font-black tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Q{currentQuestionIndex + 1}</h1>
-            <span className="text-sm font-bold text-muted-foreground">/ {totalQuestions}</span>
-          </div>
-        </div>
+      <header className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-slate-800 bg-background pt-[env(safe-area-inset-top)]">
         <div className="flex items-center gap-2">
-          {isAiGenerated && (
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-1.5 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/30 px-3 py-1.5 rounded-full">
-              <Sparkles className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">AI Generated</span>
-            </motion.div>
+          <div className="w-8 h-8 rounded-lg overflow-hidden">
+            <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs.App" className="w-full h-full object-contain" />
+          </div>
+          <span className="text-xs font-semibold text-primary">Medmacs.App</span>
+          {timerEnabled && (
+            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${timeLeft <= 5 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-primary/10 text-primary'}`}>
+              {timeLeft}s
+            </span>
           )}
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button variant="ghost" size="icon" onClick={handleSaveMCQ} className="w-10 h-10 rounded-2xl bg-muted/40 backdrop-blur-md hover:bg-muted/60 text-muted-foreground transition-all">
-              {isCurrentMCQSaved ? <BookmarkCheck className="w-5 h-5 fill-primary text-primary" /> : <Bookmark className="w-5 h-5" />}
-            </Button>
-          </motion.div>
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button variant="ghost" size="icon" onClick={() => setShowSettingsModal(true)} className="w-10 h-10 rounded-2xl bg-muted/40 backdrop-blur-md hover:bg-muted/60 text-muted-foreground">
-              <MoreVertical className="w-5 h-5" />
-            </Button>
-          </motion.div>
+        </div>
+        <div className="flex items-center gap-1">
+          {isAiGenerated && (
+            <div className="flex items-center gap-1 mr-2 px-2 py-1 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+              <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">AI</span>
+            </div>
+          )}
+          <Button variant="ghost" size="icon" onClick={handleSaveMCQ} className="w-9 h-9 rounded-lg">
+            {isCurrentMCQSaved ? <BookmarkCheck className="w-4 h-4 fill-primary text-primary" /> : <Bookmark className="w-4 h-4" />}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setShowSettingsModal(true)} className="w-9 h-9 rounded-lg">
+            <MoreVertical className="w-4 h-4" />
+          </Button>
         </div>
       </header>
 
       {/* Progress Bar */}
-      <div className="relative px-6 z-50 mt-2">
-        <div className="h-2 w-full bg-muted/30 rounded-full overflow-hidden shadow-inner">
-          <motion.div initial={{ width: 0 }} animate={{ width: `${progressPercentage}%` }} transition={{ duration: 0.3 }} className="h-full bg-gradient-to-r from-primary via-blue-500 to-primary rounded-full" />
+      <div className="relative px-4 sm:px-6 z-50 flex items-center gap-3 py-3 border-b border-slate-200 dark:border-slate-800 bg-background">
+        <span className="text-sm font-bold text-foreground shrink-0">Q{currentQuestionIndex + 1}/{totalQuestions}</span>
+        <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-primary to-blue-500 rounded-full transition-all duration-300" style={{ width: `${progressPercentage}%` }} />
         </div>
       </div>
 
       {/* Main Content */}
-      <div ref={contentRef} className="flex-1 relative z-10 flex flex-col px-6 py-6 overflow-y-auto scrollbar-hide">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentQuestionIndex}
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ type: "spring", damping: 20, stiffness: 100 }}
-            className="flex flex-col flex-1"
-          >
-            {/* Question Card */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-8 p-6 rounded-3xl bg-gradient-to-br from-muted/20 to-muted/5 backdrop-blur-sm border border-primary/20 shadow-xl">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center shadow-lg">
-                  <Target className="w-4 h-4 text-white" />
-                </div>
-                <span className="text-xs font-black uppercase tracking-widest text-primary">Question</span>
-              </div>
-              <h2 className="text-xl sm:text-2xl font-black text-foreground leading-[1.3] tracking-tight">{currentMCQ?.question}</h2>
-            </motion.div>
+      <div ref={contentRef} className="flex-1 relative z-10 flex flex-col overflow-y-auto">
+        <div key={currentQuestionIndex} className="flex flex-col flex-1">
+            {/* Question Section */}
+            <div className="px-4 sm:px-6 py-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+              <p className="text-xs font-semibold text-primary mb-2">Question {currentQuestionIndex + 1}</p>
+              <h2 className="text-base sm:text-lg font-semibold text-foreground leading-relaxed">{currentMCQ?.question}</h2>
+            </div>
 
             {/* Options */}
-            <div className="space-y-3">
+            <div className="flex-1 px-4 sm:px-6 py-4 space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground mb-3">Select your answer:</p>
               {currentMCQ?.shuffledOptions.map((option, index) => {
                 const isSelected = selectedAnswer === option;
                 const isCorrect = option === currentMCQ.correct_answer;
@@ -816,17 +790,11 @@ export const MCQDisplay = ({
                   else if (isCorrect) state = 'correct';
                 } else if (isSelected) state = 'selected';
 
-                let animation: any = {};
-                if (feedbackType) {
-                  if (isCorrect) animation = { scale: [1, 1.05, 1], transition: { duration: 0.4 } };
-                  else if (isSelected && !isCorrect) animation = { x: [-6, 6, -6, 6, 0], transition: { duration: 0.4 } };
-                }
-
-                const getGradient = () => {
-                  if (state === 'correct') return 'from-emerald-500/20 to-emerald-500/10 border-emerald-500/50 shadow-emerald-500/20';
-                  if (state === 'incorrect') return 'from-destructive/20 to-destructive/10 border-destructive/50 shadow-destructive/20';
-                  if (state === 'selected') return 'from-blue-500/20 to-blue-500/10 border-blue-500/50 shadow-blue-500/20';
-                  return 'from-muted/10 to-muted/5 border-border/30 hover:from-primary/10 hover:to-primary/5';
+                const getThemeClasses = () => {
+                  if (state === 'correct') return 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300';
+                  if (state === 'incorrect') return 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300';
+                  if (state === 'selected') return 'bg-primary/5 border-primary/30 text-primary dark:text-primary';
+                  return 'bg-background border-slate-200 dark:border-slate-700 text-foreground hover:border-primary/30 hover:bg-slate-50 dark:hover:bg-slate-800/50';
                 };
 
                 return (
@@ -835,110 +803,131 @@ export const MCQDisplay = ({
                     onClick={() => handleAnswerSelect(option)}
                     disabled={showExplanation}
                     initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0, ...animation }}
-                    transition={{ delay: 0.2 + (index * 0.05) }}
-                    whileHover={!showExplanation ? { scale: 1.01, x: 5 } : {}}
-                    whileTap={!showExplanation ? { scale: 0.99 } : {}}
-                    className={`group relative w-full p-5 rounded-2xl text-left border-2 transition-all duration-300 bg-gradient-to-r ${getGradient()} backdrop-blur-sm shadow-lg`}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className={`w-full p-3 sm:p-4 rounded-xl text-left border transition-all flex items-center gap-3 ${getThemeClasses()}`}
                   >
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex-1 flex gap-4 items-start">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[11px] font-black transition-all shrink-0 mt-0.5 shadow-lg ${state === 'default' ? 'bg-muted/30 text-muted-foreground' :
-                            state === 'correct' ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white' :
-                              state === 'incorrect' ? 'bg-gradient-to-br from-destructive to-red-600 text-white' :
-                                'bg-gradient-to-br from-blue-500 to-blue-600 text-white'
-                          }`}>
-                          {String.fromCharCode(65 + index)}
-                        </div>
-                        <span className={`text-base font-bold leading-snug transition-colors ${state === 'default' ? 'text-foreground/80' :
-                            state === 'correct' ? 'text-emerald-700 dark:text-emerald-300' :
-                              state === 'incorrect' ? 'text-destructive' :
-                                'text-blue-600 dark:text-blue-400'
-                          }`}>{option}</span>
-                      </div>
-                      <div className="shrink-0">
-                        {showExplanation && isCorrect && (
-                          <motion.div initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring" }}>
-                            <CheckCircle className="w-6 h-6 text-emerald-500 drop-shadow-lg" />
-                          </motion.div>
-                        )}
-                        {showExplanation && isSelected && !isCorrect && (
-                          <motion.div initial={{ scale: 0, rotate: 20 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring" }}>
-                            <XCircle className="w-6 h-6 text-destructive drop-shadow-lg" />
-                          </motion.div>
-                        )}
-                      </div>
-                    </div>
+                    <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 ${state === 'default' ? 'bg-slate-100 dark:bg-slate-800 text-slate-500' :
+                      state === 'correct' ? 'bg-emerald-500 text-white' :
+                        state === 'incorrect' ? 'bg-red-500 text-white' :
+                          'bg-primary text-white'
+                      }`}>
+                      {String.fromCharCode(65 + index)}
+                    </span>
+                    <span className="flex-1 text-sm sm:text-base font-medium leading-snug">{option}</span>
+                    {showExplanation && (isCorrect || isSelected) && (
+                      isCorrect ? <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" /> : <XCircle className="w-5 h-5 text-red-500 shrink-0" />
+                    )}
                   </motion.button>
                 );
               })}
             </div>
 
             {/* Explanation */}
-            <AnimatePresence>
-              {showExplanation && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                  transition={{ type: "spring" }}
-                  className="mt-8 p-6 rounded-2xl bg-gradient-to-br from-primary/10 to-blue-500/10 border-2 border-primary/30 backdrop-blur-md shadow-2xl"
-                >
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center shadow-lg">
-                      <BookOpen className="w-4 h-4 text-white" />
-                    </div>
-                    <h4 className="text-xs font-black uppercase tracking-widest text-primary">Explanation</h4>
-                  </div>
-                  <p className="text-sm text-foreground/80 leading-relaxed font-medium">{currentMCQ?.explanation || "No explanation provided for this question."}</p>
-                  {currentMCQ?.correct_answer && (
-                    <div className="mt-4 pt-3 border-t border-primary/20">
-                      <p className="text-xs font-bold text-primary/80">✓ Correct Answer: <span className="text-foreground">{currentMCQ.correct_answer}</span></p>
+            {showExplanation && (
+              <div className="px-4 sm:px-6 py-5 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2 mb-3">
+                  <BookOpen className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-semibold text-primary">Explanation</span>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">{currentMCQ?.explanation || "No explanation provided."}</p>
+
+                {/* Reference Button */}
+                <div className="mt-4">
+                  {!isSearchingReference && referenceResults.length === 0 && (
+                    <Button
+                      onClick={handleSearchReference}
+                      variant="outline"
+                      className="w-full h-10 rounded-lg text-sm font-medium"
+                    >
+                      <BookOpen className="w-4 h-4 mr-2" />
+                      Find Book References
+                    </Button>
+                  )}
+
+                  {isSearchingReference && (
+                    <div className="flex items-center justify-center gap-2 py-3">
+                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                      <span className="text-sm text-muted-foreground">Searching...</span>
                     </div>
                   )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        </AnimatePresence>
-      </div>
 
-      {/* Footer */}
-      <footer className="relative z-50 px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 bg-gradient-to-t from-background via-background/80 to-transparent">
-        <div className="flex items-center justify-between gap-4">
-          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                if (currentQuestionIndex > 0) {
-                  const prevIndex = currentQuestionIndex - 1;
-                  setCurrentQuestionIndex(prevIndex);
-                  setTimeLeft(timePerQuestion);
-                  setStartTime(Date.now());
-                }
-              }}
-              disabled={currentQuestionIndex === 0}
-              className="flex-1 max-w-[120px] rounded-2xl h-14 bg-gradient-to-r from-muted/40 to-muted/20 backdrop-blur-sm text-foreground font-bold hover:shadow-lg transition-all disabled:opacity-20"
-            >
-              <ChevronLeft className="w-4 h-4 mr-2 inline" />
-              Previous
-            </Button>
-          </motion.div>
+                  {referenceResults.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                        <span className="text-xs font-semibold text-primary">References</span>
+                      </div>
+                      <div className="flex gap-3 overflow-x-auto pb-2 -mx-2 px-2">
+                        {referenceResults.map((ref, idx) => (
+                          <div
+                            key={idx}
+                            className="min-w-[260px] max-w-[260px] p-3 rounded-lg bg-background border border-slate-200 dark:border-slate-700 shrink-0"
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge variant="secondary" className="text-[10px] font-medium px-2 py-0.5">
+                                {ref.book}
+                              </Badge>
+                              <span className="text-[10px] text-muted-foreground ml-auto">p. {ref.page}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
+                              "{ref.content}"
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {!isSearchingReference && referenceError && (
+                    <p className="text-xs text-destructive text-center mt-2">No references found.</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <footer className="relative z-50 px-4 sm:px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-background">
+          <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (currentQuestionIndex > 0) {
+                setCurrentQuestionIndex(prevIndex => prevIndex - 1);
+                setTimeLeft(timePerQuestion);
+                setStartTime(Date.now());
+              }
+            }}
+            disabled={currentQuestionIndex === 0}
+            className="w-28 sm:w-32 h-11 rounded-lg font-medium disabled:opacity-50"
+          >
+            <ChevronLeft className="w-4 h-4 mr-1" />
+            Previous
+          </Button>
 
           {showExplanation ? (
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="flex-1">
-              <Button onClick={handleNextQuestion} className="w-full rounded-2xl h-14 bg-gradient-to-r from-foreground to-foreground/80 text-background font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:shadow-xl transition-all">
-                {currentQuestionIndex === totalQuestions - 1 ? (<><Award className="w-4 h-4 mr-2" />Finish Quiz</>) : (<>Next Question<TrendingUp className="w-4 h-4 ml-2" /></>)}
-              </Button>
-            </motion.div>
+            <Button
+              onClick={handleNextQuestion}
+              className="flex-1 h-11 rounded-lg font-semibold bg-primary hover:bg-primary/90"
+            >
+              {currentQuestionIndex === totalQuestions - 1 ? (
+                <>Finish<Award className="w-4 h-4 ml-2" /></>
+              ) : (
+                <>Next<TrendingUp className="w-4 h-4 ml-2" /></>
+              )}
+            </Button>
           ) : (
             !quickSubmit && (
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="flex-1">
-                <Button onClick={() => handleSubmitAnswer()} disabled={!selectedAnswer} className="w-full rounded-2xl h-14 bg-gradient-to-r from-primary to-blue-600 text-primary-foreground font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/30 hover:shadow-xl transition-all disabled:opacity-50">
-                  <Shield className="w-4 h-4 mr-2" />
-                  Check Answer
-                </Button>
-              </motion.div>
+              <Button
+                onClick={() => handleSubmitAnswer()}
+                disabled={!selectedAnswer}
+                className="flex-1 h-11 rounded-lg font-semibold bg-primary hover:bg-primary/90 disabled:opacity-50"
+              >
+                <Shield className="w-4 h-4 mr-2" />
+                Check Answer
+              </Button>
             )
           )}
         </div>
@@ -978,7 +967,7 @@ export const MCQDisplay = ({
       />
       <LeaveTestModal isOpen={showLeaveModal} onClose={() => setShowLeaveModal(false)} onConfirm={() => { setShowLeaveModal(false); onBack(); }} />
       <ReportMCQModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} onSubmit={handleReportSubmit} isSubmitting={isReportSubmitting} />
-      <UpgradeAccountModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} onUpgradeClick={handleUpgradeClick} />
+      <UpgradeAccountModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} onUpgradeClick={handleUpgradeClick} message={upgradeModalMessage} />
 
       {currentMCQ && (
         <AIChatbot
@@ -993,6 +982,36 @@ export const MCQDisplay = ({
           onOpen={() => setIsChatbotOpen(true)}
         />
       )}
+
+      {/* Upgrade Reminder Banner */}
+      <AnimatePresence>
+        {showUpgradeBanner && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-10 left-6 right-6 z-[200]"
+          >
+            <div className="p-4 rounded-[2.5rem] bg-gradient-to-r from-orange-500 to-amber-500 shadow-2xl shadow-orange-500/30 flex items-center gap-4 border border-white/20">
+              <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                <ShieldAlert className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs font-black uppercase tracking-widest text-white/80 mb-0.5">Feature Locked</p>
+                <p className="text-sm font-bold text-white tracking-tight leading-tight">Upgrade to Premium to access book references!</p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => { setShowUpgradeBanner(false); setUpgradeModalMessage("Book references are a premium feature. Upgrade to access our complete medical library!"); setShowUpgradeModal(true); }}
+                className="rounded-full h-10 px-6 font-black uppercase text-[10px] tracking-widest"
+              >
+                Upgrade
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

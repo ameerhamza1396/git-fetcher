@@ -50,7 +50,7 @@ const IndexHeader: React.FC = () => {
     );
 
     return (
-        <header className="bg-transparent backdrop-blur-md border-b border-purple-200 dark:border-purple-800 sticky top-0 z-50">
+        <header className="bg-transparent backdrop-blur-md border-b border-purple-200 dark:border-purple-800 sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
             <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
                 <Link to="/" className="flex items-center space-x-3 group">
                     <img

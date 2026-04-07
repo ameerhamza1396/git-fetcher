@@ -600,6 +600,73 @@ ion-content::part(scroll) {
   animation: gradient-sway 25s ease infinite;
 }
 
+@keyframes mesh-gradient {
+  0% { background-position: 0% 50%; opacity: 0.8; }
+  50% { background-position: 100% 50%; opacity: 1; }
+  100% { background-position: 0% 50%; opacity: 0.8; }
+}
+
+.animate-mesh {
+  background-size: 200% 200%;
+  animation: mesh-gradient 15s ease infinite;
+}
+
+@keyframes text-gradient-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.live-gradient-text {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--primary)),
+    hsl(200 80% 50%),
+    hsl(280 80% 60%),
+    hsl(var(--primary))
+  );
+  background-size: 300% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: text-gradient-flow 4s ease-in-out infinite;
+}
+
+@keyframes text-gradient-flow-fast {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 200% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.live-gradient-text-fast {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--primary)),
+    hsl(200 80% 50%),
+    hsl(280 80% 60%),
+    hsl(var(--primary))
+  );
+  background-size: 300% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: text-gradient-flow-fast 2s ease-in-out infinite;
+}
+
 /* ===== LIVE GRADIENT & ALIVE-FEEL ANIMATIONS ===== */
 
 /* Floating gradient orbs */

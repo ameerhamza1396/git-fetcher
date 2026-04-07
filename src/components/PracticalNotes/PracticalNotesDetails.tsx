@@ -135,7 +135,7 @@ export default function SubjectPracticalDetails() {
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
             {/* 1. Main App Header */}
-            <header className="sticky top-0 z-20 w-full border-b border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm shadow-sm">
+            <header className="sticky top-0 z-20 w-full border-b border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm shadow-sm pt-[env(safe-area-inset-top)]">
                 <div className="max-w-7xl mx-auto h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8">
                     {/* Left: Back Link & Branding */}
                     <div className="flex items-center space-x-4">

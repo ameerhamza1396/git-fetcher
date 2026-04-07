@@ -137,20 +137,26 @@ export const StudyAnalytics = () => {
         ? Math.round(answersWithTime.reduce((sum, a) => sum + (a.time_taken || 0), 0) / answersWithTime.length)
         : 0;
 
-      const studyDates = allAnswers?.map(a => new Date(a.created_at).toDateString()) || [];
-      const uniqueStudyDates = [...new Set(studyDates)].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+      const studyDates = allAnswers?.map(a => {
+        const date = new Date(a.created_at);
+        return date.toLocaleDateString("en-US", { timeZone: "Asia/Karachi" });
+      }) || [];
+      const uniqueStudyDates = [...new Set(studyDates)];
 
       let currentStreak = 0;
-      const today = new Date().toDateString();
+      const today = new Date();
+      const todayPKT = new Date(today.toLocaleString("en-US", { timeZone: "Asia/Karachi" }));
+      const todayStr = todayPKT.toLocaleDateString("en-US", { timeZone: "Asia/Karachi" });
 
       if (uniqueStudyDates.length > 0) {
-        const isTodayActive = uniqueStudyDates.includes(today);
-        let checkDate = new Date();
+        const isTodayActive = uniqueStudyDates.includes(todayStr);
+        let checkDate = new Date(todayPKT);
         if (!isTodayActive) {
-          checkDate = new Date(Date.now() - 86400000);
+          checkDate.setDate(checkDate.getDate() - 1);
         }
         while (true) {
-          if (uniqueStudyDates.includes(checkDate.toDateString())) {
+          const checkStr = checkDate.toLocaleDateString("en-US", { timeZone: "Asia/Karachi" });
+          if (uniqueStudyDates.includes(checkStr)) {
             currentStreak++;
             checkDate.setDate(checkDate.getDate() - 1);
           } else {

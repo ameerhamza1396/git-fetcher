@@ -15,13 +15,16 @@ BEGIN
   v_accuracy := CASE WHEN v_total_questions > 0 THEN ROUND((v_correct_answers::NUMERIC / v_total_questions) * 100)::INTEGER ELSE 0 END;
 
   WITH daily_dates AS (
-    SELECT DISTINCT created_at::date as d
+    SELECT DISTINCT (created_at AT TIME ZONE 'Asia/Karachi')::date as d
     FROM user_answers
     WHERE user_id = p_user_id
     ORDER BY d DESC
   ),
+  today_pkt AS (
+    SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Karachi')::date as d
+  ),
   streak AS (
-    SELECT d, d = CURRENT_DATE or d = CURRENT_DATE - 1 as has_today,
+    SELECT d, d = (SELECT d FROM today_pkt) OR d = (SELECT d FROM today_pkt) - 1 as has_today,
            ROW_NUMBER() OVER (ORDER BY d DESC) as rn,
            ROW_NUMBER() OVER (ORDER BY d ASC) as rn_asc
     FROM daily_dates
@@ -29,7 +32,7 @@ BEGIN
   SELECT COALESCE(MAX(CASE WHEN has_today THEN rn_asc END), 0)
   INTO v_current_streak
   FROM streak
-  WHERE d >= CURRENT_DATE - 30;
+  WHERE d >= (SELECT d FROM today_pkt) - 30;
 
   RETURN json_build_object(
     'total_questions', v_total_questions,

@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Crown, ArrowLeft, X, Sparkles, CheckCircle, XCircle } from 'lucide-react';
+import { Crown, ArrowLeft, ArrowRight, X, Sparkles, CheckCircle, XCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardContent, CardFooter, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { ProfileDropdown } from '@/components/ProfileDropdown';
 import { Checkbox } from '@/components/ui/checkbox';
 import Seo from '@/components/Seo';
 import PlanBadge from '@/components/PlanBadge';
+import { AIProgressTracker } from '@/components/ai/AIProgressTracker';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Question {
@@ -21,36 +22,19 @@ interface Question {
     explanation: string;
 }
 
-const categorizedTopics = {
-    "1st": ["FND1 (Foundation)", "HEM1 (Blood)", "LCM1 (Locomotor)", "RSP1 (Respiratory System)", "CVS1 (Cardiovascular System)"],
-    "2nd": ["NEU1 (Nervous System)", "HNN1 (Head & Neck and Special Senses)", "END1 (Endocrinology)", "GIL1 (Gastrointestinal Tract and Liver)", "EXC1 (Renal and Excretory System)", "REP1 (Reproductive System)"],
-    "3rd": ["FND2 (Foundation II)", "IDD1 (Infectious Diseases)", "HEM2 (Hematology)", "RSP2 (Respiratory System)", "CVS2 (Cardiovascular System)", "GIL2 (Gastrointestinal Tract and Liver)", "END2 (Endocrinology)", "EXC2 (Renal and Excretory System)"],
-    "4th": ["ORT2 (Orthopedics, Rheumatology, Trauma)", "PMR (Physical Medicine & Rehabilitation)", "DPS (Dermatology, Plastic Surgery/Burns)", "GEN (Genetics)", "REP2 (Reproductive System)", "NEU2 (Neurosciences and Psychiatry)", "ENT (Ear, Nose, and Throat)", "Ophthalmology/Eye"],
-    "5th": ["Medicine Rotation", "Surgery Rotation", "Gyneacology and Obstetrics Rotation", "Paediatrics Rotation"]
-};
-
-const topicMapping = (selectedTopic: string): string => {
+const topicMapping = (subjectCode: string): string => {
     const map: { [key: string]: string } = {
-        "FND1 (Foundation)": "Foundation", "HEM1 (Blood)": "Hematology", "LCM1 (Locomotor)": "Locomotion", "RSP1 (Respiratory System)": "Respiratory System", "CVS1 (Cardiovascular System)": "Cardiovascular System",
-        "NEU1 (Nervous System)": "Neurosciences", "HNN1 (Head & Neck and Special Senses)": "Head, Neck, and Special Senses", "END1 (Endocrinology)": "Endocrinology", "GIL1 (Gastrointestinal Tract and Liver)": "Gastrointestinal Tract (GIT)", "EXC1 (Renal and Excretory System)": "Renal and Excretory System", "REP1 (Reproductive System)": "Reproductive System",
-        "FND2 (Foundation II)": "Foundation II", "IDD1 (Infectious Diseases)": "Infectious Diseases", "HEM2 (Hematology)": "Hematology II", "RSP2 (Respiratory System)": "Respiratory System II", "CVS2 (Cardiovascular System)": "Cardiovascular System II", "GIL2 (Gastrointestinal Tract and Liver)": "GIT and Liver II", "END2 (Endocrinology)": "Endocrinology II", "EXC2 (Renal and Excretory System)": "Renal and Excretory System II",
-        "ORT2 (Orthopedics, Rheumatology, Trauma)": "Orthopedics, Rheumatology, Trauma", "PMR (Physical Medicine & Rehabilitation)": "Physical Medicine & Rehabilitation", "DPS (Dermatology, Plastic Surgery/Burns)": "Dermatology, Plastic Surgery/Burns", "GEN (Genetics)": "Genetics", "REP2 (Reproductive System)": "Reproductive System II", "NEU2 (Neurosciences and Psychiatry)": "Neurosciences and Psychiatry", "ENT (Ear, Nose, and Throat)": "ENT (Otorhinolaryngology)", "Ophthalmology/Eye": "Ophthalmology",
-        "Medicine Rotation": "Medicine Rotation", "Surgery Rotation": "Surgery Rotation", "Gyneacology and Obstetrics Rotation": "Gynecology and Obstetrics Rotation", "Paediatrics Rotation": "Pediatrics Rotation",
+        "FND1": "Foundation", "HEM1": "Hematology", "LCM1": "Locomotion", "RSP1": "Respiratory System", "CVS1": "Cardiovascular System",
+        "NEU1": "Neurosciences", "HNN1": "Head, Neck, and Special Senses", "END1": "Endocrinology", "GIL1": "Gastrointestinal Tract (GIT)", "EXC1": "Renal and Excretory System", "REP1": "Reproductive System",
+        "FND2": "Foundation II", "IDD1": "Infectious Diseases", "HEM2": "Hematology II", "RSP2": "Respiratory System II", "CVS2": "Cardiovascular System II", "GIL2": "GIT and Liver II", "END2": "Endocrinology II", "EXC2": "Renal and Excretory System II",
+        "ORT2": "Orthopedics, Rheumatology, Trauma", "PMR": "Physical Medicine & Rehabilitation", "DPS": "Dermatology, Plastic Surgery/Burns", "GEN": "Genetics", "REP2": "Reproductive System II", "NEU2": "Neurosciences and Psychiatry", "ENT": "ENT (Otorhinolaryngology)", "OPH": "Ophthalmology",
+        "MED": "Medicine Rotation", "SUR": "Surgery Rotation", "GYO": "Gynecology and Obstetrics Rotation", "PAE": "Pediatrics Rotation",
     };
-    return map[selectedTopic] || selectedTopic;
-};
-
-const getTopicsForYear = (year: string): string[] => {
-    const normalizedYear = year.toLowerCase().replace(/ professional year| year/g, '');
-    const key = Object.keys(categorizedTopics).find(k => k === normalizedYear);
-    return key ? categorizedTopics[key] : [];
+    return map[subjectCode] || subjectCode;
 };
 
 const AITestGenerator: React.FC = () => {
     const { user, loading: authLoading } = useAuth();
-    const headerRef = useRef(null);
-    const lastScrollY = useRef(0);
-    const [headerVisible, setHeaderVisible] = useState(true);
 
     const { data: profile, isLoading: planLoading } = useQuery({
         queryKey: ['plan_and_year', user?.id],
@@ -65,7 +49,6 @@ const AITestGenerator: React.FC = () => {
     const plan = profile?.plan?.toLowerCase() || 'free';
     const userYear = profile?.year || '1st';
     const hasAccess = plan === 'premium';
-    const availableTopics = getTopicsForYear(userYear);
 
     const [currentStep, setCurrentStep] = useState(1);
     const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
@@ -82,6 +65,10 @@ const AITestGenerator: React.FC = () => {
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const [showExitConfirm, setShowExitConfirm] = useState(false);
 
+    // Backend subjects from Supabase
+    const [aiSubjects, setAiSubjects] = useState<{id: string; subject_code: string; subject_name: string; year: string}[]>([]);
+    const [loadingSubjects, setLoadingSubjects] = useState(true);
+
     // Fixed Capacitor back button handler
     useEffect(() => {
         let isMounted = true;
@@ -93,7 +80,20 @@ const AITestGenerator: React.FC = () => {
                 if (Capacitor.isNativePlatform() && isMounted) {
                     const { App } = await import('@capacitor/app');
                     const backListener = App.addListener('backButton', () => {
+                        // Show exit confirmation if any progress has been made
                         if (currentStep === 4 && !submitted) {
+                            setShowExitConfirm(true);
+                            return;
+                        }
+                        if (currentStep === 1 && selectedChapters.length > 0) {
+                            setShowExitConfirm(true);
+                            return;
+                        }
+                        if (currentStep === 2 && totalQ > 0) {
+                            setShowExitConfirm(true);
+                            return;
+                        }
+                        if (currentStep === 3 && (customPrompt || loading > 0)) {
                             setShowExitConfirm(true);
                             return;
                         }
@@ -120,15 +120,24 @@ const AITestGenerator: React.FC = () => {
         };
     }, [currentStep, submitted]);
 
+    // Load AI test subjects from Supabase
     useEffect(() => {
-        const handleScroll = () => {
-            const currentScrollY = window.scrollY;
-            setHeaderVisible(currentScrollY < lastScrollY.current || currentScrollY < 10);
-            lastScrollY.current = currentScrollY;
+        const loadSubjects = async () => {
+            setLoadingSubjects(true);
+            const { data, error } = await supabase
+                .from('ai_test_subjects')
+                .select('id, subject_code, subject_name, year')
+                .eq('is_active', true)
+                .eq('year', userYear)
+                .order('subject_name');
+            
+            if (!error && data) {
+                setAiSubjects(data);
+            }
+            setLoadingSubjects(false);
         };
-        window.addEventListener('scroll', handleScroll, { passive: true });
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
+        if (userYear) loadSubjects();
+    }, [userYear]);
 
     const handleChapterToggle = (chapter: string) => { setSelectedChapters(prev => prev.includes(chapter) ? [] : [chapter]); setError(null); };
     const handleConfirmChapters = () => { if (selectedChapters.length === 1) { setCurrentStep(2); setError(null); } else setError('Please select exactly one subject.'); };
@@ -140,11 +149,26 @@ const AITestGenerator: React.FC = () => {
         timerRef.current = setInterval(() => setLoading(t => { setLoadTime(t + 1); return Math.min(99, t + 10); }), 1000);
         const apiTopic = topicMapping(selectedChapters[0]);
         try {
-            const res = await fetch(`https://medmacs-ai-bot.vercel.app/generate-ai-test`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic: apiTopic, difficulty: 'medium', count: totalQ, prompt: `Strictly adhere to the syllabus for ${userYear} year and module: ${apiTopic}. ${customPrompt}` }) });
+            const res = await fetch(`https://medmacs.app/api/ai/generate-test`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic: apiTopic, difficulty: 'medium', count: totalQ, prompt: `Strictly adhere to the syllabus for ${userYear} year and module: ${apiTopic}. ${customPrompt}` }) });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || `Status ${res.status}`);
             setQuestions(data.questions); setIdx(0); setAnswers({}); setRevealed({}); setSubmitted(false); setCurrentStep(4);
-        } catch (e: any) { setError(e.message); }
+        } catch (e: any) {
+            console.error('AI Test Generation Error:', e);
+            let errorMessage = 'Something went wrong. Please try again.';
+            if (e.message.includes('network') || e.message.includes('fetch')) {
+                errorMessage = 'Network error. Please check your connection and try again.';
+            } else if (e.message.includes('429') || e.message.includes('rate limit')) {
+                errorMessage = 'Too many requests. Please wait a moment and try again.';
+            } else if (e.message.includes('500') || e.message.includes('server')) {
+                errorMessage = 'Server error. Please try again later or contact support.';
+            } else if (e.message.includes('timeout')) {
+                errorMessage = 'Request timed out. Please try again.';
+            } else if (e.message) {
+                errorMessage = e.message;
+            }
+            setError(errorMessage);
+        }
         finally { setLoading(0); if (timerRef.current) clearInterval(timerRef.current); }
     };
 
@@ -197,34 +221,21 @@ const AITestGenerator: React.FC = () => {
             <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
 
-            <header ref={headerRef} className={`fixed top-0 left-0 right-0 z-[110] bg-background/50 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
-                <div className="container mx-auto px-4 py-4 flex justify-between items-center max-w-7xl">
-                    <Link to="/dashboard"><Button variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110"><ArrowLeft className="h-5 w-5" /></Button></Link>
-                    <div className="flex items-center gap-2">
-                        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-7 h-7" />
-                        <span className="text-lg font-black">Medmacs.App</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <ProfileDropdown />
-                    </div>
-                </div>
-            </header>
-
-            <main className="flex-grow flex flex-col items-center px-4 py-8 mt-20 pb-[env(safe-area-inset-bottom)] overflow-y-auto w-full relative z-10">
+            <main className="flex-grow flex flex-col items-center px-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] overflow-y-auto w-full relative z-10">
                 <div className="w-full max-w-2xl">
                     {/* No Access */}
                     {!hasAccess && (
                         <div className="text-center py-16 space-y-6">
                             <div className="relative inline-block">
                                 <div className="absolute inset-0 bg-blue-400 blur-2xl opacity-20 rounded-full" />
-                                <div className="relative bg-gradient-to-br from-blue-600 to-indigo-600 p-5 rounded-3xl shadow-xl">
+                                <div className="relative bg-gradient-to-br from-amber-500 to-yellow-500 p-5 rounded-3xl shadow-xl">
                                     <Crown className="w-10 h-10 text-white" />
                                 </div>
                             </div>
                             <h2 className="text-xl font-black uppercase tracking-tight text-foreground">Upgrade Required</h2>
                             <p className="text-sm text-muted-foreground">Upgrade to <span className="font-bold text-primary">Premium</span> to access AI Test Generator.</p>
                             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                                <Link to="/pricing"><Button className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl h-11 px-8 font-black uppercase text-xs tracking-widest">Upgrade Plan</Button></Link>
+                                <Link to="/pricing"><Button className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-2xl h-11 px-8 font-black uppercase text-xs tracking-widest">Upgrade Plan</Button></Link>
                                 <Link to="/dashboard"><Button variant="outline" className="rounded-2xl h-11 px-8 font-black uppercase text-xs tracking-widest">Dashboard</Button></Link>
                             </div>
                         </div>
@@ -233,80 +244,386 @@ const AITestGenerator: React.FC = () => {
                     {/* Step 1: Subject Selection */}
                     {hasAccess && questions.length === 0 && currentStep === 1 && (
                         <div>
-                            <div className="text-center mb-8">
-                                <h1 className="text-2xl font-black text-foreground uppercase tracking-tight italic">Select <span className="text-blue-600">Subject</span></h1>
-                                <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] mt-2">{userYear.toUpperCase()} Professional Year</p>
+                            {/* Main Title Section */}
+                            <div className="text-center mb-6 sm:mb-8 animate-fade-in px-4">
+                                <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-foreground uppercase italic mb-3">
+                                    🧠 AI <span className="text-amber-500">Test</span> Generator
+                                </h1>
+                                <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] max-w-2xl mx-auto">
+                                    Create custom AI-powered practice tests on any medical topic
+                                </p>
                             </div>
-                            <div className="grid grid-cols-1 gap-3">
-                                {availableTopics.map(topic => (
-                                    <div key={topic} onClick={() => handleChapterToggle(topic)}
-                                        className={`relative overflow-hidden rounded-[1.5rem] p-4 shadow-xl cursor-pointer transition-all duration-300 ${selectedChapters.includes(topic)
-                                            ? 'bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white'
-                                            : 'bg-gradient-to-br from-slate-400 via-slate-500 to-slate-600 text-white/90'
-                                            }`}>
-                                        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
-                                        <div className="relative z-10 flex items-center gap-3">
-                                            <Checkbox checked={selectedChapters.includes(topic)} className="border-white data-[state=checked]:bg-white data-[state=checked]:text-slate-900" />
-                                            <span className="font-bold text-sm">{topic}</span>
-                                        </div>
+
+                            {/* AI Test Stats Peek */}
+                            <div className="max-w-4xl mx-auto px-4 sm:px-0 mb-6">
+                                <AIProgressTracker userId={user?.id} />
+                            </div>
+
+                            <motion.div 
+                                initial={{ opacity: 0, y: -20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="text-center mb-4 px-4"
+                            >
+                                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-3 block">Step 1 of 3</span>
+                            </motion.div>
+
+                            <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md -mx-3 sm:mx-0 px-3 sm:px-0">
+                                <div className="max-w-4xl mx-auto px-4 sm:px-0">
+                                    <div className="pt-4 pb-3">
+                                        <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
+                                            Select <span className="text-amber-500">Subject</span>
+                                        </h2>
+                                        <p className="text-muted-foreground text-sm font-medium mt-2 max-w-lg mx-auto text-center">
+                                            Choose a subject to generate your AI-powered test
+                                        </p>
                                     </div>
-                                ))}
+                                </div>
+                                <div className="h-4 bg-gradient-to-b from-background/80 to-transparent pointer-events-none" />
                             </div>
-                            {error && <p className="text-destructive text-sm text-center mt-4">{error}</p>}
-                            <Button onClick={handleConfirmChapters} disabled={selectedChapters.length !== 1} className="w-full mt-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl h-12 font-black uppercase text-xs tracking-widest shadow-2xl hover:scale-105 transition-all">
-                                Confirm Subject
-                            </Button>
+
+                            <div className="max-w-4xl mx-auto px-4 sm:px-0 pb-32 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {loadingSubjects ? (
+                                    Array.from({ length: 4 }).map((_, i) => (
+                                        <div key={i} className="relative overflow-hidden rounded-3xl bg-muted/20 p-6 animate-pulse border border-border/40">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-16 h-16 rounded-2xl bg-muted" />
+                                                <div className="flex-1 space-y-2">
+                                                    <div className="h-5 w-1/3 bg-muted rounded-full" />
+                                                    <div className="h-3 w-2/3 bg-muted rounded-full" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    aiSubjects.map((subject, index) => {
+                                        const isSelected = selectedChapters.includes(subject.subject_code);
+                                        return (
+                                            <motion.div
+                                                key={subject.id}
+                                                initial={{ opacity: 0, scale: 0.95 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                transition={{ delay: index * 0.05 }}
+                                                whileHover={{ scale: 1.02, y: -4 }}
+                                                whileTap={{ scale: 0.98 }}
+                                                onClick={() => handleChapterToggle(subject.subject_code)}
+                                                className={`group cursor-pointer relative overflow-hidden rounded-3xl border-2 p-6 transition-all duration-300 ${
+                                                    isSelected 
+                                                        ? 'border-amber-500 bg-amber-500/5 shadow-2xl shadow-amber-500/10' 
+                                                        : 'border-border/40 bg-white/5 dark:bg-zinc-900/50 hover:border-amber-500/30 hover:bg-amber-500/5'
+                                                }`}
+                                            >
+                                                {isSelected && (
+                                                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/20 blur-[60px] -mr-16 -mt-16 pointer-events-none" />
+                                                )}
+
+                                                <div className="flex items-center gap-5 relative z-10">
+                                                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-xl transition-transform duration-300 group-hover:scale-110 ${
+                                                        isSelected ? 'bg-amber-500 text-white' : 'bg-muted/50 text-foreground/70'
+                                                    }`}>
+                                                        📚
+                                                    </div>
+                                                    
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <h3 className={`text-xl font-black uppercase italic tracking-tight transition-colors ${
+                                                                isSelected ? 'text-amber-500' : 'text-foreground'
+                                                            }`}>
+                                                                {subject.subject_name}
+                                                            </h3>
+                                                            {isSelected && (
+                                                                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                                                            )}
+                                                        </div>
+                                                        <p className="text-muted-foreground text-xs font-medium leading-relaxed line-clamp-2">
+                                                            {subject.subject_code} • AI Generated Test
+                                                        </p>
+                                                    </div>
+
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                                                        isSelected ? 'bg-amber-500 text-white' : 'bg-muted opacity-0 group-hover:opacity-100'
+                                                    }`}>
+                                                        <ArrowRight className="w-4 h-4" />
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        );
+                                    })
+                                )}
+                            </div>
+
+                            <AnimatePresence>
+                                {selectedChapters.length === 1 && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 100 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: 100 }}
+                                        className="fixed bottom-0 left-0 right-0 p-6 pb-[env(safe-area-inset-bottom)] z-50 flex justify-center pointer-events-none"
+                                    >
+                                        <div className="w-full max-w-md pointer-events-auto">
+                                            <Button
+                                                onClick={handleConfirmChapters}
+                                                className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-2xl shadow-amber-500/40 rounded-2xl h-16 uppercase font-black text-sm tracking-[0.2em] group transition-all"
+                                                size="lg"
+                                            >
+                                                    Continue to Questions
+                                                <motion.div
+                                                    animate={{ x: [0, 5, 0] }}
+                                                    transition={{ duration: 1.5, repeat: Infinity }}
+                                                >
+                                                    <ArrowRight className="w-5 h-5 ml-2" />
+                                                </motion.div>
+                                            </Button>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            <div className="text-center pt-20 pb-10 opacity-40">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">© 2026 Medmacs App • AI Test Generator</p>
+                            </div>
                         </div>
                     )}
 
                     {/* Step 2: Question Count */}
                     {hasAccess && questions.length === 0 && currentStep === 2 && (
                         <div>
-                            <div className="text-center mb-8">
-                                <h1 className="text-2xl font-black text-foreground uppercase tracking-tight italic">How <span className="text-blue-600">Many</span>?</h1>
-                                <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] mt-2">Select number of questions</p>
-                            </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-                                {[2, 5, 10].map(num => (
-                                    <div key={num} onClick={() => setTotalQ(num)}
-                                        className={`relative overflow-hidden rounded-[1.5rem] p-4 shadow-xl cursor-pointer transition-all duration-300 text-center ${totalQ === num
-                                            ? 'bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white'
-                                            : 'bg-gradient-to-br from-slate-400 via-slate-500 to-slate-600 text-white/90'
-                                            }`}>
-                                        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
-                                        <span className="relative z-10 font-black text-lg">{num}</span>
+                            <motion.div 
+                                initial={{ opacity: 0, y: -20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="text-center mb-4 px-4"
+                            >
+                                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-3 block">Step 2 of 3</span>
+                            </motion.div>
+
+                            <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md -mx-3 sm:mx-0 px-3 sm:px-0">
+                                <div className="max-w-4xl mx-auto px-4 sm:px-0">
+                                    <div className="pt-4 pb-3">
+                                        <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
+                                            Select <span className="text-amber-500">Questions</span>
+                                        </h2>
+                                        <div className="mt-2 flex flex-col items-center gap-1">
+                                            <p className="text-muted-foreground text-sm font-bold uppercase tracking-widest">{topicMapping(selectedChapters[0])}</p>
+                                            <p className="text-muted-foreground/60 text-[10px] font-medium uppercase tracking-[0.2em]">
+                                                {profile?.plan === 'free' ? 'Free daily limits apply' : 'Unlimited Premium Access'}
+                                            </p>
+                                        </div>
                                     </div>
-                                ))}
+                                </div>
+                                <div className="h-4 bg-gradient-to-b from-background/80 to-transparent pointer-events-none" />
                             </div>
-                            <div className="flex gap-3 mt-6">
-                                <Button onClick={() => setCurrentStep(1)} variant="outline" className="flex-1 rounded-2xl h-12 font-black uppercase text-xs tracking-widest">Back</Button>
-                                <Button onClick={handleConfirmQuestions} className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl h-12 font-black uppercase text-xs tracking-widest shadow-2xl hover:scale-105 transition-all">Confirm</Button>
+
+                            <div className="max-w-4xl mx-auto px-4 sm:px-0">
+                                {/* Subject Preview Card */}
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: 0.05 }}
+                                    className="relative overflow-hidden rounded-3xl border-2 border-amber-500/20 bg-amber-500/5 p-5 mb-8"
+                                >
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-[60px] -mr-16 -mt-16 pointer-events-none" />
+                                    <div className="flex items-center gap-5 relative z-10">
+                                        <div className="w-16 h-16 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-xl shadow-amber-500/30 text-2xl">
+                                            🧠
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-1">Ready to Start</p>
+                                            <h3 className="text-xl font-black uppercase italic tracking-tight text-foreground">{topicMapping(selectedChapters[0])}</h3>
+                                            <p className="text-muted-foreground text-xs font-medium truncate">
+                                                AI Generated Test
+                                            </p>
+                                        </div>
+                                        <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0">
+                                            <ArrowRight className="w-4 h-4" />
+                                        </div>
+                                    </div>
+                                </motion.div>
+
+                                {/* Question Count Options */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                    {[
+                                        { num: 2, label: 'Quick Review', desc: 'Fast practice session' },
+                                        { num: 5, label: 'Short Test', desc: 'Brief assessment' },
+                                        { num: 10, label: 'Full Practice', desc: 'Comprehensive test' }
+                                    ].map((item, idx) => {
+                                        const isSelected = totalQ === item.num;
+                                        return (
+                                            <motion.div
+                                                key={item.num}
+                                                initial={{ opacity: 0, scale: 0.95 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                transition={{ delay: 0.1 + idx * 0.04 }}
+                                                whileHover={{ scale: 1.02, x: 5 }}
+                                                whileTap={{ scale: 0.98 }}
+                                                onClick={() => setTotalQ(item.num)}
+                                                className={`group cursor-pointer relative overflow-hidden rounded-2xl border-2 p-4 transition-all duration-300 ${
+                                                    isSelected 
+                                                        ? 'border-amber-500 bg-amber-500/5 shadow-xl shadow-amber-500/10' 
+                                                        : 'border-border/40 bg-white/5 dark:bg-zinc-900/50 hover:border-amber-500/30 hover:bg-amber-500/5'
+                                                }`}
+                                            >
+                                                {isSelected && (
+                                                    <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/20 blur-[50px] -mr-12 -mt-12 pointer-events-none" />
+                                                )}
+
+                                                <div className="flex items-center gap-4 relative z-10">
+                                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-all ${
+                                                        isSelected ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'bg-muted/50 text-foreground/70'
+                                                    }`}>
+                                                        <span className="font-black text-lg">{item.num}</span>
+                                                    </div>
+                                                    
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 mb-0.5">
+                                                            <h3 className={`text-sm font-black uppercase italic tracking-tight transition-colors ${
+                                                                isSelected ? 'text-amber-500' : 'text-foreground'
+                                                            }`}>
+                                                                {item.label}
+                                                            </h3>
+                                                            {isSelected && (
+                                                                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                                                            )}
+                                                        </div>
+                                                        <p className="text-muted-foreground text-xs font-medium leading-relaxed line-clamp-1">
+                                                            {item.desc}
+                                                        </p>
+                                                    </div>
+
+                                                    <div className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                                                        isSelected ? 'bg-amber-500/10 text-amber-500' : 'bg-muted/50 text-muted-foreground/60 opacity-0 group-hover:opacity-100'
+                                                    }`}>
+                                                        Qs
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <AnimatePresence>
+                                {totalQ > 0 && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 100 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: 100 }}
+                                        className="fixed bottom-0 left-0 right-0 p-6 pb-[env(safe-area-inset-bottom)] z-50 flex justify-center pointer-events-none"
+                                    >
+                                        <div className="w-full max-w-md pointer-events-auto flex gap-3">
+                                            <Button onClick={() => setCurrentStep(1)} variant="outline" className="flex-1 rounded-2xl h-16 font-black uppercase text-sm tracking-[0.2em]">Back</Button>
+                                            <Button onClick={handleConfirmQuestions} className="flex-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-2xl h-16 font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-amber-500/30 group transition-all">
+                                                Confirm
+                                                <motion.div
+                                                    animate={{ x: [0, 5, 0] }}
+                                                    transition={{ duration: 1.5, repeat: Infinity }}
+                                                >
+                                                    <ArrowRight className="w-5 h-5 ml-2" />
+                                                </motion.div>
+                                            </Button>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            <div className="text-center pt-20 pb-10 opacity-40">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">© 2026 Medmacs App • AI Test Generator</p>
                             </div>
                         </div>
                     )}
 
                     {/* Step 3: Custom Prompt */}
                     {hasAccess && questions.length === 0 && currentStep === 3 && (
-                        <div>
-                            <div className="text-center mb-8">
-                                <h1 className="text-2xl font-black text-foreground uppercase tracking-tight italic">Custom <span className="text-blue-600">Prompt</span></h1>
-                                <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] mt-2">Optional instructions for AI</p>
-                            </div>
-                            <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-500 via-slate-600 to-slate-700 text-white shadow-2xl p-1 mb-6">
-                                <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
-                                <div className="relative z-10 bg-white/10 backdrop-blur-xl rounded-[1.8rem] p-6 border border-white/10">
-                                    <textarea rows={5} placeholder="e.g., 'Focus on anatomy questions'..." value={customPrompt} onChange={e => setCustomPrompt(e.target.value)}
-                                        className="w-full bg-white/10 border border-white/20 text-white placeholder:text-white/40 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-white/30" />
+                        <div className="max-w-4xl mx-auto px-4 sm:px-0">
+                            <motion.div 
+                                initial={{ opacity: 0, y: -20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="text-center mb-4 px-4"
+                            >
+                                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-3 block">Step 3 of 3</span>
+                            </motion.div>
+
+                            <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md -mx-3 sm:mx-0 px-3 sm:px-0">
+                                <div className="max-w-4xl mx-auto px-4 sm:px-0">
+                                    <div className="pt-4 pb-3">
+                                        <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
+                                            Custom <span className="text-amber-500">Prompt</span>
+                                        </h2>
+                                        <p className="text-muted-foreground text-sm font-medium mt-2 max-w-lg mx-auto text-center">
+                                            Optional instructions for AI
+                                        </p>
+                                    </div>
                                 </div>
+                                <div className="h-4 bg-gradient-to-b from-background/80 to-transparent pointer-events-none" />
                             </div>
+
+                            {/* Subject Preview Card */}
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: 0.05 }}
+                                className="relative overflow-hidden rounded-3xl border-2 border-amber-500/20 bg-amber-500/5 p-5 mb-8 mt-4"
+                            >
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-[60px] -mr-16 -mt-16 pointer-events-none" />
+                                <div className="flex items-center gap-5 relative z-10">
+                                    <div className="w-16 h-16 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-xl shadow-amber-500/30 text-2xl">
+                                        🧠
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-1">Generating Test</p>
+                                        <h3 className="text-xl font-black uppercase italic tracking-tight text-foreground">{topicMapping(selectedChapters[0])}</h3>
+                                        <p className="text-muted-foreground text-xs font-medium truncate">
+                                            {totalQ} AI Generated Questions
+                                        </p>
+                                    </div>
+                                    <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0">
+                                        <ArrowRight className="w-4 h-4" />
+                                    </div>
+                                </div>
+                            </motion.div>
+
+                            {/* Prompt Input */}
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.1 }}
+                                className="mb-6"
+                            >
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Sparkles className="w-4 h-4 text-amber-500" />
+                                    <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Add Custom Instructions (Optional)</p>
+                                </div>
+                                <textarea 
+                                    rows={4} 
+                                    placeholder="e.g., Focus on clinical scenarios, include more diagrams..." 
+                                    value={customPrompt} 
+                                    onChange={e => setCustomPrompt(e.target.value)}
+                                    className="w-full p-4 rounded-2xl border-2 border-border/40 bg-muted/20 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20 transition-all resize-none"
+                                />
+                            </motion.div>
+
                             {loading > 0 && <Progress value={loading} className="h-2 mb-4 rounded-full" />}
                             {error && <p className="text-destructive text-sm text-center mb-4">{error}</p>}
-                            <div className="flex gap-3">
-                                <Button onClick={() => setCurrentStep(2)} variant="outline" className="flex-1 rounded-2xl h-12 font-black uppercase text-xs tracking-widest">Back</Button>
-                                <Button onClick={fetchAll} disabled={loading > 0} className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl h-12 font-black uppercase text-xs tracking-widest shadow-2xl hover:scale-105 transition-all">
-                                    {loading > 0 ? `Generating (${loadTime}s)…` : 'Start Test'}
-                                </Button>
-                            </div>
+
+                            <AnimatePresence>
+                                <motion.div
+                                    initial={{ opacity: 0, y: 100 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 100 }}
+                                    className="fixed bottom-0 left-0 right-0 p-6 pb-[env(safe-area-inset-bottom)] z-50 flex justify-center pointer-events-none"
+                                >
+                                    <div className="w-full max-w-md pointer-events-auto flex gap-3">
+                                        <Button onClick={() => setCurrentStep(2)} variant="outline" className="flex-1 rounded-2xl h-16 font-black uppercase text-sm tracking-[0.2em]">Back</Button>
+                                        <Button onClick={fetchAll} disabled={loading > 0} className="flex-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-2xl h-16 font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-amber-500/30 group transition-all">
+                                            {loading > 0 ? `Generating (${loadTime}s)…` : 'Start Test'}
+                                            <motion.div
+                                                animate={{ x: [0, 5, 0] }}
+                                                transition={{ duration: 1.5, repeat: Infinity }}
+                                            >
+                                                <ArrowRight className="w-5 h-5 ml-2" />
+                                            </motion.div>
+                                        </Button>
+                                    </div>
+                                </motion.div>
+                            </AnimatePresence>
                         </div>
                     )}
 
@@ -326,9 +643,9 @@ const AITestGenerator: React.FC = () => {
                                         <div className="flex flex-col">
                                             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">Question {idx + 1} of {questions.length}</span>
                                             <div className="flex items-center gap-2 mt-1">
-                                                <div className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 px-3 py-1 rounded-full">
-                                                    <Sparkles className="w-3 h-3 text-blue-500" />
-                                                    <span className="text-[9px] font-black uppercase tracking-widest text-blue-500">AI Generated</span>
+                                                <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full">
+                                                    <Sparkles className="w-3 h-3 text-amber-500" />
+                                                    <span className="text-[9px] font-black uppercase tracking-widest text-amber-500">AI Generated</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -375,25 +692,25 @@ const AITestGenerator: React.FC = () => {
                                                     animate={animation}
                                                     whileTap={{ scale: 0.98 }}
                                                     className={`group relative w-full p-5 rounded-[1.8rem] text-left border-2 transition-all duration-300 ${state === 'default'
-                                                            ? 'bg-muted/10 border-transparent hover:bg-muted/20 hover:border-muted'
-                                                            : state === 'selected'
-                                                                ? 'bg-blue-500/10 border-blue-500 shadow-[0_10px_30px_rgba(59,130,246,0.1)]'
-                                                                : state === 'correct'
-                                                                    ? 'bg-emerald-500/10 border-emerald-500 shadow-[0_10px_25px_rgba(16,185,129,0.15)] z-20 scale-[1.01]'
-                                                                    : 'bg-destructive/10 border-destructive shadow-[0_10px_25px_rgba(239,68,68,0.15)]'
+                                                        ? 'bg-muted/10 border-transparent hover:bg-muted/20 hover:border-muted'
+                                                        : state === 'selected'
+                                                            ? 'bg-amber-500/10 border-amber-500 shadow-[0_10px_30px_rgba(20,184,166,0.1)]'
+                                                            : state === 'correct'
+                                                                ? 'bg-emerald-500/10 border-emerald-500 shadow-[0_10px_25px_rgba(16,185,129,0.15)] z-20 scale-[1.01]'
+                                                                : 'bg-destructive/10 border-destructive shadow-[0_10px_25px_rgba(239,68,68,0.15)]'
                                                         }`}
                                                 >
                                                     <div className="flex items-center justify-between gap-4">
                                                         <div className="flex-1 flex gap-4 items-start">
                                                             <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-[11px] font-black transition-colors shrink-0 ${state === 'default' ? 'bg-muted/20 text-muted-foreground' :
-                                                                    state === 'correct' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' :
-                                                                        state === 'incorrect' ? 'bg-destructive text-white shadow-lg shadow-destructive/30' : 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+                                                                state === 'correct' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' :
+                                                                    state === 'incorrect' ? 'bg-destructive text-white shadow-lg shadow-destructive/30' : 'bg-amber-600 text-white shadow-lg shadow-amber-500/30'
                                                                 }`}>
                                                                 {String.fromCharCode(65 + i)}
                                                             </span>
                                                             <span className={`text-base font-bold leading-snug transition-colors ${state === 'default' ? 'text-foreground/80' :
-                                                                    state === 'correct' ? 'text-emerald-700 dark:text-emerald-300' :
-                                                                        state === 'incorrect' ? 'text-destructive' : 'text-blue-600'
+                                                                state === 'correct' ? 'text-emerald-700 dark:text-emerald-300' :
+                                                                    state === 'incorrect' ? 'text-destructive' : 'text-amber-500'
                                                                 }`}>
                                                                 {opt}
                                                             </span>
@@ -429,62 +746,82 @@ const AITestGenerator: React.FC = () => {
                                         </motion.div>
                                     )}
 
-                                    {/* Test Navigation Footer */}
-                                    <div className="flex items-center gap-4 mt-auto pt-6 border-t border-border/20">
-                                        <Button
-                                            variant="ghost"
-                                            onClick={prev}
-                                            disabled={idx === 0}
-                                            className="flex-1 max-w-[120px] rounded-2xl h-14 bg-muted/40 backdrop-blur-sm text-foreground font-bold hover:bg-muted/60 disabled:opacity-20"
-                                        >
-                                            Previous
-                                        </Button>
-
-                                        {!revealed[idx] ? (
-                                            <Button
-                                                onClick={revealAnswer}
-                                                disabled={!answers[idx]}
-                                                className="flex-1 rounded-2xl h-14 bg-blue-600 text-white font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-blue-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                                            >
-                                                Submit Answer
-                                            </Button>
-                                        ) : (
-                                            idx < questions.length - 1 ? (
-                                                <Button
-                                                    onClick={next}
-                                                    className="flex-1 rounded-2xl h-14 bg-foreground text-background font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
-                                                >
-                                                    Next Question
-                                                </Button>
-                                            ) : (
-                                                <Button
-                                                    onClick={submit}
-                                                    className="flex-1 rounded-2xl h-14 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
-                                                >
-                                                    Finish Test
-                                                </Button>
-                                            )
-                                        )}
+                                    {/* Best of Luck Wish */}
+                                    <div className="mt-12 text-center space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+                                        <h3 className="text-2xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500">
+                                            Best of Luck, {profile?.username || 'Student'}!
+                                        </h3>
+                                        <p className="text-[10px] uppercase tracking-[0.4em] font-bold text-slate-400">
+                                            Prepared specifically for {profile?.full_name}
+                                        </p>
                                     </div>
                                 </motion.div>
-                            </AnimatePresence>
 
-                            {/* Best of Luck Wish */}
-                            <div className="mt-12 text-center space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-                                <h3 className="text-2xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500">
-                                    Best of Luck, {profile?.username || 'Student'}!
-                                </h3>
-                                <p className="text-[10px] uppercase tracking-[0.4em] font-bold text-slate-400">
-                                    Prepared specifically for {profile?.full_name}
-                                </p>
-                            </div>
+                                {/* Floating Buttons - appear based on state */}
+                                <AnimatePresence>
+                                    {!revealed[idx] && answers[idx] && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 100 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: 100 }}
+                                            className="fixed bottom-0 left-0 right-0 p-6 pb-[env(safe-area-inset-bottom)] z-50 flex justify-center pointer-events-none"
+                                        >
+                                            <div className="w-full max-w-md pointer-events-auto flex gap-3">
+                                                <Button
+                                                    onClick={revealAnswer}
+                                                    className="flex-1 rounded-2xl h-16 bg-amber-600 text-white font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-amber-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                                >
+                                                    Submit Answer
+                                                </Button>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+
+                                <AnimatePresence>
+                                    {revealed[idx] && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 100 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: 100 }}
+                                            className="fixed bottom-0 left-0 right-0 p-6 pb-[env(safe-area-inset-bottom)] z-50 flex justify-center pointer-events-none"
+                                        >
+                                            <div className="w-full max-w-md pointer-events-auto flex gap-3">
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={prev}
+                                                    disabled={idx === 0}
+                                                    className="flex-1 rounded-2xl h-16 font-black uppercase text-sm tracking-[0.2em]"
+                                                >
+                                                    Previous
+                                                </Button>
+                                                {idx < questions.length - 1 ? (
+                                                    <Button
+                                                        onClick={next}
+                                                        className="flex-1 rounded-2xl h-16 bg-foreground text-background font-black uppercase text-sm tracking-[0.2em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                                    >
+                                                        Next Question
+                                                    </Button>
+                                                ) : (
+                                                    <Button
+                                                        onClick={submit}
+                                                        className="flex-1 rounded-2xl h-16 bg-gradient-to-r from-amber-500 to-emerald-500 text-white font-black uppercase text-sm tracking-[0.2em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                                    >
+                                                        Finish Test
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </AnimatePresence>
                         </div>
                     )}
 
                     {/* Step 5: Score */}
                     {hasAccess && currentStep === 5 && (
                         <div className="text-center py-8">
-                            <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white shadow-2xl p-1 mb-8">
+                            <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-amber-500 via-yellow-500 to-amber-600 text-white shadow-2xl p-1 mb-8">
                                 <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
                                 <div className="relative z-10 bg-white/10 backdrop-blur-xl rounded-[1.8rem] p-8 border border-white/10">
                                     <h2 className="text-xl font-black uppercase tracking-tight mb-6">Test Completed! 🎉</h2>
@@ -496,7 +833,7 @@ const AITestGenerator: React.FC = () => {
                                 </div>
                             </div>
                             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                                <Button onClick={startNewTest} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl h-12 px-8 font-black uppercase text-xs tracking-widest">New Test</Button>
+                                <Button onClick={startNewTest} className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-2xl h-12 px-8 font-black uppercase text-xs tracking-widest">New Test</Button>
                                 <Link to="/dashboard"><Button variant="outline" className="rounded-2xl h-12 px-8 font-black uppercase text-xs tracking-widest">Dashboard</Button></Link>
                             </div>
                         </div>

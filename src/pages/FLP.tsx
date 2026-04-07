@@ -8,7 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import Seo from "@/components/Seo";
 import UpgradeAccountModal from "@/components/UpgradeAccountModal";
-import FlpTestPage from "@/components/FLPs/FlpTestPage";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
@@ -49,8 +48,6 @@ const FLP = () => {
   const [wizardStep, setWizardStep] = useState(0); // 0=intro, 1=mcq count, 2=subject
   const [selectedMcqCount, setSelectedMcqCount] = useState<number | null>(null);
   const [isFetchingMcqs, setIsFetchingMcqs] = useState(false);
-  const [fetchedMcqs, setFetchedMcqs] = useState<MCQ[]>([]);
-  const [showQuiz, setShowQuiz] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [selectedSubjectName, setSelectedSubjectName] = useState('');
 
@@ -61,7 +58,6 @@ const FLP = () => {
 
   const [savedSession, setSavedSession] = useState<FLPSessionData | null>(null);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
-  const [initialQuizState, setInitialQuizState] = useState<{ currentIndex: number; userAnswers: Record<string, string | null>; totalTimeLeft: number } | null>(null);
 
   useEffect(() => {
     if (user && wizardStep === 0) {
@@ -134,19 +130,8 @@ const FLP = () => {
 
   const handleResumeSession = () => {
     if (!savedSession) return;
-    try {
-      localStorage.removeItem(FLP_STORAGE_KEY);
-    } catch (e) {}
-    setFetchedMcqs(savedSession.shuffledMcqs);
-    setSelectedSubjectName(savedSession.subjectName || '');
-    setSelectedMcqCount(savedSession.shuffledMcqs.length);
-    setShowQuiz(true);
-    setInitialQuizState({
-      currentIndex: savedSession.currentQuestionIndex,
-      userAnswers: savedSession.userAnswers,
-      totalTimeLeft: savedSession.totalTimeLeft,
-    });
     setShowResumeDialog(false);
+    navigate('/flp/test');
   };
 
   const handleStartFresh = () => {
@@ -163,7 +148,7 @@ const FLP = () => {
     setIsFetchingMcqs(true);
     try {
       const { data: subjectData } = await supabase.from("subjects").select("name").eq("id", selectedSubject).single();
-      if (subjectData) setSelectedSubjectName(subjectData.name);
+      const subjectName = subjectData?.name || '';
       const { data: chapters, error: chaptersError } = await supabase.from("chapters").select("id").eq("subject_id", selectedSubject);
       if (chaptersError) throw chaptersError;
       const chapterIds = (chapters || []).map((c) => c.id);
@@ -173,24 +158,12 @@ const FLP = () => {
       if (!mcqsData || mcqsData.length === 0) { toast({ title: "No MCQs Found", variant: "warning" }); setIsFetchingMcqs(false); return; }
       const shuffled = shuffleArray(mcqsData as MCQ[]);
       if (shuffled.length < selectedMcqCount) { toast({ title: "Not Enough Questions", description: `Only ${shuffled.length} available.`, variant: "warning" }); setIsFetchingMcqs(false); return; }
-      setFetchedMcqs(shuffled.slice(0, selectedMcqCount));
-      setInitialQuizState(null);
-      setShowQuiz(true);
+      const selectedMcqs = shuffled.slice(0, selectedMcqCount);
+      navigate('/flp/test', { state: { mcqs: selectedMcqs, subjectName } });
     } catch (err) {
       toast({ title: "Error", description: err?.message || "Failed to prepare test.", variant: "destructive" });
     } finally { setIsFetchingMcqs(false); }
   };
-
-  const handleFLPQuizFinish = (score: number, totalQuestions: number) => {
-    setShowQuiz(false);
-    setInitialQuizState(null);
-    toast({ title: "FLP Quiz Finished!", description: `You scored ${score} out of ${totalQuestions}.`, duration: 5000 });
-    setFetchedMcqs([]);
-    setSelectedMcqCount(null);
-    setWizardStep(0);
-  };
-
-  if (showQuiz && fetchedMcqs.length > 0) return <FlpTestPage mcqs={fetchedMcqs} onFinish={handleFLPQuizFinish} subjectName={selectedSubjectName} initialIndex={initialQuizState?.currentIndex} initialAnswers={initialQuizState?.userAnswers} initialTimeLeft={initialQuizState?.totalTimeLeft} />;
 
   if (isAuthLoading) {
     return (

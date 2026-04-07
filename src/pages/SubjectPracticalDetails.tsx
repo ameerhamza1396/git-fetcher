@@ -99,7 +99,7 @@ const SubjectPracticalDetails = () => {
         <div className="min-h-screen w-full bg-white dark:bg-gray-900">
             <Seo title={`${subject.name} Practical Notes`} description={`OSCE and VIVA notes components for ${subject.name}.`} />
 
-            <header className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-purple-200 dark:border-purple-800 sticky top-0 z-50">
+            <header className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-purple-200 dark:border-purple-800 sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
                 <div className="container mx-auto px-4 lg:px-8 py-4 flex items-center max-w-7xl">
                     <Link to="/practical-notes" className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors">
                         <ArrowLeft className="w-4 h-4" />
@@ -141,3 +141,4 @@ const SubjectPracticalDetails = () => {
 };
 
 export default SubjectPracticalDetails;
+

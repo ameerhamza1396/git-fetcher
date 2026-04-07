@@ -697,6 +697,7 @@ export type Database = {
           updated_at: string | null
           username: string | null
           website: string | null
+          restriction_details: Json | null
         }
         Insert: {
           avatar_url?: string | null

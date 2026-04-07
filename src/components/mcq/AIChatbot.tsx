@@ -89,7 +89,7 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
               className="w-14 h-14 rounded-full bg-primary/80 backdrop-blur-xl hover:bg-primary/90 shadow-xl border border-primary-foreground/10 p-0"
             >
               <img 
-                src="lovable-uploads/Mascot-mini.png" 
+                src="/lovable-uploads/Mascot-mini.png" 
               alt="Dr. Ahroid" 
               className="w-full h-full object-contain rounded-full" 
             />
@@ -116,7 +116,7 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
               <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+12px)] pb-3 border-b border-border/20">
                 <div className="flex items-center space-x-2">
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
-                    <img src="lovable-uploads/Mascot-mini.png" alt="Dr. Ahroid" className="w-full h-full object-contain" />
+                    <img src="/lovable-uploads/Mascot-mini.png" alt="Dr. Ahroid" className="w-full h-full object-contain" />
                   </div>
                   <div>
                     <span className="text-sm font-bold text-foreground">Dr. Ahroid</span>

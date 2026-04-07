@@ -15,7 +15,7 @@ const ToastViewport = React.forwardRef<
     ref={ref}
     className={cn(
       // Android standard: Centered at the bottom, small gap from the edge
-      "fixed bottom-0 z-[100] flex max-h-screen w-full flex-col p-6 items-center justify-end md:max-w-[420px] left-1/2 -translate-x-1/2",
+      "fixed bottom-0 z-[100] flex max-h-screen w-full flex-col p-6 pb-[env(safe-area-inset-bottom)] items-center justify-end md:max-w-[420px] left-1/2 -translate-x-1/2",
       className
     )}
     {...props}

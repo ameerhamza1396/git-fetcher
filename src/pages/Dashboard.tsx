@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,8 +10,8 @@ import { Label } from '@/components/ui/label';
 import {
   BookOpen, Zap, Trophy, Target, Users, Brain, Swords, Flame,
   TrendingUp, Award, Briefcase, BellRing, Bookmark, ScrollText,
-  Home, User, Settings, ChevronRight, LogOut, Lock, CreditCard,
-  Megaphone, BarChart3, Sun, Moon, ArrowRight, Crown, Mail,
+  Home, User, Settings, ChevronRight, ChevronLeft, LogOut, Lock, CreditCard,
+  Megaphone, BarChart3, Sun, Moon, ArrowRight, Crown, Mail, X,
   Receipt, Shield, FileText, RefreshCw, Sparkles, Stethoscope, PieChart, Info, Star, Loader2, Microscope,
 } from 'lucide-react';
 import {
@@ -31,6 +31,7 @@ import Seo from '@/components/Seo';
 import VersionGuard from '@/components/VersionControl';
 import ProfileAvatar from '@/components/profile/ProfileAvatar';
 import { MCQProgressWidget } from '@/components/dashboard/MCQProgressWidget';
+import { ProgressTracker } from '@/components/mcq/ProgressTracker';
 import { fetchInstitutes, getInstituteByCode } from '@/utils/institutes';
 
 // Types
@@ -51,48 +52,193 @@ type CaseOfDay = {
 };
 
 // Swipe-to-reveal Case of Day card
-const CaseOfDayCard = ({ caseOfDay }: { caseOfDay: CaseOfDay }) => {
-  const [step, setStep] = useState(0); // 0=question, 1=answer, 2=explanation
+const CaseOfDayCard = ({ caseOfDay, onClose, isPremium, onNavigateToChat, onNavigateToPricing }: { 
+  caseOfDay: CaseOfDay; 
+  onClose: () => void; 
+  isPremium: boolean;
+  onNavigateToChat: (text: string) => void;
+  onNavigateToPricing: () => void;
+}) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [direction, setDirection] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const handleSwipe = () => {
-    if (step < 2) setStep(s => s + 1);
+  const sections = [
+    { label: 'Case', icon: '📋', accent: 'bg-blue-500' },
+    { label: 'Answer', icon: '💡', accent: 'bg-amber-500' },
+    { label: 'Learn', icon: '📚', accent: 'bg-purple-500', isLast: true },
+  ];
+
+  const handleLearnMore = () => {
+    if (isPremium) {
+      const chatText = `I have a question about this case:\n\n${caseOfDay.details}\n\nAnswer: ${caseOfDay.answer}`;
+      onNavigateToChat(chatText);
+      onClose();
+    } else {
+      onNavigateToPricing();
+    }
   };
 
+  const getContent = (index: number) => {
+    if (index === 2) {
+      return (
+        <div className="space-y-4">
+          <p className="text-gray-700 dark:text-gray-200 text-[15px] leading-7 tracking-wide whitespace-pre-wrap">
+            {highlightWords(caseOfDay.explanation, 'bg-purple-500')}
+          </p>
+          <button
+            onClick={handleLearnMore}
+            className="w-full bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 shadow-lg"
+          >
+            Learn more about this topic
+            <span className="block text-xs font-normal opacity-80">By Dr Ahroid</span>
+          </button>
+        </div>
+      );
+    }
+    return highlightWords(
+      index === 0 ? caseOfDay.details : caseOfDay.answer,
+      sections[index].accent
+    );
+  };
+
+  const highlightWords = (text: string, accent: string) => {
+    const accentStyles: Record<string, { text: string; bg: string }> = {
+      'bg-blue-500': { text: 'text-blue-700 dark:text-blue-300', bg: 'bg-blue-200 dark:bg-blue-800' },
+      'bg-amber-500': { text: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-200 dark:bg-amber-800' },
+      'bg-purple-500': { text: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-200 dark:bg-purple-800' },
+    };
+    const style = accentStyles[accent] || accentStyles['bg-blue-500'];
+    
+    const parts = text.split(/(\*\*[^*]+\*\*)/);
+    
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        const word = part.slice(2, -2);
+        return (
+          <span 
+            key={i} 
+            className={`${style.text} ${style.bg} font-extrabold px-1.5 py-0.5 rounded-md underline decoration-2 underline-offset-2`}
+          >
+            {word}
+          </span>
+        );
+      }
+      return part;
+    });
+  };
+
+  const variants = {
+    enter: (direction: number) => ({
+      x: direction > 0 ? 400 : -400,
+      opacity: 0,
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+    },
+    exit: (direction: number) => ({
+      x: direction < 0 ? 400 : -400,
+      opacity: 0,
+    }),
+  };
+
+  const handleDragEnd = (event: any, info: any) => {
+    const threshold = 80;
+    const offset = info.offset.x;
+    const velocity = info.velocity.x;
+
+    if (offset < -threshold || velocity < -800) {
+      if (currentIndex < sections.length - 1) {
+        setDirection(1);
+        setCurrentIndex(prev => prev + 1);
+      }
+    } else if (offset > threshold || velocity > 800) {
+      if (currentIndex > 0) {
+        setDirection(-1);
+        setCurrentIndex(prev => prev - 1);
+      }
+    }
+  };
+
+  const currentSection = sections[currentIndex];
+
   return (
-    <div className="relative">
-      <div className="bg-gradient-to-br from-blue-500 via-indigo-500 to-violet-600 p-6 text-white">
-        <div className="absolute inset-0 opacity-10" style={{
-          backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`,
-          maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
-        }} />
-        <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/20">
-              <Stethoscope className="w-5 h-5 text-white" />
+    <div className="relative overflow-hidden rounded-t-3xl p-6 pb-0">
+      {/* Header */}
+      <div className="text-center mb-4">
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <Stethoscope className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+          <p className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-widest">Case of the Day</p>
+        </div>
+      </div>
+
+      {/* Content card */}
+      <div ref={containerRef}>
+        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden relative">
+          {/* Card header with section indicator */}
+          <div className={`${currentSection.accent} p-4`}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-xl shadow-sm">
+                {currentSection.icon}
+              </div>
+              <div>
+                <p className="text-white/80 text-[10px] font-semibold uppercase tracking-wider">Section</p>
+                <h3 className="text-white text-lg font-bold">{currentSection.label}</h3>
+              </div>
+              <div className="ml-auto flex items-center gap-1.5">
+                {sections.map((s, i) => (
+                  <div
+                    key={i}
+                    className={`h-2 rounded-full transition-all duration-500 ${
+                      i === currentIndex ? 'w-6 bg-white' : i < currentIndex ? 'w-2 bg-white/50' : 'w-2 bg-white/30'
+                    }`}
+                  />
+                ))}
+              </div>
             </div>
-            <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Case of the Day</p>
           </div>
-          <h3 className="text-lg font-black text-white mb-3">{caseOfDay.headline}</h3>
-          <p className="text-white/80 text-sm leading-relaxed mb-4">{caseOfDay.details}</p>
-
-          {step >= 1 && (
-            <div className="bg-white/15 backdrop-blur-md rounded-2xl p-4 border border-white/20 mb-3 animate-fade-in">
-              <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest mb-1">Answer</p>
-              <p className="text-white text-sm font-bold leading-relaxed">{caseOfDay.answer}</p>
+          
+          {/* Swipeable content area */}
+          <motion.div
+            key={currentIndex}
+            custom={direction}
+            variants={variants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+            drag={currentIndex < sections.length - 1 ? "x" : false}
+            dragConstraints={containerRef}
+            dragElastic={0.3}
+            onDragEnd={handleDragEnd}
+            className={`p-6 ${currentIndex === sections.length - 1 ? 'h-auto min-h-[280px]' : 'h-[280px]'} cursor-grab active:cursor-grabbing`}
+            style={{ touchAction: 'pan-y' }}
+          >
+            <div className="h-full overflow-y-auto pr-2 scrollbar-thin">
+              <div className="text-gray-700 dark:text-gray-200 text-[15px] leading-7 tracking-wide">
+                {getContent(currentIndex)}
+              </div>
+            </div>
+          </motion.div>
+        </div>
+        
+        {/* Navigation hint */}
+        <div className="flex justify-center items-center gap-2 mt-4 pb-6">
+          {currentIndex > 0 && (
+            <div className="flex items-center gap-1 text-gray-400">
+              <ChevronLeft className="w-5 h-5" />
+              <span className="text-xs">Previous</span>
             </div>
           )}
-
-          {step >= 2 && (
-            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15 mb-3 animate-fade-in">
-              <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest mb-1">Explanation</p>
-              <p className="text-white/90 text-sm leading-relaxed">{caseOfDay.explanation}</p>
-            </div>
+          {currentIndex > 0 && currentIndex < sections.length - 1 && (
+            <div className="w-px h-4 bg-gray-300 dark:bg-gray-600" />
           )}
-
-          {step < 2 && (
-            <Button onClick={handleSwipe} className="w-full bg-white/20 hover:bg-white/30 text-white border border-white/20 rounded-2xl h-11 font-bold text-xs uppercase tracking-widest mt-2">
-              {step === 0 ? '👆 Tap to Reveal Answer' : '👆 Tap to Reveal Explanation'}
-            </Button>
+          {currentIndex < sections.length - 1 && (
+            <div className="flex items-center gap-1 text-gray-400">
+              <span className="text-xs">Next</span>
+              <ChevronRight className="w-5 h-5" />
+            </div>
           )}
         </div>
       </div>
@@ -268,22 +414,49 @@ const Dashboard = () => {
       const correctAnswers = answers?.filter(a => a.is_correct)?.length || 0;
       const accuracy = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
 
-      const answerDates = answers?.map(a => new Date(a.created_at).toDateString()) || [];
-      const uniqueDates = [...new Set(answerDates)].sort().reverse();
-
       let currentStreak = 0;
-      const today = new Date().toDateString();
-      const yesterday = new Date(Date.now() - 86400000).toDateString();
+      const answerDates = answers?.map(a => {
+        const date = new Date(a.created_at);
+        return date.toLocaleDateString("en-US", { timeZone: "Asia/Karachi" });
+      }) || [];
+      const uniqueDates = [...new Set(answerDates)];
 
-      if (uniqueDates.includes(today) || uniqueDates.includes(yesterday)) {
-        for (let i = 0; i < uniqueDates.length; i++) {
-          const date = new Date(uniqueDates[i]);
-          const expectedDate = new Date();
-          expectedDate.setDate(expectedDate.getDate() - i);
-          if (date.toDateString() === expectedDate.toDateString()) {
-            currentStreak++;
-          } else {
-            break;
+      if (uniqueDates.length === 0) {
+        currentStreak = 0;
+      } else {
+        const today = new Date();
+        const todayPKT = new Date(today.toLocaleString("en-US", { timeZone: "Asia/Karachi" }));
+        todayPKT.setHours(0, 0, 0, 0);
+
+        const yesterday = new Date(todayPKT);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        const dateObjects = uniqueDates.map(d => {
+          const [month, day, year] = d.split('/');
+          return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        }).sort((a, b) => b.getTime() - a.getTime());
+
+        const mostRecentDate = dateObjects[0];
+        const isToday = mostRecentDate.getTime() === todayPKT.getTime();
+        const isYesterday = mostRecentDate.getTime() === yesterday.getTime();
+
+        if (!isToday && !isYesterday) {
+          currentStreak = 0;
+        } else {
+          currentStreak = 1;
+          let currentDate = new Date(mostRecentDate);
+
+          for (let i = 1; i < dateObjects.length; i++) {
+            const prevDate = new Date(dateObjects[i]);
+            const expectedPrevDate = new Date(currentDate);
+            expectedPrevDate.setDate(expectedPrevDate.getDate() - 1);
+
+            if (prevDate.getTime() === expectedPrevDate.getTime()) {
+              currentStreak++;
+              currentDate = prevDate;
+            } else {
+              break;
+            }
           }
         }
       }
@@ -448,7 +621,7 @@ const Dashboard = () => {
   ];
 
   const instituteModules = [
-    { title: 'Practice SEQs', description: 'Subjective questions', icon: FileText, link: '/seqs', gradient: 'from-indigo-600 to-violet-700', iconColor: 'text-indigo-200', enabled: dashboardComponents.seqs },
+    { title: 'Practice SEQs', description: 'Subjective questions', icon: FileText, link: '/seqs', gradient: 'from-orange-500 to-red-600', iconColor: 'text-orange-200', enabled: dashboardComponents.seqs },
     { title: 'Viva & Practicals', description: 'Ace your practicals', icon: Microscope, link: '/practicals', gradient: 'from-fuchsia-600 to-pink-700', iconColor: 'text-fuchsia-100', enabled: dashboardComponents.viva },
   ].filter(m => m.enabled);
 
@@ -544,20 +717,7 @@ const Dashboard = () => {
           <div className="animate-in fade-in slide-in-from-right-4 duration-300">
             <h1 className="text-xl font-bold text-foreground mb-1">📊 Analytics</h1>
             <p className="text-xs text-muted-foreground mb-5">Track your progress</p>
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              {[
-                { label: 'Accuracy', value: `${userStats?.accuracy || 0}%`, icon: Target, color: 'text-primary' },
-                { label: 'Questions', value: userStats?.totalQuestions || 0, icon: BookOpen, color: 'text-emerald-500' },
-                { label: 'Streak', value: userStats?.currentStreak || 0, icon: Flame, color: 'text-orange-500' },
-                { label: 'Points', value: userStats?.rankPoints || 0, icon: Award, color: 'text-blue-500' },
-              ].map((stat, i) => (
-                <Card key={i} className="border border-border/40 shadow-sm bg-card/80 backdrop-blur-sm p-3.5">
-                  <stat.icon className={`w-4 h-4 mb-1.5 ${stat.color}`} />
-                  <div className="text-xl font-black text-foreground">{stat.value}</div>
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{stat.label}</p>
-                </Card>
-              ))}
-            </div>
+            <ProgressTracker userId={user?.id} />
             <StudyAnalytics />
 
             {/* Deep Analysis CTA */}
@@ -968,8 +1128,16 @@ const Dashboard = () => {
 
       {/* Case of Day Dialog - swipe reveal */}
       <Dialog open={showCaseOfDay} onOpenChange={setShowCaseOfDay}>
-        <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-0">
-          {caseOfDay && <CaseOfDayCard caseOfDay={caseOfDay} />}
+        <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-0 [&>button]:hidden">
+          {caseOfDay && (
+            <CaseOfDayCard 
+              caseOfDay={caseOfDay} 
+              onClose={() => setShowCaseOfDay(false)}
+              isPremium={rawUserPlan === 'premium'}
+              onNavigateToChat={(text) => navigate('/ai/chatbot', { state: { prefilledText: text } })}
+              onNavigateToPricing={() => navigate('/pricing')}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
