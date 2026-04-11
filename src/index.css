@@ -150,17 +150,17 @@ ion-content::part(scroll) {
     @apply border-border;
   }
 
-  html,
-  body,
-  #root {
-    @apply bg-background text-foreground;
-    /* Use dvh for mobile address bar consistency */
-    height: 100dvh;
-    width: 100vw;
-    margin: 0;
-    padding: 0;
-    overflow-x: hidden;
-  }
+html,
+body,
+#root {
+  @apply bg-background text-foreground;
+  /* Use dvh for mobile address bar consistency */
+  height: 100dvh;
+  width: 100vw;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
 
   /* Bottom safe area only — headers handle top safe area themselves */
   #root {

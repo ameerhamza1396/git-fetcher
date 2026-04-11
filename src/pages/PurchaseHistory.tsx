@@ -60,8 +60,8 @@ const PurchaseHistory = () => {
     <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950">
       <Seo title="Purchase History" description="View your purchase history" />
 
-      <header
-        className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
+      <div
+        className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
       >
         <div className="container mx-auto px-4 py-4 flex justify-between items-center max-w-7xl">
           <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="w-9 h-9 p-0 hover:scale-110">
@@ -73,7 +73,7 @@ const PurchaseHistory = () => {
           </div>
           <div className="w-9" />
         </div>
-      </header>
+      </div>
 
       <main className="container mx-auto px-4 py-8 max-w-xl mt-[var(--header-height)]">
         <div className="text-center mb-8">

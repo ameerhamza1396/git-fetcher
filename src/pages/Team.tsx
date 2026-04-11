@@ -67,27 +67,7 @@ const Teams = () => {
         canonical="https://www.medmacs.app/teams"
       />
 
-      {/* Header */}
-      <header className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-md border-b border-purple-200 dark:border-purple-800 sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
-        <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
-          <Link
-            to="/"
-            className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
-
-          <span className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-300 dark:to-blue-400 animate-pulse">
-            Meet Our Team
-          </span>
-
-          <div className="flex items-center space-x-3">
-            {user ? <ProfileDropdown /> : <div className="w-9" />}
-          </div>
-        </div>
-      </header>
-
-      <div className="container mx-auto px-4 lg:px-8 py-16 max-w-6xl">
+      <div className="container mx-auto px-4 lg:px-8 py-16 max-w-6xl pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         {/* Hero Section */}
         <div className="text-center mb-20">
           <div className="relative">

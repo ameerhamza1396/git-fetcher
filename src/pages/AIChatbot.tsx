@@ -36,7 +36,7 @@ interface SavedChat {
   session_name?: string;
 }
 
-const API_BASE_URL = 'https://medmacs-ai-bot.vercel.app';
+const API_BASE_URL = 'https://medmacs.app/api/ai';
 
 const parseBoldText = (text: string) => {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
@@ -308,7 +308,7 @@ const DrSultanChat: React.FC = () => {
 
       {/* MAIN CHAT AREA */}
       <main className="flex-1 flex flex-col min-h-0 relative">
-        <header className="sticky top-0 z-30 w-full bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl border-b border-border px-6 py-4 flex items-center justify-between pt-[max(1rem,env(safe-area-inset-top))]">
+        <div className="sticky top-0 z-30 w-full bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl border-b border-border px-6 py-4 flex items-center justify-between pt-[max(1rem,env(safe-area-inset-top))] pb-[env(safe-area-inset-bottom)]">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" className="lg:hidden rounded-xl" onClick={() => setIsSidebarOpen(true)}>
               <Menu className="w-6 h-6" />
@@ -329,12 +329,12 @@ const DrSultanChat: React.FC = () => {
           <div className="flex items-center">
             <ProfileDropdown />
           </div>
-        </header>
+        </div>
 
-        <div className="flex-1 flex flex-col overflow-hidden px-4 lg:px-12 py-8 scroll-smooth custom-scrollbar">
-          <div className="max-w-4xl mx-auto flex flex-col flex-1">
-            {messages.length === 0 ? (
-              <div className="fixed top-[4.5rem] left-0 right-0 bottom-24 flex flex-col items-center justify-center text-center px-8 bg-[#F8FAFC] dark:bg-gray-950">
+        <div className="flex-1 flex flex-col overflow-y-auto px-4 lg:px-12 py-8 scroll-smooth custom-scrollbar">
+          <div className="max-w-4xl w-full mx-auto flex flex-col flex-1 pt-4">
+            {messages.length === 0 && !apiLoading ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center px-8 mt-auto mb-auto">
                 <div className="relative mb-6">
                   <div className="absolute inset-0 bg-primary/20 blur-[80px] rounded-full pointer-events-none" />
                   <div className="relative w-20 h-20 rounded-[2rem] bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center shadow-2xl p-2 overflow-hidden">
@@ -358,15 +358,15 @@ const DrSultanChat: React.FC = () => {
                 )}
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-6 flex flex-col w-full">
                 {messages.map((msg, i) => (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     key={i}
-                    className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                    className={`flex w-full ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
-                    <div className={`relative max-w-[85%] sm:max-w-[75%] p-5 rounded-3xl shadow-lg ${msg.sender === 'user'
+                    <div className={`relative max-w-[80%] sm:max-w-[70%] p-5 rounded-3xl shadow-lg ${msg.sender === 'user'
                       ? 'bg-primary text-white rounded-tr-none'
                       : 'bg-white dark:bg-zinc-900 text-foreground border border-border/60 rounded-tl-none'
                       }`}>
@@ -389,28 +389,28 @@ const DrSultanChat: React.FC = () => {
                     </div>
                   </motion.div>
                 ))}
+
+                {apiLoading && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex w-full justify-start"
+                  >
+                    <div className="bg-white dark:bg-zinc-900 p-5 rounded-3xl rounded-tl-none border border-border/60 shadow-lg max-w-[80%] sm:max-w-[70%]">
+                      <div className="flex items-center gap-3">
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                        <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Thinking...</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
               </div>
             )}
-
-            {apiLoading && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex justify-start mb-8"
-              >
-                <div className="bg-white dark:bg-zinc-900 p-5 rounded-3xl rounded-tl-none border border-border/60 shadow-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="flex space-x-1">
-                      <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </div>
-                    <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Processing...</span>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-            <div ref={messagesEndRef} className="h-4" />
+            <div ref={messagesEndRef} className="h-4 flex-shrink-0" />
           </div>
         </div>
 
@@ -470,7 +470,7 @@ const DrSultanChat: React.FC = () => {
                 </Button>
               </form>
             )}
-            <p className="text-[10px] text-center text-muted-foreground mt-4 uppercase font-black tracking-widest opacity-40">Medmacs Study Assistant • AI Consult V2.0</p>
+            <p className="text-[10px] text-center text-muted-foreground mt-4 uppercase font-black tracking-widest opacity-40">Dr Ahroid is trained on syllabus course.</p>
           </div>
         </footer>
       </main>

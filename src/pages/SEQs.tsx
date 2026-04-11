@@ -81,32 +81,7 @@ const SEQs = () => {
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] animate-pulse-slow" />
             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-accent/10 rounded-full blur-[120px] animate-pulse-slow-reverse" />
 
-            {/* Header */}
-            <header className="fixed top-0 left-0 right-0 z-50 bg-background/30 backdrop-blur-md border-b border-border/50 pt-[env(safe-area-inset-top)]">
-                <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
-                    <Link
-                        to="/dashboard"
-                        className="flex items-center space-x-2 text-primary hover:text-primary/80 transition-colors"
-                    >
-                        <ArrowLeft className="w-5 h-5" />
-                    </Link>
-                    <div className="flex items-center space-x-3">
-                        <img
-                            src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png"
-                            alt="Medmacs Logo"
-                            className="w-8 h-8 object-contain"
-                        />
-                        <span className="text-xl font-black tracking-tight text-foreground">
-                            Practice <span className="text-primary text-shimmer">SEQs</span>
-                        </span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                        <ProfileDropdown />
-                    </div>
-                </div>
-            </header>
-
-            <main className="container mx-auto px-4 flex flex-col items-center justify-center min-h-screen pt-[calc(80px+env(safe-area-inset-top))]">
+            <main className="container mx-auto px-4 flex flex-col items-center justify-center min-h-screen pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
                 {/* Premium Lock - Show upgrade prompt instead of Coming Soon */}
                 {!hasAccess ? (
                     <motion.div

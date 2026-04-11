@@ -114,7 +114,7 @@ export default function Welcome() {
             scale: 0.9,
             transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] }
           }}
-          className={`fixed inset-0 flex flex-col items-center justify-center overflow-hidden transition-colors
+          className={`fixed inset-0 flex flex-col items-center justify-center overflow-hidden overscroll-none transition-colors
             duration-700 bg-gradient-to-br ${STEPS[currentStep].gradient}`}
         >
           <button onClick={completeSetup} className="absolute top-8 right-8 z-50 text-white/50 hover:text-white text-sm font-bold uppercase tracking-widest transition-colors">
@@ -224,7 +224,7 @@ export default function Welcome() {
               delay: 0.1
             }
           }}
-          className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#0a2e2e] via-[#0f172a] to-[#020617] overflow-hidden"
+          className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#0a2e2e] via-[#0f172a] to-[#020617] overflow-hidden overscroll-none"
         >
           {/* Help/Revisit Button */}
           <button

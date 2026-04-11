@@ -193,7 +193,7 @@ const DetailedAnalytics = () => {
       <Seo title="Detailed Analytics" description="Subject and topic-wise performance analysis" />
 
       {/* Header */}
-      <header className="absolute top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)]">
+      <div className="absolute top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
           <div className="flex items-center space-x-3">
             <Button variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110" onClick={() => navigate(-1)}>
@@ -209,7 +209,7 @@ const DetailedAnalytics = () => {
             {user ? <ProfileDropdown /> : <Link to="/login"><Button size="sm">Sign In</Button></Link>}
           </div>
         </div>
-      </header>
+      </div>
 
       <main className="container mx-auto px-4 lg:px-8 py-12 lg:py-16 max-w-7xl">
         <div className="text-center mb-10">

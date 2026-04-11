@@ -157,7 +157,7 @@ const PracticalPage = () => {
       </div>
 
       {/* Glass Navigation Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-background/40 backdrop-blur-xl border-b border-white/5 pt-[env(safe-area-inset-top)]">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-background/40 backdrop-blur-xl border-b border-white/5 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
           <div className="flex items-center space-x-4">
             {level !== 'subjects' ? (
@@ -184,7 +184,7 @@ const PracticalPage = () => {
             <ProfileDropdown />
           </div>
         </div>
-      </header>
+      </div>
 
       <main className="container mx-auto px-4 pt-[calc(100px+env(safe-area-inset-top))] pb-20 max-w-7xl">
         

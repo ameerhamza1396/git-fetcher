@@ -52,9 +52,9 @@ type CaseOfDay = {
 };
 
 // Swipe-to-reveal Case of Day card
-const CaseOfDayCard = ({ caseOfDay, onClose, isPremium, onNavigateToChat, onNavigateToPricing }: { 
-  caseOfDay: CaseOfDay; 
-  onClose: () => void; 
+const CaseOfDayCard = ({ caseOfDay, onClose, isPremium, onNavigateToChat, onNavigateToPricing }: {
+  caseOfDay: CaseOfDay;
+  onClose: () => void;
   isPremium: boolean;
   onNavigateToChat: (text: string) => void;
   onNavigateToPricing: () => void;
@@ -109,15 +109,15 @@ const CaseOfDayCard = ({ caseOfDay, onClose, isPremium, onNavigateToChat, onNavi
       'bg-purple-500': { text: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-200 dark:bg-purple-800' },
     };
     const style = accentStyles[accent] || accentStyles['bg-blue-500'];
-    
+
     const parts = text.split(/(\*\*[^*]+\*\*)/);
-    
+
     return parts.map((part, i) => {
       if (part.startsWith('**') && part.endsWith('**')) {
         const word = part.slice(2, -2);
         return (
-          <span 
-            key={i} 
+          <span
+            key={i}
             className={`${style.text} ${style.bg} font-extrabold px-1.5 py-0.5 rounded-md underline decoration-2 underline-offset-2`}
           >
             {word}
@@ -190,15 +190,14 @@ const CaseOfDayCard = ({ caseOfDay, onClose, isPremium, onNavigateToChat, onNavi
                 {sections.map((s, i) => (
                   <div
                     key={i}
-                    className={`h-2 rounded-full transition-all duration-500 ${
-                      i === currentIndex ? 'w-6 bg-white' : i < currentIndex ? 'w-2 bg-white/50' : 'w-2 bg-white/30'
-                    }`}
+                    className={`h-2 rounded-full transition-all duration-500 ${i === currentIndex ? 'w-6 bg-white' : i < currentIndex ? 'w-2 bg-white/50' : 'w-2 bg-white/30'
+                      }`}
                   />
                 ))}
               </div>
             </div>
           </div>
-          
+
           {/* Swipeable content area */}
           <motion.div
             key={currentIndex}
@@ -222,7 +221,7 @@ const CaseOfDayCard = ({ caseOfDay, onClose, isPremium, onNavigateToChat, onNavi
             </div>
           </motion.div>
         </div>
-        
+
         {/* Navigation hint */}
         <div className="flex justify-center items-center gap-2 mt-4 pb-6">
           {currentIndex > 0 && (
@@ -400,7 +399,7 @@ const Dashboard = () => {
     queryKey: ['user-stats', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      
+
       const { data: answers, error: answersError } = await supabase
         .from('user_answers')
         .select('*')
@@ -1130,8 +1129,8 @@ const Dashboard = () => {
       <Dialog open={showCaseOfDay} onOpenChange={setShowCaseOfDay}>
         <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-0 [&>button]:hidden">
           {caseOfDay && (
-            <CaseOfDayCard 
-              caseOfDay={caseOfDay} 
+            <CaseOfDayCard
+              caseOfDay={caseOfDay}
               onClose={() => setShowCaseOfDay(false)}
               isPremium={rawUserPlan === 'premium'}
               onNavigateToChat={(text) => navigate('/ai/chatbot', { state: { prefilledText: text } })}

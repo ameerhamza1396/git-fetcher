@@ -11,6 +11,16 @@ interface Message {
   timestamp: string;
 }
 
+const parseBoldText = (text: string) => {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i} className="font-bold">{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+};
+
 interface AIChatbotProps {
   isOpen: boolean;
   onClose: () => void;
@@ -40,7 +50,7 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const hasPremiumAccess = userPlan?.toLowerCase() === 'premium' || userPlan?.toLowerCase() === 'iconic';
-  const API_BASE_URL = 'https://medmacs-ai-bot.vercel.app';
+  const API_BASE_URL = 'https://medmacs.app/api/ai';
 
   const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); };
   useEffect(() => { scrollToBottom(); }, [messages]);
@@ -76,23 +86,23 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
     <>
       <AnimatePresence>
         {!isHidden && (
-          <motion.div 
-            className="fixed bottom-6 right-4 z-50" 
-            whileHover={{ scale: 1.1 }} 
+          <motion.div
+            className="fixed bottom-6 right-4 z-50"
+            whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             initial={{ opacity: 0, scale: 0.5, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.5, y: 20 }}
           >
-            <Button 
+            <Button
               onClick={onOpen}
               className="w-14 h-14 rounded-full bg-primary/80 backdrop-blur-xl hover:bg-primary/90 shadow-xl border border-primary-foreground/10 p-0"
             >
-              <img 
-                src="/lovable-uploads/Mascot-mini.png" 
-              alt="Dr. Ahroid" 
-              className="w-full h-full object-contain rounded-full" 
-            />
+              <img
+                src="/lovable-uploads/Mascot-mini.png"
+                alt="Dr. Ahroid"
+                className="w-full h-full object-contain rounded-full"
+              />
             </Button>
           </motion.div>
         )}
@@ -112,7 +122,7 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
             <div className="relative flex-shrink-0">
               {/* Fade overlay at top for status bar blend */}
               <div className="absolute top-0 left-0 right-0 h-[env(safe-area-inset-top,0px)] bg-gradient-to-b from-background to-transparent z-10 pointer-events-none" />
-              
+
               <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+12px)] pb-3 border-b border-border/20">
                 <div className="flex items-center space-x-2">
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
@@ -142,15 +152,14 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
                       <p className="text-xs text-muted-foreground mt-1">I'm Dr. Ahroid, your MBBS tutor.</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-3 w-full">
                       {messages.map((message, index) => (
-                        <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm backdrop-blur-lg ${
-                            message.role === 'user'
-                              ? 'bg-primary/80 text-primary-foreground rounded-br-md'
-                              : 'bg-muted/60 text-foreground rounded-bl-md'
-                          }`}>
-                            <p className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
+                        <div key={index} className={`flex w-full ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm backdrop-blur-lg ${message.role === 'user'
+                            ? 'bg-primary/80 text-primary-foreground rounded-br-md'
+                            : 'bg-muted/60 text-foreground rounded-bl-md'
+                            }`}>
+                            <p className="whitespace-pre-wrap break-words leading-relaxed">{parseBoldText(message.content)}</p>
                             <p className={`text-[10px] mt-1 ${message.role === 'user' ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}>
                               {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </p>

@@ -141,9 +141,9 @@ const Profile = () => {
         <div className="min-h-screen w-full bg-background">
             <Seo title="User Profile" description="Manage your Medmacs App profile" canonical="https://medmacs.app/profile" />
 
-            <header
+            <div
                 ref={headerRef}
-                className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
+                className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
             >
                 <div className="container mx-auto px-4 py-4 flex justify-between items-center max-w-7xl">
                     <Link to="/dashboard">
@@ -157,7 +157,7 @@ const Profile = () => {
                     </div>
                     <ProfileAvatar user={user} profileData={profileData} displayName={displayName} rawUserPlan={rawUserPlan} userPlanDisplayName={userPlanDisplayName} planColors={planColors} isHeader={true} />
                 </div>
-            </header>
+            </div>
 
             <main className="container mx-auto px-4 py-8 max-w-xl mt-[var(--header-height)]">
                 {/* Profile hero card */}

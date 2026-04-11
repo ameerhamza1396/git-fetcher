@@ -30,8 +30,36 @@ export default function BackButtonHandler() {
 
             console.log(`[BackHandler] Back pressed. Path=[${pathname}], canGoBack=[${canGoBack}]`);
 
-            // MCQ Routes: let the MCQDisplay component handle the back button
+            // MCQ Quiz Routes: let the MCQDisplay component handle the back button (shows leave modal)
+            if (pathname.startsWith("/mcqs/quiz")) {
+                return;
+            }
+
+            // All other MCQ pages: hardcoded navigation based on page
             if (pathname.startsWith("/mcqs")) {
+                // /mcqs/chapter/:subjectId -> /mcqs (chapter selection -> subject selection)
+                const chapterMatch = pathname.match(/^\/mcqs\/chapter\/([^/]+)$/);
+                if (chapterMatch) {
+                    nav("/mcqs");
+                    return;
+                }
+
+                // /mcqs/settings/:subjectId/:chapterId -> /mcqs/chapter/:subjectId (settings -> chapter selection)
+                const settingsMatch = pathname.match(/^\/mcqs\/settings\/([^/]+)\/([^/]+)$/);
+                if (settingsMatch) {
+                    const subjectId = settingsMatch[1];
+                    nav(`/mcqs/chapter/${subjectId}`);
+                    return;
+                }
+
+                // /mcqs (subject selection) -> dashboard
+                if (pathname === "/mcqs") {
+                    nav("/dashboard");
+                    return;
+                }
+
+                // Fallback for any other MCQ routes
+                nav("/dashboard");
                 return;
             }
 

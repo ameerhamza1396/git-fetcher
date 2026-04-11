@@ -189,24 +189,20 @@ const MyTestResults = () => {
 
     return (
         <div className="min-h-screen w-full bg-white dark:bg-gray-900">
-            {/* Header - Copied from AI.tsx */}
-            <header className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-purple-200 dark:border-purple-800 sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
-                <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
-                    <Link to="/dashboard" className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors">
-                        <ArrowLeft className="w-4 h-4" />
-                    </Link>
+            <div className="container mx-auto px-4 lg:px-8 py-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] max-w-7xl flex justify-between items-center">
+                <Link to="/dashboard" className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors">
+                    <ArrowLeft className="w-4 h-4" />
+                </Link>
 
-                    <div className="flex items-center space-x-3">
-                        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs Logo" className="w-8 h-8 object-contain" />
-                        <span className="text-xl font-bold text-gray-900 dark:text-white">My Test Results</span>
-                    </div>
-
-                    <div className="flex items-center space-x-3">
-                            {/* NEW: Replaced hardcoded avatar with ProfileDropdown */}
-                            <ProfileDropdown />
-                    </div>
+                <div className="flex items-center space-x-3">
+                    <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs Logo" className="w-8 h-8 object-contain" />
+                    <span className="text-xl font-bold text-gray-900 dark:text-white">My Test Results</span>
                 </div>
-            </header>
+
+                <div className="flex items-center space-x-3">
+                    <ProfileDropdown />
+                </div>
+            </div>
 
             <div className="container mx-auto px-4 lg:px-8 py-8 max-w-7xl">
                 {/* Hero Section for Test Results */}

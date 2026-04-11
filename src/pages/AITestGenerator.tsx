@@ -267,7 +267,7 @@ const AITestGenerator: React.FC = () => {
                                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-3 block">Step 1 of 3</span>
                             </motion.div>
 
-                            <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md -mx-3 sm:mx-0 px-3 sm:px-0">
+                            <div className="sticky top-[env(safe-area-inset-top)] z-50 bg-background/80 backdrop-blur-md -mx-3 sm:mx-0 px-3 sm:px-0">
                                 <div className="max-w-4xl mx-auto px-4 sm:px-0">
                                     <div className="pt-4 pb-3">
                                         <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
@@ -395,7 +395,7 @@ const AITestGenerator: React.FC = () => {
                                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-3 block">Step 2 of 3</span>
                             </motion.div>
 
-                            <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md -mx-3 sm:mx-0 px-3 sm:px-0">
+                            <div className="sticky top-[env(safe-area-inset-top)] z-50 bg-background/80 backdrop-blur-md -mx-3 sm:mx-0 px-3 sm:px-0">
                                 <div className="max-w-4xl mx-auto px-4 sm:px-0">
                                     <div className="pt-4 pb-3">
                                         <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
@@ -541,7 +541,7 @@ const AITestGenerator: React.FC = () => {
                                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-3 block">Step 3 of 3</span>
                             </motion.div>
 
-                            <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md -mx-3 sm:mx-0 px-3 sm:px-0">
+                            <div className="sticky top-[env(safe-area-inset-top)] z-50 bg-background/80 backdrop-blur-md -mx-3 sm:mx-0 px-3 sm:px-0">
                                 <div className="max-w-4xl mx-auto px-4 sm:px-0">
                                     <div className="pt-4 pb-3">
                                         <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
@@ -820,21 +820,46 @@ const AITestGenerator: React.FC = () => {
 
                     {/* Step 5: Score */}
                     {hasAccess && currentStep === 5 && (
-                        <div className="text-center py-8">
-                            <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-amber-500 via-yellow-500 to-amber-600 text-white shadow-2xl p-1 mb-8">
-                                <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
-                                <div className="relative z-10 bg-white/10 backdrop-blur-xl rounded-[1.8rem] p-8 border border-white/10">
-                                    <h2 className="text-xl font-black uppercase tracking-tight mb-6">Test Completed! 🎉</h2>
-                                    <div className="w-28 h-28 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4">
-                                        <span className="text-5xl font-black">{score}</span>
+                        <div>
+                            <motion.div 
+                                initial={{ opacity: 0, y: -20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="text-center mb-4 px-4"
+                            >
+                                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500 mb-3 block">Test Completed</span>
+                            </motion.div>
+
+                            <div className="sticky top-[env(safe-area-inset-top)] z-50 bg-background/80 backdrop-blur-md -mx-3 sm:mx-0 px-3 sm:px-0">
+                                <div className="max-w-4xl mx-auto px-4 sm:px-0">
+                                    <div className="pb-3">
+                                        <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
+                                            Your <span className="text-amber-500">Result</span>
+                                        </h2>
+                                        <p className="text-muted-foreground text-sm font-medium mt-2 max-w-lg mx-auto text-center">
+                                            Test completed successfully
+                                        </p>
                                     </div>
-                                    <p className="text-lg font-bold">out of {questions.length}</p>
-                                    <p className="text-sm text-white/70 mt-1">Accuracy: {questions.length > 0 ? Math.round((score / questions.length) * 100) : 0}%</p>
                                 </div>
+                                <div className="h-4 bg-gradient-to-b from-background/80 to-transparent pointer-events-none" />
                             </div>
-                            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                                <Button onClick={startNewTest} className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-2xl h-12 px-8 font-black uppercase text-xs tracking-widest">New Test</Button>
-                                <Link to="/dashboard"><Button variant="outline" className="rounded-2xl h-12 px-8 font-black uppercase text-xs tracking-widest">Dashboard</Button></Link>
+
+                            <div className="max-w-4xl mx-auto px-4 sm:px-0">
+                                <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-amber-500 via-yellow-500 to-amber-600 text-white shadow-2xl p-1 mb-8 mt-4">
+                                    <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
+                                    <div className="relative z-10 bg-white/10 backdrop-blur-xl rounded-[1.8rem] p-8 border border-white/10">
+                                        <div className="text-center mb-6">
+                                            <div className="w-28 h-28 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4">
+                                                <span className="text-5xl font-black">{score}</span>
+                                            </div>
+                                            <p className="text-lg font-bold">out of {questions.length}</p>
+                                            <p className="text-sm text-white/70 mt-1">Accuracy: {questions.length > 0 ? Math.round((score / questions.length) * 100) : 0}%</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-3 justify-center pb-8 pb-[env(safe-area-inset-bottom)]">
+                                    <Button onClick={startNewTest} className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-2xl h-12 px-8 font-black uppercase text-xs tracking-widest">New Test</Button>
+                                    <Link to="/dashboard"><Button variant="outline" className="rounded-2xl h-12 px-8 font-black uppercase text-xs tracking-widest">Dashboard</Button></Link>
+                                </div>
                             </div>
                         </div>
                     )}

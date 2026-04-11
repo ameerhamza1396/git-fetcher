@@ -423,7 +423,7 @@ If you have any questions about this Privacy Policy, You can contact us:
             canonical="https://medmacs.app/privacypolicy"
             />
             {/* Header */}
-            <header className="absolute top-0 left-0 right-0 z-50 bg-background/30 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)]">
+            <div className="absolute top-0 left-0 right-0 z-50 bg-background/30 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
                 <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
                     <button onClick={() => window.history.back()} className="flex items-center space-x-2 text-primary hover:text-primary/80 transition-colors">
                         <ArrowLeft className="w-4 h-4" />
@@ -436,7 +436,7 @@ If you have any questions about this Privacy Policy, You can contact us:
 
                     <div className="w-8" />
                 </div>
-            </header>
+            </div>
 
             <div className="container mx-auto px-4 lg:px-8 py-8 max-w-4xl mt-[var(--header-height)]">
                 <div className="mb-8 animate-fade-in">

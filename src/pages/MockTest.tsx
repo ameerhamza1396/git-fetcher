@@ -497,10 +497,9 @@ const MockTest = () => {
         canonical="https://medmacs.app/mock-test"
       />
       {/* Header - Reused from Dashboard */}
-      <header className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-purple-200 dark:border-purple-800 sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
+      <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-purple-200 dark:border-purple-800 sticky top-0 z-50 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-3">
-            {/* Drawer Trigger for mobile/smaller screens */}
             <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="lg:hidden">
@@ -511,7 +510,6 @@ const MockTest = () => {
                 <SheetHeader>
                   <SheetTitle className="text-xl font-bold text-gray-900 dark:text-white mb-4">Question Map</SheetTitle>
                 </SheetHeader>
-                {/* Scrollable content area for the drawer */}
                 <div className="flex-grow overflow-y-auto pr-2">
                   <div className="grid grid-cols-4 gap-2">
                     {mockMcqs.map((mcq, index) => (
@@ -554,7 +552,7 @@ const MockTest = () => {
             <ProfileDropdown />
           </div>
         </div>
-      </header>
+      </div>
 
       <div className="flex flex-grow">
         {/* Desktop Drawer (visible on larger screens) */}

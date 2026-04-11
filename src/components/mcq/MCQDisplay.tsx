@@ -732,7 +732,7 @@ export const MCQDisplay = ({
   return (
     <div className="fixed inset-0 z-[100] bg-background flex flex-col">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-slate-800 bg-background pt-[env(safe-area-inset-top)]">
+      <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-slate-800 bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg overflow-hidden">
             <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs.App" className="w-full h-full object-contain" />
@@ -758,7 +758,7 @@ export const MCQDisplay = ({
             <MoreVertical className="w-4 h-4" />
           </Button>
         </div>
-      </header>
+      </div>
 
       {/* Progress Bar */}
       <div className="relative px-4 sm:px-6 z-50 flex items-center gap-3 py-3 border-b border-slate-200 dark:border-slate-800 bg-background">

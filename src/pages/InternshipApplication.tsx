@@ -355,7 +355,7 @@ const InternshipApplication = () => {
       </div>
 
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-[#020617]/40 backdrop-blur-2xl border-b border-white/5 pt-[env(safe-area-inset-top)]">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-[#020617]/40 backdrop-blur-2xl border-b border-white/5 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <div className="container mx-auto px-4 lg:px-8 py-3 flex justify-between items-center max-w-7xl">
           <Link to="/dashboard" className="flex items-center space-x-2 text-white/50 hover:text-[#2dd4bf] transition-colors group">
             <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
@@ -369,16 +369,13 @@ const InternshipApplication = () => {
           </div>
 
           <div className="flex items-center space-x-2 sm:space-x-4">
-            <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-10 h-10 p-0 text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-all">
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
             <PlanBadge plan={profile?.plan} />
             <ProfileDropdown />
           </div>
         </div>
-      </header>
+      </div>
 
-            
+
 
       <div className="relative z-10 container mx-auto px-4 lg:px-8 py-12 max-w-3xl pt-[calc(100px+env(safe-area-inset-top))]">
         <Card className="bg-white/[0.03] backdrop-blur-3xl border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] rounded-[2.5rem] overflow-hidden">
@@ -440,7 +437,7 @@ const InternshipApplication = () => {
                     type="tel"
                     value={contactNumber}
                     onChange={(e) => setContactNumber(e.target.value)}
-                    placeholder="+91 XXXXX XXXXX"
+                    placeholder="+92 300 1234567"
                     required
                     className="bg-white/[0.05] border-white/10 text-white focus:border-[#2dd4bf]/50 focus:ring-[#2dd4bf]/20 h-14 rounded-2xl transition-all"
                   />
@@ -569,7 +566,7 @@ const InternshipApplication = () => {
                         <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-[#2dd4bf]/10 transition-all">
                           <Upload className="w-5 h-5 text-white/30 group-hover:text-[#2dd4bf]" />
                         </div>
-                        <p className="text-white/60 text-xs font-bold leading-tight">Click to upload<br/><span className="text-white/20 text-[10px]">JPG, PNG or WebP</span></p>
+                        <p className="text-white/60 text-xs font-bold leading-tight">Click to upload<br /><span className="text-white/20 text-[10px]">JPG, PNG or WebP</span></p>
                       </>
                     )}
                     {profilePictureUploading && (
@@ -601,7 +598,7 @@ const InternshipApplication = () => {
                         <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-[#2dd4bf]/10 transition-all">
                           <FileImage className="w-5 h-5 text-white/30 group-hover:text-[#2dd4bf]" />
                         </div>
-                        <p className="text-white/60 text-xs font-bold leading-tight">Identity/CNIC<br/><span className="text-white/20 text-[10px]">JPG, PNG or WebP</span></p>
+                        <p className="text-white/60 text-xs font-bold leading-tight">Identity/CNIC<br /><span className="text-white/20 text-[10px]">JPG, PNG or WebP</span></p>
                       </>
                     )}
                     {cnicStudentCardUploading && (

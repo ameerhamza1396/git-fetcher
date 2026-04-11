@@ -135,9 +135,9 @@ const Battle: React.FC = () => {
       <Seo title="Battle Arena" description="Compete in MCQ battles" canonical="https://medmacs.app/battle" />
 
       {/* Header */}
-      <header
+      <div
         ref={headerRef}
-        className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
+        className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
       >
         <div className="flex items-center justify-between px-4 h-14">
           <div className="flex items-center gap-3">
@@ -157,7 +157,7 @@ const Battle: React.FC = () => {
             <Swords className="w-3 h-3 mr-1" /> Live
           </Badge>
         </div>
-      </header>
+      </div>
 
       <main className="px-4 pt-[calc(env(safe-area-inset-top)+64px)] pb-[calc(env(safe-area-inset-bottom)+60px)] max-w-lg mx-auto">
         {battleState === 'lobby' && (

@@ -350,7 +350,7 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
       <div className="fixed bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
 
       {/* Header - fixed position */}
-      <header className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
+      <div className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="container mx-auto px-4 py-3 flex justify-between items-center max-w-7xl">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" className="hidden lg:flex w-10 h-10 rounded-2xl bg-muted/40 hover:bg-muted/60" onClick={() => setIsPanelOpen(!isPanelOpen)}>
@@ -386,7 +386,7 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
             <ProfileDropdown />
           </div>
         </div>
-      </header>
+      </div>
 
       <div className="flex relative pt-[calc(env(safe-area-inset-top)+70px)] min-h-screen">
         {/* Desktop Panel */}

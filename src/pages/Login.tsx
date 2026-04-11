@@ -35,7 +35,7 @@ const Login = () => {
   if (!mounted) return null;
 
   return (
-    <div className="fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-[#0a2e2e] via-[#0f172a] to-[#020617]">
+    <div className="fixed inset-0 flex flex-col overflow-hidden overscroll-none bg-gradient-to-br from-[#0a2e2e] via-[#0f172a] to-[#020617]">
       <Seo
         title="Login"
         description="Log in to your Medmacs App account to access personalized MDCAT preparation tools, MCQs, AI study assistant, and more."

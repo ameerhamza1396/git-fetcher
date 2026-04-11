@@ -270,7 +270,7 @@ const SEQQuizPage = () => {
           <Progress value={((currentIndex + 1) / allSEQs.length) * 100} className="h-1 bg-orange-100 dark:bg-orange-900/30" />
         </motion.div>
 
-        <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md -mx-4 px-4 py-3 mb-4">
+        <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md -mx-4 px-4 py-3 mb-4 pt-[env(safe-area-inset-top)]">
           <div className="flex items-center justify-between">
             <Badge variant="outline" className="bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800">
               <BookOpen className="w-3 h-3 mr-1" />

@@ -116,9 +116,9 @@ const ContactUsPage = () => {
         <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950">
             <Seo title="Contact Us" description="Get in touch with Medmacs App" canonical="https://medmacs.app/contact-us" />
 
-            <header
+            <div
                 ref={headerRef}
-                className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
+                className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
             >
                 <div className="container mx-auto px-4 py-4 flex justify-between items-center max-w-7xl">
                     <Link to="/dashboard">
@@ -132,7 +132,7 @@ const ContactUsPage = () => {
                     </div>
                     <div className="w-9" />
                 </div>
-            </header>
+            </div>
 
             <main className="container mx-auto px-4 py-8 max-w-2xl mt-[var(--header-height)]">
                 <div className="text-center mb-8">

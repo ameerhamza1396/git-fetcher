@@ -200,26 +200,8 @@ const UsernamePage = () => {
 
   return (
     <div className="min-h-screen w-full bg-white dark:bg-gray-900">
-    <header className="absolute top-0 left-0 right-0 z-50 bg-white/30 dark:bg-gray-900/30 
-    backdrop-blur-md border-b border-purple-200/50 dark:border-purple-800/50 
-    pt-[env(safe-area-inset-top)]">  
-            <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
-          <Link to="/all-set" className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors">
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
 
-          <div className="flex items-center space-x-3">
-            <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs Logo" className="w-8 h-8 object-contain" />
-            <span className="text-xl font-bold text-gray-900 dark:text-white">Update Username</span>
-          </div>
-
-          <div className="flex items-center space-x-3">
-              <ProfileDropdown />
-          </div>
-        </div>
-      </header>
-
-      <div className="container mx-auto px-4 lg:px-8 py-8 max-w-7xl mt-[calc(45px+env(safe-area-inset-top))] overscroll-y-contain">
+      <div className="container mx-auto px-4 lg:px-8 py-8 max-w-7xl pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] overscroll-y-contain">
         <div className="text-center mb-8 animate-fade-in">
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
             <UserIcon className="inline-block h-8 w-8 mr-2 text-purple-600 dark:text-purple-400" />

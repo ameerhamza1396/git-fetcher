@@ -257,36 +257,7 @@ const Pricing = () => {
                 ))}
             </div>
 
-            {/* Header */}
-            {/* Header - More Compact & Glassy */}
-            <header className={`fixed top-0 left-0 right-0 z-50 bg-background/40 backdrop-blur-3xl pt-[env(safe-area-inset-top)] transition-transform duration-500 ${headerVisible ? 'translate-y-0' : '-translate-y-full'} border-b border-white/10`}>
-                <div className="container mx-auto px-5 py-3 flex justify-between items-center max-w-7xl">
-                    <div className="flex items-center space-x-3">
-                        <Button variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110" onClick={() => window.history.back()}>
-                            <ArrowLeft className="h-5 w-5" />
-                        </Button>
-                        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-8 h-8" />
-                        <span className="text-xl font-bold">Pricing</span>
-                    </div>
-
-                    <div className="flex items-center space-x-4">
-                        <div className="hidden sm:flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                            {['PKR', 'USD'].map((cur) => (
-                                <button
-                                    key={cur}
-                                    onClick={() => setCurrency(cur as 'PKR' | 'USD')}
-                                    className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all duration-300 ${currency === cur ? 'bg-white dark:bg-gray-700 shadow-sm text-blue-600' : 'text-slate-500'}`}
-                                >
-                                    {cur}
-                                </button>
-                            ))}
-                        </div>
-                        {user ? <ProfileDropdown /> : <Link to="/login"><Button size="sm">Sign In</Button></Link>}
-                    </div>
-                </div>
-            </header>
-
-            <main className="relative z-10 container mx-auto px-4 lg:px-8 py-10 max-w-2xl mt-[var(--header-height)]">
+            <main className="relative z-10 container mx-auto px-4 lg:px-8 py-10 max-w-2xl pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
                 {/* Hero Title */}
                 <motion.div
                     className="text-center mb-12"

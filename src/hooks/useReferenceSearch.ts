@@ -11,24 +11,24 @@ export function useReferenceSearch() {
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch("/api/reference", {
+            const res = await fetch("https://medmacs.app/api/reference", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ query, top_k: topK }),
             });
-            
+
             if (!res.ok) {
                 let errorMsg = "Failed to fetch references";
                 try {
-                  const errText = await res.text();
-                  const errData = JSON.parse(errText);
-                  errorMsg = errData.error || errorMsg;
-                } catch(e) {
-                  errorMsg = `Server error: ${res.status}`;
+                    const errText = await res.text();
+                    const errData = JSON.parse(errText);
+                    errorMsg = errData.error || errorMsg;
+                } catch (e) {
+                    errorMsg = `Server error: ${res.status}`;
                 }
                 throw new Error(errorMsg);
             }
-            
+
             const result: ReferenceResponse = await res.json();
             setData(result);
         } catch (err: any) {

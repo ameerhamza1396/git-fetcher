@@ -129,9 +129,9 @@ const Leaderboard = () => {
         <div className="min-h-screen w-full bg-background">
             <Seo title="Leaderboard" description="See how you rank against other students on Medmacs App's leaderboard." canonical="https://medmacs.app/leaderboard" />
 
-            <header
+            <div
                 ref={headerRef}
-                className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
+                className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
             >
                 <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center">
                     <Link to="/dashboard" className="flex items-center space-x-2 text-primary hover:text-primary/80 transition-colors">
@@ -146,7 +146,7 @@ const Leaderboard = () => {
                         <ProfileDropdown />
                     </div>
                 </div>
-            </header>
+            </div>
 
             <div className="container mx-auto px-4 lg:px-8 py-6 lg:py-8 mt-[var(--header-height)]">
                 <div className="text-center mb-6 lg:mb-8 animate-fade-in">

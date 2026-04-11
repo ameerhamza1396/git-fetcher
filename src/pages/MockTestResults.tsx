@@ -191,33 +191,29 @@ const MockTestResults = () => {
 
   return (
     <div className="min-h-screen w-full bg-white dark:bg-gray-900">
-      <header className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-purple-200 dark:border-purple-800 sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
-        <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
-          <Link to="/dashboard" className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors">
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
+      <div className="container mx-auto px-4 lg:px-8 py-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] max-w-7xl flex justify-between items-center">
+        <Link to="/dashboard" className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors">
+          <ArrowLeft className="w-4 h-4" />
+        </Link>
 
-          <div className="flex items-center space-x-3">
-            {/* Ensure this path to your logo is correct and accessible */}
-            <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs Logo" className="w-8 h-8 object-contain" />
-            <span className="text-xl font-bold text-gray-900 dark:text-white">Mock Test Results</span>
-          </div>
-
-          <div className="flex items-center space-x-3">
-            <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-9 h-9 p-0 hover:scale-110 transition-transform duration-200">
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-            <Badge
-              variant="secondary"
-              className={`hidden sm:flex ${currentPlanColorClasses.light} ${currentPlanColorClasses.dark}`}
-            >
-              {userPlanDisplayName}
-            </Badge>
-                {/* NEW: Replaced hardcoded avatar with ProfileDropdown */}
-                <ProfileDropdown />
-          </div>
+        <div className="flex items-center space-x-3">
+          <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs Logo" className="w-8 h-8 object-contain" />
+          <span className="text-xl font-bold text-gray-900 dark:text-white">Mock Test Results</span>
         </div>
-      </header>
+
+        <div className="flex items-center space-x-3">
+          <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-9 h-9 p-0 hover:scale-110 transition-transform duration-200">
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+          <Badge
+            variant="secondary"
+            className={`hidden sm:flex ${currentPlanColorClasses.light} ${currentPlanColorClasses.dark}`}
+          >
+            {userPlanDisplayName}
+          </Badge>
+          <ProfileDropdown />
+        </div>
+      </div>
 
       <div className="container mx-auto px-4 lg:px-8 py-8 max-w-7xl">
         <div className="text-center mb-8 animate-fade-in">
