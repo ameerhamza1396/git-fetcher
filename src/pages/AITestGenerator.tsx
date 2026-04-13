@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Crown, ArrowLeft, ArrowRight, X, Sparkles, CheckCircle, XCircle } from 'lucide-react';
+import { Crown, ArrowLeft, ArrowRight, X, Sparkles, CheckCircle, XCircle, PanelLeft } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardContent, CardFooter, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import Seo from '@/components/Seo';
 import PlanBadge from '@/components/PlanBadge';
 import { AIProgressTracker } from '@/components/ai/AIProgressTracker';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Skeleton } from '@/components/ui/skeleton';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Question {
@@ -57,16 +59,19 @@ const AITestGenerator: React.FC = () => {
     const [loading, setLoading] = useState(0);
     const [loadTime, setLoadTime] = useState(0);
     const [questions, setQuestions] = useState<Question[]>([]);
+    const [fetchedCount, setFetchedCount] = useState(0);
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [idx, setIdx] = useState(0);
     const [answers, setAnswers] = useState<Record<number, string>>({});
     const [revealed, setRevealed] = useState<Record<number, boolean>>({});
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const batchTimerRef = useRef<NodeJS.Timeout | null>(null);
     const [showExitConfirm, setShowExitConfirm] = useState(false);
 
     // Backend subjects from Supabase
-    const [aiSubjects, setAiSubjects] = useState<{id: string; subject_code: string; subject_name: string; year: string}[]>([]);
+    const [aiSubjects, setAiSubjects] = useState<{ id: string; subject_code: string; subject_name: string; year: string }[]>([]);
     const [loadingSubjects, setLoadingSubjects] = useState(true);
 
     // Fixed Capacitor back button handler
@@ -130,7 +135,7 @@ const AITestGenerator: React.FC = () => {
                 .eq('is_active', true)
                 .eq('year', userYear)
                 .order('subject_name');
-            
+
             if (!error && data) {
                 setAiSubjects(data);
             }
@@ -141,35 +146,101 @@ const AITestGenerator: React.FC = () => {
 
     const handleChapterToggle = (chapter: string) => { setSelectedChapters(prev => prev.includes(chapter) ? [] : [chapter]); setError(null); };
     const handleConfirmChapters = () => { if (selectedChapters.length === 1) { setCurrentStep(2); setError(null); } else setError('Please select exactly one subject.'); };
-    const handleConfirmQuestions = () => { if (totalQ > 0 && totalQ <= 20) setCurrentStep(3); else setError('Please enter 1-20 questions.'); };
+    const handleConfirmQuestions = () => { if (totalQ > 0 && totalQ <= 100) setCurrentStep(3); else setError('Please enter 1-100 questions.'); };
+
+    const fetchBatch = async (batchSize: number, batchNumber: number, totalBatches: number) => {
+        const apiTopic = topicMapping(selectedChapters[0]);
+        const res = await fetch(`https://medmacs.app/api/ai/generate-test`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                topic: apiTopic,
+                difficulty: 'medium',
+                count: batchNumber === totalBatches ? (totalQ % 10 === 0 ? 10 : totalQ % 10) : batchSize,
+                prompt: `Strictly adhere to the syllabus for ${userYear} year and module: ${apiTopic}. Batch ${batchNumber} of ${totalBatches}. ${customPrompt}`
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `Status ${res.status}`);
+        return data.questions;
+    };
 
     const fetchAll = async () => {
-        setError(null); setLoading(1); setLoadTime(0);
+        setError(null);
+        setLoading(1);
+        setLoadTime(0);
+        setQuestions([]);
+        setFetchedCount(0);
+        setIdx(0);
+        setAnswers({});
+        setRevealed({});
+        setSubmitted(false);
+
         if (timerRef.current) clearInterval(timerRef.current);
-        timerRef.current = setInterval(() => setLoading(t => { setLoadTime(t + 1); return Math.min(99, t + 10); }), 1000);
+        if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
+        timerRef.current = setInterval(() => setLoadTime(t => t + 1), 1000);
+
         const apiTopic = topicMapping(selectedChapters[0]);
-        try {
-            const res = await fetch(`https://medmacs.app/api/ai/generate-test`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic: apiTopic, difficulty: 'medium', count: totalQ, prompt: `Strictly adhere to the syllabus for ${userYear} year and module: ${apiTopic}. ${customPrompt}` }) });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || `Status ${res.status}`);
-            setQuestions(data.questions); setIdx(0); setAnswers({}); setRevealed({}); setSubmitted(false); setCurrentStep(4);
-        } catch (e: any) {
-            console.error('AI Test Generation Error:', e);
-            let errorMessage = 'Something went wrong. Please try again.';
-            if (e.message.includes('network') || e.message.includes('fetch')) {
-                errorMessage = 'Network error. Please check your connection and try again.';
-            } else if (e.message.includes('429') || e.message.includes('rate limit')) {
-                errorMessage = 'Too many requests. Please wait a moment and try again.';
-            } else if (e.message.includes('500') || e.message.includes('server')) {
-                errorMessage = 'Server error. Please try again later or contact support.';
-            } else if (e.message.includes('timeout')) {
-                errorMessage = 'Request timed out. Please try again.';
-            } else if (e.message) {
-                errorMessage = e.message;
+        const BATCH_SIZE = 10;
+        const totalBatches = Math.ceil(totalQ / BATCH_SIZE);
+
+        const fetchWithBatching = async (batchNumber: number) => {
+            if (batchNumber > totalBatches) {
+                setLoading(0);
+                if (timerRef.current) clearInterval(timerRef.current);
+                return;
             }
-            setError(errorMessage);
-        }
-        finally { setLoading(0); if (timerRef.current) clearInterval(timerRef.current); }
+
+            try {
+                const newQuestions = await fetchBatch(BATCH_SIZE, batchNumber, totalBatches);
+                const trimmedQuestions = newQuestions.slice(0, batchNumber === totalBatches ? (totalQ % 10 === 0 ? 10 : totalQ % 10) : BATCH_SIZE);
+
+                setQuestions(prev => {
+                    const combined = [...prev, ...trimmedQuestions];
+                    return combined.slice(0, totalQ);
+                });
+                setFetchedCount(prev => Math.min(prev + trimmedQuestions.length, totalQ));
+            } catch (e: any) {
+                console.error('AI Test Generation Error:', e);
+                let errorMessage = 'Something went wrong. Please try again.';
+                if (e.message.includes('network') || e.message.includes('fetch')) {
+                    errorMessage = 'Network error. Please check your connection and try again.';
+                } else if (e.message.includes('429') || e.message.includes('rate limit')) {
+                    errorMessage = 'Too many requests. Please wait a moment and try again.';
+                } else if (e.message.includes('500') || e.message.includes('server')) {
+                    errorMessage = 'Server error. Please try again later or contact support.';
+                } else if (e.message.includes('timeout')) {
+                    errorMessage = 'Request timed out. Please try again.';
+                } else if (e.message) {
+                    errorMessage = e.message;
+                }
+                setError(errorMessage);
+                setLoading(0);
+                if (timerRef.current) clearInterval(timerRef.current);
+                return;
+            }
+
+            if (batchNumber === 1) {
+                setLoading(Math.round((batchNumber / totalBatches) * 100));
+                setCurrentStep(4);
+                if (batchNumber < totalBatches) {
+                    batchTimerRef.current = setTimeout(() => fetchWithBatching(batchNumber + 1), 10000);
+                } else {
+                    setLoading(100);
+                    if (timerRef.current) clearInterval(timerRef.current);
+                }
+            } else {
+                setLoading(Math.round((batchNumber / totalBatches) * 100));
+                if (batchNumber < totalBatches) {
+                    batchTimerRef.current = setTimeout(() => fetchWithBatching(batchNumber + 1), 10000);
+                } else {
+                    setLoading(100);
+                    if (timerRef.current) clearInterval(timerRef.current);
+                }
+            }
+        };
+
+        fetchWithBatching(1);
     };
 
     const select = (i: number, a: string) => !revealed[i] && setAnswers(s => ({ ...s, [i]: a }));
@@ -177,6 +248,12 @@ const AITestGenerator: React.FC = () => {
     const revealAnswer = () => {
         if (answers[idx]) {
             setRevealed(s => ({ ...s, [idx]: true }));
+        }
+    };
+
+    const goToQuestion = (index: number) => {
+        if (index >= 0 && index < questions.length && index < fetchedCount) {
+            setIdx(index);
         }
     };
 
@@ -194,7 +271,7 @@ const AITestGenerator: React.FC = () => {
                     topic: topicMapping(selectedChapters[0]),
                     difficulty: 'medium',
                     questions: questions,
-                    total_questions: questions.length,
+                    total_questions: totalQ,
                     test_taken: true,
                     score: finalScore,
                     accuracy,
@@ -204,7 +281,25 @@ const AITestGenerator: React.FC = () => {
     };
     const score = questions.reduce((acc, q, i) => answers[i] === q.answer ? acc + 1 : acc, 0);
 
-    const startNewTest = () => { setQuestions([]); setIdx(0); setAnswers({}); setRevealed({}); setSubmitted(false); setTotalQ(10); setCustomPrompt(''); setSelectedChapters([]); setError(null); setShowExitConfirm(false); setCurrentStep(1); };
+    const startNewTest = () => {
+        setQuestions([]);
+        setIdx(0);
+        setAnswers({});
+        setRevealed({});
+        setSubmitted(false);
+        setTotalQ(10);
+        setFetchedCount(0);
+        setCustomPrompt('');
+        setSelectedChapters([]);
+        setError(null);
+        setShowExitConfirm(false);
+        setLoading(0);
+        setLoadTime(0);
+        setIsDrawerOpen(false);
+        setCurrentStep(1);
+        if (timerRef.current) clearInterval(timerRef.current);
+        if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
+    };
 
     if (authLoading || planLoading) {
         return <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] dark:bg-gray-950"><img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-16 h-16 animate-pulse" /></div>;
@@ -214,14 +309,14 @@ const AITestGenerator: React.FC = () => {
     }
 
     return (
-        <div className="fixed inset-0 z-[100] bg-background flex flex-col overflow-hidden">
+        <div className="fixed inset-0 bg-background flex flex-col overflow-hidden">
             <Seo title="AI Test Generator" description="Create custom AI practice tests on Medmacs App." canonical="https://medistics.app/ai/test-generator" />
 
             {/* Background decoration */}
             <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
 
-            <main className="flex-grow flex flex-col items-center px-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] overflow-y-auto w-full relative z-10">
+            <main className="flex-grow flex flex-col items-center px-4 pb-[env(safe-area-inset-bottom)] overflow-y-auto w-full relative z-10">
                 <div className="w-full max-w-2xl">
                     {/* No Access */}
                     {!hasAccess && (
@@ -246,7 +341,7 @@ const AITestGenerator: React.FC = () => {
                         <div>
                             {/* Main Title Section */}
                             <div className="text-center mb-6 sm:mb-8 animate-fade-in px-4">
-                                <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-foreground uppercase italic mb-3">
+                                <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-foreground uppercase italic mb-3 mt-[env(safe-area-inset-top)]">
                                     🧠 AI <span className="text-amber-500">Test</span> Generator
                                 </h1>
                                 <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] max-w-2xl mx-auto">
@@ -259,7 +354,7 @@ const AITestGenerator: React.FC = () => {
                                 <AIProgressTracker userId={user?.id} />
                             </div>
 
-                            <motion.div 
+                            <motion.div
                                 initial={{ opacity: 0, y: -20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 className="text-center mb-4 px-4"
@@ -267,9 +362,9 @@ const AITestGenerator: React.FC = () => {
                                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-3 block">Step 1 of 3</span>
                             </motion.div>
 
-                            <div className="sticky top-[env(safe-area-inset-top)] z-50 bg-background/80 backdrop-blur-md -mx-3 sm:mx-0 px-3 sm:px-0">
-                                <div className="max-w-4xl mx-auto px-4 sm:px-0">
-                                    <div className="pt-4 pb-3">
+                            <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md pt-[env(safe-area-inset-top)] -mx-4 sm:mx-0 px-4 sm:px-0">
+                                <div className="max-w-4xl mx-auto">
+                                    <div className="pb-3">
                                         <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
                                             Select <span className="text-amber-500">Subject</span>
                                         </h2>
@@ -306,28 +401,25 @@ const AITestGenerator: React.FC = () => {
                                                 whileHover={{ scale: 1.02, y: -4 }}
                                                 whileTap={{ scale: 0.98 }}
                                                 onClick={() => handleChapterToggle(subject.subject_code)}
-                                                className={`group cursor-pointer relative overflow-hidden rounded-3xl border-2 p-6 transition-all duration-300 ${
-                                                    isSelected 
-                                                        ? 'border-amber-500 bg-amber-500/5 shadow-2xl shadow-amber-500/10' 
-                                                        : 'border-border/40 bg-white/5 dark:bg-zinc-900/50 hover:border-amber-500/30 hover:bg-amber-500/5'
-                                                }`}
+                                                className={`group cursor-pointer relative overflow-hidden rounded-3xl border-2 p-6 transition-all duration-300 ${isSelected
+                                                    ? 'border-amber-500 bg-amber-500/5 shadow-2xl shadow-amber-500/10'
+                                                    : 'border-border/40 bg-white/5 dark:bg-zinc-900/50 hover:border-amber-500/30 hover:bg-amber-500/5'
+                                                    }`}
                                             >
                                                 {isSelected && (
                                                     <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/20 blur-[60px] -mr-16 -mt-16 pointer-events-none" />
                                                 )}
 
                                                 <div className="flex items-center gap-5 relative z-10">
-                                                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-xl transition-transform duration-300 group-hover:scale-110 ${
-                                                        isSelected ? 'bg-amber-500 text-white' : 'bg-muted/50 text-foreground/70'
-                                                    }`}>
+                                                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-xl transition-transform duration-300 group-hover:scale-110 ${isSelected ? 'bg-amber-500 text-white' : 'bg-muted/50 text-foreground/70'
+                                                        }`}>
                                                         📚
                                                     </div>
-                                                    
+
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2 mb-1">
-                                                            <h3 className={`text-xl font-black uppercase italic tracking-tight transition-colors ${
-                                                                isSelected ? 'text-amber-500' : 'text-foreground'
-                                                            }`}>
+                                                            <h3 className={`text-xl font-black uppercase italic tracking-tight transition-colors ${isSelected ? 'text-amber-500' : 'text-foreground'
+                                                                }`}>
                                                                 {subject.subject_name}
                                                             </h3>
                                                             {isSelected && (
@@ -339,9 +431,8 @@ const AITestGenerator: React.FC = () => {
                                                         </p>
                                                     </div>
 
-                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                                                        isSelected ? 'bg-amber-500 text-white' : 'bg-muted opacity-0 group-hover:opacity-100'
-                                                    }`}>
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isSelected ? 'bg-amber-500 text-white' : 'bg-muted opacity-0 group-hover:opacity-100'
+                                                        }`}>
                                                         <ArrowRight className="w-4 h-4" />
                                                     </div>
                                                 </div>
@@ -357,7 +448,7 @@ const AITestGenerator: React.FC = () => {
                                         initial={{ opacity: 0, y: 100 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: 100 }}
-                                        className="fixed bottom-0 left-0 right-0 p-6 pb-[env(safe-area-inset-bottom)] z-50 flex justify-center pointer-events-none"
+                                        className="fixed bottom-0 left-0 right-0 px-6 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] z-50 flex justify-center pointer-events-none"
                                     >
                                         <div className="w-full max-w-md pointer-events-auto">
                                             <Button
@@ -365,7 +456,7 @@ const AITestGenerator: React.FC = () => {
                                                 className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-2xl shadow-amber-500/40 rounded-2xl h-16 uppercase font-black text-sm tracking-[0.2em] group transition-all"
                                                 size="lg"
                                             >
-                                                    Continue to Questions
+                                                Continue to Questions
                                                 <motion.div
                                                     animate={{ x: [0, 5, 0] }}
                                                     transition={{ duration: 1.5, repeat: Infinity }}
@@ -387,7 +478,7 @@ const AITestGenerator: React.FC = () => {
                     {/* Step 2: Question Count */}
                     {hasAccess && questions.length === 0 && currentStep === 2 && (
                         <div>
-                            <motion.div 
+                            <motion.div
                                 initial={{ opacity: 0, y: -20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 className="text-center mb-4 px-4"
@@ -395,9 +486,9 @@ const AITestGenerator: React.FC = () => {
                                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-3 block">Step 2 of 3</span>
                             </motion.div>
 
-                            <div className="sticky top-[env(safe-area-inset-top)] z-50 bg-background/80 backdrop-blur-md -mx-3 sm:mx-0 px-3 sm:px-0">
-                                <div className="max-w-4xl mx-auto px-4 sm:px-0">
-                                    <div className="pt-4 pb-3">
+                            <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md pt-[env(safe-area-inset-top)] -mx-4 sm:mx-0 px-4 sm:px-0">
+                                <div className="max-w-4xl mx-auto">
+                                    <div className="pb-3">
                                         <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
                                             Select <span className="text-amber-500">Questions</span>
                                         </h2>
@@ -441,9 +532,11 @@ const AITestGenerator: React.FC = () => {
                                 {/* Question Count Options */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                                     {[
-                                        { num: 2, label: 'Quick Review', desc: 'Fast practice session' },
-                                        { num: 5, label: 'Short Test', desc: 'Brief assessment' },
-                                        { num: 10, label: 'Full Practice', desc: 'Comprehensive test' }
+                                        { num: 5, label: 'Quick Review', desc: 'Fast practice session' },
+                                        { num: 10, label: 'Short Test', desc: 'Brief assessment' },
+                                        { num: 20, label: 'Full Practice', desc: 'Comprehensive test' },
+                                        { num: 50, label: 'Extended Practice', desc: 'Deep learning session' },
+                                        { num: 100, label: 'Marathon Session', desc: 'Maximum practice' }
                                     ].map((item, idx) => {
                                         const isSelected = totalQ === item.num;
                                         return (
@@ -455,28 +548,25 @@ const AITestGenerator: React.FC = () => {
                                                 whileHover={{ scale: 1.02, x: 5 }}
                                                 whileTap={{ scale: 0.98 }}
                                                 onClick={() => setTotalQ(item.num)}
-                                                className={`group cursor-pointer relative overflow-hidden rounded-2xl border-2 p-4 transition-all duration-300 ${
-                                                    isSelected 
-                                                        ? 'border-amber-500 bg-amber-500/5 shadow-xl shadow-amber-500/10' 
-                                                        : 'border-border/40 bg-white/5 dark:bg-zinc-900/50 hover:border-amber-500/30 hover:bg-amber-500/5'
-                                                }`}
+                                                className={`group cursor-pointer relative overflow-hidden rounded-2xl border-2 p-4 transition-all duration-300 ${isSelected
+                                                    ? 'border-amber-500 bg-amber-500/5 shadow-xl shadow-amber-500/10'
+                                                    : 'border-border/40 bg-white/5 dark:bg-zinc-900/50 hover:border-amber-500/30 hover:bg-amber-500/5'
+                                                    }`}
                                             >
                                                 {isSelected && (
                                                     <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/20 blur-[50px] -mr-12 -mt-12 pointer-events-none" />
                                                 )}
 
                                                 <div className="flex items-center gap-4 relative z-10">
-                                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-all ${
-                                                        isSelected ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'bg-muted/50 text-foreground/70'
-                                                    }`}>
+                                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'bg-muted/50 text-foreground/70'
+                                                        }`}>
                                                         <span className="font-black text-lg">{item.num}</span>
                                                     </div>
-                                                    
+
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2 mb-0.5">
-                                                            <h3 className={`text-sm font-black uppercase italic tracking-tight transition-colors ${
-                                                                isSelected ? 'text-amber-500' : 'text-foreground'
-                                                            }`}>
+                                                            <h3 className={`text-sm font-black uppercase italic tracking-tight transition-colors ${isSelected ? 'text-amber-500' : 'text-foreground'
+                                                                }`}>
                                                                 {item.label}
                                                             </h3>
                                                             {isSelected && (
@@ -488,9 +578,8 @@ const AITestGenerator: React.FC = () => {
                                                         </p>
                                                     </div>
 
-                                                    <div className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
-                                                        isSelected ? 'bg-amber-500/10 text-amber-500' : 'bg-muted/50 text-muted-foreground/60 opacity-0 group-hover:opacity-100'
-                                                    }`}>
+                                                    <div className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${isSelected ? 'bg-amber-500/10 text-amber-500' : 'bg-muted/50 text-muted-foreground/60 opacity-0 group-hover:opacity-100'
+                                                        }`}>
                                                         Qs
                                                     </div>
                                                 </div>
@@ -506,7 +595,7 @@ const AITestGenerator: React.FC = () => {
                                         initial={{ opacity: 0, y: 100 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: 100 }}
-                                        className="fixed bottom-0 left-0 right-0 p-6 pb-[env(safe-area-inset-bottom)] z-50 flex justify-center pointer-events-none"
+                                        className="fixed bottom-0 left-0 right-0 px-6 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] z-50 flex justify-center pointer-events-none"
                                     >
                                         <div className="w-full max-w-md pointer-events-auto flex gap-3">
                                             <Button onClick={() => setCurrentStep(1)} variant="outline" className="flex-1 rounded-2xl h-16 font-black uppercase text-sm tracking-[0.2em]">Back</Button>
@@ -533,7 +622,7 @@ const AITestGenerator: React.FC = () => {
                     {/* Step 3: Custom Prompt */}
                     {hasAccess && questions.length === 0 && currentStep === 3 && (
                         <div className="max-w-4xl mx-auto px-4 sm:px-0">
-                            <motion.div 
+                            <motion.div
                                 initial={{ opacity: 0, y: -20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 className="text-center mb-4 px-4"
@@ -541,9 +630,9 @@ const AITestGenerator: React.FC = () => {
                                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-3 block">Step 3 of 3</span>
                             </motion.div>
 
-                            <div className="sticky top-[env(safe-area-inset-top)] z-50 bg-background/80 backdrop-blur-md -mx-3 sm:mx-0 px-3 sm:px-0">
-                                <div className="max-w-4xl mx-auto px-4 sm:px-0">
-                                    <div className="pt-4 pb-3">
+                            <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md pt-[env(safe-area-inset-top)] -mx-4 sm:mx-0 px-4 sm:px-0">
+                                <div className="max-w-4xl mx-auto">
+                                    <div className="pb-3">
                                         <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
                                             Custom <span className="text-amber-500">Prompt</span>
                                         </h2>
@@ -591,10 +680,10 @@ const AITestGenerator: React.FC = () => {
                                     <Sparkles className="w-4 h-4 text-amber-500" />
                                     <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Add Custom Instructions (Optional)</p>
                                 </div>
-                                <textarea 
-                                    rows={4} 
-                                    placeholder="e.g., Focus on clinical scenarios, include more diagrams..." 
-                                    value={customPrompt} 
+                                <textarea
+                                    rows={4}
+                                    placeholder="e.g., Focus on clinical scenarios, include more diagrams..."
+                                    value={customPrompt}
                                     onChange={e => setCustomPrompt(e.target.value)}
                                     className="w-full p-4 rounded-2xl border-2 border-border/40 bg-muted/20 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20 transition-all resize-none"
                                 />
@@ -629,10 +718,61 @@ const AITestGenerator: React.FC = () => {
 
                     {/* Step 4: Test Taking */}
                     {hasAccess && questions.length > 0 && currentStep === 4 && (
-                        <div className="flex flex-col flex-1 w-full max-w-2xl">
+                        <div className="flex flex-col flex-1 w-full max-w-2xl pt-[env(safe-area-inset-top)]">
+                            {/* Question Map Drawer - Outside AnimatePresence */}
+                            <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+                                <SheetContent side="left" className="w-[280px] sm:w-[320px] p-0 border-r border-amber-200 dark:border-amber-800 bg-background/95 backdrop-blur-xl flex flex-col z-[101]">
+                                    <SheetHeader className="p-6 border-b border-amber-200 dark:border-amber-800">
+                                        <SheetTitle className="text-xl font-black italic tracking-tight">Question <span className="text-amber-500">Map</span></SheetTitle>
+                                        <SheetDescription className="text-xs text-muted-foreground">{fetchedCount} of {totalQ} loaded</SheetDescription>
+                                    </SheetHeader>
+                                    <div className="flex-grow overflow-y-auto p-6">
+                                        <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                                            {Array.from({ length: totalQ }).map((_, index) => {
+                                                const isAnswered = index in answers;
+                                                const isCurrent = idx === index;
+                                                const isLoaded = index < fetchedCount;
+
+                                                if (!isLoaded) {
+                                                    return (
+                                                        <Skeleton key={`skeleton-${index}`} className="w-full h-10 rounded-xl" />
+                                                    );
+                                                }
+
+                                                return (
+                                                    <Button
+                                                        key={`qmap-${index}`}
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            setIdx(index);
+                                                            setIsDrawerOpen(false);
+                                                        }}
+                                                        className={`w-full h-10 rounded-xl text-sm font-bold transition-all ${isCurrent
+                                                            ? 'bg-gradient-to-br from-amber-500 to-yellow-500 text-white border-transparent shadow-lg'
+                                                            : isAnswered
+                                                                ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                                                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                                                            }`}
+                                                    >
+                                                        {index + 1}
+                                                    </Button>
+                                                );
+                                            })}
+                                        </div>
+                                        <div className="mt-4 text-xs text-muted-foreground space-y-1.5">
+                                            <p className="flex items-center"><span className="inline-block w-3 h-3 rounded-full bg-gradient-to-br from-amber-500 to-yellow-500 mr-2" />Current</p>
+                                            <p className="flex items-center"><span className="inline-block w-3 h-3 rounded-full bg-emerald-500 mr-2" />Answered</p>
+                                            <p className="flex items-center"><span className="inline-block w-3 h-3 rounded-full bg-muted mr-2" />Unanswered</p>
+                                            <p className="flex items-center"><span className="inline-block w-3 h-3 rounded-full bg-muted animate-pulse mr-2" />Loading</p>
+                                        </div>
+                                    </div>
+                                </SheetContent>
+                            </Sheet>
+
                             <AnimatePresence mode="wait">
                                 <motion.div
-                                    key={idx}
+                                    key={`question-wrapper-${idx}`}
                                     initial={{ opacity: 0, x: 20 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     exit={{ opacity: 0, x: -20 }}
@@ -641,7 +781,10 @@ const AITestGenerator: React.FC = () => {
                                     {/* Question Header Info */}
                                     <div className="flex items-center justify-between mb-6">
                                         <div className="flex flex-col">
-                                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">Question {idx + 1} of {questions.length}</span>
+                                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
+                                                Question {idx + 1} of {totalQ}
+                                                {fetchedCount < totalQ && <span className="text-amber-500 ml-1">({fetchedCount} loaded)</span>}
+                                            </span>
                                             <div className="flex items-center gap-2 mt-1">
                                                 <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full">
                                                     <Sparkles className="w-3 h-3 text-amber-500" />
@@ -649,19 +792,24 @@ const AITestGenerator: React.FC = () => {
                                                 </div>
                                             </div>
                                         </div>
-                                        <Button variant="ghost" size="icon" onClick={() => setShowExitConfirm(true)} className="w-10 h-10 rounded-2xl bg-muted/40 backdrop-blur-md hover:bg-muted/60 text-muted-foreground">
-                                            <X className="w-5 h-5" />
-                                        </Button>
+                                        <div className="flex items-center gap-2">
+                                            <Button variant="ghost" size="icon" onClick={() => setIsDrawerOpen(true)} className="w-10 h-10 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground">
+                                                <PanelLeft className="w-5 h-5" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" onClick={() => setShowExitConfirm(true)} className="w-10 h-10 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground">
+                                                <X className="w-5 h-5" />
+                                            </Button>
+                                        </div>
                                     </div>
 
                                     {/* Question Text */}
                                     <h2 className="text-xl sm:text-2xl font-black text-foreground leading-[1.3] tracking-tight mb-8">
-                                        {questions[idx].question}
+                                        {questions[idx]?.question || 'Loading...'}
                                     </h2>
 
                                     {/* Options List */}
                                     <div className="space-y-4 mb-8">
-                                        {questions[idx].options.map((opt, i) => {
+                                        {questions[idx]?.options.map((opt, i) => {
                                             const isSelected = answers[idx] === opt;
                                             const isCorrectOption = opt === questions[idx].answer;
                                             const isRevealed = revealed[idx];
@@ -675,7 +823,7 @@ const AITestGenerator: React.FC = () => {
                                             }
 
                                             // Bounce if correct, shake if selected and wrong
-                                            let animation: any = {};
+                                            let animation: { scale?: number[]; x?: number[]; transition?: { duration?: number } } = {};
                                             if (isRevealed) {
                                                 if (isCorrectOption) {
                                                     animation = { scale: [1, 1.08, 1], transition: { duration: 0.4 } };
@@ -684,11 +832,13 @@ const AITestGenerator: React.FC = () => {
                                                 }
                                             }
 
+                                            const optionKey = opt ? `option-${idx}-${i}` : `option-empty-${idx}-${i}`;
+
                                             return (
                                                 <motion.button
-                                                    key={i}
+                                                    key={optionKey}
                                                     onClick={() => select(idx, opt)}
-                                                    disabled={isRevealed}
+                                                    disabled={isRevealed || !opt}
                                                     animate={animation}
                                                     whileTap={{ scale: 0.98 }}
                                                     className={`group relative w-full p-5 rounded-[1.8rem] text-left border-2 transition-all duration-300 ${state === 'default'
@@ -712,7 +862,7 @@ const AITestGenerator: React.FC = () => {
                                                                 state === 'correct' ? 'text-emerald-700 dark:text-emerald-300' :
                                                                     state === 'incorrect' ? 'text-destructive' : 'text-amber-500'
                                                                 }`}>
-                                                                {opt}
+                                                                {opt || 'Loading...'}
                                                             </span>
                                                         </div>
                                                         <div className="shrink-0">
@@ -726,7 +876,7 @@ const AITestGenerator: React.FC = () => {
                                     </div>
 
                                     {/* Explanation / Result */}
-                                    {revealed[idx] && (
+                                    {revealed[idx] && questions[idx] && (
                                         <motion.div
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
@@ -746,82 +896,74 @@ const AITestGenerator: React.FC = () => {
                                         </motion.div>
                                     )}
 
-                                    {/* Best of Luck Wish */}
-                                    <div className="mt-12 text-center space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-                                        <h3 className="text-2xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500">
-                                            Best of Luck, {profile?.username || 'Student'}!
-                                        </h3>
-                                        <p className="text-[10px] uppercase tracking-[0.4em] font-bold text-slate-400">
-                                            Prepared specifically for {profile?.full_name}
-                                        </p>
-                                    </div>
+                                    {/* Best of Luck Wish - Hide when current question is selected or answered */}
+                                    {!answers[idx] && !revealed[idx] && (
+                                        <div className="mt-12 text-center space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+                                            <h3 className="text-2xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500">
+                                                Best of Luck, {profile?.username || 'Student'}!
+                                            </h3>
+                                            <p className="text-[10px] uppercase tracking-[0.4em] font-bold text-slate-400">
+                                                Prepared specifically for {profile?.full_name}
+                                            </p>
+                                        </div>
+                                    )}
                                 </motion.div>
-
-                                {/* Floating Buttons - appear based on state */}
-                                <AnimatePresence>
-                                    {!revealed[idx] && answers[idx] && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: 100 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: 100 }}
-                                            className="fixed bottom-0 left-0 right-0 p-6 pb-[env(safe-area-inset-bottom)] z-50 flex justify-center pointer-events-none"
-                                        >
-                                            <div className="w-full max-w-md pointer-events-auto flex gap-3">
-                                                <Button
-                                                    onClick={revealAnswer}
-                                                    className="flex-1 rounded-2xl h-16 bg-amber-600 text-white font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-amber-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                                                >
-                                                    Submit Answer
-                                                </Button>
-                                            </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-
-                                <AnimatePresence>
-                                    {revealed[idx] && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: 100 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: 100 }}
-                                            className="fixed bottom-0 left-0 right-0 p-6 pb-[env(safe-area-inset-bottom)] z-50 flex justify-center pointer-events-none"
-                                        >
-                                            <div className="w-full max-w-md pointer-events-auto flex gap-3">
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={prev}
-                                                    disabled={idx === 0}
-                                                    className="flex-1 rounded-2xl h-16 font-black uppercase text-sm tracking-[0.2em]"
-                                                >
-                                                    Previous
-                                                </Button>
-                                                {idx < questions.length - 1 ? (
-                                                    <Button
-                                                        onClick={next}
-                                                        className="flex-1 rounded-2xl h-16 bg-foreground text-background font-black uppercase text-sm tracking-[0.2em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
-                                                    >
-                                                        Next Question
-                                                    </Button>
-                                                ) : (
-                                                    <Button
-                                                        onClick={submit}
-                                                        className="flex-1 rounded-2xl h-16 bg-gradient-to-r from-amber-500 to-emerald-500 text-white font-black uppercase text-sm tracking-[0.2em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
-                                                    >
-                                                        Finish Test
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
                             </AnimatePresence>
+
+                            {/* Floating Buttons - Outside AnimatePresence */}
+                            <div className="fixed bottom-0 left-0 right-0 px-6 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] z-50 flex justify-center pointer-events-none">
+                                <div className="w-full max-w-md pointer-events-auto flex gap-3">
+                                    {answers[idx] && !revealed[idx] ? (
+                                        <Button
+                                            onClick={revealAnswer}
+                                            className="flex-1 rounded-2xl h-16 bg-amber-600 text-white font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-amber-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                        >
+                                            Submit Answer
+                                        </Button>
+                                    ) : revealed[idx] ? (
+                                        <>
+                                            <Button
+                                                variant="outline"
+                                                onClick={prev}
+                                                disabled={idx === 0}
+                                                className="flex-1 rounded-2xl h-16 font-black uppercase text-sm tracking-[0.2em]"
+                                            >
+                                                Previous
+                                            </Button>
+                                            {idx < fetchedCount - 1 ? (
+                                                <Button
+                                                    onClick={next}
+                                                    disabled={idx + 1 >= fetchedCount}
+                                                    className="flex-1 rounded-2xl h-16 bg-foreground text-background font-black uppercase text-sm tracking-[0.2em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                                >
+                                                    {idx + 1 >= fetchedCount - 1 ? 'Last Question' : 'Next Question'}
+                                                </Button>
+                                            ) : fetchedCount >= totalQ ? (
+                                                <Button
+                                                    onClick={submit}
+                                                    className="flex-1 rounded-2xl h-16 bg-gradient-to-r from-amber-500 to-emerald-500 text-white font-black uppercase text-sm tracking-[0.2em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                                >
+                                                    Finish Test
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    disabled
+                                                    className="flex-1 rounded-2xl h-16 bg-muted text-muted-foreground font-black uppercase text-sm tracking-[0.2em]"
+                                                >
+                                                    Loading...
+                                                </Button>
+                                            )}
+                                        </>
+                                    ) : null}
+                                </div>
+                            </div>
                         </div>
                     )}
 
                     {/* Step 5: Score */}
                     {hasAccess && currentStep === 5 && (
                         <div>
-                            <motion.div 
+                            <motion.div
                                 initial={{ opacity: 0, y: -20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 className="text-center mb-4 px-4"
@@ -829,8 +971,8 @@ const AITestGenerator: React.FC = () => {
                                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500 mb-3 block">Test Completed</span>
                             </motion.div>
 
-                            <div className="sticky top-[env(safe-area-inset-top)] z-50 bg-background/80 backdrop-blur-md -mx-3 sm:mx-0 px-3 sm:px-0">
-                                <div className="max-w-4xl mx-auto px-4 sm:px-0">
+                            <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md pt-[env(safe-area-inset-top)] -mx-4 sm:mx-0 px-4 sm:px-0">
+                                <div className="max-w-4xl mx-auto">
                                     <div className="pb-3">
                                         <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
                                             Your <span className="text-amber-500">Result</span>
@@ -851,8 +993,8 @@ const AITestGenerator: React.FC = () => {
                                             <div className="w-28 h-28 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4">
                                                 <span className="text-5xl font-black">{score}</span>
                                             </div>
-                                            <p className="text-lg font-bold">out of {questions.length}</p>
-                                            <p className="text-sm text-white/70 mt-1">Accuracy: {questions.length > 0 ? Math.round((score / questions.length) * 100) : 0}%</p>
+                                            <p className="text-lg font-bold">out of {totalQ}</p>
+                                            <p className="text-sm text-white/70 mt-1">Accuracy: {totalQ > 0 ? Math.round((score / totalQ) * 100) : 0}%</p>
                                         </div>
                                     </div>
                                 </div>

@@ -313,19 +313,21 @@ export const AITestGenerator: React.FC = () => {
         </motion.div>
       </AnimatePresence>
 
-      {/* Vibrant Best of Luck Message */}
-      <div className="mt-10 text-center animate-pulse">
-        <h3 className="text-xl font-black italic tracking-tight">
-          Best of Luck,
-          <span className="block text-3xl mt-1 bg-gradient-to-r from-pink-500 via-violet-500 to-cyan-500 bg-clip-text text-transparent drop-shadow-sm">
-            {displayName}
-          </span>
-        </h3>
-        <div className="mt-4 flex flex-col items-center opacity-40">
-          <p className="text-[10px] font-medium">A Project by Hmacs Studios.</p>
-          <p className="text-[10px]">© 2026 All rights reserved</p>
+      {/* Vibrant Best of Luck Message - Hide when question is selected or answered */}
+      {!userAns && !isRevealed && (
+        <div className="mt-10 text-center animate-pulse">
+          <h3 className="text-xl font-black italic tracking-tight">
+            Best of Luck,
+            <span className="block text-3xl mt-1 bg-gradient-to-r from-pink-500 via-violet-500 to-cyan-500 bg-clip-text text-transparent drop-shadow-sm">
+              {displayName}
+            </span>
+          </h3>
+          <div className="mt-4 flex flex-col items-center opacity-40">
+            <p className="text-[10px] font-medium">A Project by Hmacs Studios.</p>
+            <p className="text-[10px]">© 2026 All rights reserved</p>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

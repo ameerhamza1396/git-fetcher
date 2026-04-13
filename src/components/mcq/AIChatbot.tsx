@@ -156,11 +156,11 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
                       {messages.map((message, index) => (
                         <div key={index} className={`flex w-full ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                           <div className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm backdrop-blur-lg ${message.role === 'user'
-                            ? 'bg-primary/80 text-primary-foreground rounded-br-md'
+                            ? 'bg-primary text-white dark:bg-slate-700 dark:text-white rounded-br-md'
                             : 'bg-muted/60 text-foreground rounded-bl-md'
                             }`}>
                             <p className="whitespace-pre-wrap break-words leading-relaxed">{parseBoldText(message.content)}</p>
-                            <p className={`text-[10px] mt-1 ${message.role === 'user' ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}>
+                            <p className={`text-[10px] mt-1 ${message.role === 'user' ? 'text-white/70' : 'text-muted-foreground'}`}>
                               {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </p>
                           </div>

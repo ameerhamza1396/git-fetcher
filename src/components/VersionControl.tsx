@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Zap, RefreshCw } from 'lucide-react';
 
-const CURRENT_APP_VERSION = "7.1.0"
+const CURRENT_APP_VERSION = "7.2.0"
 
 const VersionGuard = () => {
     const [isOutdated, setIsOutdated] = useState(false);
@@ -69,7 +69,7 @@ const VersionGuard = () => {
 
                 <div className="bg-teal-50 dark:bg-teal-900/20 p-4 rounded-2xl border border-teal-100 dark:border-teal-900/50">
                     <p className="text-sm font-bold text-teal-700 dark:text-teal-400">
-                    Please download the latest version from the Play Store to continue.                    </p>
+                        Please download the latest version from the Play Store to continue.                    </p>
                 </div>
 
                 <Button

@@ -889,7 +889,7 @@ export const MCQDisplay = ({
         </div>
 
         {/* Footer */}
-        <footer className="relative z-50 px-4 sm:px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-background">
+        <footer className="relative z-50 px-4 sm:px-6 py-3 pb-[env(safe-area-inset-bottom)] border-t border-slate-200 dark:border-slate-800 bg-background">
           <div className="flex items-center gap-3">
           <Button
             variant="outline"

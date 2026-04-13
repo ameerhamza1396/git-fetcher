@@ -427,3 +427,65 @@ export const getUserSEQStats = async (userId: string) => {
     return { totalQuestions: 0, correctAnswers: 0, accuracy: 0, averageTime: 0, avgSatisfaction: 0 };
   }
 };
+
+export const getUserSEQAnswersByChapter = async (userId: string, chapterId: string) => {
+  try {
+    const { data: seqs, error: seqsError } = await supabase
+      .from('seqs')
+      .select('id')
+      .eq('chapter_id', chapterId);
+
+    if (seqsError || !seqs) return {};
+
+    const seqIds = seqs.map(s => s.id);
+    
+    if (seqIds.length === 0) return {};
+
+    const { data, error } = await supabase
+      .from('user_seq_answers')
+      .select('*')
+      .eq('user_id', userId)
+      .in('seq_id', seqIds);
+
+    if (error) throw error;
+    
+    const answersMap: Record<string, {
+      userAnswer: string;
+      isCorrect: boolean;
+      satisfactionIndex: number;
+      correctedAnswer: string;
+      explanation: string;
+      createdAt: string;
+    }> = {};
+
+    data?.forEach(answer => {
+      answersMap[answer.seq_id] = {
+        userAnswer: answer.user_answer,
+        isCorrect: answer.is_correct,
+        satisfactionIndex: answer.satisfaction_index,
+        correctedAnswer: answer.corrected_answer,
+        explanation: answer.explanation,
+        createdAt: answer.created_at
+      };
+    });
+
+    return answersMap;
+  } catch {
+    return {};
+  }
+};
+
+export const getFirstUnattemptedSEQIndex = async (userId: string, chapterId: string, seqs: SEQ[]) => {
+  try {
+    const answersMap = await getUserSEQAnswersByChapter(userId, chapterId);
+    
+    for (let i = 0; i < seqs.length; i++) {
+      if (!answersMap[seqs[i].id]) {
+        return i;
+      }
+    }
+    return seqs.length;
+  } catch {
+    return 0;
+  }
+};

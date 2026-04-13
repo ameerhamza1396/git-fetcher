@@ -1102,6 +1102,10 @@ const Dashboard = () => {
       {/* Term of Day Dialog - vibrant */}
       <Dialog open={showTermOfDay} onOpenChange={setShowTermOfDay}>
         <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border-0">
+          <DialogHeader>
+            <DialogTitle className="sr-only">Term of the Day</DialogTitle>
+            <DialogDescription className="sr-only">{termOfDay?.term}</DialogDescription>
+          </DialogHeader>
           {termOfDay && (
             <div className="relative bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 p-6 text-white">
               <div className="absolute inset-0 opacity-10" style={{
@@ -1128,6 +1132,10 @@ const Dashboard = () => {
       {/* Case of Day Dialog - swipe reveal */}
       <Dialog open={showCaseOfDay} onOpenChange={setShowCaseOfDay}>
         <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-0 [&>button]:hidden">
+          <DialogHeader>
+            <DialogTitle className="sr-only">Case of the Day</DialogTitle>
+            <DialogDescription className="sr-only">{caseOfDay?.case_name}</DialogDescription>
+          </DialogHeader>
           {caseOfDay && (
             <CaseOfDayCard
               caseOfDay={caseOfDay}
