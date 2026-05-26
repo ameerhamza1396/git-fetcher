@@ -701,7 +701,7 @@ const Dashboard = () => {
     setIsNavigating(false);
   }, [authLoading, profileLoading, user, profile, navigate]);
 
-  const flpAction = { title: 'Full-Length Paper', description: 'Timed mixed exams', icon: ScrollText, link: '/flp', gradient: 'from-sky-600 to-violet-600', iconColor: 'text-sky-100' };
+  const flpAction = { title: 'Full-Length Paper', description: 'Timed mixed exams', icon: ScrollText, link: '/flp', gradient: 'from-fuchsia-600 to-rose-600', iconColor: 'text-fuchsia-100' };
   const collaborateAction = { title: 'Collaborate', description: 'Why Medmacs needs you', icon: Briefcase, onClick: () => setShowCollaborateModal(true), gradient: 'from-rose-500 to-pink-600', iconColor: 'text-rose-100' };
 
   const quickActions = [
