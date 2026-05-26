@@ -15,6 +15,10 @@
       "destination": "/api/reference.ts"
     },
     {
+      "source": "/api/gamecontroller",
+      "destination": "/api/gamecontroller.ts"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

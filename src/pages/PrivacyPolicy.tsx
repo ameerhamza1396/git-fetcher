@@ -43,7 +43,7 @@ For the purposes of this Privacy Policy:
     for election of directors or other managing authority.
 
 * **Company** (referred to as either "the Company", "We", "Us" or "Our" in this
-    Agreement) refers to Medistics.app, L13, KDA Flats, Sector 5E Surjani
+    Agreement) refers to Medmacs.app, L13, KDA Flats, Sector 5E Surjani
     Town, Karachi.
 
 * **Cookies** are small files that are placed on Your computer, mobile device or

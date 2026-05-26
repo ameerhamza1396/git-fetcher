@@ -2,7 +2,7 @@
 export interface BattleRoom {
   id: string;
   room_code: string;
-  battle_type: '1v1' | '2v2' | 'ffa';
+  battle_type: BattleType;
   max_players: number;
   current_players: number;
   status: 'waiting' | 'in_progress' | 'completed';
@@ -18,10 +18,18 @@ export interface BattleRoom {
   last_ping_sender_id: string | null;
   last_ping_sender_username: string | null;
   countdown_initiated_at: string | null;
+  question_started_at: string | null;
+  win_target: number;
+  winner_user_id: string | null;
+  winner_team: number | null;
+  paused_at: string | null;
+  is_private: boolean;
   created_at: string;
   started_at: string | null;
   ended_at: string | null;
 }
+
+export type BattleType = '1v1' | '2v2' | 'ffa' | 'rapid_fire';
 
 export interface Participant {
   id: string;
@@ -35,6 +43,23 @@ export interface Participant {
   joined_at: string;
   created_at: string;
   kicked_at: string | null;
+  is_bot: boolean;
+  bot_accuracy: number | null;
+}
+
+export interface BattleAnswerEvent {
+  id: string;
+  battle_room_id: string;
+  user_id: string;
+  username: string;
+  team: number | null;
+  question_index: number;
+  question_id: string | null;
+  selected_answer: string | null;
+  is_correct: boolean;
+  response_time_ms: number;
+  submitted_at: string;
+  created_at: string;
 }
 
 export interface BattleResult {
@@ -70,6 +95,12 @@ export interface DatabaseBattleRoom {
   last_ping_sender_id: string | null;
   last_ping_sender_username: string | null;
   countdown_initiated_at: string | null;
+  question_started_at: string | null;
+  win_target: number;
+  winner_user_id: string | null;
+  winner_team: number | null;
+  paused_at: string | null;
+  is_private: boolean;
   created_at: string;
   started_at: string | null;
   ended_at: string | null;
@@ -87,6 +118,8 @@ export interface DatabaseParticipant {
   joined_at: string;
   created_at: string;
   kicked_at: string | null;
+  is_bot: boolean;
+  bot_accuracy: number | null;
 }
 
 // Real-time event types

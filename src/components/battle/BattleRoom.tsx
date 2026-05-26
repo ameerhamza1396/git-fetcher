@@ -2,11 +2,19 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Users, Swords, XCircle, Gamepad2, Hourglass, Copy, BookOpenText, Play, Bell } from 'lucide-react';
+import { Loader2, Users, Swords, XCircle, Gamepad2, Hourglass, Copy, BookOpenText, Play, Bell, Trophy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
+import { createBotAccuracy, getBotName, getGameControllerConfig } from '@/utils/gameController';
+
+type BattleType = '1v1' | '2v2' | 'ffa' | 'rapid_fire';
+
+const createBotUserId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+  return '00000000-0000-4000-8000-' + Math.random().toString(16).slice(2, 14).padEnd(12, '0');
+};
 
 interface BattleRoomProps {
   roomId: string;
@@ -18,22 +26,35 @@ interface BattleRoomProps {
 interface RoomData {
   id: string;
   room_code: string;
-  battle_type: '1v1' | '2v2' | 'ffa';
+  battle_type: BattleType;
   max_players: number;
   status: 'waiting' | 'in_progress' | 'completed';
   time_per_question: number;
   total_questions: number;
+  subject_id: string | null;
+  chapter_id: string | null;
+  questions: any[] | null;
   subject: string;
   host_id: string;
   host_ping_requested_at: string | null;
   last_ping_sender_id: string | null;
   last_ping_sender_username: string | null;
   countdown_initiated_at: string | null;
+  question_started_at: string | null;
+  win_target?: number;
+  winner_user_id?: string | null;
+  winner_team?: number | null;
+  paused_at?: string | null;
+  is_private?: boolean | null;
   created_at: string;
   battle_participants: { 
     id: string; 
     user_id: string; 
     username: string; 
+    team: number | null;
+    score: number | null;
+    is_bot?: boolean | null;
+    bot_accuracy?: number | null;
     created_at: string; 
   }[];
 }
@@ -48,6 +69,8 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
   const prevHostPingSenderId = useRef<string | null>(null);
   const [showConfirmLeaveModal, setShowConfirmLeaveModal] = useState(false);
   const prevParticipantsCount = useRef<number | null>(null);
+  const botFillInFlightRef = useRef(false);
+  const battleStartHandledRef = useRef(false);
 
   // Fetch room details and participants in real-time
   const { data: room, isLoading: roomLoading, error: roomError } = useQuery({
@@ -58,7 +81,7 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
         .from('battle_rooms')
         .select(`
           *,
-          battle_participants(id, user_id, username, created_at)
+          battle_participants(id, user_id, username, team, score, is_bot, bot_accuracy, created_at)
         `)
         .eq('id', roomId)
         .single();
@@ -76,7 +99,8 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
 
   // Check if battle should start immediately when room data changes
   useEffect(() => {
-    if (room && room.status === 'in_progress') {
+    if (room && room.status === 'in_progress' && !battleStartHandledRef.current) {
+      battleStartHandledRef.current = true;
       console.log("BattleRoom.tsx: Room status is 'in_progress'. Starting battle immediately...");
       if (countdownTimerRef.current) {
         clearInterval(countdownTimerRef.current);
@@ -127,15 +151,11 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
           queryClient.invalidateQueries({ queryKey: ['battleRoom', roomId] });
           const updatedRoom = payload.new as RoomData; // Cast to RoomData
           if (updatedRoom.status === 'in_progress') {
-            console.log("BattleRoom.tsx: Room status changed to 'in_progress' via real-time. Triggering battle start.");
+            console.log("BattleRoom.tsx: Room status changed to 'in_progress' via real-time. Waiting for full room refresh.");
             if (countdownTimerRef.current) {
               clearInterval(countdownTimerRef.current);
               countdownTimerRef.current = null;
             }
-            // Trigger battle start with updated room data
-            setTimeout(() => {
-              onBattleStart(updatedRoom);
-            }, 500);
           } else if (updatedRoom.status === 'completed') {
             console.log("BattleRoom.tsx: Room status changed to 'completed'. Leaving room.");
             onLeave();
@@ -160,6 +180,104 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
     };
   }, [roomId, queryClient, onBattleStart, onLeave, toast]);
 
+  useEffect(() => {
+    if (!room || room.status !== 'waiting' || room.host_id !== userId || room.is_private) return;
+    if (botFillInFlightRef.current) return;
+
+    const fillBots = async () => {
+      const config = await getGameControllerConfig();
+      if (!config.botsEnabled) return;
+
+      const rule = config.roomFill[room.battle_type];
+      if (!rule) return;
+
+      const participants = room.battle_participants || [];
+      const botCount = participants.filter(participant => participant.is_bot).length;
+      const targetPlayers = Math.min(room.max_players, rule.targetPlayers);
+      const missingPlayers = Math.max(0, targetPlayers - participants.length);
+      const botsToAdd = Math.min(missingPlayers, Math.max(0, rule.maxBots - botCount));
+      if (botsToAdd <= 0) return;
+
+      botFillInFlightRef.current = true;
+      const usedNames = new Set(participants.map(participant => participant.username));
+
+      const baseJoinDelay = room.battle_type === 'ffa'
+        ? Math.min(config.botJoinDelayMs, 850)
+        : config.botJoinDelayMs;
+      const joinJitter = room.battle_type === 'ffa' ? 450 : 1400;
+
+      Array.from({ length: botsToAdd }).forEach((_, index) => {
+        window.setTimeout(async () => {
+          try {
+            const botName = getBotName(config.botNames, usedNames);
+            usedNames.add(botName);
+            const team = room.battle_type === '2v2'
+              ? ((participants.length + index) % 2) + 1
+              : room.battle_type === 'rapid_fire'
+                ? ((participants.length + index) % 3) + 1
+                : null;
+
+            const botRow = {
+              battle_room_id: room.id,
+              user_id: createBotUserId(),
+              username: botName,
+              team,
+              score: 0,
+              answers: [],
+              is_ready: true,
+              is_bot: true,
+              bot_accuracy: createBotAccuracy(config),
+            };
+
+            const { data: latestRoom } = await supabase
+              .from('battle_rooms')
+              .select('status, countdown_initiated_at, current_players')
+              .eq('id', room.id)
+              .single();
+            if (latestRoom?.status !== 'waiting' || latestRoom?.countdown_initiated_at) return;
+
+            const { error } = await supabase.from('battle_participants').insert(botRow);
+            if (error) throw error;
+
+            queryClient.invalidateQueries({ queryKey: ['battleRoom', roomId] });
+          } catch (error) {
+            console.warn('Unable to add battle bot.', error);
+          } finally {
+            if (index === botsToAdd - 1) botFillInFlightRef.current = false;
+          }
+        }, baseJoinDelay * (index + 1) + Math.random() * joinJitter);
+      });
+    };
+
+    fillBots();
+  }, [room, roomId, userId, queryClient]);
+
+  useEffect(() => {
+    if (!room || room.status !== 'waiting' || room.host_id !== userId || room.is_private || room.countdown_initiated_at) return;
+    if (room.battle_type === '1v1' || room.battle_type === '2v2') return;
+
+    const bots = (room.battle_participants || []).filter(participant => participant.is_bot);
+    const humans = (room.battle_participants || []).filter(participant => !participant.is_bot);
+    const churnChance = room.battle_type === 'ffa' ? 0.08 : 0.25;
+    const churnDelay = room.battle_type === 'ffa'
+      ? 18000 + Math.random() * 15000
+      : 7000 + Math.random() * 9000;
+    if (bots.length === 0 || humans.length === 0 || Math.random() > churnChance) return;
+    if (room.battle_type === 'ffa' && bots.length < 2) return;
+
+    const timer = window.setTimeout(async () => {
+      const leavingBot = bots[Math.floor(Math.random() * bots.length)];
+      await supabase
+        .from('battle_participants')
+        .delete()
+        .eq('battle_room_id', room.id)
+        .eq('user_id', leavingBot.user_id);
+      queryClient.invalidateQueries({ queryKey: ['battleRoom', roomId] });
+    }, churnDelay);
+
+    return () => window.clearTimeout(timer);
+  }, [room, roomId, userId, queryClient]);
+
   // Countdown management
   useEffect(() => {
     console.log('BattleRoom.tsx: Countdown effect triggered. Room status:', room?.status, 'countdown_initiated_at:', room?.countdown_initiated_at);
@@ -183,22 +301,21 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
 
     console.log(`BattleRoom.tsx: isRoomFull: ${isRoomFull}, isWaitingStatus: ${isWaitingStatus}, isCountdownInitiated: ${isCountdownInitiated}`);
 
-    if (isWaitingStatus && (isRoomFull || isCountdownInitiated)) {
-      const initialCountdownDuration = room.battle_type === '1v1' ? 5 : 10; // 5 seconds for 1v1, 10 for others
-      let calculatedTimeRemaining = initialCountdownDuration;
+    if (room.battle_type !== 'rapid_fire' && isWaitingStatus && (isRoomFull || isCountdownInitiated)) {
+      const countdownDuration = 5;
+      let elapsedSeconds = 0;
 
       if (isCountdownInitiated && room.countdown_initiated_at) {
-        const timeElapsed = (new Date().getTime() - new Date(room.countdown_initiated_at).getTime()) / 1000;
-        calculatedTimeRemaining = Math.max(0, initialCountdownDuration - Math.floor(timeElapsed));
-        console.log(`BattleRoom.tsx: Countdown initiated at ${room.countdown_initiated_at}. Time elapsed: ${timeElapsed}s. Calculated remaining: ${calculatedTimeRemaining}s`);
+        elapsedSeconds = Math.min(countdownDuration, Math.max(0, Math.floor((Date.now() - new Date(room.countdown_initiated_at).getTime()) / 1000) + 1));
       } else if (isRoomFull && !isCountdownInitiated) {
-        // This block handles the first time the room becomes full and countdown needs to be initiated
-        console.log('BattleRoom.tsx: Room is full and countdown not initiated. Attempting to set countdown_initiated_at.');
+        if (room.host_id !== userId) return;
         const updateCountdownInitiated = async () => {
           const { error } = await supabase
             .from('battle_rooms')
             .update({ countdown_initiated_at: new Date().toISOString() })
-            .eq('id', room.id);
+            .eq('id', room.id)
+            .eq('host_id', userId)
+            .eq('status', 'waiting');
           if (error) {
             console.error('BattleRoom.tsx: Error setting countdown_initiated_at:', error);
             toast({
@@ -207,26 +324,27 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
               variant: "destructive",
             });
           } else {
-            console.log('BattleRoom.tsx: Successfully set countdown_initiated_at for room:', room.id);
-            // Invalidate query to refetch room data with new countdown_initiated_at
             queryClient.invalidateQueries({ queryKey: ['battleRoom', roomId] });
           }
         };
         updateCountdownInitiated();
-        // Return here to let the next render cycle (triggered by invalidateQueries) handle the countdown start
         return;
       }
 
-      setCountdown(calculatedTimeRemaining);
-      console.log(`BattleRoom.tsx: Setting countdown to: ${calculatedTimeRemaining}`);
+      setCountdown(elapsedSeconds);
       
-      if (calculatedTimeRemaining <= 0) {
+      if (elapsedSeconds >= countdownDuration) {
+        if (room.host_id !== userId) return;
         const updateStatus = async () => {
-          console.log('BattleRoom.tsx: Countdown finished (calculatedTimeRemaining <= 0), updating room status to in_progress');
           const { error } = await supabase
             .from('battle_rooms')
-            .update({ status: 'in_progress', countdown_initiated_at: null })
-            .eq('id', roomId);
+            .update({
+              status: 'in_progress',
+              started_at: new Date().toISOString(),
+            })
+            .eq('id', roomId)
+            .eq('host_id', userId)
+            .eq('status', 'waiting');
           if (error) {
             console.error('BattleRoom.tsx: Error updating room status to in_progress:', error);
             toast({
@@ -239,38 +357,41 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
           }
         };
         updateStatus();
-        return; // Exit useEffect after triggering status update
+        return;
       }
 
-      if (calculatedTimeRemaining > 0) {
-        console.log('BattleRoom.tsx: Starting interval for countdown display.');
-        countdownTimerRef.current = setInterval(() => {
-          setCountdown(prev => {
-            if (prev === null || prev <= 1) {
-              console.log('BattleRoom.tsx: Countdown timer reached 0 or less. Triggering status update.');
-              if (countdownTimerRef.current) {
-                clearInterval(countdownTimerRef.current);
-                countdownTimerRef.current = null;
-              }
-              const updateStatus = async () => {
-                console.log('BattleRoom.tsx: Countdown timer finished, updating room status to in_progress');
-                const { error } = await supabase
-                  .from('battle_rooms')
-                  .update({ status: 'in_progress', countdown_initiated_at: null })
-                  .eq('id', roomId);
+      countdownTimerRef.current = setInterval(() => {
+        if (!room.countdown_initiated_at) return;
+        const nextElapsed = Math.min(countdownDuration, Math.max(0, Math.floor((Date.now() - new Date(room.countdown_initiated_at).getTime()) / 1000) + 1));
+        setCountdown(nextElapsed);
+        if (nextElapsed >= countdownDuration) {
+          if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+          countdownTimerRef.current = null;
+          if (room.host_id === userId) {
+            supabase
+              .from('battle_rooms')
+              .update({
+                status: 'in_progress',
+                started_at: new Date().toISOString(),
+              })
+              .eq('id', roomId)
+              .eq('host_id', userId)
+              .eq('status', 'waiting')
+              .then(({ error }) => {
                 if (error) {
-                  console.error('BattleRoom.tsx: Error updating room status from interval:', error);
+                  console.error('BattleRoom.tsx: Error finalizing countdown start:', error);
+                  toast({
+                    title: "Start Failed",
+                    description: error.message || "Failed to start battle automatically.",
+                    variant: "destructive",
+                  });
                 } else {
-                  console.log('BattleRoom.tsx: Room status successfully updated to in_progress from interval.');
+                  queryClient.invalidateQueries({ queryKey: ['battleRoom', roomId] });
                 }
-              };
-              updateStatus();
-              return 0; // Set countdown to 0
-            }
-            return prev - 1;
-          });
-        }, 1000);
-      }
+              });
+          }
+        }
+      }, 250);
     } else {
       console.log('BattleRoom.tsx: Room not full or countdown not initiated, and not in waiting state. Resetting countdown to null.');
       setCountdown(null);
@@ -283,7 +404,7 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
         countdownTimerRef.current = null;
       }
     };
-  }, [room, roomId, toast, queryClient]); // Added queryClient to dependencies
+  }, [room, roomId, userId, toast, queryClient]); // Added queryClient to dependencies
 
   // Join/Leave notifications
   useEffect(() => {
@@ -448,17 +569,70 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
     }
   });
 
-  // Start battle mutation (FFA only)
+  const loadRapidFireQuestions = async () => {
+    if (!room?.chapter_id) return [];
+
+    const requestedQuestions = Math.max(1, room.total_questions || 20);
+    const { data: mcqs, error } = await supabase
+      .from('mcqs')
+      .select('id, question, options, correct_answer, explanation')
+      .eq('chapter_id', room.chapter_id)
+      .limit(requestedQuestions * 2);
+
+    if (error) throw error;
+    if (!mcqs || mcqs.length === 0) {
+      throw new Error("No MCQs found for this Rapid Fire topic.");
+    }
+
+    return mcqs
+      .map((mcq: any) => ({
+        id: mcq.id,
+        question: mcq.question,
+        options: Array.isArray(mcq.options)
+          ? mcq.options
+          : typeof mcq.options === 'string'
+            ? JSON.parse(mcq.options)
+            : [],
+        correct_answer: mcq.correct_answer,
+        explanation: mcq.explanation,
+      }))
+      .sort(() => Math.random() - 0.5)
+      .slice(0, requestedQuestions);
+  };
+
+  // Start battle mutation (FFA and Rapid Fire)
   const startBattleMutation = useMutation({
     mutationFn: async () => {
       if (!room || room.host_id !== userId) {
         throw new Error("Only the host can start the battle.");
       }
-      if (room.battle_type !== 'ffa') {
-        throw new Error("Only FFA battles can be started manually by the host.");
+      if (room.battle_type !== 'ffa' && room.battle_type !== 'rapid_fire') {
+        throw new Error("Only FFA and Rapid Fire battles can be started manually by the host.");
       }
       if (room.status !== 'waiting') {
         throw new Error("Battle can only be started from 'waiting' status.");
+      }
+      if ((room.battle_participants?.length || 0) < 2) {
+        throw new Error("At least 2 participants are required to start.");
+      }
+
+      if (room.battle_type === 'rapid_fire') {
+        const questions = await loadRapidFireQuestions();
+        const { error } = await supabase
+          .from('battle_rooms')
+          .update({
+            questions,
+            status: 'in_progress',
+            started_at: new Date().toISOString(),
+            question_started_at: new Date().toISOString(),
+            current_question: 0,
+            countdown_initiated_at: null,
+            paused_at: null,
+          })
+          .eq('id', roomId);
+
+        if (error) throw error;
+        return;
       }
 
       console.log('BattleRoom.tsx: Host is starting battle manually (FFA), updating countdown_initiated_at.');
@@ -481,7 +655,9 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
     onSuccess: () => {
       toast({
         title: "Starting Battle!",
-        description: "The host has initiated the battle countdown.",
+        description: room?.battle_type === 'rapid_fire'
+          ? "Rapid Fire is live."
+          : "The host has initiated the battle countdown.",
       });
     },
     onError: (error: any) => {
@@ -490,6 +666,31 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
         title: "Error Starting Battle",
         description: `Failed to start battle: ${error.message}`,
         variant: "destructive"
+      });
+    }
+  });
+
+  const joinTeamMutation = useMutation({
+    mutationFn: async (team: number | null) => {
+      if (!room || room.status !== 'waiting') {
+        throw new Error("Teams lock once the match starts.");
+      }
+      const { error } = await supabase
+        .from('battle_participants')
+        .update({ team })
+        .eq('battle_room_id', roomId)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['battleRoom', roomId] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Team Update Failed",
+        description: error.message,
+        variant: "destructive",
       });
     }
   });
@@ -613,94 +814,165 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
   const isGameStarting = room.status === 'in_progress';
   const isHost = room.host_id === userId;
   const isCountdownInitiated = room.countdown_initiated_at !== null;
+  const isRapidFire = room.battle_type === 'rapid_fire';
+  const currentUserParticipant = room.battle_participants?.find(p => p.user_id === userId);
+  const visibleTeams = Array.from(
+    new Set([1, 2, 3, ...(room.battle_participants || []).map(p => p.team).filter((team): team is number => typeof team === 'number')])
+  ).sort((a, b) => a - b);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 dark:from-red-900/20 dark:via-orange-900/20 dark:to-yellow-900/20 p-4 flex flex-col items-center justify-center">
-      <Card className="w-full max-w-2xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-red-200 dark:border-red-800 shadow-xl">
-        <CardHeader className="text-center p-6 pb-4">
-          <CardTitle className="text-3xl font-bold text-gray-900 dark:text-white flex items-center justify-center space-x-3">
-            <Gamepad2 className="w-8 h-8 text-red-600 dark:text-red-400" />
+    <div className="relative min-h-screen overflow-hidden bg-background px-4 py-6 flex flex-col items-center justify-center">
+      <div className="pointer-events-none absolute left-5 top-10 h-16 w-16 rounded-full border border-primary/15 bg-primary/5" />
+      <div className="pointer-events-none absolute right-8 top-24 h-9 w-9 rounded-full border border-emerald-500/20 bg-emerald-500/10" />
+      <div className="pointer-events-none absolute bottom-20 left-10 h-12 w-12 rounded-full border border-orange-500/20 bg-orange-500/10" />
+      <div className="pointer-events-none absolute -right-8 bottom-36 h-28 w-28 rounded-full border border-primary/10 bg-primary/5" />
+
+      <Card className="relative w-full max-w-4xl overflow-hidden rounded-[2rem] border-border/50 bg-card/95 shadow-2xl shadow-primary/10">
+        <div className="pointer-events-none absolute right-6 top-6 h-24 w-24 rounded-full border border-primary/10 bg-primary/5" />
+        <div className="pointer-events-none absolute left-8 bottom-8 h-14 w-14 rounded-full border border-emerald-500/15 bg-emerald-500/10" />
+        <CardHeader className="relative text-center p-6 pb-4">
+          <CardTitle className="text-2xl font-black tracking-tight text-foreground flex items-center justify-center space-x-3">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary">
+              <Gamepad2 className="w-6 h-6" />
+            </span>
             <span>Battle Room</span>
           </CardTitle>
-          <CardDescription className="text-md text-gray-600 dark:text-gray-300 mt-2">
-            Waiting for players to join...
+          <CardDescription className="text-sm text-muted-foreground mt-2">
+            {isRapidFire ? 'Choose teams, invite friends, then let the host start Rapid Fire.' : 'Waiting for players to join...'}
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-6 pt-2 space-y-6">
+        <CardContent className="relative p-5 sm:p-6 pt-2 space-y-6">
           {/* Room Code Display */}
           <div className="flex flex-col items-center space-y-2 mt-4">
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Room Code:</p>
+            <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Room Code</p>
             <div className="flex items-center space-x-2">
               <Input
                 type="text"
                 readOnly
                 value={room.room_code}
-                className="w-32 md:w-40 text-center font-mono text-xl tracking-wider select-text"
+                className="w-32 md:w-40 text-center font-mono text-xl tracking-wider select-text bg-background"
               />
-              <Button onClick={handleCopyRoomCode} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white">
+              <Button onClick={handleCopyRoomCode} className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground">
                 <Copy className="w-4 h-4 mr-2" /> Copy
               </Button>
             </div>
           </div>
 
           {/* Room Statistics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-start text-center mt-6">
-            <div>
-              <Users className="w-6 h-6 mx-auto mb-1 text-red-600 dark:text-red-400" />
-              <p className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-stretch text-center mt-6">
+            <div className="rounded-2xl border border-border/45 bg-background/70 p-3 shadow-sm">
+              <Users className="w-6 h-6 mx-auto mb-1 text-primary" />
+              <p className="text-lg font-semibold text-foreground">
                 {currentPlayers} / {room.max_players}
               </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Players Joined</p>
+              <p className="text-sm text-muted-foreground">Players Joined</p>
             </div>
-            <div>
-              <Swords className="w-6 h-6 mx-auto mb-1 text-red-600 dark:text-red-400" />
-              <p className="text-lg font-semibold text-gray-800 dark:text-gray-200">{room.battle_type}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Battle Type</p>
+            <div className="rounded-2xl border border-border/45 bg-background/70 p-3 shadow-sm">
+              <Swords className="w-6 h-6 mx-auto mb-1 text-primary" />
+              <p className="text-lg font-semibold text-foreground">{isRapidFire ? 'Rapid Fire' : room.battle_type}</p>
+              <p className="text-sm text-muted-foreground">Battle Type</p>
             </div>
-            <div>
-              <Hourglass className="w-6 h-6 mx-auto mb-1 text-red-600 dark:text-red-400" />
-              <p className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+            <div className="rounded-2xl border border-border/45 bg-background/70 p-3 shadow-sm">
+              <Hourglass className="w-6 h-6 mx-auto mb-1 text-primary" />
+              <p className="text-lg font-semibold text-foreground">
                 {room.total_questions} Qs / {room.time_per_question}s
               </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Settings</p>
+              <p className="text-sm text-muted-foreground">Settings</p>
             </div>
             {room.subject && (
-              <div>
-                <BookOpenText className="w-6 h-6 mx-auto mb-1 text-red-600 dark:text-red-400" />
-                <p className="text-lg font-semibold text-gray-800 dark:text-gray-200">{room.subject}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Subject</p>
+              <div className="rounded-2xl border border-border/45 bg-background/70 p-3 shadow-sm">
+                <BookOpenText className="w-6 h-6 mx-auto mb-1 text-primary" />
+                <p className="text-lg font-semibold text-foreground">{room.subject}</p>
+                <p className="text-sm text-muted-foreground">Subject</p>
+              </div>
+            )}
+            {isRapidFire && (
+              <div className="rounded-2xl border border-border/45 bg-background/70 p-3 shadow-sm">
+                <Trophy className="w-6 h-6 mx-auto mb-1 text-primary" />
+                <p className="text-lg font-semibold text-foreground">{room.win_target || 20}</p>
+                <p className="text-sm text-muted-foreground">Correct to Win</p>
               </div>
             )}
           </div>
 
+          {isRapidFire && room.status === 'waiting' && (
+            <div className="space-y-3 rounded-2xl border border-border/40 bg-muted/20 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold text-foreground">Choose Team</h3>
+                  <p className="text-xs text-muted-foreground">Self-join a team or stay solo before the host starts.</p>
+                </div>
+                <Badge className="bg-primary/10 text-primary border-0">Rapid Fire</Badge>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <Button
+                  variant={currentUserParticipant?.team == null ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => joinTeamMutation.mutate(null)}
+                  disabled={joinTeamMutation.isPending}
+                >
+                  Solo
+                </Button>
+                {visibleTeams.map(team => (
+                  <Button
+                    key={team}
+                    variant={currentUserParticipant?.team === team ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => joinTeamMutation.mutate(team)}
+                    disabled={joinTeamMutation.isPending}
+                  >
+                    Team {team}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => joinTeamMutation.mutate(Math.max(...visibleTeams) + 1)}
+                  disabled={joinTeamMutation.isPending || visibleTeams.length >= 10}
+                >
+                  + Team
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Players List */}
           <div className="space-y-3">
-            <h3 className="font-medium text-gray-900 dark:text-white">Current Players:</h3>
-            <div className="flex flex-col space-y-2">
+            <h3 className="font-medium text-foreground">Current Players:</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
               {room.battle_participants?.map((participant) => (
-                <Badge
+                <div
                   key={participant.id}
-                  variant="secondary"
-                  className="w-full flex items-center justify-start p-3 text-md border border-gray-200 dark:border-gray-700 rounded-md shadow-sm"
+                  className="min-h-[74px] rounded-2xl border border-border/45 bg-background/75 p-3 text-foreground shadow-sm transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
                 >
-                  <Users className="w-4 h-4 mr-2" />
-                  <span>{participant.username}</span>
-                  {participant.user_id === userId && room.host_id === participant.user_id && (
-                    <span className="ml-1 font-bold text-red-700 dark:text-red-300">(You, Host)</span>
-                  )}
-                  {participant.user_id === userId && room.host_id !== participant.user_id && (
-                    <span className="ml-1 text-purple-600 dark:text-purple-400">(You)</span>
-                  )}
-                  {room.host_id === participant.user_id && participant.user_id !== userId && (
-                    <span className="ml-1 font-bold text-blue-600 dark:text-blue-400">(Host)</span>
-                  )}
+                  <div className="flex items-start gap-2">
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-black">{participant.username}</p>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {isRapidFire && (
+                          <Badge variant="secondary" className="h-5 rounded-full px-2 text-[10px]">
+                            {participant.team ? `Team ${participant.team}` : 'Solo'}
+                          </Badge>
+                        )}
+                        {participant.user_id === userId && (
+                          <Badge className="h-5 rounded-full border-0 bg-primary/10 px-2 text-[10px] text-primary">You</Badge>
+                        )}
+                        {room.host_id === participant.user_id && (
+                          <Badge className="h-5 rounded-full border-0 bg-amber-500/10 px-2 text-[10px] text-amber-600">Host</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Host can remove participants */}
                   {isHost && participant.user_id !== userId && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="ml-auto p-1 h-auto text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200"
+                      className="mt-2 h-7 w-full rounded-xl p-1 text-destructive hover:text-destructive"
                       onClick={() => removeParticipantMutation.mutate(participant.user_id)}
                       disabled={removeParticipantMutation.isPending}
                     >
@@ -712,46 +984,46 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="ml-auto p-1 h-auto text-yellow-500 hover:text-yellow-700 dark:text-yellow-400 dark:hover:text-yellow-200"
+                      className="mt-2 h-7 w-full rounded-xl p-1 text-primary hover:text-primary"
                       onClick={() => pingHostMutation.mutate()}
                       disabled={pingHostMutation.isPending}
                     >
                       <Bell className="w-4 h-4" />
                     </Button>
                   )}
-                </Badge>
+                </div>
               ))}
             </div>
           </div>
 
           {/* Status Messages */}
           {countdown !== null && room.status === 'waiting' && countdown > 0 ? (
-            <div className="text-center text-lg font-semibold text-green-600 dark:text-green-400 animate-pulse">
-              Battle starting in {countdown} seconds!
+            <div className="text-center text-lg font-semibold text-primary animate-pulse">
+              Match launch {countdown}/5
             </div>
           ) : isGameStarting ? (
-            <div className="text-center text-lg font-semibold text-green-600 dark:text-green-400 animate-pulse">
+            <div className="text-center text-lg font-semibold text-primary animate-pulse">
               Starting battle now...
             </div>
           ) : room.status === 'waiting' ? (
-            <div className="text-center text-gray-700 dark:text-gray-300">
+            <div className="text-center text-muted-foreground">
               Waiting for players to join...
             </div>
           ) : null}
 
           {/* Host Start Battle Button (FFA only) */}
-          {isHost && room.battle_type === 'ffa' && room.status === 'waiting' && currentPlayers > 1 && !isCountdownInitiated && (
+          {isHost && (room.battle_type === 'ffa' || room.battle_type === 'rapid_fire') && room.status === 'waiting' && currentPlayers > 1 && !isCountdownInitiated && (
             <Button
               onClick={() => startBattleMutation.mutate()}
               disabled={startBattleMutation.isPending || currentPlayers < 2}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg flex items-center justify-center space-x-2"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 flex items-center justify-center space-x-2"
             >
               {startBattleMutation.isPending ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <Play className="w-4 h-4" />
               )}
-              <span>Start Battle Now! (FFA)</span>
+              <span>{isRapidFire ? 'Start Rapid Fire Now!' : 'Start Battle Now! (FFA)'}</span>
             </Button>
           )}
 
@@ -760,7 +1032,7 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
             onClick={handleLeaveClick}
             disabled={leaveRoomMutation.isPending}
             variant="outline"
-            className="w-full border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30"
+            className="w-full border-border/60 text-foreground hover:bg-muted/50"
           >
             {isLeaving ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />

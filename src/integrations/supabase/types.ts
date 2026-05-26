@@ -150,10 +150,12 @@ export type Database = {
           created_at: string
           id: string
           is_ready: boolean | null
+          is_bot: boolean
           joined_at: string
           kicked_at: string | null
           score: number | null
           team: number | null
+          bot_accuracy: number | null
           user_id: string
           username: string
         }
@@ -163,10 +165,12 @@ export type Database = {
           created_at?: string
           id?: string
           is_ready?: boolean | null
+          is_bot?: boolean
           joined_at?: string
           kicked_at?: string | null
           score?: number | null
           team?: number | null
+          bot_accuracy?: number | null
           user_id: string
           username: string
         }
@@ -176,16 +180,71 @@ export type Database = {
           created_at?: string
           id?: string
           is_ready?: boolean | null
+          is_bot?: boolean
           joined_at?: string
           kicked_at?: string | null
           score?: number | null
           team?: number | null
+          bot_accuracy?: number | null
           user_id?: string
           username?: string
         }
         Relationships: [
           {
             foreignKeyName: "battle_participants_battle_room_id_fkey"
+            columns: ["battle_room_id"]
+            isOneToOne: false
+            referencedRelation: "battle_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_answer_events: {
+        Row: {
+          battle_room_id: string | null
+          created_at: string
+          id: string
+          is_correct: boolean
+          question_id: string | null
+          question_index: number
+          response_time_ms: number
+          selected_answer: string | null
+          submitted_at: string
+          team: number | null
+          user_id: string
+          username: string
+        }
+        Insert: {
+          battle_room_id?: string | null
+          created_at?: string
+          id?: string
+          is_correct?: boolean
+          question_id?: string | null
+          question_index: number
+          response_time_ms?: number
+          selected_answer?: string | null
+          submitted_at?: string
+          team?: number | null
+          user_id: string
+          username: string
+        }
+        Update: {
+          battle_room_id?: string | null
+          created_at?: string
+          id?: string
+          is_correct?: boolean
+          question_id?: string | null
+          question_index?: number
+          response_time_ms?: number
+          selected_answer?: string | null
+          submitted_at?: string
+          team?: number | null
+          user_id?: string
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_answer_events_battle_room_id_fkey"
             columns: ["battle_room_id"]
             isOneToOne: false
             referencedRelation: "battle_rooms"
@@ -252,9 +311,12 @@ export type Database = {
           host_id: string | null
           host_ping_requested_at: string | null
           id: string
+          is_private: boolean
           last_ping_sender_id: string | null
           last_ping_sender_username: string | null
           max_players: number
+          paused_at: string | null
+          question_started_at: string | null
           questions: Json | null
           room_code: string
           started_at: string | null
@@ -263,6 +325,9 @@ export type Database = {
           subject_id: string | null
           time_per_question: number | null
           total_questions: number | null
+          win_target: number
+          winner_team: number | null
+          winner_user_id: string | null
         }
         Insert: {
           battle_type: string
@@ -275,9 +340,12 @@ export type Database = {
           host_id?: string | null
           host_ping_requested_at?: string | null
           id?: string
+          is_private?: boolean
           last_ping_sender_id?: string | null
           last_ping_sender_username?: string | null
           max_players: number
+          paused_at?: string | null
+          question_started_at?: string | null
           questions?: Json | null
           room_code: string
           started_at?: string | null
@@ -286,6 +354,9 @@ export type Database = {
           subject_id?: string | null
           time_per_question?: number | null
           total_questions?: number | null
+          win_target?: number
+          winner_team?: number | null
+          winner_user_id?: string | null
         }
         Update: {
           battle_type?: string
@@ -298,9 +369,12 @@ export type Database = {
           host_id?: string | null
           host_ping_requested_at?: string | null
           id?: string
+          is_private?: boolean
           last_ping_sender_id?: string | null
           last_ping_sender_username?: string | null
           max_players?: number
+          paused_at?: string | null
+          question_started_at?: string | null
           questions?: Json | null
           room_code?: string
           started_at?: string | null
@@ -309,6 +383,9 @@ export type Database = {
           subject_id?: string | null
           time_per_question?: number | null
           total_questions?: number | null
+          win_target?: number
+          winner_team?: number | null
+          winner_user_id?: string | null
         }
         Relationships: []
       }
@@ -1114,6 +1191,17 @@ export type Database = {
       is_group_member: {
         Args: { group_id_param: string }
         Returns: boolean
+      }
+      submit_rapid_fire_answer: {
+        Args: {
+          p_room_id: string
+          p_user_id: string
+          p_question_index: number
+          p_question_id: string
+          p_selected_answer: string
+          p_response_time_ms: number
+        }
+        Returns: Json
       }
     }
     Enums: {

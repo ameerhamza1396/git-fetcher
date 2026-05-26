@@ -205,7 +205,7 @@ const Profile = () => {
                                     onClick={() => toast.info('Institute can only be set once. To request a change, please contact us at hi@medistics.app.')}
                                     className="bg-white/5 border-white/10 text-white/60 rounded-xl h-11 mt-1 cursor-not-allowed"
                                 />
-                                <p className="text-[10px] text-white/40 mt-1">To change institute, email hi@medistics.app</p>
+                                <p className="text-[10px] text-white/40 mt-1">To change institute, email hi@medmacs.app</p>
                             </div>
                             <div>
                                 <Label htmlFor="full_name" className="text-white/80 text-xs font-bold uppercase tracking-wider">Full Name *</Label>

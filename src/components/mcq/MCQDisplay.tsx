@@ -7,7 +7,7 @@ import {
   Clock, CheckCircle, XCircle, Timer, Bot, MessageSquare, X, Bookmark,
   BookmarkCheck, Crown, LogOut, AlertTriangle, MoreVertical, Flag, BotOff,
   Moon, Sun, Zap, Sparkles, BookOpen, ChevronLeft, Loader2, Star, Award,
-  TrendingUp, Brain, Target, Shield, ShieldAlert, Trash2
+  TrendingUp, Brain, Target, Shield, ShieldAlert, Trash2, PanelBottom
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
@@ -20,6 +20,7 @@ import { useQuery } from '@tanstack/react-query';
 import { playCorrectSound, playIncorrectSound } from '@/utils/soundEffects';
 import { Textarea } from '@/components/ui/textarea';
 import { useTheme } from 'next-themes';
+
 import { Switch } from '@/components/ui/switch';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 
@@ -367,6 +368,32 @@ const ReportMCQModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
+const QuestionMapDrawer = ({ isOpen, onOpenChange, children }) => (
+  <DialogPrimitive.Root open={isOpen} onOpenChange={onOpenChange}>
+    <DialogPrimitive.Portal>
+      <DialogPrimitive.Overlay
+        className="fixed inset-0 z-[200] bg-black/70 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+      />
+      <DialogPrimitive.Content
+        className="fixed inset-y-0 left-0 z-[201] flex h-full w-[300px] max-w-[85vw] flex-col border-r border-slate-200 bg-background shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left data-[state=closed]:duration-300 data-[state=open]:duration-300 dark:border-slate-800 sm:w-[350px]"
+      >
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
+          <DialogPrimitive.Title className="text-lg font-semibold text-foreground">
+            Question <span className="text-blue-600">Map</span>
+          </DialogPrimitive.Title>
+          <DialogPrimitive.Close className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-6">
+          {children}
+        </div>
+      </DialogPrimitive.Content>
+    </DialogPrimitive.Portal>
+  </DialogPrimitive.Root>
+);
+
 export const MCQDisplay = ({
   subject,
   chapter,
@@ -411,6 +438,7 @@ export const MCQDisplay = ({
     if (typeof window !== 'undefined') return localStorage.getItem('mcqSoundDisabled') !== 'true';
     return true;
   });
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [dailySubmissionsCount, setDailySubmissionsCount] = useState(0);
   const [lastSubmissionResetDate, setLastSubmissionResetDate] = useState<string | null>(null);
   const [showUpgradeBanner, setShowUpgradeBanner] = useState(false);
@@ -561,6 +589,16 @@ export const MCQDisplay = ({
 
   const handleUpgradeClick = () => setShowUpgradeModal(false);
 
+  const goToQuestion = (index: number) => {
+    setCurrentQuestionIndex(index);
+    setIsDrawerOpen(false);
+    if (contentRef.current) {
+      contentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const isQuestionAnswered = (mcqId: string) => answeredQuestions[mcqId] !== undefined;
+
   const handleSearchReference = () => {
     if (!currentMCQ) return;
     if (userPlanForChatbot === 'free') {
@@ -630,6 +668,29 @@ export const MCQDisplay = ({
     }
   }, [currentQuestionIndex]);
 
+  const lastScrollY = useRef(0);
+  const scrollThrottle = useRef(false);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      if (scrollThrottle.current) return;
+      scrollThrottle.current = true;
+      setTimeout(() => { scrollThrottle.current = false; }, 300);
+      const scrollTop = el.scrollTop;
+      const scrollHeight = el.scrollHeight;
+      const clientHeight = el.clientHeight;
+      const distFromBottom = scrollHeight - scrollTop - clientHeight;
+      if (distFromBottom < 60 && scrollTop < lastScrollY.current) {
+        setIsDrawerOpen(true);
+      }
+      lastScrollY.current = scrollTop;
+    };
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, []);
+
   useEffect(() => {
     const loadMCQs = async () => {
       setLoading(true);
@@ -637,6 +698,8 @@ export const MCQDisplay = ({
 
       // Load previous answers for this chapter
       let firstUnattemptedIndex = 0;
+      const answerMap: Record<string, { selectedAnswer: string }> = {};
+
       if (user?.id) {
         const { data: previousAnswers } = await supabase
           .from('user_answers')
@@ -645,16 +708,14 @@ export const MCQDisplay = ({
           .in('mcq_id', data.map(m => m.id));
 
         if (previousAnswers) {
-          const answerMap = {};
           previousAnswers.forEach(ans => {
             answerMap[ans.mcq_id] = { selectedAnswer: ans.selected_answer };
           });
           setAnsweredQuestions(answerMap);
 
-          // Find the first index that hasn't been answered
           const foundIndex = data.findIndex(m => !answerMap[m.id]);
           if (foundIndex !== -1) firstUnattemptedIndex = foundIndex;
-          else firstUnattemptedIndex = data.length - 1; // All answered, go to last
+          else firstUnattemptedIndex = data.length - 1;
         }
       }
 
@@ -664,9 +725,14 @@ export const MCQDisplay = ({
       });
       setMcqs(shuffledMCQs);
 
-      // NEW: Scroll to nearest unattempted
       if (initialIndex > 0) {
-        setCurrentQuestionIndex(initialIndex);
+        // Find nearest unanswered from initialIndex going forward
+        const nearestForward = data.findIndex((m, i) => i >= initialIndex && !answerMap[m.id]);
+        if (nearestForward !== -1) {
+          setCurrentQuestionIndex(nearestForward);
+        } else {
+          setCurrentQuestionIndex(firstUnattemptedIndex);
+        }
       } else {
         setCurrentQuestionIndex(firstUnattemptedIndex);
       }
@@ -699,6 +765,31 @@ export const MCQDisplay = ({
   useEffect(() => {
     setReferenceData(null);
   }, [currentQuestionIndex, setReferenceData]);
+
+  const QuestionMapGrid = () => (
+    <>
+      <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+        {mcqs.map((mcq, index) => (
+          <button key={mcq.id}
+            className={`w-full h-10 rounded-xl text-sm font-bold transition-all ${
+              currentQuestionIndex === index
+                ? 'bg-gradient-to-br from-primary to-blue-600 text-white border-transparent shadow-lg shadow-primary/30'
+                : isQuestionAnswered(mcq.id)
+                  ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                  : 'bg-muted text-muted-foreground border border-transparent'
+            }`}
+            onClick={() => goToQuestion(index)}>
+            {index + 1}
+          </button>
+        ))}
+      </div>
+      <div className="mt-4 text-xs text-muted-foreground space-y-1.5">
+        <p className="flex items-center"><span className="inline-block w-3 h-3 rounded-full bg-gradient-to-br from-primary to-blue-600 mr-2" />Current</p>
+        <p className="flex items-center"><span className="inline-block w-3 h-3 rounded-full bg-emerald-500 mr-2" />Answered</p>
+        <p className="flex items-center"><span className="inline-block w-3 h-3 rounded-full bg-muted mr-2" />Unanswered</p>
+      </div>
+    </>
+  );
 
   if (loading || profileLoading) {
     return (
@@ -753,6 +844,9 @@ export const MCQDisplay = ({
           )}
           <Button variant="ghost" size="icon" onClick={handleSaveMCQ} className="w-9 h-9 rounded-lg">
             {isCurrentMCQSaved ? <BookmarkCheck className="w-4 h-4 fill-primary text-primary" /> : <Bookmark className="w-4 h-4" />}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setIsDrawerOpen(true)} className="w-9 h-9 rounded-lg">
+            <PanelBottom className="w-4 h-4" />
           </Button>
           <Button variant="ghost" size="icon" onClick={() => setShowSettingsModal(true)} className="w-9 h-9 rounded-lg">
             <MoreVertical className="w-4 h-4" />
@@ -888,9 +982,8 @@ export const MCQDisplay = ({
           </div>
         </div>
 
-        {/* Footer */}
-        <footer className="relative z-50 px-4 sm:px-6 py-3 pb-[env(safe-area-inset-bottom)] border-t border-slate-200 dark:border-slate-800 bg-background">
-          <div className="flex items-center gap-3">
+      <footer className="relative z-50 px-4 sm:px-6 py-3 pb-[env(safe-area-inset-bottom)] border-t border-slate-200 dark:border-slate-800 bg-background">
+        <div className="flex items-center gap-3">
           <Button
             variant="outline"
             onClick={() => {
@@ -968,6 +1061,9 @@ export const MCQDisplay = ({
       <LeaveTestModal isOpen={showLeaveModal} onClose={() => setShowLeaveModal(false)} onConfirm={() => { setShowLeaveModal(false); onBack(); }} />
       <ReportMCQModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} onSubmit={handleReportSubmit} isSubmitting={isReportSubmitting} />
       <UpgradeAccountModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} onUpgradeClick={handleUpgradeClick} message={upgradeModalMessage} />
+      <QuestionMapDrawer isOpen={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+        <QuestionMapGrid />
+      </QuestionMapDrawer>
 
       {currentMCQ && (
         <AIChatbot

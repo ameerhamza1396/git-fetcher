@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#0D0520</color>
+    <color name="splash_bg">#0D0520</color>
+    <color name="splash_text">#FFFFFF</color>
+    <color name="splash_footer">#9CA3AF</color>
+</resources>

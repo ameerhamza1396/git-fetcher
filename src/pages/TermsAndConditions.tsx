@@ -9,9 +9,9 @@ const TermsAndConditions = () => {
 
 **Last updated:** June 12, 2025
 
-These Terms and Conditions outline the rules and regulations for the use of Medistics.app's Website, an MCAT Learning platform integrated with Artificial Intelligence.
+These Terms and Conditions outline the rules and regulations for the use of Medmacs.app's Website, an MCAT Learning platform integrated with Artificial Intelligence.
 
-By accessing this website we assume you accept these terms and conditions. Do not continue to use Medistics.app if you do not agree to take all of the terms and conditions stated on this page.
+By accessing this website we assume you accept these terms and conditions. Do not continue to use Medmacs.app if you do not agree to take all of the terms and conditions stated on this page.
 
 ---
 
@@ -36,7 +36,7 @@ For the purposes of these Terms and Conditions:
     for election of directors or other managing authority.
 
 * **Company** (referred to as either "the Company", "We", "Us" or "Our" in this
-    Agreement) refers to Medistics.app, L13, KDA Flats, Sector 5E Surjani
+    Agreement) refers to Medmacs.app, L13, KDA Flats, Sector 5E Surjani
     Town, Karachi.
 
 * **Country** refers to: Pakistan
@@ -56,8 +56,8 @@ For the purposes of these Terms and Conditions:
     network website through which a User can log in or create an account to
     use the Service.
 
-* **Website** refers to Medistics.app, accessible from
-    [medistics.app](medistics.app)
+* **Website** refers to Medmacs.app, accessible from
+    [Medmacs.app](Medmacs.app)
 
 * **You** means the individual accessing or using the Service, or the company,
     or other legal entity on behalf of which such individual is accessing or
@@ -67,20 +67,20 @@ For the purposes of these Terms and Conditions:
 
 ## Cookies
 
-We employ the use of cookies. By accessing Medistics.app, you agreed to use cookies in agreement with the Medistics.app's Privacy Policy.
+We employ the use of cookies. By accessing Medmacs.app, you agreed to use cookies in agreement with the Medmacs.app's Privacy Policy.
 
 ---
 
 ## License
 
-Unless otherwise stated, Medistics.app and/or its licensors own the intellectual property rights for all material on Medistics.app. All intellectual property rights are reserved. You may access this from Medistics.app for your own personal use subject to restrictions set in these terms and conditions.
+Unless otherwise stated, Medmacs.app and/or its licensors own the intellectual property rights for all material on Medmacs.app. All intellectual property rights are reserved. You may access this from Medmacs.app for your own personal use subject to restrictions set in these terms and conditions.
 
 You must not:
 
-* Republish material from Medistics.app
-* Sell, rent or sub-license material from Medistics.app
-* Reproduce, duplicate or copy material from Medistics.app
-* Redistribute content from Medistics.app
+* Republish material from Medmacs.app
+* Sell, rent or sub-license material from Medmacs.app
+* Reproduce, duplicate or copy material from Medmacs.app
+* Redistribute content from Medmacs.app
 
 Specifically, regarding the AI integration:
 
@@ -96,7 +96,7 @@ The following organizations may link to our Website without prior written approv
 * Government agencies
 * Search engines
 
-Anyone can link to Medistics.app. The link must not be in any way deceptive and must not falsely imply sponsorship, endorsement or approval of the linking party and its products or services, and must fit within the context of the linking party’s site.
+Anyone can link to Medmacs.app. The link must not be in any way deceptive and must not falsely imply sponsorship, endorsement or approval of the linking party and its products or services, and must fit within the context of the linking party’s site.
 
 ---
 
@@ -129,7 +129,7 @@ To the maximum extent permitted by applicable law, we exclude all representation
 
 The limitations and prohibitions of liability set in this Section and elsewhere in this disclaimer: (a) are subject to the preceding paragraph; and (b) govern all liabilities arising under the disclaimer, including liabilities arising in contract, in tort and for breach of statutory duty.
 
-While we strive to provide accurate and up-to-date information through Medistics.app, we do not warrant the completeness or accuracy of the information presented on this website. We also do not guarantee that the website will remain available or that the material on the website will be kept up to date. The MCAT learning content and AI-generated insights are provided for educational purposes only and should not be considered a substitute for professional advice or comprehensive study resources. Your reliance on any information provided by the Service is solely at your own risk. As long as the website and the information and services on the website are provided free of charge, we will not be liable for any loss or damage of any nature.
+While we strive to provide accurate and up-to-date information through Medmacs.app, we do not warrant the completeness or accuracy of the information presented on this website. We also do not guarantee that the website will remain available or that the material on the website will be kept up to date. The MCAT learning content and AI-generated insights are provided for educational purposes only and should not be considered a substitute for professional advice or comprehensive study resources. Your reliance on any information provided by the Service is solely at your own risk. As long as the website and the information and services on the website are provided free of charge, we will not be liable for any loss or damage of any nature.
 
 ---
 
@@ -137,18 +137,18 @@ While we strive to provide accurate and up-to-date information through Medistics
 
 If you have any questions about these Terms and Conditions, you can contact us:
 
-* By email: [medistics@dr.com](mailto:medistics@dr.com)
+* By email: [Medmacs@dr.com](mailto:Medmacs@dr.com)
 
 * By visiting this page on our website:
-    [instagram.com/medistics.app](https://instagram.com/medistics.app)
+    [instagram.com/Medmacs.app](https://instagram.com/Medmacs.app)
 `;
 
   return (
     <div className="min-h-screen w-full bg-background">
       <Seo
         title="Terms and Conditions"
-        description="Read the terms and conditions for using Medistics App services. Your agreement to these terms is required for usage."
-        canonical="https://medistics.app/terms"
+        description="Read the terms and conditions for using Medmacs App services. Your agreement to these terms is required for usage."
+        canonical="https://Medmacs.app/terms"
       />
 
       <div className="container mx-auto px-4 lg:px-8 py-8 max-w-4xl pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">

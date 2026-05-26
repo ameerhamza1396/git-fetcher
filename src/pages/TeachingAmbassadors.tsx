@@ -371,7 +371,7 @@ const TeachingAmbassadors = () => {
                 {/* Perks of Being a Teaching Ambassador */}
                 <div className="mt-12 text-center animate-fade-in">
                     <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-6">
-                        🌟 Perks of Being a Medistics Intern.
+                        🌟 Perks of Being a Medmacs Intern.
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
                         <Card className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 hover:scale-105 transition-transform duration-300">
@@ -444,7 +444,7 @@ const TeachingAmbassadors = () => {
                             <p className="font-medium mb-2">Medmacs Teaching Intership Program Details:</p>
                             <ul className="space-y-1 text-xs">
                                 <li>• <strong>Share Knowledge:</strong> Help students excel in their studies by providing guidance and teaching.</li>
-                                <li>• <strong>Content Creation:</strong> Contribute to Medistics' educational resources.</li>
+                                <li>• <strong>Content Creation:</strong> Contribute to Medmacs' educational resources.</li>
                                 <li>• <strong>Community Building:</strong> Foster a vibrant learning environment among students and peers.</li>
                                 <li>• <strong>Professional Growth:</strong> Enhance your teaching skills and build a professional portfolio.</li>
                             </ul>

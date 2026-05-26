@@ -51,6 +51,20 @@ type CaseOfDay = {
   created_at: string;
 };
 
+type DashboardAnnouncement = {
+  id: string;
+  card_heading: string;
+  card_subheading: string;
+  card_background_image_url?: string | null;
+  card_secondary_image_url?: string | null;
+  modal_heading: string;
+  modal_subheading: string;
+  modal_background_image_url?: string | null;
+  modal_image_urls?: string[] | null;
+  cta_text?: string | null;
+  cta_url?: string | null;
+};
+
 // Swipe-to-reveal Case of Day card
 const CaseOfDayCard = ({ caseOfDay, onClose, isPremium, onNavigateToChat, onNavigateToPricing }: {
   caseOfDay: CaseOfDay;
@@ -264,6 +278,7 @@ const ActionCard = ({ action, isExternal = false, fixedHeight = false }: any) =>
   );
 
   if (isExternal) return <a href={action.link} target="_blank" rel="noopener noreferrer">{content}</a>;
+  if (action.onClick) return <button type="button" onClick={action.onClick} className="w-full text-left">{content}</button>;
   return <Link to={action.disabled ? '#' : action.link} className={action.disabled ? 'opacity-50 pointer-events-none' : ''}>{content}</Link>;
 };
 
@@ -349,6 +364,51 @@ const DashboardReviewCard = ({ onComplete }: { onComplete: () => void }) => {
   );
 };
 
+const DashboardAnnouncementCard = ({
+  announcement,
+  onOpen,
+}: {
+  announcement: DashboardAnnouncement;
+  onOpen: () => void;
+}) => {
+  return (
+    <button
+      onClick={onOpen}
+      className="relative overflow-hidden rounded-[2rem] h-32 mb-6 w-full text-left shadow-xl active:scale-[0.98] transition-all group"
+    >
+      {announcement.card_background_image_url ? (
+        <img
+          src={announcement.card_background_image_url}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0f172a] via-[#0d9488] to-[#0284c7]" />
+      )}
+      <div className="absolute inset-0 bg-black/35" />
+      {announcement.card_secondary_image_url && (
+        <img
+          src={announcement.card_secondary_image_url}
+          alt=""
+          className="absolute right-2 bottom-0 h-[92%] max-w-[42%] object-contain drop-shadow-2xl"
+        />
+      )}
+      <div className="relative z-10 h-full flex flex-col justify-end p-5 pr-[42%]">
+        <div className="flex items-center gap-1.5 mb-1">
+          <Megaphone className="w-3.5 h-3.5 text-[#2dd4bf]" />
+          <span className="text-[10px] font-black text-white/65 uppercase tracking-[0.18em]">Announcement</span>
+        </div>
+        <h3 className="text-lg font-black text-white tracking-tight leading-tight line-clamp-1">
+          {announcement.card_heading}
+        </h3>
+        <p className="text-white/70 text-[11px] leading-relaxed line-clamp-2 mt-1">
+          {announcement.card_subheading}
+        </p>
+      </div>
+    </button>
+  );
+};
+
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -360,6 +420,8 @@ const Dashboard = () => {
   const [showWhatsNew, setShowWhatsNew] = useState(false);
   const [showTermOfDay, setShowTermOfDay] = useState(false);
   const [showCaseOfDay, setShowCaseOfDay] = useState(false);
+  const [showCollaborateModal, setShowCollaborateModal] = useState(false);
+  const [selectedDashboardAnnouncement, setSelectedDashboardAnnouncement] = useState<DashboardAnnouncement | null>(null);
   const [appVersion, setAppVersion] = useState<string>('Loading...');
   const [reviewCompleted, setReviewCompleted] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -569,6 +631,39 @@ const Dashboard = () => {
     enabled: !!(profile as any)?.institute
   });
 
+  const { data: dashboardAnnouncements = [] } = useQuery<DashboardAnnouncement[]>({
+    queryKey: ['dashboardAnnouncements', (profile as any)?.institute],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('dashboard_announcements')
+        .select(`
+          id,
+          card_heading,
+          card_subheading,
+          card_background_image_url,
+          card_secondary_image_url,
+          modal_heading,
+          modal_subheading,
+          modal_background_image_url,
+          modal_image_urls,
+          cta_text,
+          cta_url
+        `)
+        .eq('is_published', true)
+        .order('display_order', { ascending: true })
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching dashboard announcements:', error);
+        return [];
+      }
+
+      return data || [];
+    },
+    enabled: !!user?.id,
+    staleTime: 1000 * 60 * 5,
+  });
+
   const dashboardComponents = instituteData?.dashboard_components || { mcqs: true, seqs: false, viva: false };
 
   const markAsReadMutation = useMutation({
@@ -606,17 +701,19 @@ const Dashboard = () => {
     setIsNavigating(false);
   }, [authLoading, profileLoading, user, profile, navigate]);
 
+  const flpAction = { title: 'Full-Length Paper', description: 'Timed mixed exams', icon: ScrollText, link: '/flp', gradient: 'from-sky-600 to-violet-600', iconColor: 'text-sky-100' };
+  const collaborateAction = { title: 'Collaborate', description: 'Why Medmacs needs you', icon: Briefcase, onClick: () => setShowCollaborateModal(true), gradient: 'from-rose-500 to-pink-600', iconColor: 'text-rose-100' };
+
   const quickActions = [
     { title: 'Practice MCQs', description: 'Test your knowledge', icon: BookOpen, link: '/mcqs', gradient: 'from-blue-500 to-indigo-600', iconColor: 'text-blue-200' },
     { title: 'Saved MCQs', description: 'Review bookmarks', icon: Bookmark, link: '/saved-mcqs', gradient: 'from-teal-500 to-emerald-600', iconColor: 'text-teal-100' },
     { title: 'Battle Arena', description: 'Compete with friends', icon: Swords, link: '/battle', gradient: 'from-orange-500 to-red-500', iconColor: 'text-orange-100' },
-    { title: 'Collaborate', description: 'Open now! Apply for Medmacs', icon: Briefcase, link: '/summerinternship2025', gradient: 'from-rose-500 to-pink-600', iconColor: 'text-rose-100' },
+    flpAction,
   ];
 
   const premiumPerks = [
     { title: 'AI Test Generator', description: 'Custom tests with AI', icon: Brain, link: '/ai/test-generator', gradient: 'from-cyan-500 to-blue-600', iconColor: 'text-cyan-100' },
     { title: 'AI Chatbot', description: 'Instant AI tutor', icon: Zap, link: '/ai/chatbot', gradient: 'from-amber-400 to-orange-500', iconColor: 'text-yellow-100' },
-    { title: 'Full-Length Paper', description: 'Timed mixed exams', icon: ScrollText, link: '/flp', gradient: 'from-teal-500 to-emerald-600', iconColor: 'text-teal-200' },
   ];
 
   const instituteModules = [
@@ -627,6 +724,18 @@ const Dashboard = () => {
   const displayName = profile?.full_name || profile?.username || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Medmacs User';
   const rawUserPlan = profile?.plan?.toLowerCase() || 'free';
   const userPlanDisplayName = rawUserPlan.charAt(0).toUpperCase() + rawUserPlan.slice(1) + ' Plan';
+  const dashboardAnnouncement = dashboardAnnouncements[0] || null;
+
+  const openExternalUrl = async (url?: string | null) => {
+    if (!url) return;
+
+    try {
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({ url });
+    } catch (error) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  };
 
   if (isNavigating || authLoading || profileLoading) {
     return (
@@ -984,13 +1093,20 @@ const Dashboard = () => {
             )}
 
             {/* Review or Institute Card */}
-            {reviewCompleted ? (
-              <InstituteDetailCard institute={instituteData} />
+            {dashboardAnnouncement ? (
+              <DashboardAnnouncementCard
+                announcement={dashboardAnnouncement}
+                onOpen={() => setSelectedDashboardAnnouncement(dashboardAnnouncement)}
+              />
             ) : (
-              <DashboardReviewCard onComplete={() => {
-                setReviewCompleted(true);
-                localStorage.setItem('medmacs_dashboard_review_completed', 'true');
-              }} />
+              reviewCompleted ? (
+                <InstituteDetailCard institute={instituteData} />
+              ) : (
+                <DashboardReviewCard onComplete={() => {
+                  setReviewCompleted(true);
+                  localStorage.setItem('medmacs_dashboard_review_completed', 'true');
+                }} />
+              )
             )}
 
             {/* Premium Perks with animated crown */}
@@ -1007,6 +1123,9 @@ const Dashboard = () => {
               <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-1.5">
                 <TrendingUp className="w-3.5 h-3.5 text-violet-500" /> Explore
               </h2>
+              <div className="mb-3">
+                <ActionCard action={collaborateAction} />
+              </div>
               <a href="https://medistics.app" target="_blank" rel="noopener noreferrer">
                 <div className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-violet-600 to-purple-700 shadow-lg shadow-violet-500/10 active:scale-[0.97] transition-all">
                   <div className="relative z-10 flex items-center gap-3">
@@ -1126,6 +1245,143 @@ const Dashboard = () => {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!selectedDashboardAnnouncement}
+        onOpenChange={(open) => {
+          if (!open) setSelectedDashboardAnnouncement(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-[430px] p-0 overflow-hidden border-0 rounded-[2rem] [&>button]:hidden">
+          <DialogHeader>
+            <DialogTitle className="sr-only">
+              {selectedDashboardAnnouncement?.modal_heading || 'Dashboard announcement'}
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              {selectedDashboardAnnouncement?.modal_subheading}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedDashboardAnnouncement && (
+            <div className="relative max-h-[82vh] overflow-hidden bg-[#06111f] text-white">
+              {selectedDashboardAnnouncement.modal_background_image_url ? (
+                <img
+                  src={selectedDashboardAnnouncement.modal_background_image_url}
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              ) : (
+                <div className="absolute inset-0 bg-gradient-to-br from-[#0f172a] via-[#0f766e] to-[#075985]" />
+              )}
+              <div className="absolute inset-0 bg-black/55" />
+
+              <div className="relative z-10 flex max-h-[82vh] flex-col">
+                <div className="flex items-start justify-between gap-4 p-5 pb-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#2dd4bf] mb-2">
+                      Medmacs Update
+                    </p>
+                    <h2 className="text-2xl font-black leading-tight tracking-tight">
+                      {selectedDashboardAnnouncement.modal_heading}
+                    </h2>
+                  </div>
+                  <button
+                    onClick={() => setSelectedDashboardAnnouncement(null)}
+                    className="w-9 h-9 rounded-full bg-white/10 border border-white/10 flex items-center justify-center shrink-0 active:scale-95 transition-all"
+                  >
+                    <X className="w-4 h-4 text-white" />
+                  </button>
+                </div>
+
+                <div className="overflow-y-auto px-5 pb-5">
+                  <p className="text-sm leading-6 text-white/78 mb-5">
+                    {selectedDashboardAnnouncement.modal_subheading}
+                  </p>
+
+                  {!!selectedDashboardAnnouncement.modal_image_urls?.length && (
+                    <div className="mb-5 -mx-5 overflow-x-auto px-5">
+                      <div className="flex gap-3 pb-1">
+                        {selectedDashboardAnnouncement.modal_image_urls.map((imageUrl, index) => (
+                          <img
+                            key={`${imageUrl}-${index}`}
+                            src={imageUrl}
+                            alt=""
+                            className="h-40 w-64 shrink-0 rounded-2xl object-cover border border-white/10 shadow-lg"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedDashboardAnnouncement.cta_text && selectedDashboardAnnouncement.cta_url && (
+                    <button
+                      onClick={() => openExternalUrl(selectedDashboardAnnouncement.cta_url)}
+                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-[#0ea5e9]/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                    >
+                      {selectedDashboardAnnouncement.cta_text}
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCollaborateModal} onOpenChange={setShowCollaborateModal}>
+        <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border border-white/20 rounded-[2rem] bg-white/10 dark:bg-slate-950/50 backdrop-blur-2xl shadow-2xl [&>button]:hidden">
+          <DialogHeader>
+            <DialogTitle className="sr-only">Why Medmacs</DialogTitle>
+            <DialogDescription className="sr-only">
+              Learn why students collaborate with Medmacs and visit the collaboration page.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="relative overflow-hidden text-white">
+            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/45 via-slate-950/80 to-cyan-500/35" />
+            <div className="absolute inset-0 bg-white/[0.06]" />
+            <button
+              onClick={() => setShowCollaborateModal(false)}
+              className="absolute right-4 top-4 z-20 w-9 h-9 rounded-full bg-white/12 border border-white/15 flex items-center justify-center active:scale-95 transition-all"
+            >
+              <X className="w-4 h-4 text-white" />
+            </button>
+
+            <div className="relative z-10 px-6 pt-7 pb-6">
+              <div className="flex items-end justify-between gap-3 mb-5">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200 mb-2">
+                    Collaborate
+                  </p>
+                  <h2 className="text-3xl font-black leading-none tracking-tight">
+                    Why Medmacs?
+                  </h2>
+                </div>
+                <img
+                  src="/mascots/Mascot3.png"
+                  alt="Medmacs mascot"
+                  className="w-28 h-28 object-contain drop-shadow-2xl shrink-0"
+                />
+              </div>
+
+              <div className="rounded-3xl border border-white/15 bg-white/10 backdrop-blur-xl p-4 mb-5 shadow-xl">
+                <p className="text-sm leading-6 text-white/82">
+                  Medmacs is built around students who want better study tools, sharper medical learning, and a community that actually moves fast. Collaborators help shape campaigns, campus presence, content ideas, and the next student-first features inside the app.
+                </p>
+              </div>
+
+              <button
+                onClick={() => openExternalUrl('https://medmacs.app/collaborate')}
+                className="w-full py-3.5 rounded-2xl bg-white text-slate-950 font-black text-xs uppercase tracking-widest shadow-lg shadow-black/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              >
+                Visit Collaborate
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

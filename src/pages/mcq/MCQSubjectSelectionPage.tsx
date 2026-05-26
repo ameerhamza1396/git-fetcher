@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,9 @@ const MCQSubjectSelectionPage = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+  const [isHeadingStuck, setIsHeadingStuck] = useState(false);
+  const stickyHeadingRef = useRef<HTMLDivElement>(null);
+  const stickyHeadingStartTop = useRef<number | null>(null);
   const [userStats, setUserStats] = useState({
     totalQuestions: 0, correctAnswers: 0, accuracy: 0, averageTime: 0, bestStreak: 0
   });
@@ -66,6 +69,24 @@ const MCQSubjectSelectionPage = () => {
       setLoading(false);
     };
     loadSubjects();
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!stickyHeadingRef.current) return;
+      if (stickyHeadingStartTop.current === null) {
+        stickyHeadingStartTop.current = stickyHeadingRef.current.offsetTop;
+      }
+      setIsHeadingStuck(window.scrollY >= stickyHeadingStartTop.current - 1);
+    };
+
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    };
   }, []);
 
   useEffect(() => {
@@ -133,16 +154,43 @@ const MCQSubjectSelectionPage = () => {
         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-3 block">Step 1 of 3</span>
       </motion.div>
 
-      <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md pt-[env(safe-area-inset-top)] -mx-3 sm:mx-0 px-3 sm:px-0">
+      <div ref={stickyHeadingRef} className="sticky top-0 z-50 bg-background/80 backdrop-blur-md pt-[env(safe-area-inset-top)] -mx-3 sm:mx-0 px-3 sm:px-0">
         <div className="max-w-4xl mx-auto px-4 sm:px-0">
-          <div className="pt-4 pb-3">
-            <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
-              Select <span className="live-gradient-text">Subject</span>
-            </h2>
-            <p className="text-muted-foreground text-sm font-medium mt-2 max-w-lg mx-auto text-center">
+          <motion.div
+            animate={{ paddingTop: isHeadingStuck ? 10 : 16, paddingBottom: isHeadingStuck ? 10 : 12 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+            className="overflow-hidden"
+          >
+            <motion.div
+              animate={{ height: isHeadingStuck ? 28 : 56 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+              className="relative"
+            >
+              <motion.h2
+                animate={{
+                  left: isHeadingStuck ? '0%' : '50%',
+                  x: isHeadingStuck ? '0%' : '-50%',
+                  scale: isHeadingStuck ? 0.58 : 1
+                }}
+                transition={{ type: 'spring', stiffness: 260, damping: 28 }}
+                className="absolute top-0 origin-left whitespace-nowrap text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none"
+              >
+                Select <span className="live-gradient-text">Subject</span>
+              </motion.h2>
+            </motion.div>
+            <motion.p
+              animate={{
+                opacity: isHeadingStuck ? 0 : 1,
+                y: isHeadingStuck ? -8 : 0,
+                height: isHeadingStuck ? 0 : 'auto',
+                marginTop: isHeadingStuck ? 0 : 8
+              }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden text-muted-foreground text-sm font-medium max-w-lg mx-auto text-center"
+            >
               Choose a subject to begin your practice. Each subject contains comprehensive chapters and high-yield MCQs.
-            </p>
-          </div>
+            </motion.p>
+          </motion.div>
         </div>
         <div className="h-4 bg-gradient-to-b from-background/80 to-transparent pointer-events-none" />
       </div>

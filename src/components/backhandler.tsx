@@ -30,6 +30,10 @@ export default function BackButtonHandler() {
 
             console.log(`[BackHandler] Back pressed. Path=[${pathname}], canGoBack=[${canGoBack}]`);
 
+            if (document.body.dataset.battleGameActive === "true") {
+                return;
+            }
+
             // MCQ Quiz Routes: let the MCQDisplay component handle the back button (shows leave modal)
             if (pathname.startsWith("/mcqs/quiz")) {
                 return;

@@ -1,42 +1,24 @@
-// BattleGame.tsx
-import React, { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Clock, Trophy, Users, Zap } from 'lucide-react';
+import { Clock, LogOut, ShieldAlert, Trophy, Users, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { shouldBotAnswerCorrectly } from '@/utils/gameController';
+import { App } from '@capacitor/app';
 
-interface BattleGameProps {
-  roomData: {
-    id: string;
-    room_code: string;
-    battle_type: '1v1' | '2v2' | 'ffa';
-    max_players: number;
-    time_per_question: number;
-    total_questions: number;
-    subject: string;
-    subject_id?: string;
-    chapter_id?: string;
-    battle_participants: { 
-      id: string; 
-      user_id: string; 
-      username: string; 
-      score: number; 
-      answers?: any[];
-      is_finished?: boolean;
-    }[];
-  };
-  userId: string;
-  onGameComplete: (results: {
-    finalScore: number;
-    totalQuestions: number;
-    correctAnswers: number;
-    accuracy: number;
-    rank: number;
-    roomCode: string;
-  }) => void; 
+interface Participant {
+  id: string;
+  user_id: string;
+  username: string;
+  team: number | null;
+  score: number;
+  answers?: any[];
+  is_finished?: boolean;
+  is_bot?: boolean;
+  bot_accuracy?: number | null;
 }
 
 interface Question {
@@ -47,97 +29,154 @@ interface Question {
   explanation?: string;
 }
 
-export const BattleGame = ({ roomData, userId, onGameComplete }: BattleGameProps) => {
+interface BattleGameProps {
+  roomData: {
+    id: string;
+    room_code: string;
+    battle_type: '1v1' | '2v2' | 'ffa';
+    max_players: number;
+    time_per_question: number;
+    total_questions: number;
+    subject: string;
+    host_id?: string;
+    subject_id?: string;
+    chapter_id?: string;
+    battle_participants: Participant[];
+  };
+  userId: string;
+  onGameComplete: (results: any) => void;
+  onExit: () => void;
+}
+
+const normalizeOptions = (options: unknown) => {
+  if (Array.isArray(options)) return options as string[];
+  if (typeof options === 'string') {
+    try {
+      const parsed = JSON.parse(options);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+export const BattleGame = ({ roomData, userId, onGameComplete, onExit }: BattleGameProps) => {
   const { toast } = useToast();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(roomData.time_per_question);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [score, setScore] = useState(0);
+  const [lastPoints, setLastPoints] = useState<number | null>(null);
+  const [pointBursts, setPointBursts] = useState<{ id: number; points: number }[]>([]);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [participants, setParticipants] = useState<Participant[]>(roomData.battle_participants || []);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [gameFinishedLocally, setGameFinishedLocally] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const botAnswerRef = useRef<Set<string>>(new Set());
+
+  const isHost = roomData.host_id === userId;
+
+  const leaderboard = useMemo(
+    () => [...participants].sort((a, b) => (b.score || 0) - (a.score || 0)),
+    [participants]
+  );
+
+  const teamLeaderboard = useMemo(() => {
+    const map = new Map<number, { team: number; score: number; players: string[] }>();
+    participants.forEach(participant => {
+      if (!participant.team) return;
+      const row = map.get(participant.team) || { team: participant.team, score: 0, players: [] };
+      row.score += participant.score || 0;
+      row.players.push(participant.username);
+      map.set(participant.team, row);
+    });
+    return Array.from(map.values()).sort((a, b) => b.score - a.score);
+  }, [participants]);
+
+  const currentParticipant = participants.find(participant => participant.user_id === userId);
+  const currentUserRank = leaderboard.findIndex(player => player.user_id === userId) + 1;
+  const currentUserRow = leaderboard.find(player => player.user_id === userId);
+  const compactRankRows = currentUserRank > 3 && currentUserRow
+    ? [...leaderboard.slice(0, 3), currentUserRow]
+    : leaderboard.slice(0, 3);
+
+  useEffect(() => {
+    document.body.dataset.battleGameActive = 'true';
+
+    let listener: any = null;
+    App.addListener('backButton', () => {
+      setShowExitConfirm(true);
+    }).then(handle => {
+      listener = handle;
+    });
+
+    return () => {
+      delete document.body.dataset.battleGameActive;
+      listener?.remove?.();
+    };
+  }, []);
+
+  const fetchParticipants = async () => {
+    const { data, error } = await supabase
+      .from('battle_participants')
+      .select('id, user_id, username, team, score, answers, is_finished, is_bot, bot_accuracy')
+      .eq('battle_room_id', roomData.id);
+
+    if (!error && data) {
+      setParticipants((data || []) as Participant[]);
+      const me = data.find(participant => participant.user_id === userId);
+      if (me) setScore(me.score || 0);
+    }
+  };
 
   useEffect(() => {
     loadQuestionsFromDatabase();
-  }, [roomData.chapter_id, roomData.total_questions]);
+    fetchParticipants();
+
+    const channel = supabase
+      .channel(`battle_game_participants_${roomData.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'battle_participants', filter: `battle_room_id=eq.${roomData.id}` }, fetchParticipants)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [roomData.id, roomData.chapter_id, roomData.total_questions]);
 
   const loadQuestionsFromDatabase = async () => {
     try {
       setIsLoading(true);
-      
+
       if (!roomData.chapter_id) {
-        console.error('No chapter_id provided, falling back to sample questions');
         loadSampleQuestions();
         return;
       }
 
-      console.log('Loading questions for chapter:', roomData.chapter_id);
-      
       const { data: mcqs, error } = await supabase
         .from('mcqs')
         .select('id, question, options, correct_answer, explanation')
         .eq('chapter_id', roomData.chapter_id)
         .limit(roomData.total_questions * 2);
 
-      if (error) {
-        console.error('Error fetching MCQs:', error);
-        toast({
-          title: "Error Loading Questions",
-          description: "Failed to load questions from database. Using sample questions.",
-          variant: "destructive",
-        });
+      if (error || !mcqs || mcqs.length === 0) {
         loadSampleQuestions();
         return;
       }
 
-      if (!mcqs || mcqs.length === 0) {
-        console.warn('No MCQs found for chapter, using sample questions');
-        toast({
-          title: "No Questions Available",
-          description: "No questions found for this topic. Using sample questions.",
-        });
-        loadSampleQuestions();
-        return;
-      }
+      const transformedQuestions = mcqs.map(mcq => ({
+        id: mcq.id,
+        question: mcq.question,
+        options: normalizeOptions(mcq.options),
+        correct_answer: mcq.correct_answer,
+        explanation: mcq.explanation || undefined,
+      }));
 
-      const transformedQuestions: Question[] = mcqs.map(mcq => {
-        let options: string[] = [];
-        
-        // Handle different option formats
-        if (Array.isArray(mcq.options)) {
-          options = mcq.options as string[];
-        } else if (typeof mcq.options === 'string') {
-          try {
-            options = JSON.parse(mcq.options);
-          } catch {
-            options = [];
-          }
-        }
-        
-        return {
-          id: mcq.id,
-          question: mcq.question,
-          options: options,
-          correct_answer: mcq.correct_answer,
-          explanation: mcq.explanation || undefined
-        };
-      });
-
-      const shuffledQuestions = transformedQuestions
-        .sort(() => Math.random() - 0.5)
-        .slice(0, roomData.total_questions);
-
-      setQuestions(shuffledQuestions);
-      console.log(`Loaded ${shuffledQuestions.length} questions from database`);
-
+      setQuestions(transformedQuestions.sort(() => Math.random() - 0.5).slice(0, roomData.total_questions));
     } catch (error) {
-      console.error('Error in loadQuestionsFromDatabase:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load questions. Using sample questions.",
-        variant: "destructive",
-      });
+      console.error('Error loading battle questions:', error);
       loadSampleQuestions();
     } finally {
       setIsLoading(false);
@@ -145,68 +184,45 @@ export const BattleGame = ({ roomData, userId, onGameComplete }: BattleGameProps
   };
 
   const loadSampleQuestions = () => {
-    const sampleQuestions: Question[] = [
+    setQuestions([
       {
         id: 'sample_1',
         question: 'What is the powerhouse of the cell?',
         options: ['Nucleus', 'Mitochondria', 'Ribosome', 'Golgi apparatus'],
         correct_answer: 'Mitochondria',
-        explanation: 'Mitochondria are known as the powerhouse of the cell because they produce ATP.'
+        explanation: 'Mitochondria produce ATP.',
       },
       {
         id: 'sample_2',
-        question: 'Which organ system is responsible for transporting blood throughout the body?',
+        question: 'Which organ system transports blood throughout the body?',
         options: ['Respiratory system', 'Digestive system', 'Circulatory system', 'Nervous system'],
         correct_answer: 'Circulatory system',
-        explanation: 'The circulatory system, consisting of the heart and blood vessels, transports blood throughout the body.'
+        explanation: 'The circulatory system transports blood.',
       },
       {
         id: 'sample_3',
         question: 'What is the basic unit of heredity?',
         options: ['Chromosome', 'Gene', 'DNA', 'Protein'],
         correct_answer: 'Gene',
-        explanation: 'A gene is the basic unit of heredity that carries genetic information.'
+        explanation: 'A gene is the basic unit of heredity.',
       },
-      {
-        id: 'sample_4',
-        question: 'Which part of the brain controls balance and coordination?',
-        options: ['Cerebrum', 'Cerebellum', 'Brainstem', 'Hypothalamus'],
-        correct_answer: 'Cerebellum',
-        explanation: 'The cerebellum is responsible for balance, coordination, and fine motor control.'
-      },
-      {
-        id: 'sample_5',
-        question: 'What type of blood cell fights infections?',
-        options: ['Red blood cells', 'White blood cells', 'Platelets', 'Plasma cells'],
-        correct_answer: 'White blood cells',
-        explanation: 'White blood cells are part of the immune system and help fight infections.'
-      }
-    ];
-
-    setQuestions(sampleQuestions.slice(0, roomData.total_questions));
+    ].slice(0, roomData.total_questions));
   };
 
   useEffect(() => {
-    if (!isLoading && !gameFinishedLocally) {
-      startTimer();
-    }
+    if (!isLoading && !gameFinishedLocally) startTimer();
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
+      if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [currentQuestionIndex, isLoading, gameFinishedLocally]);
 
   const startTimer = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-    
+    if (timerRef.current) clearInterval(timerRef.current);
     setTimeLeft(roomData.time_per_question);
     timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
+      setTimeLeft(prev => {
         if (prev <= 1) {
-          handleTimeUp();
+          handleAnswerSubmit(null);
           return 0;
         }
         return prev - 1;
@@ -214,50 +230,82 @@ export const BattleGame = ({ roomData, userId, onGameComplete }: BattleGameProps
     }, 1000);
   };
 
-  const handleTimeUp = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-    handleAnswerSubmit(null);
-  };
+  useEffect(() => {
+    if (isLoading || gameFinishedLocally || !isHost || questions.length === 0) return;
+
+    const currentQuestion = questions[currentQuestionIndex];
+    if (!currentQuestion) return;
+
+    const botParticipants = participants.filter(participant => participant.is_bot);
+    const timers = botParticipants.map(bot => {
+      const key = `${bot.user_id}:${currentQuestionIndex}`;
+      if (botAnswerRef.current.has(key)) return null;
+      botAnswerRef.current.add(key);
+
+      const questionMs = roomData.time_per_question * 1000;
+      const responseDelay = Math.max(700, Math.min(questionMs - 600, 900 + Math.random() * questionMs * 0.7));
+      return window.setTimeout(async () => {
+        const willBeCorrect = shouldBotAnswerCorrectly(bot.bot_accuracy);
+        const wrongOptions = currentQuestion.options.filter(option => option !== currentQuestion.correct_answer);
+        const selected = willBeCorrect
+          ? currentQuestion.correct_answer
+          : wrongOptions[Math.floor(Math.random() * wrongOptions.length)] || currentQuestion.options[0];
+        const remainingSeconds = Math.max(0, roomData.time_per_question - Math.round(responseDelay / 1000));
+        const points = willBeCorrect ? 100 + remainingSeconds * 2 : 0;
+
+        const { data: participantData } = await supabase
+          .from('battle_participants')
+          .select('score, answers')
+          .eq('battle_room_id', roomData.id)
+          .eq('user_id', bot.user_id)
+          .single();
+
+        const existingAnswers = (participantData?.answers as any[]) || [];
+        if (existingAnswers.some(answer => answer.questionId === currentQuestion.id)) return;
+
+        await supabase
+          .from('battle_participants')
+          .update({
+            score: (participantData?.score || 0) + points,
+            answers: [...existingAnswers, {
+              questionId: currentQuestion.id,
+              question: currentQuestion.question,
+              selectedAnswer: selected,
+              correctAnswer: currentQuestion.correct_answer,
+              isCorrect: willBeCorrect,
+              timeLeft: remainingSeconds,
+              points,
+            }],
+          })
+          .eq('battle_room_id', roomData.id)
+          .eq('user_id', bot.user_id);
+      }, responseDelay);
+    }).filter(Boolean) as number[];
+
+    return () => timers.forEach(timer => window.clearTimeout(timer));
+  }, [currentQuestionIndex, isLoading, gameFinishedLocally, isHost, questions, participants, roomData.id, roomData.time_per_question]);
 
   const handleAnswerSelect = (answer: string) => {
     if (selectedAnswer !== null) return;
     setSelectedAnswer(answer);
-    
-    setTimeout(() => {
-      handleAnswerSubmit(answer);
-    }, 500);
+    setTimeout(() => handleAnswerSubmit(answer), 350);
   };
 
   const handleAnswerSubmit = async (answer: string | null) => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (!questions[currentQuestionIndex]) return;
 
     const currentQuestion = questions[currentQuestionIndex];
     const isCorrect = answer === currentQuestion.correct_answer;
-    
-    let questionScore = 0;
-    if (isCorrect) {
-      const timeBonus = Math.max(0, timeLeft);
-      questionScore = 100 + timeBonus * 2;
-      setScore(prev => prev + questionScore);
-      
-      toast({
-        title: "Correct! 🎉",
-        description: `+${questionScore} points (including time bonus)`,
-      });
-    } else {
-      toast({
-        title: "Incorrect ❌",
-        description: `Correct answer: ${currentQuestion.correct_answer}`,
-        variant: "destructive",
-      });
-    }
+    const questionScore = isCorrect ? 100 + Math.max(0, timeLeft) * 2 : 0;
+    setLastPoints(questionScore);
+    const burstId = Date.now();
+    setPointBursts(prev => [...prev, { id: burstId, points: questionScore }]);
+    window.setTimeout(() => {
+      setPointBursts(prev => prev.filter(burst => burst.id !== burstId));
+    }, 900);
 
     try {
-      console.log('Attempting to fetch participant for room:', roomData.id, 'user:', userId);
       const { data: participantData, error: fetchError } = await supabase
         .from('battle_participants')
         .select('score, answers')
@@ -265,63 +313,33 @@ export const BattleGame = ({ roomData, userId, onGameComplete }: BattleGameProps
         .eq('user_id', userId)
         .single();
 
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('Error fetching participant:', fetchError);
-        console.warn('Participant not found or multiple found. Ensure battle_participants has unique (battle_room_id, user_id) constraint.', fetchError);
-        if (fetchError.code === 'PGRST116') {
-          console.log('Participant not found, attempting to insert new one.');
-          const { error: insertError } = await supabase
-            .from('battle_participants')
-            .insert({
-              battle_room_id: roomData.id,
-              user_id: userId,
-              username: "Player",
-              score: 0,
-              answers: [],
-              is_finished: false
-            });
-          if (insertError) {
-            console.error('Error inserting new participant:', insertError);
-            throw insertError;
-          }
-          console.log('New participant inserted after initial fetch failed.');
-        } else {
-          throw fetchError;
-        }
-      }
+      if (fetchError) throw fetchError;
 
       const existingAnswers = (participantData?.answers as any[]) || [];
       const updatedScore = (participantData?.score || 0) + questionScore;
+      setScore(updatedScore);
 
-      console.log('Attempting to update participant with score:', updatedScore, 'and answers:', (existingAnswers as any[]).length + 1);
       const { error: updateError } = await supabase
         .from('battle_participants')
         .update({
           score: updatedScore,
           answers: [...existingAnswers, {
             questionId: currentQuestion.id,
+            question: currentQuestion.question,
             selectedAnswer: answer,
+            correctAnswer: currentQuestion.correct_answer,
             isCorrect,
             timeLeft,
-            points: questionScore
-          }]
+            points: questionScore,
+          }],
         })
         .eq('battle_room_id', roomData.id)
         .eq('user_id', userId);
 
-      if (updateError) {
-        console.error('Error updating participant:', updateError);
-        throw updateError;
-      }
-
-      console.log('Answer and score saved to battle_participants successfully.');
-    } catch (error) {
-      console.error('Error in handleAnswerSubmit (Supabase operation failed):', error);
-      toast({
-        title: "Error",
-        description: `Failed to save answer: ${error instanceof Error ? error.message : JSON.stringify(error)}`,
-        variant: "destructive"
-      });
+      if (updateError) throw updateError;
+      fetchParticipants();
+    } catch (error: any) {
+      toast({ title: 'Answer Not Saved', description: error.message, variant: 'destructive' });
     }
 
     setTimeout(() => {
@@ -330,210 +348,291 @@ export const BattleGame = ({ roomData, userId, onGameComplete }: BattleGameProps
       } else {
         setCurrentQuestionIndex(prev => prev + 1);
         setSelectedAnswer(null);
+        setLastPoints(null);
       }
-    }, 2000);
+    }, 850);
   };
 
   const finishGame = async () => {
     setGameFinishedLocally(true);
-    
+
     try {
-      console.log('Attempting to update final score and finish status for current participant.');
-      const { error: updateParticipantError } = await supabase
+      await supabase
         .from('battle_participants')
-        .update({ score: score, is_finished: true })
+        .update({ is_finished: true })
         .eq('battle_room_id', roomData.id)
         .eq('user_id', userId);
 
-      if (updateParticipantError) {
-        console.error('Error updating final participant status:', updateParticipantError);
-        throw updateParticipantError;
-      }
-      console.log('Final score and finished status updated for current participant successfully.');
-
-      console.log('Fetching all participants for room:', roomData.id, 'to calculate ranks.');
-      const { data: allParticipants, error: fetchParticipantsError } = await supabase
+      const { data: latestParticipants, error } = await supabase
         .from('battle_participants')
-        .select('user_id, username, score')
+        .select('user_id, username, team, score, answers')
         .eq('battle_room_id', roomData.id);
 
-      if (fetchParticipantsError) {
-        console.error('Error fetching all participants for ranking:', fetchParticipantsError);
-        toast({
-          title: "Error",
-          description: `Failed to fetch participant data for ranking: ${fetchParticipantsError.message}`,
-          variant: "destructive"
-        });
-        return;
-      }
-      console.log('Fetched participants:', allParticipants);
+      if (error) throw error;
 
-      const updatedParticipants = allParticipants.map(p => 
-        p.user_id === userId ? { ...p, score: score } : p
-      );
+      const rows = (latestParticipants || []).map((participant: any) => ({
+        ...participant,
+        score: participant.user_id === userId ? Math.max(participant.score || 0, score) : participant.score || 0,
+        correctAnswers: ((participant.answers as any[]) || []).filter(answer => answer.isCorrect).length,
+      }));
+      const rankings = [...rows].sort((a, b) => b.score - a.score);
+      const playerRank = rankings.findIndex(player => player.user_id === userId) + 1;
+      const me = rankings.find(player => player.user_id === userId);
+      const totalCorrect = me?.correctAnswers || 0;
+      const finalScore = me?.score || score;
+      const accuracyPercentage = questions.length ? (totalCorrect / questions.length) * 100 : 0;
 
-      const sortedParticipants = [...updatedParticipants].sort((a, b) => b.score - a.score);
-      console.log('Sorted participants for rank calculation:', sortedParticipants);
+      const teamRankings = Array.from(rows.reduce((map: Map<number, any>, participant: any) => {
+        if (!participant.team) return map;
+        const row = map.get(participant.team) || { team: participant.team, score: 0, players: [] };
+        row.score += participant.score || 0;
+        row.players.push(participant.username);
+        map.set(participant.team, row);
+        return map;
+      }, new Map()).values()).sort((a: any, b: any) => b.score - a.score);
 
-      const playerRank = sortedParticipants.findIndex(p => p.user_id === userId) + 1;
-      console.log('Calculated player rank:', playerRank);
-
-      const totalCorrect = Math.floor(score / 100);
-      const accuracyPercentage = (totalCorrect / questions.length) * 100;
-
-      console.log('Attempting to upsert battle results with calculated rank:', playerRank);
-      const { error: upsertResultError } = await supabase
+      await supabase
         .from('battle_results')
         .upsert({
           battle_room_id: roomData.id,
           user_id: userId,
-          final_score: score,
+          final_score: finalScore,
           rank: playerRank,
           total_correct: totalCorrect,
           total_questions: questions.length,
           accuracy_percentage: accuracyPercentage,
-          time_bonus: score - (totalCorrect * 100)
+          time_bonus: finalScore - (totalCorrect * 100),
         }, { onConflict: 'battle_room_id,user_id' });
 
-      if (upsertResultError) {
-        console.error('Error upserting battle results:', upsertResultError);
-        throw upsertResultError;
-      }
-      console.log('Battle results (including client-side calculated rank) upserted successfully.');
-
-      const results = {
-        finalScore: score,
+      onGameComplete({
+        finalScore,
         totalQuestions: questions.length,
         correctAnswers: totalCorrect,
         accuracy: accuracyPercentage,
         rank: playerRank,
-        roomCode: roomData.room_code
-      };
-
-      setTimeout(() => {
-        onGameComplete(results);
-      }, 2000);
-
-    } catch (error) {
-      console.error('Error in finishGame (Supabase operation failed):', error);
-      toast({
-        title: "Error",
-        description: `Failed to save game results or calculate rank: ${error instanceof Error ? error.message : JSON.stringify(error)}`,
-        variant: "destructive"
+        roomCode: roomData.room_code,
+        battleType: roomData.battle_type,
+        rankings,
+        teamRankings,
+        answers: (me?.answers as any[]) || [],
       });
+    } catch (error: any) {
+      toast({ title: 'Results Not Saved', description: error.message, variant: 'destructive' });
     }
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20">
-        <Card className="w-full max-w-md p-8 text-center">
-          <CardTitle className="text-2xl mb-4">Loading Questions...</CardTitle>
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
-          <p className="text-sm text-gray-600 dark:text-gray-300 mt-4">
-            Fetching questions from {roomData.subject}
-          </p>
-        </Card>
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background p-6 text-center">
+        <div>
+          <div className="mx-auto mb-5 h-12 w-12 rounded-2xl bg-primary/10 animate-pulse" />
+          <h2 className="text-2xl font-black text-foreground">Loading Questions</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Fetching questions from {roomData.subject}</p>
+        </div>
       </div>
     );
   }
 
   if (gameFinishedLocally) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20">
-        <Card className="w-full max-w-md p-8 text-center">
-          <CardTitle className="text-2xl mb-4 flex items-center justify-center">
-            <Trophy className="w-6 h-6 mr-2 text-yellow-500" />
-            Battle Complete!
-          </CardTitle>
-          <p className="text-lg font-semibold text-purple-600 dark:text-purple-400">
-            Final Score: {score}
-          </p>
-          <p className="text-gray-600 dark:text-gray-300 mt-2">
-            Calculating ranks...
-          </p>
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mt-4"></div>
-        </Card>
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background p-6 text-center">
+        <div>
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+            <Trophy className="h-7 w-7" />
+          </div>
+          <h2 className="text-2xl font-black text-foreground">
+            Battle Complete
+          </h2>
+          <p className="mt-2 text-lg font-semibold text-foreground">Final Score: {score}</p>
+          <p className="text-muted-foreground mt-2">Calculating rankings...</p>
+        </div>
       </div>
     );
   }
 
   const currentQuestion = questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+  const currentTeamScore = currentParticipant?.team
+    ? teamLeaderboard.find(team => team.team === currentParticipant.team)?.score || 0
+    : null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 p-4">
-      <div className="max-w-4xl mx-auto mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <Badge variant="outline" className="text-lg px-4 py-2">
-            <Users className="w-4 h-4 mr-2" />
-            Room: {roomData.room_code}
-          </Badge>
-          <Badge variant="outline" className="text-lg px-4 py-2">
-            <Trophy className="w-4 h-4 mr-2" />
-            Score: {score}
-          </Badge>
-        </div>
-        
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium">
-            Question {currentQuestionIndex + 1} of {questions.length}
-          </span>
-          <div className="flex items-center space-x-2">
-            <Clock className="w-4 h-4 text-red-500" />
-            <span className={`font-bold ${timeLeft <= 5 ? 'text-red-500 animate-pulse' : 'text-gray-700 dark:text-gray-300'}`}>
-              {timeLeft}s
-            </span>
+    <div className="fixed inset-0 z-[100] overflow-y-auto bg-background px-3 pb-[calc(env(safe-area-inset-bottom)+76px)] pt-[calc(env(safe-area-inset-top)+48px)] sm:px-4">
+      <div className="fixed left-3 right-3 top-[calc(env(safe-area-inset-top)+8px)] z-[130] flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <img
+            src="/favicon.png"
+            alt="Medmacs.app"
+            className="h-7 w-7 shrink-0 rounded-lg"
+          />
+          <div className="min-w-0 leading-none">
+            <p className="truncate text-sm font-black tracking-tight text-foreground">Medmacs.app</p>
+            <p className="mt-0.5 text-[10px] font-black uppercase tracking-widest text-primary">
+              {roomData.battle_type === '1v1' ? '1v1 Battle' : roomData.battle_type === '2v2' ? '2v2 Team Battle' : 'Free For All'}
+            </p>
           </div>
         </div>
-        <Progress value={progress} className="h-2" />
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Badge className={timeLeft <= 5 ? 'h-7 bg-destructive text-destructive-foreground border-0' : 'h-7'} variant={timeLeft <= 5 ? 'default' : 'outline'}>
+            <Clock className="w-3 h-3 mr-1" /> {timeLeft}s
+          </Badge>
+          <Badge className="h-7 border-primary/20 bg-card px-2 text-xs shadow-sm" variant="outline">
+            {score} pts
+          </Badge>
+          {lastPoints !== null && (
+            <Badge className="h-7 border-0 bg-primary/10 text-primary">
+              <Zap className="w-3 h-3 mr-1" /> +{lastPoints}
+            </Badge>
+          )}
+        </div>
       </div>
 
-      <Card className="max-w-4xl mx-auto">
-        <CardHeader>
-          <CardTitle className="text-xl font-bold text-center">
-            {currentQuestion.question}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {currentQuestion.options.map((option, index) => {
-            const letters = ['A', 'B', 'C', 'D'];
-            const isSelected = selectedAnswer === option;
-            const isCorrect = selectedAnswer && option === currentQuestion.correct_answer;
-            const isWrong = selectedAnswer && selectedAnswer !== currentQuestion.correct_answer && isSelected;
-            
-            return (
-              <Button
-                key={index}
-                variant="outline"
-                className={`w-full p-4 h-auto text-left justify-start text-wrap ${
-                  isCorrect ? 'bg-green-100 border-green-500 text-green-800 dark:bg-green-900/30 dark:border-green-400 dark:text-green-200' :
-                  isWrong ? 'bg-red-100 border-red-500 text-red-800 dark:bg-red-900/30 dark:border-red-400 dark:text-red-200' :
-                  isSelected ? 'bg-blue-100 border-blue-500 dark:bg-blue-900/30 dark:border-blue-400' :
-                  'hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
-                onClick={() => handleAnswerSelect(option)}
-                disabled={selectedAnswer !== null}
-              >
-                <div className="flex items-start space-x-3">
-                  <Badge variant="secondary" className="mt-0.5 flex-shrink-0">
+      <AnimatePresence>
+        {pointBursts.map(burst => (
+          <motion.div
+            key={burst.id}
+            initial={{ opacity: 0, scale: 0.85, x: 0, y: 0 }}
+            animate={{ opacity: [0, 1, 1, 0], scale: [0.85, 1.12, 1, 0.85], x: 120, y: -150 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.85, ease: 'easeOut' }}
+            className="fixed right-20 top-[48%] z-[140] rounded-full bg-primary px-4 py-2 text-lg font-black text-primary-foreground shadow-2xl shadow-primary/30"
+          >
+            +{burst.points}
+          </motion.div>
+        ))}
+      </AnimatePresence>
+
+      <div className="mx-auto flex min-h-[calc(100vh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-124px)] max-w-6xl flex-col gap-2">
+        <div className="mb-2 flex items-center gap-2">
+          <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest">
+            {roomData.battle_type.toUpperCase()}
+          </Badge>
+          <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest">
+            {roomData.subject}
+          </Badge>
+          {currentTeamScore !== null && (
+            <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest">
+              Team {currentParticipant?.team}: {currentTeamScore}
+            </Badge>
+          )}
+        </div>
+
+        <motion.div
+          key={currentQuestion.id}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+          className="space-y-3"
+        >
+          <section className="rounded-2xl border border-border/40 bg-card px-3 py-3 shadow-sm sm:px-4">
+            <h1 className="text-base font-black leading-snug text-foreground sm:text-lg">
+              {currentQuestion.question}
+            </h1>
+          </section>
+
+          <section className="space-y-2">
+            {currentQuestion.options.map((option, index) => {
+              const letters = ['A', 'B', 'C', 'D'];
+              const isSelected = selectedAnswer === option;
+
+              return (
+                <motion.button
+                  key={option}
+                  type="button"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.04 }}
+                  onClick={() => handleAnswerSelect(option)}
+                  disabled={selectedAnswer !== null}
+                  className={`flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${
+                    isSelected
+                      ? 'border-primary bg-primary/10 text-primary shadow-lg shadow-primary/10'
+                      : 'border-border/60 bg-background text-foreground hover:border-primary/40 hover:bg-primary/5'
+                  }`}
+                >
+                  <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-black ${
+                    isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                  }`}>
                     {letters[index]}
-                  </Badge>
-                  <span className="flex-1">{option}</span>
-                  {isCorrect && <Zap className="w-4 h-4 text-green-600 flex-shrink-0" />}
-                </div>
-              </Button>
-            );
-          })}
-        </CardContent>
-      </Card>
-
-      <div className="max-w-4xl mx-auto mt-6 text-center">
-        <Badge variant="secondary" className="px-4 py-2">
-          {roomData.battle_type.toUpperCase()} Battle • {roomData.subject}
-        </Badge>
+                  </span>
+                  <span className="text-sm font-semibold leading-snug">{option}</span>
+                </motion.button>
+              );
+            })}
+          </section>
+        </motion.div>
       </div>
+
+      {compactRankRows.length > 0 && (
+        <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+34px)] right-3 z-[130] w-44 rounded-xl border border-border/40 bg-background/92 p-2 shadow-lg backdrop-blur">
+          <div className="mb-1 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            <Users className="h-3 w-3 text-primary" /> Ranking
+          </div>
+          <div className="space-y-1">
+            {compactRankRows.map((player, index) => {
+              const rank = player.user_id === userId ? currentUserRank : index + 1;
+              const isCurrentUser = player.user_id === userId;
+              return (
+                <div
+                  key={`${player.user_id}-${rank}`}
+                  className={`flex items-center justify-between gap-2 rounded-md px-1.5 py-1 text-[11px] leading-none ${
+                    isCurrentUser ? 'bg-primary/10 text-primary' : ''
+                  }`}
+                >
+                  <span className="truncate font-semibold">#{rank} {isCurrentUser ? 'You' : player.username}</span>
+                  <span className="font-black">{player.score || 0}</span>
+                </div>
+              );
+            })}
+          </div>
+          {roomData.battle_type === '2v2' && teamLeaderboard.length > 0 && (
+            <div className="mt-1.5 grid grid-cols-2 gap-1 border-t border-border/40 pt-1.5">
+              {teamLeaderboard.slice(0, 2).map(team => (
+                <div key={team.team} className="rounded-md bg-muted/35 px-1.5 py-1 text-center text-[10px] leading-none">
+                  <span className="font-black">T{team.team}</span>
+                  <span className="ml-1 font-bold text-primary">{team.score}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+29px)] left-3 z-[130] flex items-center gap-2 rounded-xl border border-border/40 bg-background/82 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground shadow-lg backdrop-blur-md">
+        <span>Question {currentQuestionIndex + 1}/{questions.length}</span>
+        <span className="h-1 w-1 rounded-full bg-muted-foreground/50" />
+        <span>{roomData.time_per_question}s max</span>
+      </div>
+      <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+12px)] left-3 right-3 z-[130]">
+        <div className="rounded-full border border-border/40 bg-background/80 p-0.5 shadow-lg backdrop-blur-md">
+          <Progress value={progress} className="h-3 rounded-full bg-muted/80" />
+        </div>
+      </div>
+
+      {showExitConfirm && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/45 p-5 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-3xl border border-border/40 bg-background p-5 shadow-2xl">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
+                <ShieldAlert className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-black text-foreground">Exit battle?</h2>
+                <p className="text-xs text-muted-foreground">Your current battle progress may be lost.</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" className="rounded-2xl" onClick={() => setShowExitConfirm(false)}>
+                Stay
+              </Button>
+              <Button variant="destructive" className="rounded-2xl" onClick={onExit}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Exit
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-// This component handles the battle game logic, including question loading, answer submission, and game completion.
