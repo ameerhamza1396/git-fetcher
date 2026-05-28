@@ -6,8 +6,7 @@
   },
   "client": [
     {
-      "client_info": {+,
-
+      "client_info": {
         "mobilesdk_app_id": "1:287093141844:android:8e2626393d7b2a44cad8c1",
         "android_client_info": {
           "package_name": "com.hmacs.medmacs"

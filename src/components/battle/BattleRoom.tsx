@@ -193,18 +193,25 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
 
       const participants = room.battle_participants || [];
       const botCount = participants.filter(participant => participant.is_bot).length;
-      const targetPlayers = Math.min(room.max_players, rule.targetPlayers);
+      const targetPlayers = room.battle_type === 'rapid_fire'
+        ? room.max_players
+        : Math.min(room.max_players, rule.targetPlayers);
       const missingPlayers = Math.max(0, targetPlayers - participants.length);
-      const botsToAdd = Math.min(missingPlayers, Math.max(0, rule.maxBots - botCount));
+      const maxBotsForRoom = room.battle_type === 'rapid_fire'
+        ? Math.max(0, room.max_players - participants.filter(participant => !participant.is_bot).length)
+        : rule.maxBots;
+      const botsToAdd = Math.min(missingPlayers, Math.max(0, maxBotsForRoom - botCount));
       if (botsToAdd <= 0) return;
 
       botFillInFlightRef.current = true;
       const usedNames = new Set(participants.map(participant => participant.username));
 
-      const baseJoinDelay = room.battle_type === 'ffa'
-        ? Math.min(config.botJoinDelayMs, 850)
-        : config.botJoinDelayMs;
-      const joinJitter = room.battle_type === 'ffa' ? 450 : 1400;
+      const baseJoinDelay = room.battle_type === 'rapid_fire'
+        ? Math.min(config.botJoinDelayMs, 450)
+        : room.battle_type === 'ffa'
+          ? Math.min(config.botJoinDelayMs, 850)
+          : config.botJoinDelayMs;
+      const joinJitter = room.battle_type === 'rapid_fire' ? 350 : room.battle_type === 'ffa' ? 450 : 1400;
 
       Array.from({ length: botsToAdd }).forEach((_, index) => {
         window.setTimeout(async () => {

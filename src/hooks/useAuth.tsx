@@ -98,7 +98,7 @@ export const useAuth = () => {
         }
       });
       if (error) throw error;
-      toast({ title: "Account created!", description: "Please check your email to confirm." });
+      toast({ title: "Verification code sent!", description: "Enter the code from your email to finish signup." });
       return { data, error: null };
     } catch (error: any) {
       toast({ title: "Signup failed", description: error.message, variant: "destructive" });
@@ -113,6 +113,36 @@ export const useAuth = () => {
       return { data, error: null };
     } catch (error: any) {
       toast({ title: "Sign in failed", description: error.message, variant: "destructive" });
+      return { data: null, error };
+    }
+  };
+
+  const verifySignupOtp = async (email: string, token: string) => {
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'signup',
+      });
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error: any) {
+      toast({ title: "Verification failed", description: error.message, variant: "destructive" });
+      return { data: null, error };
+    }
+  };
+
+  const resendSignupOtp = async (email: string) => {
+    try {
+      const { data, error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+      });
+      if (error) throw error;
+      toast({ title: "Code resent", description: "A new verification code has been sent." });
+      return { data, error: null };
+    } catch (error: any) {
+      toast({ title: "Resend failed", description: error.message, variant: "destructive" });
       return { data: null, error };
     }
   };
@@ -164,6 +194,8 @@ export const useAuth = () => {
     session,
     loading,
     signUp,
+    verifySignupOtp,
+    resendSignupOtp,
     signIn,
     signOut,
     signInWithGoogle,

@@ -3,6 +3,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from '@/components/ui/drawer';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Clock, Users, Zap } from 'lucide-react';
@@ -88,9 +96,13 @@ export const RapidFireGame = ({ roomData, userId, onGameComplete }: RapidFireGam
   const [showCorrectFlash, setShowCorrectFlash] = useState(false);
   const [showNegativeFlash, setShowNegativeFlash] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRankingOpen, setIsRankingOpen] = useState(false);
+  const [scorePulses, setScorePulses] = useState<{ id: string; username: string; points: number }[]>([]);
   const completeRef = useRef(false);
   const botAnswerRef = useRef<Set<string>>(new Set());
   const advanceInFlightRef = useRef(false);
+  const seenEventIdsRef = useRef<Set<string>>(new Set());
+  const hasLoadedEventsRef = useRef(false);
 
   const isHost = room.host_id === userId;
   const questionIndex = room.current_question || 0;
@@ -228,6 +240,36 @@ export const RapidFireGame = ({ roomData, userId, onGameComplete }: RapidFireGam
     setShowNegativeFlash(false);
     setTimeLeft(questionDuration);
   }, [questionIndex, room.question_started_at, questionDuration]);
+
+  useEffect(() => {
+    if (!hasLoadedEventsRef.current) {
+      seenEventIdsRef.current = new Set(events.map(event => event.id));
+      hasLoadedEventsRef.current = true;
+      return;
+    }
+
+    const newEvents = events.filter(event => !seenEventIdsRef.current.has(event.id));
+    if (newEvents.length === 0) return;
+
+    newEvents.forEach(event => seenEventIdsRef.current.add(event.id));
+    const scoredEvents = newEvents
+      .filter(event => Number(event.points_awarded || 0) !== 0)
+      .slice(-4)
+      .map(event => ({
+        id: event.id,
+        username: event.user_id === userId ? 'You' : event.username,
+        points: Number(event.points_awarded || 0),
+      }));
+
+    if (scoredEvents.length === 0) return;
+
+    setScorePulses(current => [...current, ...scoredEvents].slice(-4));
+    scoredEvents.forEach(event => {
+      window.setTimeout(() => {
+        setScorePulses(current => current.filter(pulse => pulse.id !== event.id));
+      }, 1800);
+    });
+  }, [events, userId]);
 
   useEffect(() => {
     if (!firstCorrectEvent) return;
@@ -508,7 +550,11 @@ export const RapidFireGame = ({ roomData, userId, onGameComplete }: RapidFireGam
       </div>
 
       {compactRankRows.length > 0 && (
-        <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+34px)] right-3 z-40 w-44 rounded-xl border border-border/40 bg-background/92 p-2 shadow-lg backdrop-blur">
+        <button
+          type="button"
+          onClick={() => setIsRankingOpen(true)}
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+34px)] right-3 z-40 w-44 rounded-xl border border-border/40 bg-background/92 p-2 text-left shadow-lg backdrop-blur transition active:scale-[0.98]"
+        >
           <div className="mb-1 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
             <Users className="h-3 w-3 text-primary" /> Ranking
           </div>
@@ -529,6 +575,24 @@ export const RapidFireGame = ({ roomData, userId, onGameComplete }: RapidFireGam
               );
             })}
           </div>
+        </button>
+      )}
+
+      {scorePulses.length > 0 && (
+        <div className="pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+120px)] right-5 z-30 flex w-40 flex-col items-end gap-1.5">
+          {scorePulses.map(pulse => (
+            <div
+              key={pulse.id}
+              className={`max-w-full rounded-full border px-2.5 py-1 text-[11px] font-black shadow-md backdrop-blur animate-in fade-in slide-in-from-bottom-2 ${
+                pulse.points > 0
+                  ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600'
+                  : 'border-red-500/20 bg-red-500/10 text-red-600'
+              }`}
+            >
+              <span className="inline-block max-w-[92px] truncate align-bottom">{pulse.username}</span>{' '}
+              {pulse.points > 0 ? `+${pulse.points}` : pulse.points}
+            </div>
+          ))}
         </div>
       )}
 
@@ -542,6 +606,51 @@ export const RapidFireGame = ({ roomData, userId, onGameComplete }: RapidFireGam
           <Progress value={progress} className="h-3 rounded-full bg-muted/80" />
         </div>
       </div>
+
+      <Drawer open={isRankingOpen} onOpenChange={setIsRankingOpen}>
+        <DrawerContent className="max-h-[82vh]">
+          <DrawerHeader className="pb-2 text-left">
+            <DrawerTitle className="flex items-center gap-2 text-base font-black">
+              <Users className="h-4 w-4 text-primary" /> Candidate Scores
+            </DrawerTitle>
+            <DrawerDescription>Live Rapid Fire ranking for everyone in this room.</DrawerDescription>
+          </DrawerHeader>
+          <div className="overflow-y-auto px-4 pb-4">
+            <div className="space-y-2">
+              {playerRows.map((row, index) => {
+                const isCurrentUser = row.userId === userId;
+                return (
+                  <div
+                    key={row.userId}
+                    className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${
+                      isCurrentUser
+                        ? 'border-primary/25 bg-primary/10'
+                        : 'border-border/40 bg-muted/20'
+                    }`}
+                  >
+                    <span className="w-8 shrink-0 text-center text-sm font-black text-muted-foreground">#{index + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-black text-foreground">{isCurrentUser ? 'You' : row.username}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {row.team ? `Team ${row.team}` : 'Solo'} - {row.correct} correct
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-black text-foreground">{row.points}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">pts</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <DrawerClose asChild>
+              <Button variant="outline" className="mt-4 h-11 w-full rounded-xl font-bold">
+                Close
+              </Button>
+            </DrawerClose>
+          </div>
+        </DrawerContent>
+      </Drawer>
 
       <div className="mx-auto flex min-h-[calc(100vh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-124px)] max-w-6xl flex-col gap-2">
         <div

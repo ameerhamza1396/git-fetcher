@@ -13,7 +13,7 @@ import { Switch } from '@/components/ui/switch';
 type BattleType = '1v1' | '2v2' | 'ffa' | 'rapid_fire';
 
 interface BattleLobbyProps {
-  onJoinBattle: (roomId: string, options?: { joinedByCode?: boolean }) => void;
+  onJoinBattle: (roomId: string, options?: { joinedByCode?: boolean; createdRoom?: boolean }) => Promise<void> | void;
   mode: 'create' | 'join';
 }
 
@@ -38,6 +38,7 @@ export const BattleLobby = ({ onJoinBattle, mode }: BattleLobbyProps) => {
   const [rooms, setRooms] = useState<BattleRoom[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [createStep, setCreateStep] = useState<'idle' | 'creating' | 'opening'>('idle');
   const [roomCode, setRoomCode] = useState('');
   const [battleType, setBattleType] = useState<BattleType>('1v1');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
@@ -101,6 +102,7 @@ export const BattleLobby = ({ onJoinBattle, mode }: BattleLobbyProps) => {
     if (!selectedSubjectId || !selectedChapterId) return toast({ title: "Select a topic first", variant: "destructive" });
     try {
       setIsCreating(true);
+      setCreateStep('creating');
       const maxPlayers = battleType === '1v1' ? 2 : battleType === 'rapid_fire' ? 50 : 4;
       const totalQuestions = battleType === 'rapid_fire' ? Math.max(numQuestions, 20) : numQuestions;
       const code = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -115,8 +117,8 @@ export const BattleLobby = ({ onJoinBattle, mode }: BattleLobbyProps) => {
         subject_id: selectedSubjectId, chapter_id: selectedChapterId
       }]).select().single();
       if (error) throw error;
-      toast({ title: "Room Created!", description: `Code: ${code}` });
-      onJoinBattle(data.id);
+      setCreateStep('opening');
+      await onJoinBattle(data.id, { createdRoom: true });
     } catch (error: any) {
       console.error('Error creating battle room:', error);
       toast({
@@ -124,7 +126,10 @@ export const BattleLobby = ({ onJoinBattle, mode }: BattleLobbyProps) => {
         description: error?.message || "Failed to create room.",
         variant: "destructive"
       });
-    } finally { setIsCreating(false); }
+    } finally {
+      setIsCreating(false);
+      setCreateStep('idle');
+    }
   };
 
   const joinRoomByCode = async () => {
@@ -217,6 +222,21 @@ export const BattleLobby = ({ onJoinBattle, mode }: BattleLobbyProps) => {
   if (mode === 'create') {
     return (
       <div className="relative space-y-5 pb-8">
+        {isCreating && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/85 px-6 backdrop-blur-md">
+            <div className="w-full max-w-xs rounded-2xl border border-border/50 bg-card p-5 text-center shadow-2xl shadow-primary/20">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+              <p className="text-sm font-black uppercase tracking-widest text-foreground">
+                {createStep === 'opening' ? 'Opening room' : 'Creating room'}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {createStep === 'opening' ? 'Setting up the lobby now...' : 'Saving your battle settings...'}
+              </p>
+            </div>
+          </div>
+        )}
         <div className="pointer-events-none absolute -right-4 top-24 h-14 w-14 rounded-full border border-primary/15 bg-primary/5" />
         <div className="pointer-events-none absolute left-2 top-64 h-8 w-8 rounded-full border border-emerald-500/20 bg-emerald-500/10" />
         <SubjectChapterSelector
@@ -339,7 +359,7 @@ export const BattleLobby = ({ onJoinBattle, mode }: BattleLobbyProps) => {
               </div>
 
               <Button onClick={createRoom} disabled={isCreating || !selectedSubjectId || !selectedChapterId} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-2xl h-12 font-black uppercase text-xs tracking-widest shadow-lg shadow-primary/20">
-                {isCreating ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Creating...</> : <><Trophy className="w-4 h-4 mr-2" />Create Battle Room</>}
+                {isCreating ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />{createStep === 'opening' ? 'Opening...' : 'Creating...'}</> : <><Trophy className="w-4 h-4 mr-2" />Create Battle Room</>}
               </Button>
             </div>
           </div>

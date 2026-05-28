@@ -151,7 +151,7 @@ const InputField = ({
 );
 
 const Signup = () => {
-  const { signUp, user, resendVerificationEmail } = useAuth();
+  const { signUp, user, verifySignupOtp, resendSignupOtp } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -171,6 +171,10 @@ const Signup = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
+  const [signupStep, setSignupStep] = useState("form");
+  const [otp, setOtp] = useState("");
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const RESEND_DELAY_SECONDS = 60;
 
@@ -205,6 +209,12 @@ const Signup = () => {
     setValidationErrors(validateForm(formData));
   }, [formData, validateForm]);
 
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((current) => Math.max(current - 1, 0)), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
+
   const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -213,12 +223,13 @@ const Signup = () => {
   const handleResendVerification = useCallback(async () => {
     setResendLoading(true);
     try {
-      const { error } = await resendVerificationEmail(formData.email);
+      const { error } = await resendSignupOtp(formData.email);
       if (error) throw error;
+      setResendCooldown(RESEND_DELAY_SECONDS);
 
       toast({
-        title: "Resent!",
-        description: "Verification email has been successfully re-sent.",
+        title: "Code resent!",
+        description: "Check your inbox for the new verification code.",
         duration: 5000
       });
 
@@ -233,10 +244,45 @@ const Signup = () => {
     } finally {
       setResendLoading(false);
     }
-  }, [formData.email, resendVerificationEmail, toast]);
+  }, [formData.email, resendSignupOtp, toast]);
+
+  const handleVerifyOtp = useCallback(async () => {
+    if (otp.trim().length < 6) {
+      toast({
+        title: "Invalid code",
+        description: "Please enter the 6-digit code from your email.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setVerifyLoading(true);
+    try {
+      const { error } = await verifySignupOtp(formData.email, otp.trim());
+      if (error) throw error;
+      toast({
+        title: "Email verified!",
+        description: "Your account is ready."
+      });
+      navigate("/dashboard");
+    } catch (error) {
+      toast({
+        title: "Verification failed",
+        description: error.message || "Please check the code and try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setVerifyLoading(false);
+    }
+  }, [formData.email, navigate, otp, toast, verifySignupOtp]);
 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
+
+    if (signupStep === "verify") {
+      await handleVerifyOtp();
+      return;
+    }
 
     if (Object.keys(validationErrors).length > 0) {
       toast({
@@ -266,7 +312,12 @@ const Signup = () => {
       );
 
       if (!error && data) {
-        setIsModalOpen(true);
+        setSignupStep("verify");
+        setResendCooldown(RESEND_DELAY_SECONDS);
+        toast({
+          title: "Check your email",
+          description: "Enter the verification code below to finish signup."
+        });
       } else if (error) {
         if (error.message.includes("already registered")) {
           toast({
@@ -290,7 +341,7 @@ const Signup = () => {
     } finally {
       setLoading(false);
     }
-  }, [formData, validationErrors, signUp, toast]);
+  }, [formData, validationErrors, signUp, toast, signupStep, handleVerifyOtp]);
 
   const getInputIcon = useCallback((fieldName, hasError, hasValue) => {
     if (hasValue && !hasError)
@@ -321,6 +372,73 @@ const Signup = () => {
         resendLoading={resendLoading}
         resendDelay={RESEND_DELAY_SECONDS}
       />
+
+      {signupStep === "verify" && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-[#020617]/70 backdrop-blur-xl px-5"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94, y: 16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className="w-full max-w-sm rounded-3xl border border-white/15 bg-white/[0.09] p-6 shadow-2xl shadow-black/50"
+          >
+            <div className="mb-5 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#2dd4bf]/30 bg-[#2dd4bf]/15">
+                <Mail className="h-7 w-7 text-[#5eead4]" />
+              </div>
+              <h2 className="text-2xl font-black text-white">Verify your email</h2>
+              <p className="mt-2 text-sm text-white/55">
+                Enter the 6-digit code sent to <span className="font-semibold text-[#99f6e4]">{formData.email}</span>.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <Input
+                id="otp"
+                name="otp"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="123456"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                className="h-14 rounded-2xl border-white/15 bg-white/[0.08] text-center text-xl font-black tracking-[0.45em] text-white placeholder:text-white/20 focus:border-[#2dd4bf]/60"
+                autoFocus
+              />
+              <Button
+                type="button"
+                onClick={handleVerifyOtp}
+                disabled={verifyLoading}
+                className="h-12 w-full rounded-2xl bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] font-bold text-white hover:from-[#2dd4bf]/90 hover:to-[#0ea5e9]/90"
+              >
+                {verifyLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Verify & Continue"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleResendVerification}
+                disabled={resendLoading || resendCooldown > 0}
+                className="h-11 w-full rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10"
+              >
+                {resendLoading
+                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  : resendCooldown > 0
+                    ? `Resend Code in ${resendCooldown}s`
+                    : "Resend Code"}
+              </Button>
+              <button
+                type="button"
+                onClick={() => setSignupStep("form")}
+                className="w-full pt-1 text-sm font-semibold text-white/55 hover:text-white/80"
+              >
+                Edit signup details
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
 
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 right-0 w-96 h-96 bg-[#2dd4bf]/20 rounded-full blur-3xl animate-pulse" />
@@ -448,11 +566,15 @@ const Signup = () => {
               <Button
                 type="submit"
                 className="w-full bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] hover:from-[#2dd4bf]/90 hover:to-[#0ea5e9]/90 text-white rounded-xl h-12 font-bold text-sm tracking-wide shadow-lg shadow-[#0ea5e9]/20 transition-all duration-300"
-                disabled={loading || Object.keys(validationErrors).length > 0}
+                disabled={loading || verifyLoading || (signupStep === "form" && Object.keys(validationErrors).length > 0)}
               >
                 {loading
                   ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  : "Create Account"}
+                  : verifyLoading
+                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    : signupStep === "verify"
+                      ? "Verify & Continue"
+                      : "Create Account"}
               </Button>
 
             </form>

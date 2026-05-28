@@ -26,7 +26,7 @@ const fallbackConfig: GameControllerConfig = {
     '1v1': { targetPlayers: 2, maxBots: 1 },
     '2v2': { targetPlayers: 4, maxBots: 3 },
     ffa: { targetPlayers: 3, maxBots: 2 },
-    rapid_fire: { targetPlayers: 8, maxBots: 7 },
+    rapid_fire: { targetPlayers: 50, maxBots: 49 },
   },
   botNames: [],
 };

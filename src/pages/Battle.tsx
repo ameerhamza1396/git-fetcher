@@ -55,7 +55,7 @@ const Battle: React.FC = () => {
   const [gameData, setGameData] = useState<RoomData | null>(null);
   const [battleResults, setBattleResults] = useState<any>(null);
 
-  const handleJoinBattle = async (roomId: string, options?: { joinedByCode?: boolean }) => {
+  const handleJoinBattle = async (roomId: string, options?: { joinedByCode?: boolean; createdRoom?: boolean }) => {
     if (!user) {
       toast({ title: "Auth Required", description: "Please log in.", variant: "destructive" });
       return;
@@ -97,7 +97,9 @@ const Battle: React.FC = () => {
 
       setCurrentRoomId(roomId);
       setBattleState('room');
-      toast({ title: "Joined!", description: `Room ${roomData.room_code}` });
+      if (!options?.createdRoom) {
+        toast({ title: "Joined!", description: `Room ${roomData.room_code}` });
+      }
     } catch (error: any) {
       toast({ title: "Failed", description: error.message || "Could not join.", variant: "destructive" });
     }

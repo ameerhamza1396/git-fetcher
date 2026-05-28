@@ -1118,11 +1118,14 @@ const Dashboard = () => {
               {premiumPerks.map((action, i) => <ActionCard key={i} action={action} />)}
             </div>
 
-            {/* Medistics - purple */}
+            {/* Explore */}
             <div className="mb-6 pt-4 border-t border-border/30">
               <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-1.5">
                 <TrendingUp className="w-3.5 h-3.5 text-violet-500" /> Explore
               </h2>
+              <div className="mb-3">
+                <ActionCard action={flpAction} />
+              </div>
               <div className="mb-3">
                 <ActionCard action={collaborateAction} />
               </div>
