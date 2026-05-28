@@ -42,9 +42,7 @@ export const BattleLobby = ({ onJoinBattle, mode }: BattleLobbyProps) => {
   const [roomCode, setRoomCode] = useState('');
   const [battleType, setBattleType] = useState<BattleType>('1v1');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
-  const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
   const [selectedSubjectName, setSelectedSubjectName] = useState<string | null>(null);
-  const [selectedChapterName, setSelectedChapterName] = useState<string | null>(null);
   const [numQuestions, setNumQuestions] = useState<number>(10);
   const [timePerQuestion, setTimePerQuestion] = useState<number>(15);
   const [isPrivateRoom, setIsPrivateRoom] = useState(false);
@@ -56,7 +54,10 @@ export const BattleLobby = ({ onJoinBattle, mode }: BattleLobbyProps) => {
     if (battleType === 'rapid_fire' && timePerQuestion < 20) {
       setTimePerQuestion(20);
     }
-  }, [battleType, timePerQuestion]);
+    if (battleType === 'rapid_fire' && numQuestions < 20) {
+      setNumQuestions(20);
+    }
+  }, [battleType, timePerQuestion, numQuestions]);
 
   useEffect(() => {
     loadRooms();
@@ -99,7 +100,7 @@ export const BattleLobby = ({ onJoinBattle, mode }: BattleLobbyProps) => {
 
   const createRoom = async () => {
     if (!user) return toast({ title: "Login Required", variant: "destructive" });
-    if (!selectedSubjectId || !selectedChapterId) return toast({ title: "Select a topic first", variant: "destructive" });
+    if (!selectedSubjectId) return toast({ title: "Select a subject first", variant: "destructive" });
     try {
       setIsCreating(true);
       setCreateStep('creating');
@@ -114,7 +115,8 @@ export const BattleLobby = ({ onJoinBattle, mode }: BattleLobbyProps) => {
         negative_marking: battleType === 'rapid_fire' ? rapidNegativeMarking : false,
         is_private: isPrivateRoom,
         subject: selectedSubjectName,
-        subject_id: selectedSubjectId, chapter_id: selectedChapterId
+        subject_id: selectedSubjectId,
+        chapter_id: null
       }]).select().single();
       if (error) throw error;
       setCreateStep('opening');
@@ -151,13 +153,16 @@ export const BattleLobby = ({ onJoinBattle, mode }: BattleLobbyProps) => {
   const handleSubjectChange = (subjectId: string, subjectName: string) => {
     setSelectedSubjectId(subjectId);
     setSelectedSubjectName(subjectName);
-    setSelectedChapterId(null);
-    setSelectedChapterName(null);
   };
 
-  const handleChapterChange = (chapterId: string, chapterName: string) => {
-    setSelectedChapterId(chapterId);
-    setSelectedChapterName(chapterName);
+  const handleBattleTypeChange = (nextType: BattleType) => {
+    setBattleType(nextType);
+    if (nextType === 'rapid_fire') {
+      setNumQuestions(20);
+      setTimePerQuestion(current => Math.max(current, 20));
+    } else if (numQuestions > 15) {
+      setNumQuestions(10);
+    }
   };
 
   const getBattleTypeGradient = (type: string) => {
@@ -200,7 +205,7 @@ export const BattleLobby = ({ onJoinBattle, mode }: BattleLobbyProps) => {
       case 'rapid_fire':
         return {
           title: 'Rapid Fire Rules',
-          description: 'Up to 50 players, self-join teams, host-selected MCQ count, and faster correct answers score more points.',
+          description: 'Up to 50 players compete solo. The host selects the MCQ count, and faster correct answers score more points.',
         };
       default:
         return {
@@ -241,9 +246,7 @@ export const BattleLobby = ({ onJoinBattle, mode }: BattleLobbyProps) => {
         <div className="pointer-events-none absolute left-2 top-64 h-8 w-8 rounded-full border border-emerald-500/20 bg-emerald-500/10" />
         <SubjectChapterSelector
           selectedSubjectId={selectedSubjectId}
-          selectedChapterId={selectedChapterId}
           onSubjectChange={handleSubjectChange}
-          onChapterChange={handleChapterChange}
         />
 
         {/* Create Room Card */}
@@ -270,7 +273,7 @@ export const BattleLobby = ({ onJoinBattle, mode }: BattleLobbyProps) => {
                   {(['1v1', '2v2', 'ffa', 'rapid_fire'] as const).map(t => (
                     <button
                       key={t}
-                      onClick={() => setBattleType(t)}
+                      onClick={() => handleBattleTypeChange(t)}
                       className={`py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
                         battleType === t
                           ? 'bg-primary text-primary-foreground border-primary shadow-sm'
@@ -291,7 +294,7 @@ export const BattleLobby = ({ onJoinBattle, mode }: BattleLobbyProps) => {
               <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/40 bg-muted/20 p-3">
                 <div>
                   <p className="text-xs font-black uppercase tracking-wider text-foreground">Private Room</p>
-                  <p className="text-xs text-muted-foreground">Code-only room. Bots and public listing stay off.</p>
+                  <p className="text-xs text-muted-foreground">Code-only room. Public listing stays off.</p>
                 </div>
                 <Switch checked={isPrivateRoom} onCheckedChange={setIsPrivateRoom} />
               </div>
@@ -358,7 +361,7 @@ export const BattleLobby = ({ onJoinBattle, mode }: BattleLobbyProps) => {
                 </div>
               </div>
 
-              <Button onClick={createRoom} disabled={isCreating || !selectedSubjectId || !selectedChapterId} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-2xl h-12 font-black uppercase text-xs tracking-widest shadow-lg shadow-primary/20">
+              <Button onClick={createRoom} disabled={isCreating || !selectedSubjectId} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-2xl h-12 font-black uppercase text-xs tracking-widest shadow-lg shadow-primary/20">
                 {isCreating ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />{createStep === 'opening' ? 'Opening...' : 'Creating...'}</> : <><Trophy className="w-4 h-4 mr-2" />Create Battle Room</>}
               </Button>
             </div>

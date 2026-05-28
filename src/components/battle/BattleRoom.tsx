@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, Users, Swords, XCircle, Gamepad2, Hourglass, Copy, BookOpenText, Play, Bell, Trophy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -68,8 +69,11 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
   const prevHostPingRequestedAt = useRef<string | null>(null);
   const prevHostPingSenderId = useRef<string | null>(null);
   const [showConfirmLeaveModal, setShowConfirmLeaveModal] = useState(false);
+  const [participantAvatars, setParticipantAvatars] = useState<Record<string, string | null>>({});
   const prevParticipantsCount = useRef<number | null>(null);
   const botFillInFlightRef = useRef(false);
+  const rapidFireChurnScheduledRef = useRef(false);
+  const rapidFireChurnTimersRef = useRef<number[]>([]);
   const battleStartHandledRef = useRef(false);
 
   // Fetch room details and participants in real-time
@@ -181,6 +185,41 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
   }, [roomId, queryClient, onBattleStart, onLeave, toast]);
 
   useEffect(() => {
+    if (!room?.battle_participants?.length) {
+      setParticipantAvatars({});
+      return;
+    }
+
+    const userIds = Array.from(new Set(
+      room.battle_participants
+        .map(participant => participant.user_id)
+        .filter(Boolean)
+    ));
+    if (userIds.length === 0) return;
+
+    let cancelled = false;
+    const loadParticipantAvatars = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, avatar_url')
+        .in('id', userIds);
+
+      if (cancelled || error) return;
+
+      const avatarMap = (data || []).reduce<Record<string, string | null>>((map, profile: any) => {
+        map[profile.id] = profile.avatar_url || null;
+        return map;
+      }, {});
+      setParticipantAvatars(avatarMap);
+    };
+
+    loadParticipantAvatars();
+    return () => {
+      cancelled = true;
+    };
+  }, [room?.battle_participants]);
+
+  useEffect(() => {
     if (!room || room.status !== 'waiting' || room.host_id !== userId || room.is_private) return;
     if (botFillInFlightRef.current) return;
 
@@ -206,11 +245,10 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
       botFillInFlightRef.current = true;
       const usedNames = new Set(participants.map(participant => participant.username));
 
-      const baseJoinDelay = room.battle_type === 'rapid_fire'
-        ? Math.min(config.botJoinDelayMs, 450)
-        : room.battle_type === 'ffa'
-          ? Math.min(config.botJoinDelayMs, 850)
-          : config.botJoinDelayMs;
+      const rapidFireFillDuration = 100_000 + Math.random() * 60_000;
+      const baseJoinDelay = room.battle_type === 'ffa'
+        ? Math.min(config.botJoinDelayMs, 850)
+        : config.botJoinDelayMs;
       const joinJitter = room.battle_type === 'rapid_fire' ? 350 : room.battle_type === 'ffa' ? 450 : 1400;
 
       Array.from({ length: botsToAdd }).forEach((_, index) => {
@@ -220,9 +258,7 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
             usedNames.add(botName);
             const team = room.battle_type === '2v2'
               ? ((participants.length + index) % 2) + 1
-              : room.battle_type === 'rapid_fire'
-                ? ((participants.length + index) % 3) + 1
-                : null;
+              : null;
 
             const botRow = {
               battle_room_id: room.id,
@@ -252,7 +288,9 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
           } finally {
             if (index === botsToAdd - 1) botFillInFlightRef.current = false;
           }
-        }, baseJoinDelay * (index + 1) + Math.random() * joinJitter);
+        }, room.battle_type === 'rapid_fire'
+          ? ((index + 1) / botsToAdd) * rapidFireFillDuration + Math.random() * joinJitter
+          : baseJoinDelay * (index + 1) + Math.random() * joinJitter);
       });
     };
 
@@ -262,6 +300,41 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
   useEffect(() => {
     if (!room || room.status !== 'waiting' || room.host_id !== userId || room.is_private || room.countdown_initiated_at) return;
     if (room.battle_type === '1v1' || room.battle_type === '2v2') return;
+
+    if (room.battle_type === 'rapid_fire') {
+      if (rapidFireChurnScheduledRef.current) return;
+      rapidFireChurnScheduledRef.current = true;
+
+      const leavesToSchedule = Math.floor(Math.random() * 6) + 3;
+      rapidFireChurnTimersRef.current = Array.from({ length: leavesToSchedule }).map((_, index) => {
+        const delay = 24_000 + index * (9_000 + Math.random() * 8_000);
+        return window.setTimeout(async () => {
+          const { data: latestRoom } = await supabase
+            .from('battle_rooms')
+            .select('status, countdown_initiated_at')
+            .eq('id', room.id)
+            .single();
+          if (latestRoom?.status !== 'waiting' || latestRoom?.countdown_initiated_at) return;
+
+          const { data: candidates } = await supabase
+            .from('battle_participants')
+            .select('user_id')
+            .eq('battle_room_id', room.id)
+            .eq('is_bot', true)
+            .limit(30);
+          if (!candidates || candidates.length === 0) return;
+
+          const leavingParticipant = candidates[Math.floor(Math.random() * candidates.length)];
+          await supabase
+            .from('battle_participants')
+            .delete()
+            .eq('battle_room_id', room.id)
+            .eq('user_id', leavingParticipant.user_id);
+          queryClient.invalidateQueries({ queryKey: ['battleRoom', roomId] });
+        }, delay);
+      });
+      return;
+    }
 
     const bots = (room.battle_participants || []).filter(participant => participant.is_bot);
     const humans = (room.battle_participants || []).filter(participant => !participant.is_bot);
@@ -284,6 +357,13 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
 
     return () => window.clearTimeout(timer);
   }, [room, roomId, userId, queryClient]);
+
+  useEffect(() => {
+    return () => {
+      rapidFireChurnTimersRef.current.forEach(timer => window.clearTimeout(timer));
+      rapidFireChurnTimersRef.current = [];
+    };
+  }, []);
 
   // Countdown management
   useEffect(() => {
@@ -413,28 +493,12 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
     };
   }, [room, roomId, userId, toast, queryClient]); // Added queryClient to dependencies
 
-  // Join/Leave notifications
+  // Participant safety checks
   useEffect(() => {
     if (!room) return;
 
     const currentPlayers = room.battle_participants?.length || 0;
     const isHost = room.host_id === userId;
-
-    if (prevParticipantsCount.current !== null && prevParticipantsCount.current !== currentPlayers) {
-      if (currentPlayers > prevParticipantsCount.current) {
-        toast({
-          title: "Player Joined!",
-          description: "A new player has joined the room.",
-        });
-        console.log('BattleRoom.tsx: Player joined notification.');
-      } else if (currentPlayers < prevParticipantsCount.current) {
-        toast({
-          title: "Player Left",
-          description: "A player has left the room.",
-        });
-        console.log('BattleRoom.tsx: Player left notification.');
-      }
-    }
     prevParticipantsCount.current = currentPlayers;
 
     const currentUserIsParticipant = room.battle_participants?.some(
@@ -577,18 +641,18 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
   });
 
   const loadRapidFireQuestions = async () => {
-    if (!room?.chapter_id) return [];
+    if (!room?.subject_id) return [];
 
-    const requestedQuestions = Math.max(1, room.total_questions || 20);
+    const requestedQuestions = Math.max(20, room.total_questions || 20);
     const { data: mcqs, error } = await supabase
       .from('mcqs')
-      .select('id, question, options, correct_answer, explanation')
-      .eq('chapter_id', room.chapter_id)
+      .select('id, question, options, correct_answer, explanation, chapters!inner(subject_id)')
+      .eq('chapters.subject_id', room.subject_id)
       .limit(requestedQuestions * 2);
 
     if (error) throw error;
     if (!mcqs || mcqs.length === 0) {
-      throw new Error("No MCQs found for this Rapid Fire topic.");
+      throw new Error("No MCQs found for this Rapid Fire subject.");
     }
 
     return mcqs
@@ -822,234 +886,218 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
   const isHost = room.host_id === userId;
   const isCountdownInitiated = room.countdown_initiated_at !== null;
   const isRapidFire = room.battle_type === 'rapid_fire';
-  const currentUserParticipant = room.battle_participants?.find(p => p.user_id === userId);
-  const visibleTeams = Array.from(
-    new Set([1, 2, 3, ...(room.battle_participants || []).map(p => p.team).filter((team): team is number => typeof team === 'number')])
-  ).sort((a, b) => a - b);
+  const battleLabel = isRapidFire ? 'Rapid Fire' : room.battle_type === 'ffa' ? 'Free For All' : room.battle_type === '2v2' ? '2v2 Team' : '1v1 Duel';
+  const playerFillPercent = Math.min(100, Math.round((currentPlayers / Math.max(room.max_players, 1)) * 100));
+  const statusText = countdown !== null && room.status === 'waiting' && countdown > 0
+    ? `Match launch ${countdown}/5`
+    : isGameStarting
+      ? 'Starting battle now...'
+      : room.status === 'waiting'
+        ? isHost ? 'Waiting for challengers' : 'Waiting for host'
+        : 'Room active';
+  const canStartManually = isHost
+    && (room.battle_type === 'ffa' || room.battle_type === 'rapid_fire')
+    && room.status === 'waiting'
+    && currentPlayers > 1
+    && !isCountdownInitiated;
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background px-4 py-6 flex flex-col items-center justify-center">
-      <div className="pointer-events-none absolute left-5 top-10 h-16 w-16 rounded-full border border-primary/15 bg-primary/5" />
-      <div className="pointer-events-none absolute right-8 top-24 h-9 w-9 rounded-full border border-emerald-500/20 bg-emerald-500/10" />
-      <div className="pointer-events-none absolute bottom-20 left-10 h-12 w-12 rounded-full border border-orange-500/20 bg-orange-500/10" />
-      <div className="pointer-events-none absolute -right-8 bottom-36 h-28 w-28 rounded-full border border-primary/10 bg-primary/5" />
-
-      <Card className="relative w-full max-w-4xl overflow-hidden rounded-[2rem] border-border/50 bg-card/95 shadow-2xl shadow-primary/10">
-        <div className="pointer-events-none absolute right-6 top-6 h-24 w-24 rounded-full border border-primary/10 bg-primary/5" />
-        <div className="pointer-events-none absolute left-8 bottom-8 h-14 w-14 rounded-full border border-emerald-500/15 bg-emerald-500/10" />
-        <CardHeader className="relative text-center p-6 pb-4">
-          <CardTitle className="text-2xl font-black tracking-tight text-foreground flex items-center justify-center space-x-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary">
-              <Gamepad2 className="w-6 h-6" />
-            </span>
-            <span>Battle Room</span>
-          </CardTitle>
-          <CardDescription className="text-sm text-muted-foreground mt-2">
-            {isRapidFire ? 'Choose teams, invite friends, then let the host start Rapid Fire.' : 'Waiting for players to join...'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="relative p-5 sm:p-6 pt-2 space-y-6">
-          {/* Room Code Display */}
-          <div className="flex flex-col items-center space-y-2 mt-4">
-            <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Room Code</p>
-            <div className="flex items-center space-x-2">
-              <Input
-                type="text"
-                readOnly
-                value={room.room_code}
-                className="w-32 md:w-40 text-center font-mono text-xl tracking-wider select-text bg-background"
-              />
-              <Button onClick={handleCopyRoomCode} className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground">
-                <Copy className="w-4 h-4 mr-2" /> Copy
-              </Button>
+    <div className="min-h-screen bg-transparent px-4 pb-[calc(env(safe-area-inset-bottom)+226px)] pt-[calc(env(safe-area-inset-top)+104px)]">
+      <div className="mx-auto flex w-full max-w-lg flex-col gap-4">
+        <div className="fixed inset-x-0 top-0 z-50 border-b border-border/40 bg-background/90 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+10px)] backdrop-blur-md">
+          <div className="mx-auto w-full max-w-lg">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary">
+                  <Gamepad2 className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.28em] text-primary">Live Competition</p>
+                  <h1 className="truncate text-2xl font-black uppercase italic tracking-tight text-foreground">Battle Arena</h1>
+                  <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">{battleLabel} lobby</p>
+                </div>
+              </div>
+              <Badge className="shrink-0 border-0 bg-primary/10 text-primary">
+                {isHost ? 'Host' : 'Member'}
+              </Badge>
             </div>
           </div>
+        </div>
 
-          {/* Room Statistics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-stretch text-center mt-6">
-            <div className="rounded-2xl border border-border/45 bg-background/70 p-3 shadow-sm">
-              <Users className="w-6 h-6 mx-auto mb-1 text-primary" />
-              <p className="text-lg font-semibold text-foreground">
-                {currentPlayers} / {room.max_players}
-              </p>
-              <p className="text-sm text-muted-foreground">Players Joined</p>
-            </div>
-            <div className="rounded-2xl border border-border/45 bg-background/70 p-3 shadow-sm">
-              <Swords className="w-6 h-6 mx-auto mb-1 text-primary" />
-              <p className="text-lg font-semibold text-foreground">{isRapidFire ? 'Rapid Fire' : room.battle_type}</p>
-              <p className="text-sm text-muted-foreground">Battle Type</p>
-            </div>
-            <div className="rounded-2xl border border-border/45 bg-background/70 p-3 shadow-sm">
-              <Hourglass className="w-6 h-6 mx-auto mb-1 text-primary" />
-              <p className="text-lg font-semibold text-foreground">
-                {room.total_questions} Qs / {room.time_per_question}s
-              </p>
-              <p className="text-sm text-muted-foreground">Settings</p>
-            </div>
-            {room.subject && (
-              <div className="rounded-2xl border border-border/45 bg-background/70 p-3 shadow-sm">
-                <BookOpenText className="w-6 h-6 mx-auto mb-1 text-primary" />
-                <p className="text-lg font-semibold text-foreground">{room.subject}</p>
-                <p className="text-sm text-muted-foreground">Subject</p>
-              </div>
-            )}
-            {isRapidFire && (
-              <div className="rounded-2xl border border-border/45 bg-background/70 p-3 shadow-sm">
-                <Trophy className="w-6 h-6 mx-auto mb-1 text-primary" />
-                <p className="text-lg font-semibold text-foreground">{room.win_target || 20}</p>
-                <p className="text-sm text-muted-foreground">Correct to Win</p>
-              </div>
-            )}
-          </div>
-
-          {isRapidFire && room.status === 'waiting' && (
-            <div className="space-y-3 rounded-2xl border border-border/40 bg-muted/20 p-4">
-              <div className="flex items-center justify-between gap-3">
+        <div className="space-y-4">
+          <div className="space-y-4">
+            <section className="rounded-2xl border border-border/45 bg-card p-4 shadow-sm">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h3 className="font-semibold text-foreground">Choose Team</h3>
-                  <p className="text-xs text-muted-foreground">Self-join a team or stay solo before the host starts.</p>
-                </div>
-                <Badge className="bg-primary/10 text-primary border-0">Rapid Fire</Badge>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <Button
-                  variant={currentUserParticipant?.team == null ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => joinTeamMutation.mutate(null)}
-                  disabled={joinTeamMutation.isPending}
-                >
-                  Solo
-                </Button>
-                {visibleTeams.map(team => (
-                  <Button
-                    key={team}
-                    variant={currentUserParticipant?.team === team ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => joinTeamMutation.mutate(team)}
-                    disabled={joinTeamMutation.isPending}
-                  >
-                    Team {team}
-                  </Button>
-                ))}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => joinTeamMutation.mutate(Math.max(...visibleTeams) + 1)}
-                  disabled={joinTeamMutation.isPending || visibleTeams.length >= 10}
-                >
-                  + Team
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Players List */}
-          <div className="space-y-3">
-            <h3 className="font-medium text-foreground">Current Players:</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-              {room.battle_participants?.map((participant) => (
-                <div
-                  key={participant.id}
-                  className="min-h-[74px] rounded-2xl border border-border/45 bg-background/75 p-3 text-foreground shadow-sm transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
-                >
-                  <div className="flex items-start gap-2">
-                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <Users className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-black">{participant.username}</p>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {isRapidFire && (
-                          <Badge variant="secondary" className="h-5 rounded-full px-2 text-[10px]">
-                            {participant.team ? `Team ${participant.team}` : 'Solo'}
-                          </Badge>
-                        )}
-                        {participant.user_id === userId && (
-                          <Badge className="h-5 rounded-full border-0 bg-primary/10 px-2 text-[10px] text-primary">You</Badge>
-                        )}
-                        {room.host_id === participant.user_id && (
-                          <Badge className="h-5 rounded-full border-0 bg-amber-500/10 px-2 text-[10px] text-amber-600">Host</Badge>
-                        )}
-                      </div>
-                    </div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground">Room Code</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <Input
+                      type="text"
+                      readOnly
+                      value={room.room_code}
+                      className="h-12 w-36 rounded-xl border-border/60 bg-background text-center font-mono text-xl font-black tracking-widest sm:w-44"
+                    />
+                    <Button onClick={handleCopyRoomCode} className="h-12 rounded-xl px-4 font-black uppercase tracking-widest">
+                      <Copy className="mr-2 h-4 w-4" /> Copy
+                    </Button>
                   </div>
-
-                  {/* Host can remove participants */}
-                  {isHost && participant.user_id !== userId && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="mt-2 h-7 w-full rounded-xl p-1 text-destructive hover:text-destructive"
-                      onClick={() => removeParticipantMutation.mutate(participant.user_id)}
-                      disabled={removeParticipantMutation.isPending}
-                    >
-                      <XCircle className="w-4 h-4" />
-                    </Button>
-                  )}
-                  {/* Ping host button */}
-                  {!isHost && participant.user_id === room.host_id && room.battle_type === 'ffa' && room.status === 'waiting' && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="mt-2 h-7 w-full rounded-xl p-1 text-primary hover:text-primary"
-                      onClick={() => pingHostMutation.mutate()}
-                      disabled={pingHostMutation.isPending}
-                    >
-                      <Bell className="w-4 h-4" />
-                    </Button>
-                  )}
                 </div>
-              ))}
-            </div>
+                <div className="min-w-[180px] rounded-xl border border-primary/15 bg-primary/5 p-3">
+                  <div className="mb-2 flex items-center justify-between text-xs font-black uppercase tracking-widest">
+                    <span className="text-primary">{currentPlayers}/{room.max_players}</span>
+                    <span className="text-muted-foreground">joined</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${playerFillPercent}%` }} />
+                  </div>
+                  <p className="mt-2 text-xs font-semibold text-muted-foreground">{statusText}</p>
+                </div>
+              </div>
+            </section>
+
+            <section className="grid grid-cols-2 gap-2.5">
+              <div className="rounded-2xl border border-border/45 bg-card p-3 shadow-sm">
+                <Users className="mb-2 h-4 w-4 text-primary" />
+                <p className="text-lg font-black text-foreground">{currentPlayers}/{room.max_players}</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Members</p>
+              </div>
+              <div className="rounded-2xl border border-border/45 bg-card p-3 shadow-sm">
+                <Swords className="mb-2 h-4 w-4 text-primary" />
+                <p className="truncate text-lg font-black text-foreground">{battleLabel}</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Mode</p>
+              </div>
+              <div className="rounded-2xl border border-border/45 bg-card p-3 shadow-sm">
+                <Hourglass className="mb-2 h-4 w-4 text-primary" />
+                <p className="text-lg font-black text-foreground">{room.total_questions} Qs</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{room.time_per_question}s each</p>
+              </div>
+              <div className="rounded-2xl border border-border/45 bg-card p-3 shadow-sm">
+                {isRapidFire ? <Trophy className="mb-2 h-4 w-4 text-primary" /> : <BookOpenText className="mb-2 h-4 w-4 text-primary" />}
+                <p className="truncate text-lg font-black text-foreground">{isRapidFire ? (room.win_target || 20) : (room.subject || 'Topic')}</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{isRapidFire ? 'Win target' : 'Subject'}</p>
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-border/45 bg-card p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-black uppercase tracking-widest text-foreground">Members</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">{currentPlayers} candidate{currentPlayers === 1 ? '' : 's'} in the room</p>
+                </div>
+                <Badge variant="outline" className="bg-background">{statusText}</Badge>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                {room.battle_participants?.map((participant) => {
+                  const isCurrentUser = participant.user_id === userId;
+                  const participantIsHost = room.host_id === participant.user_id;
+                  const initial = (participant.username || '?').trim().charAt(0).toUpperCase() || '?';
+                  const avatarUrl = participantAvatars[participant.user_id];
+                  return (
+                    <div
+                      key={participant.id}
+                      className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 shadow-sm transition hover:border-primary/30 ${
+                        isCurrentUser ? 'border-primary/25 bg-primary/5' : 'border-border/45 bg-background/70'
+                      }`}
+                    >
+                      <Avatar className={`h-10 w-10 shrink-0 rounded-2xl border ${
+                        participantIsHost ? 'border-amber-500/20' : 'border-primary/15'
+                      }`}>
+                        <AvatarImage src={avatarUrl || undefined} alt={`${participant.username} avatar`} className="object-cover" />
+                        <AvatarFallback className={`rounded-2xl text-sm font-black ${
+                          participantIsHost ? 'bg-amber-500/10 text-amber-600' : 'bg-primary/10 text-primary'
+                        }`}>
+                          {initial}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-black text-foreground">{participant.username}</p>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {isCurrentUser && (
+                            <Badge className="h-5 rounded-full border-0 bg-primary/10 px-2 text-[10px] text-primary">You</Badge>
+                          )}
+                          {participantIsHost && (
+                            <Badge className="h-5 rounded-full border-0 bg-amber-500/10 px-2 text-[10px] text-amber-600">Host</Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      {isHost && participant.user_id !== userId && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-9 w-9 shrink-0 rounded-xl p-0 text-destructive hover:text-destructive"
+                          onClick={() => removeParticipantMutation.mutate(participant.user_id)}
+                          disabled={removeParticipantMutation.isPending}
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {!isHost && participant.user_id === room.host_id && room.battle_type === 'ffa' && room.status === 'waiting' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-9 shrink-0 rounded-xl px-2 text-xs font-bold text-primary hover:text-primary"
+                          onClick={() => pingHostMutation.mutate()}
+                          disabled={pingHostMutation.isPending}
+                        >
+                          <Bell className="mr-1.5 h-3.5 w-3.5" /> Ping Host
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
           </div>
 
-          {/* Status Messages */}
-          {countdown !== null && room.status === 'waiting' && countdown > 0 ? (
-            <div className="text-center text-lg font-semibold text-primary animate-pulse">
-              Match launch {countdown}/5
-            </div>
-          ) : isGameStarting ? (
-            <div className="text-center text-lg font-semibold text-primary animate-pulse">
-              Starting battle now...
-            </div>
-          ) : room.status === 'waiting' ? (
-            <div className="text-center text-muted-foreground">
-              Waiting for players to join...
-            </div>
-          ) : null}
+        </div>
+      </div>
 
-          {/* Host Start Battle Button (FFA only) */}
-          {isHost && (room.battle_type === 'ffa' || room.battle_type === 'rapid_fire') && room.status === 'waiting' && currentPlayers > 1 && !isCountdownInitiated && (
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border/40 bg-background/90 px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 backdrop-blur-md">
+        <div className="mx-auto w-full max-w-lg space-y-3">
+          <section className="rounded-2xl border border-border/45 bg-card p-3 shadow-sm">
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-primary">Status</p>
+            <h2 className="mt-1 text-base font-black text-foreground">{statusText}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {isRapidFire
+                ? 'Every candidate competes individually.'
+                : isRoomFull
+                  ? 'Room is full. The match will start automatically.'
+                  : 'Share the room code and wait for the room to fill.'}
+            </p>
+          </section>
+
+          <div className={`grid gap-2 ${canStartManually ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            <Button
+              onClick={handleLeaveClick}
+              disabled={leaveRoomMutation.isPending}
+              variant="outline"
+              className="h-12 rounded-2xl border-border/60 font-bold text-foreground hover:bg-muted/50"
+            >
+              {isLeaving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <XCircle className="mr-2 h-4 w-4" />
+              )}
+              Leave Room
+            </Button>
+            {canStartManually && (
             <Button
               onClick={() => startBattleMutation.mutate()}
               disabled={startBattleMutation.isPending || currentPlayers < 2}
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 flex items-center justify-center space-x-2"
+              className="h-12 rounded-2xl bg-primary text-xs font-black uppercase tracking-widest text-primary-foreground shadow-lg shadow-primary/20 hover:bg-primary/90"
             >
               {startBattleMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <Play className="w-4 h-4" />
+                <Play className="mr-2 h-4 w-4" />
               )}
-              <span>{isRapidFire ? 'Start Rapid Fire Now!' : 'Start Battle Now! (FFA)'}</span>
+              {isRapidFire ? 'Start Rapid Fire' : 'Start Battle'}
             </Button>
-          )}
-
-          {/* Leave Button */}
-          <Button
-            onClick={handleLeaveClick}
-            disabled={leaveRoomMutation.isPending}
-            variant="outline"
-            className="w-full border-border/60 text-foreground hover:bg-muted/50"
-          >
-            {isLeaving ? (
-              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-            ) : (
-              <XCircle className="w-4 h-4 mr-2" />
             )}
-            Leave Room
-          </Button>
-        </CardContent>
-      </Card>
+          </div>
+        </div>
+      </div>
 
       {/* Confirmation Modal */}
       {showConfirmLeaveModal && (

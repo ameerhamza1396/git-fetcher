@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { BattleLobby } from '@/components/battle/BattleLobby';
 import { BattleRoom } from '@/components/battle/BattleRoom';
@@ -54,6 +54,30 @@ const Battle: React.FC = () => {
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [gameData, setGameData] = useState<RoomData | null>(null);
   const [battleResults, setBattleResults] = useState<any>(null);
+  const battleMusicRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (!battleMusicRef.current) {
+      battleMusicRef.current = new Audio('/music/battle.mp3');
+      battleMusicRef.current.loop = true;
+      battleMusicRef.current.volume = 0.28;
+    }
+
+    const audio = battleMusicRef.current;
+    const shouldPlayMusic = Boolean(user) && battleState !== 'game';
+
+    if (shouldPlayMusic) {
+      audio.play().catch(() => {
+        // Browser autoplay policies may block until the user interacts.
+      });
+    } else {
+      audio.pause();
+    }
+
+    return () => {
+      audio.pause();
+    };
+  }, [battleState, user]);
 
   const handleJoinBattle = async (roomId: string, options?: { joinedByCode?: boolean; createdRoom?: boolean }) => {
     if (!user) {
@@ -145,14 +169,18 @@ const Battle: React.FC = () => {
     );
   }
 
-  return (
-    <div className="min-h-screen w-full bg-background">
-      <Seo title="Battle Arena" description="Compete in MCQ battles" canonical="https://medmacs.app/battle" />
+  const showLivingBackground = battleState !== 'game';
 
-      <main className={`${battleState === 'game' || battleState === 'results' ? 'w-full' : 'px-4 pb-[calc(env(safe-area-inset-bottom)+60px)] max-w-lg mx-auto'}`}>
+  return (
+    <div className="relative min-h-screen w-full overflow-hidden bg-background">
+      <Seo title="Battle Arena" description="Compete in MCQ battles" canonical="https://medmacs.app/battle" />
+      {showLivingBackground && <BattleLivingBackground />}
+
+      <main className={`relative z-10 ${battleState === 'game' || battleState === 'results' || battleState === 'room' ? 'w-full' : 'px-4 pb-[calc(env(safe-area-inset-bottom)+60px)] max-w-lg mx-auto'}`}>
         {battleState === 'lobby' && (
-          <div className="space-y-5">
-            <div className="sticky top-0 z-50 -mx-4 bg-background/85 px-4 pt-[calc(env(safe-area-inset-top)+14px)] pb-3 backdrop-blur-md">
+          <div className="space-y-5 pt-[calc(env(safe-area-inset-top)+122px)]">
+            <div className="fixed inset-x-0 top-0 z-50 bg-background/85 px-4 pt-[calc(env(safe-area-inset-top)+14px)] pb-3 backdrop-blur-md">
+              <div className="mx-auto max-w-lg">
               {/* Hero */}
               <div className="text-center mb-3">
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-2">Live Competition</p>
@@ -179,6 +207,7 @@ const Battle: React.FC = () => {
                     <Icon className="w-3.5 h-3.5" /> {label}
                   </button>
                 ))}
+              </div>
               </div>
             </div>
 
@@ -213,6 +242,10 @@ const Battle: React.FC = () => {
     </div>
   );
 };
+
+const BattleLivingBackground = () => (
+  <div aria-hidden="true" className="battle-live-bg" />
+);
 
 /* ───── Battle Leaderboard ───── */
 import { Loader2, Medal } from 'lucide-react';
@@ -313,12 +346,10 @@ const BattleLeaderboard = () => {
 export default Battle;
 
 const RapidFireResults = ({ results, onReturnToLobby }: { results: any; onReturnToLobby: () => void }) => {
-  const winnerName = results.winnerTeam
-    ? `Team ${results.winnerTeam}`
-    : results.players?.find((player: any) => player.userId === results.winnerUserId)?.username || results.players?.[0]?.username || 'Rapid Fire winner';
+  const winnerName = results.players?.find((player: any) => player.userId === results.winnerUserId)?.username || results.players?.[0]?.username || 'Rapid Fire winner';
 
   return (
-    <div className="min-h-screen bg-background p-4">
+    <div className="min-h-screen bg-transparent p-4">
       <div className="mx-auto max-w-3xl space-y-5">
         <div className="rounded-3xl border border-primary/20 bg-primary/5 p-6 text-center shadow-sm">
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
@@ -332,20 +363,6 @@ const RapidFireResults = ({ results, onReturnToLobby }: { results: any; onReturn
           </div>
         </div>
 
-        {results.teams?.length > 0 && (
-          <div className="rounded-2xl border border-border/40 bg-card p-4 shadow-sm">
-            <h2 className="mb-3 text-sm font-black uppercase tracking-widest">Team Ranking</h2>
-            <div className="space-y-2">
-              {results.teams.map((team: any, index: number) => (
-                <div key={team.team} className="flex items-center justify-between rounded-xl bg-muted/30 px-3 py-2">
-                  <span className="font-semibold">#{index + 1} Team {team.team}</span>
-                <span className="font-black">{team.points ?? team.correct} pts</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         <div className="rounded-2xl border border-border/40 bg-card p-4 shadow-sm">
           <h2 className="mb-3 text-sm font-black uppercase tracking-widest">Player Ranking</h2>
           <div className="space-y-2">
@@ -355,7 +372,7 @@ const RapidFireResults = ({ results, onReturnToLobby }: { results: any; onReturn
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold">{player.username}</p>
                   <p className="text-xs text-muted-foreground">
-                    {player.team ? `Team ${player.team}` : 'Solo'} - fastest {player.fastest ? `${(player.fastest / 1000).toFixed(2)}s` : 'n/a'}
+                    fastest {player.fastest ? `${(player.fastest / 1000).toFixed(2)}s` : 'n/a'}
                   </p>
                 </div>
                 <span className="font-black">{player.points ?? player.correct} pts</span>

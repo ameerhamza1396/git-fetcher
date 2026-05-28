@@ -27,7 +27,7 @@ export const BattleResults = ({ results, onReturnToLobby }: BattleResultsProps) 
   const answers = results.answers || [];
 
   return (
-    <div className="h-dvh overflow-hidden bg-background px-4 py-[calc(env(safe-area-inset-top)+12px)] pb-[calc(env(safe-area-inset-bottom)+12px)]">
+    <div className="h-dvh overflow-hidden bg-transparent px-4 py-[calc(env(safe-area-inset-top)+12px)] pb-[calc(env(safe-area-inset-bottom)+12px)]">
       <div className="mx-auto flex h-full max-w-4xl flex-col gap-3">
         <Card className="shrink-0 border-primary/20 bg-primary/5 shadow-sm">
           <CardHeader className="px-4 pb-3 pt-4 text-center">

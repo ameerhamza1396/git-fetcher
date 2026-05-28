@@ -144,21 +144,21 @@ export const BattleGame = ({ roomData, userId, onGameComplete, onExit }: BattleG
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [roomData.id, roomData.chapter_id, roomData.total_questions]);
+  }, [roomData.id, roomData.subject_id, roomData.total_questions]);
 
   const loadQuestionsFromDatabase = async () => {
     try {
       setIsLoading(true);
 
-      if (!roomData.chapter_id) {
+      if (!roomData.subject_id) {
         loadSampleQuestions();
         return;
       }
 
       const { data: mcqs, error } = await supabase
         .from('mcqs')
-        .select('id, question, options, correct_answer, explanation')
-        .eq('chapter_id', roomData.chapter_id)
+        .select('id, question, options, correct_answer, explanation, chapters!inner(subject_id)')
+        .eq('chapters.subject_id', roomData.subject_id)
         .limit(roomData.total_questions * 2);
 
       if (error || !mcqs || mcqs.length === 0) {

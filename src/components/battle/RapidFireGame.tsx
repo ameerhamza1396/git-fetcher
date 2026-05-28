@@ -172,26 +172,6 @@ export const RapidFireGame = ({ roomData, userId, onGameComplete }: RapidFireGam
     });
   }, [activeParticipants, events]);
 
-  const teamRows = useMemo(() => {
-    const map = new Map<number, { team: number; correct: number; points: number; attempts: number; totalResponse: number }>();
-    events.forEach(event => {
-      if (!event.team) return;
-      const row = map.get(event.team) || { team: event.team, correct: 0, points: 0, attempts: 0, totalResponse: 0 };
-      row.attempts += 1;
-      row.totalResponse += event.response_time_ms || 0;
-      row.points += event.points_awarded || 0;
-      if (event.is_correct) row.correct += 1;
-      map.set(event.team, row);
-    });
-    return Array.from(map.values()).sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.correct !== a.correct) return b.correct - a.correct;
-      const aAvg = a.attempts ? a.totalResponse / a.attempts : Number.MAX_SAFE_INTEGER;
-      const bAvg = b.attempts ? b.totalResponse / b.attempts : Number.MAX_SAFE_INTEGER;
-      return aAvg - bAvg;
-    });
-  }, [events]);
-
   const fetchRoom = async () => {
     const { data, error } = await supabase
       .from('battle_rooms')
@@ -369,22 +349,21 @@ export const RapidFireGame = ({ roomData, userId, onGameComplete }: RapidFireGam
       mode: 'rapid_fire',
       roomCode: room.room_code,
       winnerUserId: room.winner_user_id,
-      winnerTeam: room.winner_team,
+      winnerTeam: null,
       players: playerRows,
-      teams: teamRows,
+      teams: [],
       winTarget,
     });
-  }, [room.status, room.winner_user_id, room.winner_team, playerRows, teamRows, winTarget, onGameComplete]);
+  }, [room.status, room.winner_user_id, playerRows, winTarget, onGameComplete]);
 
   const completeRoom = async () => {
-    const topTeam = teamRows[0];
     const topPlayer = playerRows[0];
     await supabase
       .from('battle_rooms')
       .update({
         status: 'completed',
-        winner_user_id: topTeam && topTeam.points > (topPlayer?.points || 0) ? null : topPlayer?.userId || null,
-        winner_team: topTeam && topTeam.points > (topPlayer?.points || 0) ? topTeam.team : null,
+        winner_user_id: topPlayer?.userId || null,
+        winner_team: null,
         ended_at: new Date().toISOString(),
       })
       .eq('id', room.id);
@@ -579,7 +558,7 @@ export const RapidFireGame = ({ roomData, userId, onGameComplete }: RapidFireGam
       )}
 
       {scorePulses.length > 0 && (
-        <div className="pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+120px)] right-5 z-30 flex w-40 flex-col items-end gap-1.5">
+        <div className="pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+62px)] left-3 z-30 flex w-44 flex-col items-start gap-1.5">
           {scorePulses.map(pulse => (
             <div
               key={pulse.id}
@@ -589,7 +568,7 @@ export const RapidFireGame = ({ roomData, userId, onGameComplete }: RapidFireGam
                   : 'border-red-500/20 bg-red-500/10 text-red-600'
               }`}
             >
-              <span className="inline-block max-w-[92px] truncate align-bottom">{pulse.username}</span>{' '}
+              <span className="inline-block max-w-[112px] truncate align-bottom">{pulse.username}</span>{' '}
               {pulse.points > 0 ? `+${pulse.points}` : pulse.points}
             </div>
           ))}
@@ -631,9 +610,7 @@ export const RapidFireGame = ({ roomData, userId, onGameComplete }: RapidFireGam
                     <span className="w-8 shrink-0 text-center text-sm font-black text-muted-foreground">#{index + 1}</span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-black text-foreground">{isCurrentUser ? 'You' : row.username}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {row.team ? `Team ${row.team}` : 'Solo'} - {row.correct} correct
-                      </p>
+                      <p className="text-xs text-muted-foreground">{row.correct} correct</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-black text-foreground">{row.points}</p>
