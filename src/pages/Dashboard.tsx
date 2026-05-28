@@ -1124,9 +1124,6 @@ const Dashboard = () => {
                 <TrendingUp className="w-3.5 h-3.5 text-violet-500" /> Explore
               </h2>
               <div className="mb-3">
-                <ActionCard action={flpAction} />
-              </div>
-              <div className="mb-3">
                 <ActionCard action={collaborateAction} />
               </div>
               <a href="https://medistics.app" target="_blank" rel="noopener noreferrer">

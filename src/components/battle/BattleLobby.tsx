@@ -226,7 +226,7 @@ export const BattleLobby = ({ onJoinBattle, mode }: BattleLobbyProps) => {
   /* ─── CREATE TAB ─── */
   if (mode === 'create') {
     return (
-      <div className="relative space-y-5 pb-8">
+      <div className="relative space-y-5 pb-[calc(env(safe-area-inset-bottom)+108px)]">
         {isCreating && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/85 px-6 backdrop-blur-md">
             <div className="w-full max-w-xs rounded-2xl border border-border/50 bg-card p-5 text-center shadow-2xl shadow-primary/20">
@@ -361,12 +361,17 @@ export const BattleLobby = ({ onJoinBattle, mode }: BattleLobbyProps) => {
                 </div>
               </div>
 
-              <Button onClick={createRoom} disabled={isCreating || !selectedSubjectId} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-2xl h-12 font-black uppercase text-xs tracking-widest shadow-lg shadow-primary/20">
-                {isCreating ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />{createStep === 'opening' ? 'Opening...' : 'Creating...'}</> : <><Trophy className="w-4 h-4 mr-2" />Create Battle Room</>}
-              </Button>
             </div>
           </div>
         </motion.div>
+
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border/40 bg-background px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 shadow-[0_-12px_30px_rgba(0,0,0,0.08)]">
+          <div className="mx-auto w-full max-w-lg">
+            <Button onClick={createRoom} disabled={isCreating || !selectedSubjectId} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-2xl h-12 font-black uppercase text-xs tracking-widest shadow-lg shadow-primary/20">
+              {isCreating ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />{createStep === 'opening' ? 'Opening...' : 'Creating...'}</> : <><Trophy className="w-4 h-4 mr-2" />Create Battle Room</>}
+            </Button>
+          </div>
+        </div>
 
         {/* Footer */}
         <div className="text-center pt-4 pb-4">

@@ -902,9 +902,9 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
     && !isCountdownInitiated;
 
   return (
-    <div className="min-h-screen bg-transparent px-4 pb-[calc(env(safe-area-inset-bottom)+226px)] pt-[calc(env(safe-area-inset-top)+104px)]">
+    <div className="min-h-screen bg-transparent px-4 pb-[calc(env(safe-area-inset-bottom)+214px)] pt-[calc(env(safe-area-inset-top)+104px)]">
       <div className="mx-auto flex w-full max-w-lg flex-col gap-4">
-        <div className="fixed inset-x-0 top-0 z-50 border-b border-border/40 bg-background/90 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+10px)] backdrop-blur-md">
+        <div className="fixed inset-x-0 top-0 z-50 border-b border-border/40 bg-background px-4 pb-3 pt-[calc(env(safe-area-inset-top)+10px)] shadow-sm">
           <div className="mx-auto w-full max-w-lg">
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
@@ -1053,12 +1053,14 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border/40 bg-background/90 px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 backdrop-blur-md">
-        <div className="mx-auto w-full max-w-lg space-y-3">
-          <section className="rounded-2xl border border-border/45 bg-card p-3 shadow-sm">
-            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-primary">Status</p>
-            <h2 className="mt-1 text-base font-black text-foreground">{statusText}</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border/40 bg-background px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 shadow-[0_-12px_30px_rgba(0,0,0,0.08)]">
+        <div className="mx-auto w-full max-w-lg space-y-2">
+          <section className="border-b border-border/35 pb-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-primary">Status</p>
+              <p className="truncate text-sm font-black text-foreground">{statusText}</p>
+            </div>
+            <p className="mt-1 truncate text-xs text-muted-foreground">
               {isRapidFire
                 ? 'Every candidate competes individually.'
                 : isRoomFull

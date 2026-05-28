@@ -176,10 +176,10 @@ const Battle: React.FC = () => {
       <Seo title="Battle Arena" description="Compete in MCQ battles" canonical="https://medmacs.app/battle" />
       {showLivingBackground && <BattleLivingBackground />}
 
-      <main className={`relative z-10 ${battleState === 'game' || battleState === 'results' || battleState === 'room' ? 'w-full' : 'px-4 pb-[calc(env(safe-area-inset-bottom)+60px)] max-w-lg mx-auto'}`}>
+      <main className={`relative z-10 ${battleState === 'game' || battleState === 'results' || battleState === 'room' ? 'w-full' : 'px-4 pb-[calc(env(safe-area-inset-bottom)+72px)] max-w-lg mx-auto'}`}>
         {battleState === 'lobby' && (
-          <div className="space-y-5 pt-[calc(env(safe-area-inset-top)+122px)]">
-            <div className="fixed inset-x-0 top-0 z-50 bg-background/85 px-4 pt-[calc(env(safe-area-inset-top)+14px)] pb-3 backdrop-blur-md">
+          <div className="space-y-5 pt-[calc(env(safe-area-inset-top)+150px)] pb-[calc(env(safe-area-inset-bottom)+24px)]">
+            <div className="fixed inset-x-0 top-0 z-50 border-b border-border/40 bg-background px-4 pt-[calc(env(safe-area-inset-top)+14px)] pb-3 shadow-sm">
               <div className="mx-auto max-w-lg">
               {/* Hero */}
               <div className="text-center mb-3">
@@ -308,11 +308,12 @@ const BattleLeaderboard = () => {
   }
 
   return (
-    <div className="space-y-3">
-      <h3 className="text-sm font-black text-foreground uppercase tracking-widest flex items-center gap-2">
-        <Trophy className="w-4 h-4 text-yellow-500" /> Battle Rankings
-      </h3>
-      <div className="space-y-2">
+    <div className="mt-4 flex min-h-[calc(100dvh-260px)] flex-col pb-[calc(env(safe-area-inset-bottom)+8px)]">
+      <div className="flex-1 space-y-3">
+        <h3 className="text-sm font-black text-foreground uppercase tracking-widest flex items-center gap-2">
+          <Trophy className="w-4 h-4 text-yellow-500" /> Battle Rankings
+        </h3>
+        <div className="space-y-2">
         {leaders.map((leader, idx) => (
           <div key={leader.userId} className={`flex items-center gap-3 p-3.5 rounded-2xl border transition-all ${
             idx < 3
@@ -332,13 +333,14 @@ const BattleLeaderboard = () => {
             </div>
           </div>
         ))}
+        </div>
       </div>
 
       {/* Footer */}
-      <div className="text-center pt-4 pb-4">
+      <footer className="mt-auto pt-4 pb-2 text-center">
         <p className="text-[10px] text-muted-foreground font-medium">A Project by Hmacs Studios.</p>
         <p className="text-[10px] text-muted-foreground mt-1">© 2026 Hmacs Studios. All rights reserved</p>
-      </div>
+      </footer>
     </div>
   );
 };
