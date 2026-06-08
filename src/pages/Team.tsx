@@ -30,28 +30,28 @@ type TeamCategory = 'core' | 'extended' | 'contributor' | 'special_thanks';
 const sectionMeta = {
   core: {
     order: 1,
-    eyebrow: 'Step 1 of 4',
+    eyebrow: '01 Core',
     title: 'Core Team',
     description: 'The people building, operating, and polishing Medmacs for medical students.',
     icon: Crown,
   },
   extended: {
     order: 2,
-    eyebrow: 'Step 2 of 4',
+    eyebrow: '02 Extended',
     title: 'Extended Team',
     description: 'Campus, content, and community collaborators helping the platform reach more learners.',
     icon: Users,
   },
   contributor: {
     order: 3,
-    eyebrow: 'Step 3 of 4',
+    eyebrow: '03 Contributors',
     title: 'Contributors',
     description: 'Helpful names behind feedback, ideas, and support across the Medmacs ecosystem.',
     icon: Sparkles,
   },
   special_thanks: {
     order: 4,
-    eyebrow: 'Step 4 of 4',
+    eyebrow: '04 Special Thanks',
     title: 'Special Thanks',
     description: 'People we are grateful to have had beside the project.',
     icon: Zap,
@@ -111,9 +111,16 @@ const MemberCard = ({ member, index, compact = false }: { member: TeamMember; in
           <h3 className="break-words text-base font-black uppercase italic leading-tight tracking-tight text-foreground sm:text-lg">
             {member.name || 'Open Position'}
           </h3>
-          <p className="mt-1 line-clamp-2 text-xs font-medium leading-relaxed text-muted-foreground">
-            {member.role || 'Medmacs Collaborator'}
-          </p>
+          <div className="mt-2">
+            <span
+              className="inline-flex max-w-full items-center bg-primary px-3 py-1 text-[10px] font-black uppercase leading-tight text-primary-foreground shadow-lg shadow-primary/15"
+              style={{ clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 100%, 10px 100%)' }}
+            >
+              <span className="line-clamp-2 break-words px-1">
+                {member.role || 'Medmacs Collaborator'}
+              </span>
+            </span>
+          </div>
         </div>
 
         {instagramUrl ? (

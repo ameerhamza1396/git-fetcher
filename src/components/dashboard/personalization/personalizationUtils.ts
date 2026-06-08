@@ -1,5 +1,18 @@
 import { Flashcard, WrongAttempt } from './types';
 
+const normalizeOptions = (options: any): string[] => {
+  if (Array.isArray(options)) return options.map(option => String(option));
+  if (typeof options === 'string') {
+    try {
+      const parsed = JSON.parse(options);
+      return Array.isArray(parsed) ? parsed.map(option => String(option)) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
 export const normalizeWrongAttempts = (rows: any[]): WrongAttempt[] => {
   return (rows || [])
     .filter(row => row.mcqs)
@@ -10,6 +23,7 @@ export const normalizeWrongAttempts = (rows: any[]): WrongAttempt[] => {
       mcq: {
         id: row.mcqs.id,
         question: row.mcqs.question,
+        options: normalizeOptions(row.mcqs.options),
         correctAnswer: row.mcqs.correct_answer,
         explanation: row.mcqs.explanation || '',
         chapterId: row.mcqs.chapter_id,

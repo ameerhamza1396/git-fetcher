@@ -1,4 +1,11 @@
 ALTER TABLE public.profiles
+ADD COLUMN IF NOT EXISTS badges JSONB DEFAULT '{
+  "earned_badge_ids": [],
+  "stats": {},
+  "synced_at": null
+}'::jsonb;
+
+ALTER TABLE public.profiles
 ADD COLUMN IF NOT EXISTS flashcard_generated integer NOT NULL DEFAULT 0;
 
 UPDATE public.profiles

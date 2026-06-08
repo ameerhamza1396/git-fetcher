@@ -1,6 +1,5 @@
 // @ts-nocheck
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,9 +7,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { BookOpen, ChevronLeft, ChevronRight, FlaskConical, Loader2, RotateCcw, Sparkles, Wand2 } from 'lucide-react';
 import { getFlashcardQuota, recordGeneratedFlashcards } from '@/components/profile/AchievementBadges';
 import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
+import { CorrectionMCQModal } from './CorrectionMCQModal';
+import { FlashcardLimitModal } from './FlashcardLimitModal';
 import { buildFallbackCards, refineFlashcardsWithAI } from './personalizationUtils';
-import { Flashcard, MistakeChapter, WrongAttempt } from './types';
+import { Flashcard, MistakeChapter } from './types';
 
 type TitrationProps = {
   weakestChapter: MistakeChapter | null;
@@ -35,14 +35,15 @@ const FlashcardSkeleton = () => (
 );
 
 export const Titration = ({ weakestChapter }: TitrationProps) => {
-  const navigate = useNavigate();
   const { user } = useAuth();
-  const { toast } = useToast();
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [activeCard, setActiveCard] = useState(0);
   const [batchIndex, setBatchIndex] = useState(0);
   const [cardsLoading, setCardsLoading] = useState(false);
   const [flashcardModalOpen, setFlashcardModalOpen] = useState(false);
+  const [correctionOpen, setCorrectionOpen] = useState(false);
+  const [limitModalOpen, setLimitModalOpen] = useState(false);
+  const [limitDetails, setLimitDetails] = useState({ plan: 'free', limit: 2 });
 
   const loadFlashcards = async (nextBatch = false) => {
     if (!weakestChapter) return;
@@ -52,13 +53,9 @@ export const Titration = ({ weakestChapter }: TitrationProps) => {
     const allowedCount = Math.min(requestedCount, quota.remaining);
 
     if (allowedCount <= 0) {
-      toast({
-        title: 'Daily flashcard limit reached',
-        description: quota.plan === 'premium'
-          ? 'Premium fair-use protection refreshes tomorrow.'
-          : `Your ${quota.plan} plan refreshes tomorrow.`,
-        variant: 'destructive',
-      });
+      setLimitDetails({ plan: quota.plan, limit: quota.limit });
+      setFlashcardModalOpen(false);
+      setLimitModalOpen(true);
       return;
     }
 
@@ -83,9 +80,8 @@ export const Titration = ({ weakestChapter }: TitrationProps) => {
 
   const startCorrectionSession = () => {
     if (!weakestChapter) return;
-    navigate(`/mcqs/quiz/${weakestChapter.subjectId}/${weakestChapter.id}?mode=mistakes&timer=false`, {
-      state: { wrongMcqIds: weakestChapter.attempts.map((attempt: WrongAttempt) => attempt.mcq.id) },
-    });
+    setFlashcardModalOpen(false);
+    setCorrectionOpen(true);
   };
 
   const currentCard = flashcards[activeCard];
@@ -200,6 +196,23 @@ export const Titration = ({ weakestChapter }: TitrationProps) => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <FlashcardLimitModal
+        open={limitModalOpen}
+        onOpenChange={setLimitModalOpen}
+        plan={limitDetails.plan}
+        limit={limitDetails.limit}
+        onUpgrade={() => {
+          setLimitModalOpen(false);
+          navigate('/pricing');
+        }}
+      />
+
+      <CorrectionMCQModal
+        open={correctionOpen}
+        chapter={weakestChapter}
+        onOpenChange={setCorrectionOpen}
+      />
     </>
   );
 };

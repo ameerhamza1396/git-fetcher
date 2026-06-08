@@ -5,6 +5,7 @@ export type WrongAttempt = {
   mcq: {
     id: string;
     question: string;
+    options: string[];
     correctAnswer: string;
     explanation: string;
     chapterId: string;

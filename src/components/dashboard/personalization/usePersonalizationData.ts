@@ -22,6 +22,7 @@ export const usePersonalizationData = () => {
           mcqs!inner(
             id,
             question,
+            options,
             correct_answer,
             explanation,
             chapter_id,

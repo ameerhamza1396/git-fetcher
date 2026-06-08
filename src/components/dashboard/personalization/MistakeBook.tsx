@@ -1,11 +1,11 @@
 // @ts-nocheck
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { BookOpen, ChevronLeft, ChevronRight, Loader2, Lock, RotateCcw, Sparkles, Target, XCircle } from 'lucide-react';
+import { CorrectionMCQModal } from './CorrectionMCQModal';
 import { fetchReferenceSnippet } from './personalizationUtils';
 import { MistakeChapter, MistakeSubject, WrongAttempt } from './types';
 
@@ -15,8 +15,9 @@ type MistakeBookProps = {
 };
 
 export const MistakeBook = ({ subjects, isPremium }: MistakeBookProps) => {
-  const navigate = useNavigate();
   const [activeChapter, setActiveChapter] = useState<MistakeChapter | null>(null);
+  const [correctionChapter, setCorrectionChapter] = useState<MistakeChapter | null>(null);
+  const [correctionOpen, setCorrectionOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [aiExplainTarget, setAiExplainTarget] = useState<WrongAttempt | null>(null);
   const [aiExplanation, setAiExplanation] = useState('');
@@ -36,9 +37,9 @@ export const MistakeBook = ({ subjects, isPremium }: MistakeBookProps) => {
 
   const startCorrectionSession = (chapter = activeChapter) => {
     if (!chapter) return;
-    navigate(`/mcqs/quiz/${chapter.subjectId}/${chapter.id}?mode=mistakes&timer=false`, {
-      state: { wrongMcqIds: chapter.attempts.map((attempt: WrongAttempt) => attempt.mcq.id) },
-    });
+    setCorrectionChapter(chapter);
+    setActiveChapter(null);
+    setCorrectionOpen(true);
   };
 
   const loadAiExplanation = async (attempt: WrongAttempt) => {
@@ -176,7 +177,7 @@ Avoid negative language. End with one memory hook.`,
                     </Button>
                     <Button size="sm" variant="outline" className="rounded-xl" onClick={() => startCorrectionSession()}>
                       <RotateCcw className="mr-2 h-4 w-4" />
-                      Correct Chapter
+                      Correct Question
                     </Button>
                   </div>
                 </motion.div>
@@ -218,6 +219,12 @@ Avoid negative language. End with one memory hook.`,
           )}
         </DialogContent>
       </Dialog>
+
+      <CorrectionMCQModal
+        open={correctionOpen}
+        chapter={correctionChapter}
+        onOpenChange={setCorrectionOpen}
+      />
     </>
   );
 };

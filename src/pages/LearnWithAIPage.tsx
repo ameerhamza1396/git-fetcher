@@ -12,10 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MCQPageLayout } from '@/pages/mcq/MCQPageLayout';
 import { fetchChaptersBySubject, fetchMCQsByChapter, fetchSubjects, Chapter, MCQ, Subject } from '@/utils/mcqData';
+import { FlashcardLimitModal } from '@/components/dashboard/personalization/FlashcardLimitModal';
 import { fetchReferenceSnippet } from '@/components/dashboard/personalization/personalizationUtils';
 import { getFlashcardQuota, recordGeneratedFlashcards } from '@/components/profile/AchievementBadges';
 import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 type Flashcard = {
@@ -134,7 +134,6 @@ const LearnWithAIPage = () => {
   }, []);
 
   const { user, loading: authLoading } = useAuth();
-  const { toast } = useToast();
   const navigate = useNavigate();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -151,6 +150,8 @@ const LearnWithAIPage = () => {
   const [batchIndex, setBatchIndex] = useState(0);
   const [cardsLoading, setCardsLoading] = useState(false);
   const [flashcardModalOpen, setFlashcardModalOpen] = useState(false);
+  const [limitModalOpen, setLimitModalOpen] = useState(false);
+  const [limitDetails, setLimitDetails] = useState({ plan: 'free', limit: 2 });
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['profile', user?.id, 'learn-ai'],
@@ -228,13 +229,9 @@ const LearnWithAIPage = () => {
     const allowedCount = Math.min(requestedCount, quota.remaining);
 
     if (allowedCount <= 0) {
-      toast({
-        title: 'Daily flashcard limit reached',
-        description: quota.plan === 'premium'
-          ? 'Premium fair-use protection refreshes tomorrow.'
-          : `Your ${quota.plan} plan refreshes tomorrow.`,
-        variant: 'destructive',
-      });
+      setLimitDetails({ plan: quota.plan, limit: quota.limit });
+      setFlashcardModalOpen(false);
+      setLimitModalOpen(true);
       return;
     }
 
@@ -538,6 +535,17 @@ const LearnWithAIPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <FlashcardLimitModal
+        open={limitModalOpen}
+        onOpenChange={setLimitModalOpen}
+        plan={limitDetails.plan}
+        limit={limitDetails.limit}
+        onUpgrade={() => {
+          setLimitModalOpen(false);
+          navigate('/pricing');
+        }}
+      />
     </MCQPageLayout>
   );
 };
