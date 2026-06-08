@@ -726,9 +726,9 @@ const Dashboard = () => {
   ];
 
   const premiumPerks = [
-    { title: 'Learn with Dr Ahroid', description: 'AI flashcards by chapter', icon: Sparkles, link: '/learn-with-ai', gradient: 'from-violet-500 to-fuchsia-600', iconColor: 'text-violet-100' },
-    { title: 'AI Test Generator', description: 'Custom tests with AI', icon: Brain, link: '/ai/test-generator', gradient: 'from-cyan-500 to-blue-600', iconColor: 'text-cyan-100' },
     { title: 'AI Chatbot', description: 'Instant AI tutor', icon: Zap, link: '/ai/chatbot', gradient: 'from-amber-400 to-orange-500', iconColor: 'text-yellow-100' },
+    { title: 'AI Test Generator', description: 'Custom tests with AI', icon: Brain, link: '/ai/test-generator', gradient: 'from-cyan-500 to-blue-600', iconColor: 'text-cyan-100' },
+    { title: 'Learn with Dr Ahroid', description: 'AI flashcards by chapter', icon: Sparkles, link: '/learn-with-ai', gradient: 'from-violet-500 to-fuchsia-600', iconColor: 'text-violet-100' },
   ];
 
   const instituteModules = [
@@ -880,7 +880,14 @@ const Dashboard = () => {
               </div>
             </div>
 
-            <AchievementBadges userId={user?.id} compact />
+            {/* Achievements Section */}
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Trophy className="w-5 h-5 text-amber-500 fill-amber-500" />
+                <h2 className="text-base font-bold text-foreground">Achievements</h2>
+              </div>
+              <AchievementBadges userId={user?.id} />
+            </div>
 
             <Card className="border border-border/40 shadow-sm bg-card/80">
               <CardContent className="p-4">
