@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -27,35 +27,78 @@ const SetupWizard = () => {
   const [usernameError, setUsernameError] = useState('');
   const [existingProfile, setExistingProfile] = useState<any>(null);
 
+  const ensureProfile = useCallback(async () => {
+    if (!user?.id) throw new Error('User not authenticated.');
+
+    const { data: existing, error: fetchError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (fetchError) throw fetchError;
+    if (existing) return existing;
+
+    const profileSeed = {
+      id: user.id,
+      full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || null,
+      avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .insert(profileSeed as any)
+      .select('*')
+      .maybeSingle();
+
+    if (error) {
+      if (error.code === '23505') {
+        const { data: raceProfile, error: raceFetchError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (raceFetchError) throw raceFetchError;
+        return raceProfile;
+      }
+
+      throw error;
+    }
+
+    return data;
+  }, [user]);
+
   useEffect(() => {
     if (authLoading) return;
     if (!user) { navigate('/login'); return; }
 
     const load = async () => {
-      const [profileRes, insts] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
-        fetchInstitutes(),
-      ]);
-      setInstitutes(insts);
-      const data = profileRes.data;
-      setExistingProfile(data);
+      try {
+        const [profile, insts] = await Promise.all([
+          ensureProfile(),
+          fetchInstitutes(),
+        ]);
+        setInstitutes(insts);
+        setExistingProfile(profile);
 
-      if (data) {
-        if (data.username) setUsername(data.username);
-        if ((data as any).institute) setInstitute((data as any).institute);
-        if ((data as any).year) setYear((data as any).year);
+        if (profile?.username) setUsername(profile.username);
+        if ((profile as any)?.institute) setInstitute((profile as any).institute);
+        if ((profile as any)?.year) setYear((profile as any).year);
 
-        if (!data.username) { setCurrentStep(1); }
-        else if (!(data as any).institute) { setCurrentStep(2); }
-        else if (!(data as any).year || !VALID_YEARS.includes((data as any).year)) { setCurrentStep(3); }
+        if (!profile?.username) { setCurrentStep(1); }
+        else if (!(profile as any).institute) { setCurrentStep(2); }
+        else if (!(profile as any).year || !VALID_YEARS.includes((profile as any).year)) { setCurrentStep(3); }
         else { navigate('/dashboard'); return; }
-      } else {
-        setCurrentStep(0);
+      } catch (error) {
+        console.error('Failed to initialize setup profile:', error);
+        toast.error('Failed to load setup. Please try again.');
       }
       setLoading(false);
     };
     load();
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, ensureProfile]);
 
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'there';
 
@@ -74,7 +117,12 @@ const SetupWizard = () => {
       setSaving(true);
       const valid = await validateUsername(username);
       if (!valid) { setSaving(false); return; }
-      const { error } = await supabase.from('profiles').update({ username } as any).eq('id', user!.id);
+      const { error } = await supabase.from('profiles').upsert({
+        id: user!.id,
+        username,
+        full_name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || null,
+        updated_at: new Date().toISOString(),
+      } as any, { onConflict: 'id' });
       setSaving(false);
       if (error) { toast.error('Failed to save username'); return; }
       setCurrentStep(2);
@@ -83,7 +131,11 @@ const SetupWizard = () => {
     if (currentStep === 2) {
       if (!institute) { toast.error('Please select an institute'); return; }
       setSaving(true);
-      const { error } = await supabase.from('profiles').update({ institute } as any).eq('id', user!.id);
+      const { error } = await supabase.from('profiles').upsert({
+        id: user!.id,
+        institute,
+        updated_at: new Date().toISOString(),
+      } as any, { onConflict: 'id' });
       setSaving(false);
       if (error) { toast.error('Failed to save institute'); return; }
       setCurrentStep(3);
@@ -92,7 +144,11 @@ const SetupWizard = () => {
     if (currentStep === 3) {
       if (!year) { toast.error('Please select your year'); return; }
       setSaving(true);
-      const { error } = await supabase.from('profiles').update({ year } as any).eq('id', user!.id);
+      const { error } = await supabase.from('profiles').upsert({
+        id: user!.id,
+        year,
+        updated_at: new Date().toISOString(),
+      } as any, { onConflict: 'id' });
       setSaving(false);
       if (error) { toast.error('Failed to save year'); return; }
       setCurrentStep(4);

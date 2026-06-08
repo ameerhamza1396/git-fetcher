@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
 import Seo from '@/components/Seo';
+import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertDialog,
@@ -138,7 +139,10 @@ const DrSultanChat: React.FC = () => {
           .select().single();
 
         if (error) throw error;
-        if (data) setCurrentSessionId(data.id);
+        if (data) {
+          setCurrentSessionId(data.id);
+          notifyAchievementProgress('ai_chat_session');
+        }
       }
       queryClient.invalidateQueries({ queryKey: ['chatHistory'] });
     } catch (err) {

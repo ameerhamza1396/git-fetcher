@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Send, MessageSquare, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Message, ChatSession, ChatSessionInsert, ChatSessionUpdate } from '@/types/ai';
+import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://medistics-ai-bot.vercel.app';
 
@@ -87,6 +88,7 @@ export const AIStudyChat = () => {
       setCurrentSession(formatted);
       setMessages([]);
       setSessions(prev => [formatted, ...prev]);
+      notifyAchievementProgress('ai_chat_session');
       toast({ title: 'New Session', description: 'Started a new study session' });
     } catch (e: any) {
       console.error('Error creating session:', e);

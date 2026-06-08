@@ -1,46 +1,234 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Instagram, Sun, Moon, Zap } from 'lucide-react';
-import { useTheme } from 'next-themes';
-import Seo from '@/components/Seo';
+import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import { Typewriter } from 'react-simple-typewriter';
-import { useAuth } from '@/hooks/useAuth';
-import { ProfileDropdown } from '@/components/ProfileDropdown';
+import {
+  ArrowRight,
+  BookOpen,
+  Crown,
+  Instagram,
+  Sparkles,
+  Users,
+  Zap,
+} from 'lucide-react';
+import Seo from '@/components/Seo';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+type TeamMember = {
+  id?: string;
+  name?: string | null;
+  role?: string | null;
+  category?: string | null;
+  image_url?: string | null;
+  order_index?: number | null;
+  instagram_url?: string | null;
+  instagram?: string | null;
+};
+
+type TeamCategory = 'core' | 'extended' | 'contributor' | 'special_thanks';
+
+const sectionMeta = {
+  core: {
+    order: 1,
+    eyebrow: 'Step 1 of 4',
+    title: 'Core Team',
+    description: 'The people building, operating, and polishing Medmacs for medical students.',
+    icon: Crown,
+  },
+  extended: {
+    order: 2,
+    eyebrow: 'Step 2 of 4',
+    title: 'Extended Team',
+    description: 'Campus, content, and community collaborators helping the platform reach more learners.',
+    icon: Users,
+  },
+  contributor: {
+    order: 3,
+    eyebrow: 'Step 3 of 4',
+    title: 'Contributors',
+    description: 'Helpful names behind feedback, ideas, and support across the Medmacs ecosystem.',
+    icon: Sparkles,
+  },
+  special_thanks: {
+    order: 4,
+    eyebrow: 'Step 4 of 4',
+    title: 'Special Thanks',
+    description: 'People we are grateful to have had beside the project.',
+    icon: Zap,
+  },
+};
+
+const teamCategories: TeamCategory[] = ['core', 'extended', 'contributor', 'special_thanks'];
+
+const fallbackMembers: TeamMember[] = [
+  {
+    name: 'Dr. Muhammad Ameer Hamza',
+    role: 'Founder',
+    category: 'core',
+    image_url: '/team/founders/hamza.png',
+    instagram_url: 'https://instagram.com/ameerhamza.exe',
+  },
+];
+
+const medmacsLogo = '/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png';
+
+const getProfileImage = (member: TeamMember) => {
+  if (member.image_url) return member.image_url;
+  return member.name ? '/teampage/user.png' : medmacsLogo;
+};
+
+const getInstagramUrl = (member: TeamMember) => {
+  const raw = member.instagram_url || member.instagram;
+  if (!raw) return null;
+  if (raw.startsWith('http')) return raw;
+  return `https://instagram.com/${raw.replace('@', '')}`;
+};
+
+const MemberCard = ({ member, index, compact = false }: { member: TeamMember; index: number; compact?: boolean }) => {
+  const instagramUrl = getInstagramUrl(member);
+  const isVacant = !member.name;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: index * 0.05 }}
+      whileHover={{ scale: 1.02, y: -4 }}
+      whileTap={{ scale: 0.98 }}
+      className="group relative overflow-hidden rounded-3xl border-2 border-border/40 bg-white/5 p-5 transition-all duration-300 hover:border-primary/30 hover:bg-primary/5 dark:bg-zinc-900/50"
+    >
+      <div className="absolute right-0 top-0 h-28 w-28 translate-x-10 -translate-y-10 rounded-full bg-primary/10 blur-3xl transition-opacity group-hover:opacity-100" />
+      <div className="relative z-10 flex items-center gap-4">
+        <div className={`${compact ? 'h-14 w-14' : 'h-16 w-16'} ${isVacant ? 'pulse-ring glow-breathe bg-primary/10 p-2 ring-primary/30' : 'bg-muted/50 ring-border/50'} shrink-0 overflow-hidden rounded-2xl shadow-xl ring-1`}>
+          <img
+            src={getProfileImage(member)}
+            alt={member.name || member.role || 'Open team position'}
+            className={`${isVacant ? 'object-contain drop-shadow-lg' : 'object-cover'} h-full w-full transition-transform duration-300 group-hover:scale-110`}
+          />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <h3 className="break-words text-base font-black uppercase italic leading-tight tracking-tight text-foreground sm:text-lg">
+            {member.name || 'Open Position'}
+          </h3>
+          <p className="mt-1 line-clamp-2 text-xs font-medium leading-relaxed text-muted-foreground">
+            {member.role || 'Medmacs Collaborator'}
+          </p>
+        </div>
+
+        {instagramUrl ? (
+          <a
+            href={instagramUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Open ${member.name}'s Instagram`}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition-transform active:scale-95"
+          >
+            <Instagram className="h-4 w-4" />
+          </a>
+        ) : isVacant ? (
+          <Link
+            to="/summerinternship2025"
+            aria-label="Apply for this team position"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
+          >
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        ) : null}
+      </div>
+    </motion.div>
+  );
+};
+
+const TeamSectionHeading = ({ category, fixed = false }: { category: TeamCategory; fixed?: boolean }) => {
+  const meta = sectionMeta[category];
+  const Icon = meta.icon;
+  const [titleLead, ...titleRestParts] = meta.title.split(' ');
+  const titleRest = titleRestParts.join(' ');
+
+  return (
+    <div
+      className={`${fixed ? 'fixed left-0 right-0 top-0 z-50 pointer-events-none' : '-mx-3 sm:mx-0'} bg-background/95 px-3 pt-[env(safe-area-inset-top)] backdrop-blur-md sm:px-0`}
+      style={fixed ? { zIndex: 60 } : undefined}
+    >
+      <div className="mx-auto max-w-4xl px-4 sm:px-0">
+        <motion.div
+          initial={fixed ? false : { opacity: 0, y: -12 }}
+          whileInView={fixed ? undefined : { opacity: 1, y: 0 }}
+          animate={fixed ? { opacity: 1, y: 0 } : undefined}
+          viewport={fixed ? undefined : { once: true, margin: '-80px' }}
+          className="overflow-hidden py-3 text-center"
+        >
+          <span className="mb-3 block text-[10px] font-black uppercase tracking-[0.3em] text-primary">
+            {meta.eyebrow}
+          </span>
+          <div className="flex items-center justify-center gap-2">
+            <Icon className="h-5 w-5 text-primary" />
+            <h2 className="text-3xl font-black uppercase italic leading-none tracking-tight text-foreground sm:text-5xl">
+              {titleLead}{' '}
+              {titleRest && <span className="live-gradient-text">{titleRest}</span>}
+            </h2>
+          </div>
+          <p className="mx-auto mt-2 max-w-lg text-sm font-medium text-muted-foreground">
+            {meta.description}
+          </p>
+        </motion.div>
+      </div>
+      <div className="h-4 bg-gradient-to-b from-background/80 to-transparent pointer-events-none" />
+    </div>
+  );
+};
+
+const MemberSection = ({
+  category,
+  members,
+  compact = false,
+}: {
+  category: keyof typeof sectionMeta;
+  members: TeamMember[];
+  compact?: boolean;
+}) => {
+  if (!members.length) return null;
+
+  return (
+    <>
+      <div
+        data-team-section={category}
+        className="team-section-marker"
+      >
+        <TeamSectionHeading category={category} />
+      </div>
+
+      <section className="mx-auto max-w-4xl px-4 sm:px-0">
+        <div className={`grid grid-cols-1 gap-4 ${compact ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+          {members.map((member, index) => (
+            <MemberCard key={member.id || `${category}-${member.name || member.role}-${index}`} member={member} index={index} compact={compact} />
+          ))}
+        </div>
+      </section>
+    </>
+  );
+};
+
+const TeamSkeleton = () => (
+  <div className="mx-auto grid max-w-4xl grid-cols-1 gap-4 px-4 sm:px-0 md:grid-cols-2">
+    {Array.from({ length: 4 }).map((_, index) => (
+      <div key={index} className="relative overflow-hidden rounded-3xl border border-border/40 bg-muted/20 p-5 animate-pulse">
+        <div className="flex items-center gap-4">
+          <div className="h-16 w-16 rounded-2xl bg-muted" />
+          <div className="flex-1 space-y-2">
+            <div className="h-5 w-1/2 rounded-full bg-muted" />
+            <div className="h-3 w-2/3 rounded-full bg-muted" />
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
 const Teams = () => {
-  const { user } = useAuth();
-  const [heroOpacity, setHeroOpacity] = useState(1);
-  const [subheadingOpacity, setSubheadingOpacity] = useState(1);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const heroSection = document.getElementById('hero-heading');
-      const subheading = document.getElementById('hero-subheading');
-      if (heroSection && subheading) {
-        const scrollPosition = window.scrollY;
-        const heroOffset = heroSection.offsetTop;
-        const subheadingOffset = subheading.offsetTop;
-
-        const heroFadeStart = heroOffset + 20;
-        const heroFadeEnd = heroFadeStart + 100;
-        const newHeroOpacity = 1 - (scrollPosition - heroFadeStart) / (heroFadeEnd - heroFadeStart);
-        setHeroOpacity(Math.max(0, newHeroOpacity));
-
-        const subheadingFadeStart = subheadingOffset + 20;
-        const subheadingFadeEnd = subheadingFadeStart + 100;
-        const newSubheadingOpacity = 1 - (scrollPosition - subheadingFadeStart) / (subheadingFadeEnd - subheadingFadeStart);
-        setSubheadingOpacity(Math.max(0, newSubheadingOpacity));
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // --- Data from Supabase ---
-  const { data: teamMembers = [] } = useQuery({
+  const [activeHeading, setActiveHeading] = useState<TeamCategory | null>(null);
+  const { data: teamMembers = [], isLoading } = useQuery<TeamMember[]>({
     queryKey: ['team_members'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -49,212 +237,120 @@ const Teams = () => {
         .order('order_index', { ascending: true });
       if (error) throw error;
       return data || [];
-    }
+    },
   });
 
-  const coreTeam = teamMembers.filter(m => m.category === 'core');
-  const extendedTeam = teamMembers.filter(m => m.category === 'extended');
-  const contributors = teamMembers.filter(m => m.category === 'contributor');
-  const specialThanks = teamMembers.filter(m => m.category === 'special_thanks');
+  const members = teamMembers.length ? teamMembers : fallbackMembers;
+  const coreTeam = members.filter((member) => member.category === 'core');
+  const extendedTeam = members.filter((member) => member.category === 'extended');
+  const contributors = members.filter((member) => member.category === 'contributor');
+  const specialThanks = members.filter((member) => member.category === 'special_thanks');
 
-  // --- Render Function ---
+  useEffect(() => {
+    const root = document.getElementById('root');
+    if (!root) return;
+
+    const getSafeTop = () => {
+      const parsed = Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--sat')
+      );
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const updateActiveHeading = () => {
+      if (root.scrollTop < 24) {
+        setActiveHeading(null);
+        return;
+      }
+
+      const safeTop = getSafeTop();
+      const replacementTop = safeTop + 150;
+      let active: TeamCategory | null = null;
+
+      teamCategories.forEach((category) => {
+        const marker = document.querySelector<HTMLElement>(`[data-team-section="${category}"]`);
+        if (!marker) return;
+        if (marker.getBoundingClientRect().top <= replacementTop) {
+          active = category;
+        }
+      });
+
+      setActiveHeading(active);
+    };
+
+    updateActiveHeading();
+    root.addEventListener('scroll', updateActiveHeading, { passive: true });
+    window.addEventListener('resize', updateActiveHeading);
+    return () => {
+      root.removeEventListener('scroll', updateActiveHeading);
+      window.removeEventListener('resize', updateActiveHeading);
+    };
+  }, [isLoading, coreTeam.length, extendedTeam.length, contributors.length, specialThanks.length]);
 
   return (
-    <div className="min-h-screen w-full bg-background">
+    <div className="min-h-screen w-full overflow-x-hidden bg-background bg-mesh text-foreground">
       <Seo
         title="Our Team - Medmacs"
-        description="Meet the passionate team behind Medmacs — innovators, leaders, and contributors shaping the future of medical education."
+        description="Meet the passionate team behind Medmacs App."
         canonical="https://www.medmacs.app/teams"
       />
 
-      <div className="container mx-auto px-4 lg:px-8 py-16 max-w-6xl pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-        {/* Hero Section */}
-        <div className="text-center mb-20">
-          <div className="relative">
-            <h1
-              id="hero-heading"
-              style={{ opacity: heroOpacity }}
-              className="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-blue-500 to-pink-500 dark:from-purple-300 dark:via-blue-300 dark:to-pink-300 animate-fade-in sticky top-20 opacity-90 transition-opacity duration-700 z-10"
-            >
-              <Typewriter
-                words={['The Medmacs Team']}
-                loop={1}
-                typeSpeed={80}
-                deleteSpeed={50}
-                delaySpeed={1000}
-              />
-            </h1>
-          </div>
-          <p
-            id="hero-subheading"
-            style={{ opacity: subheadingOpacity }}
-            className="mt-6 text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto animate-fade-in transition-opacity duration-700"
-          >
-            A collective of dreamers, innovators, and medical minds — working to
-            reshape how students learn, connect, and succeed.
+      <main className="pb-20" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1.5rem)' }}>
+        {activeHeading && <TeamSectionHeading category={activeHeading} fixed />}
+
+        <div className="mb-6 text-center animate-fade-in">
+          <h1 className="mb-3 text-2xl font-black uppercase italic tracking-tight text-foreground sm:text-3xl md:text-4xl">
+            <BookOpen className="mr-2 inline h-7 w-7 text-primary" />
+            Medmacs <span className="text-primary">Team</span>
+          </h1>
+          <p className="mx-auto max-w-2xl px-4 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            The medical minds, builders, and collaborators shaping the app
           </p>
         </div>
 
-        {/* Founder Section */}
-        <div className="text-center mb-24 animate-fade-in-up">
-          <div className="relative inline-flex items-center group">
-            <img
-              src="https://i.postimg.cc/VLJk5HPk/Gemini-Generated-Image-r8zbqr8zbqr8zbqr.png"
-              alt="Founder"
-              className="w-40 h-40 rounded-full object-cover shadow-2xl border-4 border-primary/40 transition-all duration-500 group-hover:translate-x-[-80px]"
-            />
-            <div className="absolute left-0 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 group-hover:translate-x-[60px] transition-all duration-500 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground rounded-full px-6 py-3 shadow-lg whitespace-nowrap">
-              <p>UI/UX Designer</p>
-              <p>Web Developer</p>
-              <p>Mobile Application</p>
-              <p>Database Manager</p>
-              <p>AI Trainer</p>
-            </div>
-          </div>
-          <h2 className="mt-6 text-3xl font-bold text-foreground">
-            Dr. Muhammad Ameer Hamza
-          </h2>
-          <p className="text-primary font-medium">Founder</p>
-          <a
-            href="https://instagram.com/ameerhamza.exe"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-3 inline-flex items-center text-primary hover:underline hover:scale-105 transition-transform"
-          >
-            <Instagram className="w-5 h-5 mr-2" /> ameerhamza.exe
-          </a>
-        </div>
+        <div className="space-y-12 pt-2">
+          {isLoading ? (
+            <TeamSkeleton />
+          ) : (
+            <>
+              <MemberSection category="core" members={coreTeam} />
+              <MemberSection category="extended" members={extendedTeam} />
+              <MemberSection category="contributor" members={contributors} compact />
+              <MemberSection category="special_thanks" members={specialThanks} compact />
+            </>
+          )}
 
-        {/* Core Team */}
-        <div className="mb-20 text-center">
-          <h2 className="text-4xl font-bold text-primary mb-12">Core Team</h2>
-          <div className="flex flex-wrap justify-center gap-12">
-            {coreTeam.map((member, i) => (
-              <div
-                key={i}
-                className="group text-center transform hover:scale-110 transition duration-500 flex flex-col items-center"
-              >
-                <img
-                  src={member.image_url || '/teampage/user.png'}
-                  alt={member.name || 'Vacant'}
-                  className="w-32 h-32 rounded-full mx-auto object-cover shadow-lg group-hover:shadow-purple-400/50 transition-shadow"
-                />
-                
-                {member.name ? (
-                  <>
-                    <h3 className="mt-4 text-xl font-semibold text-gray-900 dark:text-white">
-                      {member.name}
-                    </h3>
-                    <p className="text-purple-600 dark:text-purple-400">
-                      {member.role}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="mt-4 text-purple-600 dark:text-purple-400 font-medium">
-                      {member.role}
-                    </p>
-                    <Link
-                      to="/summerinternship2025"
-                      className="mt-2 text-xs font-bold px-4 py-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                    >
-                      Apply for Position
-                    </Link>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Extended Team */}
-        <div className="mb-20 text-center">
-          <h2 className="text-4xl font-bold text-primary mb-12">Extended Team</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-12">
-            {extendedTeam.map((member, i) => (
-              <div
-                key={i}
-                className="group text-center hover:scale-110 transition-transform duration-500 flex flex-col items-center"
-              >
-                <img
-                  src={member.image_url || '/teampage/user.png'}
-                  alt={member.name || 'Vacant'}
-                  className="w-28 h-28 rounded-full mx-auto object-cover shadow-lg group-hover:shadow-blue-400/50 transition-shadow"
-                />
-                
-                {member.name ? (
-                  <>
-                    <h3 className="mt-3 text-lg font-semibold text-gray-900 dark:text-white">
-                      {member.name}
-                    </h3>
-                    <p className="text-blue-600 dark:text-blue-400">{member.role}</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="mt-3 text-sm text-blue-600 dark:text-blue-400 font-medium">{member.role}</p>
-                    <Link
-                      to="/summerinternship2025"
-                      className="mt-2 text-[10px] font-bold px-3 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-colors"
-                    >
-                      Apply for Position
-                    </Link>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Collaboration Request Button */}
-        <div className="text-center my-16">
-          <Link
-            to="/summerinternship2025"
-            className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-full shadow-xl text-white bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 dark:from-pink-400 dark:to-purple-500 dark:hover:from-pink-500 dark:hover:to-purple-600 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800"
-          >
-            <Zap className="w-5 h-5 mr-2" />
-            Request to Become a Collaborator
-          </Link>
-        </div>
-
-        {/* Contributors */}
-        {contributors.length > 0 && (
-          <div className="mb-20 text-center">
-            <h2 className="text-4xl font-bold text-primary mb-10">Contributors</h2>
-            <div className="flex flex-wrap justify-center gap-6">
-              {contributors.map((contrib, i) => (
-                <span
-                  key={i}
-                  className="px-4 py-2 text-foreground rounded-full bg-accent shadow hover:shadow-lg hover:scale-105 transition-all text-sm font-medium"
+          <section className="mx-auto max-w-4xl px-4 sm:px-0">
+            <div className="relative overflow-hidden rounded-3xl border-2 border-primary/20 bg-primary/5 p-6">
+              <div className="absolute right-0 top-0 h-32 w-32 translate-x-12 -translate-y-12 rounded-full bg-primary/20 blur-[60px]" />
+              <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.3em] text-primary">
+                    Collaborate
+                  </span>
+                  <h2 className="text-2xl font-black uppercase italic tracking-tight text-foreground">
+                    Build With <span className="live-gradient-text">Medmacs</span>
+                  </h2>
+                  <p className="mt-2 max-w-xl text-sm font-medium leading-relaxed text-muted-foreground">
+                    Apply for open roles, campus collaborations, content support, or student-led initiatives.
+                  </p>
+                </div>
+                <Link
+                  to="/summerinternship2025"
+                  className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-primary px-6 text-xs font-black uppercase tracking-[0.18em] text-primary-foreground shadow-2xl shadow-primary/30 transition-transform active:scale-95"
                 >
-                  {contrib.name}
-                </span>
-              ))}
+                  Apply
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
             </div>
-          </div>
-        )}
-
-        {/* Special Thanks */}
-        {specialThanks.length > 0 && (
-          <div className="text-center mb-10">
-            <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-yellow-500 mb-6">
-              Special Thanks To
-            </h2>
-            {specialThanks.map((thanks, i) => (
-              <p key={i} className="text-lg text-gray-700 dark:text-gray-300 font-medium mb-2">
-                {thanks.name}
-              </p>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Footer */}
-      <footer className="bg-card border-t border-border py-6 text-center text-muted-foreground">
-        <div className="container mx-auto px-4 lg:px-8">
-          <p className="text-sm font-semibold mb-1">A Project by Hmacs Studios.</p>
-          <p className="text-xs">&copy; 2025 Hmacs Studios. All rights reserved.</p>
+          </section>
         </div>
-      </footer>
+
+        <div className="pt-16 text-center opacity-40">
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">© 2026 Medmacs App • All rights reserved</p>
+        </div>
+      </main>
     </div>
   );
 };

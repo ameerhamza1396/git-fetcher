@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       ai_chat_sessions: {
         Row: {
+          correction_mode: boolean
           created_at: string
           id: string
           messages: Json | null
@@ -24,6 +25,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          correction_mode?: boolean
           created_at?: string
           id?: string
           messages?: Json | null
@@ -32,6 +34,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          correction_mode?: boolean
           created_at?: string
           id?: string
           messages?: Json | null
@@ -766,6 +769,8 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          badges: Json | null
+          flashcard_generated: number
           full_name: string | null
           id: string
           plan: string
@@ -778,6 +783,8 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          badges?: Json | null
+          flashcard_generated?: number
           full_name?: string | null
           id: string
           plan?: string
@@ -789,6 +796,8 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          badges?: Json | null
+          flashcard_generated?: number
           full_name?: string | null
           id?: string
           plan?: string
@@ -967,6 +976,7 @@ export type Database = {
           mcq_id: string | null
           selected_answer: string
           time_taken: number | null
+          used_ai_help: boolean
           user_id: string
         }
         Insert: {
@@ -976,6 +986,7 @@ export type Database = {
           mcq_id?: string | null
           selected_answer: string
           time_taken?: number | null
+          used_ai_help?: boolean
           user_id: string
         }
         Update: {
@@ -985,6 +996,7 @@ export type Database = {
           mcq_id?: string | null
           selected_answer?: string
           time_taken?: number | null
+          used_ai_help?: boolean
           user_id?: string
         }
         Relationships: [

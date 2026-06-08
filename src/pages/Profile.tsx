@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +17,7 @@ import ProfileAvatar from '@/components/profile/ProfileAvatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { fetchInstitutes, getInstituteDisplayName, type Institute } from '@/utils/institutes';
 import PageSkeleton from '@/components/skeletons/PageSkeleton';
+import { AchievementBadges, useAchievementData } from '@/components/profile/AchievementBadges';
 
 const planStyles = {
     free: { gradient: 'from-slate-500 via-slate-600 to-slate-700', icon: Shield, accent: 'bg-slate-300' },
@@ -32,6 +34,7 @@ const Profile = () => {
 
     const [editableProfile, setEditableProfile] = useState({ full_name: '', username: '', year: '' });
     const [loadingUpdateProfile, setLoadingUpdateProfile] = useState(false);
+    const [showStatsModal, setShowStatsModal] = useState(false);
     const [institutes, setInstitutes] = useState<Institute[]>([]);
     const validYears = ["1st", "2nd", "3rd", "4th", "5th"];
 
@@ -47,7 +50,7 @@ const Profile = () => {
         queryKey: ['profile', user?.id],
         queryFn: async () => {
             if (!user?.id) return null;
-            const { data, error } = await supabase.from('profiles').select('id, full_name, username, email, avatar_url, plan, plan_expiry_date, role, year, institute').eq('id', user.id).maybeSingle();
+            const { data, error } = await supabase.from('profiles').select('id, full_name, username, email, avatar_url, plan, plan_expiry_date, role, year, institute, badges').eq('id', user.id).maybeSingle();
             if (error && error.code !== 'PGRST116') throw new Error(error.message);
             return data;
         },
@@ -90,6 +93,14 @@ const Profile = () => {
 
     const userInstituteCode = (profileData as any)?.institute || '';
     const userInstituteName = getInstituteDisplayName(userInstituteCode, institutes);
+    const { data: achievementData } = useAchievementData(user?.id);
+    const achievementStats = achievementData?.stats || {
+        lifetimeMcqs: 0,
+        flpCompletions: 0,
+        aiChatSessions: 0,
+        points: 0,
+        accuracy: 0,
+    };
 
     const updateProfile = async (e) => {
         e.preventDefault();
@@ -161,13 +172,21 @@ const Profile = () => {
 
             <main className="container mx-auto px-4 py-8 max-w-xl mt-[var(--header-height)]">
                 {/* Profile hero card */}
-                <div className={`relative overflow-hidden rounded-[2rem] bg-gradient-to-br ${style.gradient} text-white shadow-2xl p-6 mb-6`}>
+                <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setShowStatsModal(true)}
+                    onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') setShowStatsModal(true);
+                    }}
+                    className={`relative w-full overflow-hidden rounded-[2rem] bg-gradient-to-br ${style.gradient} text-left text-white shadow-2xl p-6 mb-6 active:scale-[0.99] transition-transform`}
+                >
                     <div className="absolute inset-0 opacity-10" style={{
                         backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`,
                         maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
                     }} />
                     <div className="relative z-10 flex items-center gap-4">
-                        <div className="shrink-0">
+                        <div className="shrink-0" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
                             <ProfileAvatar user={user} profileData={profileData} displayName={displayName} rawUserPlan={rawUserPlan} userPlanDisplayName={userPlanDisplayName} planColors={planColors} isHeader={false} />
                         </div>
                         <div>
@@ -176,9 +195,12 @@ const Profile = () => {
                             <Badge className="mt-1.5 bg-white/20 text-white border-white/20 text-[10px] font-bold uppercase tracking-widest">
                                 {userPlanDisplayName}
                             </Badge>
+                            <p className="mt-2 text-[10px] font-bold uppercase tracking-widest text-white/45">Tap to view stats</p>
                         </div>
                     </div>
                 </div>
+
+                <AchievementBadges userId={user?.id} />
 
                 {/* Edit form */}
                 <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-500 via-slate-600 to-slate-700 text-white shadow-2xl p-1 mb-6">
@@ -281,6 +303,30 @@ const Profile = () => {
                     </Link>
                 </div>
             </main>
+
+            <Dialog open={showStatsModal} onOpenChange={setShowStatsModal}>
+                <DialogContent className="sm:max-w-[430px] rounded-[2rem]">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-black">Your Stats</DialogTitle>
+                        <DialogDescription>Lifetime learning progress on Medmacs.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid grid-cols-2 gap-3">
+                        {[
+                            { label: 'Lifetime MCQs', value: achievementStats.lifetimeMcqs },
+                            { label: 'FLPs Completed', value: achievementStats.flpCompletions },
+                            { label: 'AI Chats', value: achievementStats.aiChatSessions },
+                            { label: 'Points', value: achievementStats.points },
+                            { label: 'Accuracy', value: `${achievementStats.accuracy}%` },
+                        ].map((stat) => (
+                            <div key={stat.label} className="rounded-2xl border border-border/40 bg-muted/30 p-4">
+                                <p className="text-2xl font-black text-primary">{stat.value}</p>
+                                <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{stat.label}</p>
+                            </div>
+                        ))}
+                    </div>
+                    <AchievementBadges userId={user?.id} compact />
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

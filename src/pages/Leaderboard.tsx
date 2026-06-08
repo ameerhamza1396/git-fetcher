@@ -1,22 +1,102 @@
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trophy, Medal, Award, Crown, Star, Target, Zap, Users } from 'lucide-react';
+import { ArrowLeft, Trophy, Medal, Award, Crown, Star, Target, Users, Globe2, School, CalendarDays } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Seo from '@/components/Seo';
 import PlanBadge from '@/components/PlanBadge';
 import PageSkeleton from '@/components/skeletons/PageSkeleton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { fetchInstitutes, getInstituteDisplayName } from '@/utils/institutes';
 
+type LeaderboardScope = 'pakistan' | 'institute' | 'year-campus';
+type LeaderboardPeriod = 'all-time' | 'monthly' | 'weekly';
+
+type LeaderboardProfile = {
+    id: string;
+    username: string | null;
+    full_name: string | null;
+    avatar_url: string | null;
+    plan?: string | null;
+    institute: string | null;
+    year: string | null;
+};
+
+type LeaderboardEntry = {
+    id: string;
+    user_id: string;
+    username: string;
+    avatar_url: string | null;
+    total_score: number;
+    accuracy: number;
+    best_streak: number;
+    total_questions: number;
+    correct_answers: number;
+};
+
+const PERIOD_LABELS: Record<LeaderboardPeriod, string> = {
+    'all-time': 'All time',
+    monthly: 'Monthly',
+    weekly: 'Weekly',
+};
+
+const getPakistanPeriodRange = (period: LeaderboardPeriod) => {
+    if (period === 'all-time') return null;
+
+    const pakistanOffsetMs = 5 * 60 * 60 * 1000;
+    const pakistanNow = new Date(Date.now() + pakistanOffsetMs);
+    const year = pakistanNow.getUTCFullYear();
+    const month = pakistanNow.getUTCMonth();
+    const day = pakistanNow.getUTCDate();
+
+    if (period === 'monthly') {
+        return {
+            start: new Date(Date.UTC(year, month, 1) - pakistanOffsetMs),
+            end: new Date(Date.UTC(year, month + 1, 1) - pakistanOffsetMs),
+        };
+    }
+
+    const utcDay = pakistanNow.getUTCDay();
+    const daysSinceMonday = (utcDay + 6) % 7;
+    return {
+        start: new Date(Date.UTC(year, month, day - daysSinceMonday) - pakistanOffsetMs),
+        end: new Date(Date.UTC(year, month, day - daysSinceMonday + 7) - pakistanOffsetMs),
+    };
+};
+
+const formatPakistanDate = (date: Date) =>
+    new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Karachi',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+    }).format(date);
+
+const getPeriodDetailLabel = (period: LeaderboardPeriod) => {
+    const periodRange = getPakistanPeriodRange(period);
+
+    if (!periodRange) return 'All historical attempts';
+
+    if (period === 'monthly') {
+        return `Month of ${new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Karachi',
+            month: 'long',
+            year: 'numeric',
+        }).format(periodRange.start)}`;
+    }
+
+    const inclusiveEnd = new Date(periodRange.end.getTime() - 1);
+    return `From ${formatPakistanDate(periodRange.start)} to ${formatPakistanDate(inclusiveEnd)}`;
+};
 
 const Leaderboard = () => {
     const { user } = useAuth();
-    const [userPlan, setUserPlan] = useState<string | null>(null);
-    const [currentUserAvatar, setCurrentUserAvatar] = useState<string | null>(null);
+    const [activeScope, setActiveScope] = useState<LeaderboardScope>('pakistan');
+    const [activePeriod, setActivePeriod] = useState<LeaderboardPeriod>('all-time');
     const headerRef = useRef<HTMLElement>(null);
     const lastScrollY = useRef(0);
     const [headerVisible, setHeaderVisible] = useState(true);
@@ -31,30 +111,46 @@ const Leaderboard = () => {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    useEffect(() => {
-        const fetchUserPlanAndAvatar = async () => {
-            if (user?.id) {
-                const { data, error } = await supabase
-                    .from('profiles')
-                    .select('plan, avatar_url')
-                    .eq('id', user.id)
-                    .single();
-                if (!error && data) {
-                    setUserPlan(data.plan);
-                    setCurrentUserAvatar(data.avatar_url);
-                }
-            } else {
-                setUserPlan(null);
-                setCurrentUserAvatar(null);
-            }
-        };
-        fetchUserPlanAndAvatar();
-    }, [user]);
+    const { data: currentProfile } = useQuery<LeaderboardProfile | null>({
+        queryKey: ['leaderboard-current-profile', user?.id],
+        queryFn: async () => {
+            if (!user?.id) return null;
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id, username, full_name, avatar_url, plan, institute, year')
+                .eq('id', user.id)
+                .maybeSingle();
+            if (error) return null;
+            return data as LeaderboardProfile | null;
+        },
+        enabled: !!user?.id,
+    });
 
-    const { data: leaderboardData = [], isLoading } = useQuery({
-        queryKey: ['leaderboard'],
+    const { data: institutes = [] } = useQuery({
+        queryKey: ['leaderboard-institutes'],
+        queryFn: fetchInstitutes,
+    });
+
+    const instituteName = currentProfile?.institute
+        ? getInstituteDisplayName(currentProfile.institute, institutes)
+        : 'Institute Name';
+    const yearCampusLabel = currentProfile?.year && currentProfile?.institute
+        ? `${currentProfile.year} Year ${currentProfile.institute}`
+        : 'Year Campus';
+
+    const hasInstituteScope = !!currentProfile?.institute;
+    const hasYearCampusScope = !!currentProfile?.institute && !!currentProfile?.year;
+
+    useEffect(() => {
+        if (activeScope === 'institute' && !hasInstituteScope) setActiveScope('pakistan');
+        if (activeScope === 'year-campus' && !hasYearCampusScope) setActiveScope('pakistan');
+    }, [activeScope, hasInstituteScope, hasYearCampusScope]);
+
+    const { data: leaderboardData = [], isLoading } = useQuery<LeaderboardEntry[]>({
+        queryKey: ['leaderboard', activeScope, activePeriod, currentProfile?.institute, currentProfile?.year],
         queryFn: async () => {
             try {
+                const periodRange = getPakistanPeriodRange(activePeriod);
                 const { data: userAnswers, error: answersError } = await supabase
                     .from('user_answers')
                     .select('user_id, is_correct, time_taken, created_at');
@@ -62,21 +158,39 @@ const Leaderboard = () => {
 
                 const { data: profiles, error: profilesError } = await supabase
                     .from('profiles')
-                    .select('id, username, full_name, avatar_url');
+                    .select('id, username, full_name, avatar_url, institute, year');
                 if (profilesError) return [];
 
-                const userStats: Record<string, any> = {};
-                userAnswers?.forEach(answer => {
-                    if (!userStats[answer.user_id]) {
-                        userStats[answer.user_id] = { user_id: answer.user_id, totalQuestions: 0, correctAnswers: 0, totalTime: 0, answers: [] };
+                const scopedProfiles = (profiles as LeaderboardProfile[]).filter(profile => {
+                    if (activeScope === 'institute') return !!currentProfile?.institute && profile.institute === currentProfile.institute;
+                    if (activeScope === 'year-campus') {
+                        return !!currentProfile?.institute && !!currentProfile?.year
+                            && profile.institute === currentProfile.institute
+                            && profile.year === currentProfile.year;
                     }
-                    userStats[answer.user_id].totalQuestions++;
-                    if (answer.is_correct) userStats[answer.user_id].correctAnswers++;
-                    userStats[answer.user_id].totalTime += answer.time_taken || 0;
-                    userStats[answer.user_id].answers.push(answer);
+                    return true;
                 });
+                const scopedProfileIds = new Set(scopedProfiles.map(profile => profile.id));
 
-                const leaderboardEntries = profiles
+                const userStats: Record<string, any> = {};
+                userAnswers
+                    ?.filter(answer => {
+                        if (!scopedProfileIds.has(answer.user_id)) return false;
+                        if (!periodRange) return true;
+                        const answerDate = new Date(answer.created_at);
+                        return answerDate >= periodRange.start && answerDate < periodRange.end;
+                    })
+                    .forEach(answer => {
+                        if (!userStats[answer.user_id]) {
+                            userStats[answer.user_id] = { user_id: answer.user_id, totalQuestions: 0, correctAnswers: 0, totalTime: 0, answers: [] };
+                        }
+                        userStats[answer.user_id].totalQuestions++;
+                        if (answer.is_correct) userStats[answer.user_id].correctAnswers++;
+                        userStats[answer.user_id].totalTime += answer.time_taken || 0;
+                        userStats[answer.user_id].answers.push(answer);
+                    });
+
+                const leaderboardEntries = scopedProfiles
                     ?.filter(profile => userStats[profile.id]?.totalQuestions > 0)
                     .map(profile => {
                         const stats = userStats[profile.id];
@@ -101,11 +215,27 @@ const Leaderboard = () => {
 
                 return leaderboardEntries.sort((a, b) => b.total_score - a.total_score).slice(0, 50);
             } catch (error) { return []; }
-        }
+        },
+        enabled: activeScope === 'pakistan' || !!currentProfile,
     });
 
     const userRank = leaderboardData.findIndex(entry => entry.user_id === user?.id) + 1;
     const currentUserData = leaderboardData.find(entry => entry.user_id === user?.id);
+
+    const activeScopeLabel = useMemo(() => {
+        if (activeScope === 'institute') return instituteName;
+        if (activeScope === 'year-campus') return yearCampusLabel;
+        return 'All over Pakistan';
+    }, [activeScope, instituteName, yearCampusLabel]);
+
+    const periodDetailLabel = useMemo(() => getPeriodDetailLabel(activePeriod), [activePeriod]);
+
+    const emptyStateMessage = useMemo(() => {
+        const period = activePeriod === 'all-time' ? 'yet' : activePeriod === 'monthly' ? 'this month' : 'this week';
+        if (activeScope === 'institute') return `No rankings ${period} for ${instituteName}.`;
+        if (activeScope === 'year-campus') return `No rankings ${period} for ${yearCampusLabel}.`;
+        return `No rankings ${period}. Start practicing!`;
+    }, [activePeriod, activeScope, instituteName, yearCampusLabel]);
 
     const getRankIcon = (rank: number) => {
         switch (rank) {
@@ -142,7 +272,7 @@ const Leaderboard = () => {
                         <span className="text-lg md:text-xl font-bold text-foreground">Leaderboard</span>
                     </div>
                     <div className="flex items-center space-x-3">
-                        <PlanBadge plan={userPlan || undefined} />
+                        <PlanBadge plan={currentProfile?.plan || undefined} />
                         <ProfileDropdown />
                     </div>
                 </div>
@@ -158,6 +288,53 @@ const Leaderboard = () => {
                     </p>
                 </div>
 
+                <div className="mb-6 lg:mb-8 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <Tabs value={activeScope} onValueChange={(value) => setActiveScope(value as LeaderboardScope)} className="w-full lg:w-auto">
+                        <TabsList className="grid h-auto w-full grid-cols-3 rounded-2xl bg-muted/70 p-1 lg:w-auto">
+                            <TabsTrigger value="pakistan" className="rounded-xl px-2 py-2 text-[11px] font-bold sm:text-sm">
+                                <Globe2 className="mr-1.5 h-3.5 w-3.5" />
+                                All over Pakistan
+                            </TabsTrigger>
+                            <TabsTrigger disabled={!hasInstituteScope} value="institute" className="rounded-xl px-2 py-2 text-[11px] font-bold sm:text-sm">
+                                <School className="mr-1.5 h-3.5 w-3.5" />
+                                {instituteName}
+                            </TabsTrigger>
+                            <TabsTrigger disabled={!hasYearCampusScope} value="year-campus" className="rounded-xl px-2 py-2 text-[11px] font-bold sm:text-sm">
+                                <Target className="mr-1.5 h-3.5 w-3.5" />
+                                {yearCampusLabel}
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+
+                    <div className="flex items-center gap-2 lg:justify-end">
+                        <CalendarDays className="h-4 w-4 text-primary" />
+                        <Select value={activePeriod} onValueChange={(value) => setActivePeriod(value as LeaderboardPeriod)}>
+                            <SelectTrigger className="h-11 w-full rounded-xl border-border/60 bg-card/80 font-bold lg:w-[150px]">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all-time">All time</SelectItem>
+                                <SelectItem value="monthly">Monthly</SelectItem>
+                                <SelectItem value="weekly">Weekly</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                            {activeScopeLabel} / {PERIOD_LABELS[activePeriod]}
+                        </p>
+                        <p className="mt-1 text-xs font-medium text-primary">
+                            {periodDetailLabel}
+                        </p>
+                    </div>
+                    {(activeScope !== 'pakistan' && (!hasInstituteScope || (activeScope === 'year-campus' && !hasYearCampusScope))) && (
+                        <p className="text-xs text-muted-foreground">Complete your profile setup to unlock this leaderboard.</p>
+                    )}
+                </div>
+
                 {currentUserData && (
                     <Card className="mb-6 lg:mb-8 bg-gradient-to-br from-primary/5 to-accent border-border hover:shadow-lg transition-all duration-300 animate-scale-in backdrop-blur-sm">
                         <CardHeader className="p-4 lg:p-6">
@@ -170,8 +347,8 @@ const Leaderboard = () => {
                             <div className="flex items-center justify-between flex-wrap gap-4">
                                 <div className="flex items-center space-x-3 md:space-x-4">
                                     <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-r from-primary to-primary/70 rounded-full flex items-center justify-center overflow-hidden">
-                                        {currentUserAvatar ? (
-                                            <img src={currentUserAvatar} alt="avatar" className="w-full h-full object-cover" />
+                                        {currentProfile?.avatar_url ? (
+                                            <img src={currentProfile?.avatar_url} alt="avatar" className="w-full h-full object-cover" />
                                         ) : (
                                             <span className="text-primary-foreground font-bold text-lg md:text-xl">
                                                 {currentUserData.username?.substring(0, 2).toUpperCase() || 'U'}
@@ -181,6 +358,8 @@ const Leaderboard = () => {
                                     <div>
                                         <p className="font-semibold text-foreground text-sm md:text-base">{currentUserData.username}</p>
                                         <p className="text-xs md:text-sm text-muted-foreground">Total Score: {currentUserData.total_score}</p>
+                                        <p className="text-xs text-muted-foreground">{PERIOD_LABELS[activePeriod]} / {activeScopeLabel}</p>
+                                        <p className="text-xs text-primary">{periodDetailLabel}</p>
                                     </div>
                                 </div>
                                 <div className="text-right">
@@ -242,7 +421,7 @@ const Leaderboard = () => {
                             </div>
                         ) : leaderboardData.length === 0 ? (
                             <div className="text-center py-8">
-                                <p className="text-muted-foreground text-sm md:text-base">No data available yet. Start practicing!</p>
+                                <p className="text-muted-foreground text-sm md:text-base">{emptyStateMessage}</p>
                             </div>
                         ) : (
                             <div className="space-y-2">

@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
+import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -145,6 +146,23 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
       await (supabase as any).from('flp_user_attempts').delete().eq('user_id', user.id).eq('test_config_id', flpTestConfigId);
       const { data: insertedResult, error: insertError } = await (supabase as any).from('flp_user_attempts').insert([resultData]).select('id').single();
       if (insertError) throw insertError;
+      const { data: profileBadges } = await (supabase as any).from('profiles').select('badges').eq('id', user.id).maybeSingle();
+      const currentBadges = profileBadges?.badges || {};
+      const currentStats = currentBadges.stats || {};
+      await (supabase as any)
+        .from('profiles')
+        .update({
+          badges: {
+            ...currentBadges,
+            stats: {
+              ...currentStats,
+              flpCompletionCount: Number(currentStats.flpCompletionCount || 0) + 1,
+            },
+            synced_at: new Date().toISOString(),
+          },
+        })
+        .eq('id', user.id);
+      notifyAchievementProgress('flp_completed');
       setCurrentTestResultId((insertedResult as any).id);
       setIsQuizEnded(true);
       toast({ title: autoSubmit ? "Time's Up! Test Submitted." : "Test Submitted!", description: `You scored ${finalScore}/${totalQuestions}.`, duration: 3000 });

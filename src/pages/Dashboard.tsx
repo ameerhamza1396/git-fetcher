@@ -12,7 +12,7 @@ import {
   TrendingUp, Award, Briefcase, BellRing, Bookmark, ScrollText,
   Home, User, Settings, ChevronRight, ChevronLeft, LogOut, Lock, CreditCard,
   Megaphone, BarChart3, Sun, Moon, ArrowRight, Crown, Mail, X,
-  Receipt, Shield, FileText, RefreshCw, Sparkles, Stethoscope, PieChart, Info, Star, Loader2, Microscope,
+  Receipt, Shield, FileText, RefreshCw, Sparkles, Stethoscope, PieChart, Info, Star, Loader2, Microscope, FlaskConical,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
@@ -30,6 +30,7 @@ import Seo from '@/components/Seo';
 
 import VersionGuard from '@/components/VersionControl';
 import ProfileAvatar from '@/components/profile/ProfileAvatar';
+import { AchievementBadges } from '@/components/profile/AchievementBadges';
 import { MCQProgressWidget } from '@/components/dashboard/MCQProgressWidget';
 import { ProgressTracker } from '@/components/mcq/ProgressTracker';
 import { fetchInstitutes, getInstituteByCode } from '@/utils/institutes';
@@ -421,6 +422,7 @@ const Dashboard = () => {
   const [showTermOfDay, setShowTermOfDay] = useState(false);
   const [showCaseOfDay, setShowCaseOfDay] = useState(false);
   const [showCollaborateModal, setShowCollaborateModal] = useState(false);
+  const [showHeaderScore, setShowHeaderScore] = useState(true);
   const [selectedDashboardAnnouncement, setSelectedDashboardAnnouncement] = useState<DashboardAnnouncement | null>(null);
   const [appVersion, setAppVersion] = useState<string>('Loading...');
   const [reviewCompleted, setReviewCompleted] = useState(() => {
@@ -680,6 +682,12 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
+    setShowHeaderScore(true);
+    const timer = window.setTimeout(() => setShowHeaderScore(false), 10000);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
     if (!authLoading && !user) {
       navigate('/login', { replace: true });
     }
@@ -693,7 +701,8 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (authLoading || profileLoading) { setIsNavigating(true); return; }
-    if (!user || !profile) { setIsNavigating(false); return; }
+    if (!user) { setIsNavigating(false); return; }
+    if (!profile) { navigate('/setup'); return; }
     // Redirect to setup wizard if any required field is missing
     const validYears = ["1st", "2nd", "3rd", "4th", "5th"];
     const needsSetup = !profile.username || !(profile as any).institute || !((profile as any).year && validYears.includes((profile as any).year));
@@ -711,7 +720,13 @@ const Dashboard = () => {
     flpAction,
   ];
 
+  const personalizationActions = [
+    { title: 'Mistake Book', description: 'Review wrong MCQs', icon: Target, link: '/mistake-book', gradient: 'from-rose-500 to-red-600', iconColor: 'text-rose-100' },
+    { title: 'Titration', description: 'Repair weakest chapter', icon: FlaskConical, link: '/titration', gradient: 'from-violet-500 to-fuchsia-600', iconColor: 'text-violet-100' },
+  ];
+
   const premiumPerks = [
+    { title: 'Learn with Dr Ahroid', description: 'AI flashcards by chapter', icon: Sparkles, link: '/learn-with-ai', gradient: 'from-violet-500 to-fuchsia-600', iconColor: 'text-violet-100' },
     { title: 'AI Test Generator', description: 'Custom tests with AI', icon: Brain, link: '/ai/test-generator', gradient: 'from-cyan-500 to-blue-600', iconColor: 'text-cyan-100' },
     { title: 'AI Chatbot', description: 'Instant AI tutor', icon: Zap, link: '/ai/chatbot', gradient: 'from-amber-400 to-orange-500', iconColor: 'text-yellow-100' },
   ];
@@ -864,6 +879,8 @@ const Dashboard = () => {
                 <Badge className="mt-1.5 text-[10px] bg-primary/15 text-primary border-0 font-semibold">{userPlanDisplayName}</Badge>
               </div>
             </div>
+
+            <AchievementBadges userId={user?.id} compact />
 
             <Card className="border border-border/40 shadow-sm bg-card/80">
               <CardContent className="p-4">
@@ -1109,6 +1126,15 @@ const Dashboard = () => {
               )
             )}
 
+            {/* Personalization */}
+            <div className="flex items-center gap-2 mb-3 mt-6">
+              <Target className="w-4 h-4 text-rose-500" />
+              <h2 className="text-sm font-bold text-foreground">Personalization</h2>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              {personalizationActions.map((action, i) => <ActionCard key={i} action={action} />)}
+            </div>
+
             {/* Premium Perks with animated crown */}
             <div className="flex items-center gap-2 mb-3">
               <Crown className="w-4 h-4 text-amber-500 animate-bounce-gentle" />
@@ -1151,7 +1177,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-background bg-mesh pb-28 overflow-x-hidden relative">
+    <div className="dashboard-modern-font min-h-screen w-full bg-background bg-mesh pb-28 overflow-x-hidden relative">
       {/* Floating gradient orbs */}
       <div className="orb orb-1" />
       <div className="orb orb-2" />
@@ -1167,7 +1193,9 @@ const Dashboard = () => {
             <span className="text-sm font-extrabold text-foreground tracking-tight">Medmacs</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge className="text-[10px] font-bold bg-primary/10 text-primary border-0 px-2.5">{userPlanDisplayName}</Badge>
+            <Badge className="text-[10px] font-bold bg-primary/10 text-primary border-0 px-2.5">
+              {showHeaderScore ? `${userStats?.rankPoints || 0} pts` : userPlanDisplayName}
+            </Badge>
             <button onClick={() => setActiveTab('profile')} className="shrink-0">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center overflow-hidden ring-1 ring-primary/20">
                 {profile?.avatar_url ? (

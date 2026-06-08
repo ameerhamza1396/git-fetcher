@@ -1,0 +1,93 @@
+import { Flashcard, WrongAttempt } from './types';
+
+export const normalizeWrongAttempts = (rows: any[]): WrongAttempt[] => {
+  return (rows || [])
+    .filter(row => row.mcqs)
+    .map(row => ({
+      id: row.id,
+      selectedAnswer: row.selected_answer,
+      createdAt: row.created_at,
+      mcq: {
+        id: row.mcqs.id,
+        question: row.mcqs.question,
+        correctAnswer: row.mcqs.correct_answer,
+        explanation: row.mcqs.explanation || '',
+        chapterId: row.mcqs.chapter_id,
+        chapterName: row.mcqs.chapters?.name || 'Unknown Chapter',
+        chapterNumber: row.mcqs.chapters?.chapter_number || 0,
+        subjectId: row.mcqs.chapters?.subjects?.id || row.mcqs.chapters?.subject_id,
+        subjectName: row.mcqs.chapters?.subjects?.name || row.mcqs.subject || 'Unknown Subject',
+        subjectIcon: row.mcqs.chapters?.subjects?.icon,
+      },
+    }));
+};
+
+export const buildFallbackCards = (attempts: WrongAttempt[], batchIndex: number, batchSize = 5): Flashcard[] => {
+  const start = batchIndex * batchSize;
+  const selected = attempts.slice(start, start + batchSize);
+  const source = selected.length ? selected : attempts.slice(0, batchSize);
+
+  return source.map((attempt, index) => ({
+    front: attempt.mcq.question,
+    back: attempt.mcq.explanation || `Correct answer: ${attempt.mcq.correctAnswer}`,
+    source: `Card ${start + index + 1}`,
+  }));
+};
+
+export const fetchReferenceSnippet = async (question: string) => {
+  try {
+    const response = await fetch('https://medmacs.app/api/reference', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: question, top_k: 2 }),
+    });
+    if (!response.ok) return '';
+    const data = await response.json();
+    return (data.results || [])
+      .map((ref: any) => `${ref.book || 'Reference'} p.${ref.page || '-'}: ${ref.content || ''}`)
+      .join('\n');
+  } catch {
+    return '';
+  }
+};
+
+export const refineFlashcardsWithAI = async (attempts: WrongAttempt[], batchIndex: number, batchSize = 5): Promise<Flashcard[]> => {
+  const selected = attempts.slice(batchIndex * batchSize, batchIndex * batchSize + batchSize);
+  const cardSource = selected.length ? selected : attempts.slice(0, batchSize);
+  const references = await Promise.all(cardSource.map(attempt => fetchReferenceSnippet(attempt.mcq.question)));
+
+  const prompt = `Create exactly ${cardSource.length} concise MBBS flashcards from this weak chapter.
+Use the MCQs, explanations, and reference snippets. Make each card focused, high-yield, and exam-ready.
+Return only JSON: {"cards":[{"front":"...","back":"...","source":"..."}]}.
+
+Items:
+${cardSource.map((attempt, index) => `
+${index + 1}. Question: ${attempt.mcq.question}
+Correct answer: ${attempt.mcq.correctAnswer}
+Explanation: ${attempt.mcq.explanation || 'None'}
+Reference: ${references[index] || 'No reference retrieved'}
+`).join('\n')}`;
+
+  const response = await fetch('https://medmacs.app/api/ai/study-chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question: prompt }),
+  });
+  if (!response.ok) throw new Error('AI flashcard generation failed');
+
+  const data = await response.json();
+  const answer = data.answer || '';
+  const jsonMatch = answer.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('AI response was not JSON');
+  const parsed = JSON.parse(jsonMatch[0]);
+  const cards = Array.isArray(parsed.cards) ? parsed.cards : [];
+
+  return cards
+    .filter((card: any) => card.front && card.back)
+    .slice(0, batchSize)
+    .map((card: any, index: number) => ({
+      front: String(card.front),
+      back: String(card.back),
+      source: card.source ? String(card.source) : `AI card ${index + 1}`,
+    }));
+};

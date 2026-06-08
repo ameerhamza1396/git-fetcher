@@ -32,6 +32,7 @@ const MCQQuizPage = () => {
   }, [location.state]);
 
   const timerEnabled = searchParams.get('timer') === 'true';
+  const mistakeMode = searchParams.get('mode') === 'mistakes';
   const timePerQuestion = parseInt(searchParams.get('time') || '30', 10);
 
   useEffect(() => {
@@ -41,6 +42,10 @@ const MCQQuizPage = () => {
   }, [user, authLoading]);
 
   const handleBack = () => {
+    if (mistakeMode) {
+      navigate('/dashboard');
+      return;
+    }
     if (subjectId && chapterId) {
       navigate(`/mcqs/settings/${subjectId}/${chapterId}`);
     } else {
@@ -97,6 +102,8 @@ const MCQQuizPage = () => {
       timerEnabled={timerEnabled}
       timePerQuestion={timePerQuestion}
       initialIndex={initialIndex}
+      mistakeMode={mistakeMode}
+      mistakeMcqIds={(location.state as any)?.wrongMcqIds || []}
     />
   );
 };

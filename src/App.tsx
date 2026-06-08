@@ -41,6 +41,9 @@ import Career from '@/pages/Career';
 import TeachingAmbassadors from '@/pages/TeachingAmbassadors';
 import InternshipApplication from '@/pages/InternshipApplication';
 import SavedMCQsPage from '@/pages/SavedMCQsPage';
+import MistakeBookPage from '@/pages/MistakeBookPage';
+import TitrationPage from '@/pages/TitrationPage';
+import LearnWithAIPage from '@/pages/LearnWithAIPage';
 import Announcements from '@/pages/Announcements';
 import ContactUsPage from '@/pages/ContactUsPage';
 import FLP from '@/pages/FLP';
@@ -65,6 +68,7 @@ import DetailedAnalytics from "@/pages/DetailedAnalytics";
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import BlockedUserOverlay from '@/components/auth/BlockedUserOverlay';
+import { AchievementUnlockNotifier } from '@/components/profile/AchievementBadges';
 import { useQuery } from '@tanstack/react-query';
 
 
@@ -134,6 +138,11 @@ const UserRestrictionHandler = () => {
   return <BlockedUserOverlay details={restrictionDetails} onSignOut={signOut} userId={user.id} />;
 };
 
+const AchievementNotifierHandler = () => {
+  const { user } = useAuth();
+  return <AchievementUnlockNotifier userId={user?.id} />;
+};
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -154,6 +163,7 @@ function App() {
               <BackHandler />
               <ConnectionStatusModal />
               <UserRestrictionHandler />
+              <AchievementNotifierHandler />
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
@@ -187,6 +197,9 @@ function App() {
                 <Route path="/teaching-career" element={<TeachingAmbassadors />} />
                 <Route path="/summerinternship2025" element={<InternshipApplication />} />
                 <Route path="/saved-mcqs" element={<SavedMCQsPage />} />
+                <Route path="/mistake-book" element={<MistakeBookPage />} />
+                <Route path="/titration" element={<TitrationPage />} />
+                <Route path="/learn-with-ai" element={<LearnWithAIPage />} />
                 <Route path="/announcements" element={<Announcements />} />
                 <Route path="/contact-us" element={<ContactUsPage />} />
                 <Route path="/flp" element={<FLP />} />

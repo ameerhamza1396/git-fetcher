@@ -31,6 +31,7 @@ interface AIChatbotProps {
   userPlan?: string;
   isHidden?: boolean;
   onOpen: () => void;
+  onQuestionHelp?: () => void;
 }
 
 export const AIChatbot: React.FC<AIChatbotProps> = ({
@@ -42,7 +43,8 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
   correctAnswer,
   userPlan,
   isHidden = false,
-  onOpen
+  onOpen,
+  onQuestionHelp
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -80,7 +82,11 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
   };
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); sendMessage(input); };
-  const handleQuestionHelp = () => { if (hasPremiumAccess && questionContext) sendMessage(`Explain this MCQ:\n${questionContext}\nExplanation: ${explanationContext}`); };
+  const handleQuestionHelp = () => {
+    if (!hasPremiumAccess || !questionContext) return;
+    onQuestionHelp?.();
+    sendMessage(`Explain this MCQ:\n${questionContext}\nExplanation: ${explanationContext}`);
+  };
 
   return (
     <>
