@@ -1,38 +1,47 @@
 import { useEffect, useState } from 'react';
+import { App } from '@capacitor/app';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Zap, RefreshCw } from 'lucide-react';
-
-const CURRENT_APP_VERSION = "7.3.0"
+import { RefreshCw } from 'lucide-react';
 
 const VersionGuard = () => {
     const [isOutdated, setIsOutdated] = useState(false);
     const [checking, setChecking] = useState(true);
+    const [currentVersionCode, setCurrentVersionCode] = useState<number | null>(null);
 
-    const isVersionLower = (current: string, minRequired: string) => {
-        const v1 = current.split('.').map(Number);
-        const v2 = minRequired.split('.').map(Number);
-
-        for (let i = 0; i < Math.max(v1.length, v2.length); i++) {
-            const num1 = v1[i] || 0;
-            const num2 = v2[i] || 0;
-            if (num1 < num2) return true;
-            if (num1 > num2) return false;
-        }
-        return false;
+    const parseVersionCode = (value: unknown) => {
+        const versionCode = Number(value);
+        return Number.isFinite(versionCode) ? versionCode : null;
     };
 
     useEffect(() => {
         const checkVersion = async () => {
             try {
-                const { data, error } = await (supabase as any)
+                const appInfo = await App.getInfo();
+                const nativeVersionCode = parseVersionCode(appInfo.build);
+
+                if (nativeVersionCode === null) {
+                    console.warn("Version check skipped: native version code is unavailable.", appInfo);
+                    return;
+                }
+
+                setCurrentVersionCode(nativeVersionCode);
+
+                const { data, error } = await supabase
                     .from('app_config')
                     .select('value')
                     .eq('key', 'min_required_version')
                     .single();
 
                 if (data && !error) {
-                    if (isVersionLower(CURRENT_APP_VERSION, data.value)) {
+                    const minRequiredVersionCode = parseVersionCode(data.value);
+
+                    if (minRequiredVersionCode === null) {
+                        console.warn("Version check skipped: min_required_version is not numeric.", data.value);
+                        return;
+                    }
+
+                    if (nativeVersionCode < minRequiredVersionCode) {
                         setIsOutdated(true);
                     }
                 }
@@ -63,7 +72,7 @@ const VersionGuard = () => {
                         Update Required
                     </h2>
                     <p className="text-gray-500 dark:text-gray-400 font-medium leading-relaxed">
-                        We've released important improvements. Your current version ({CURRENT_APP_VERSION}) is no longer supported.
+                        We've released important improvements. Your current build ({currentVersionCode}) is no longer supported.
                     </p>
                 </div>
 

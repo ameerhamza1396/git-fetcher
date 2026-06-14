@@ -23,6 +23,7 @@ import { useTheme } from 'next-themes';
 import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
 
 import { Switch } from '@/components/ui/switch';
+import { Skeleton } from '@/components/ui/skeleton';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 
 interface MCQDisplayProps {
@@ -945,10 +946,6 @@ Return only JSON in this exact shape: {"matchingIndexes":[0,2]}. Include only sn
   }, [currentQuestionIndex, mcqs, answeredQuestions]);
 
   useEffect(() => {
-    // Only fetch logic here, initialIndex handled within loadMCQs
-  }, [subject, chapter, initialIndex]);
-
-  useEffect(() => {
     if (contentRef.current) {
       contentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -1041,10 +1038,16 @@ Return only JSON in this exact shape: {"matchingIndexes":[0,2]}. Include only sn
         setCurrentQuestionIndex(firstUnattemptedIndex);
       }
 
-      setLoading(false);
     };
     loadMCQs();
-  }, [chapter, user?.id, mistakeMode, mistakeMcqIds]);
+  }, [chapter, user?.id, mistakeMode, mistakeMcqIds, initialIndex]);
+
+  // Keep skeleton until shuffled mcqs have been committed to the DOM
+  useEffect(() => {
+    if (loading && mcqs.length > 0) {
+      setLoading(false);
+    }
+  }, [mcqs]);
 
   useEffect(() => {
     if (!loading && mcqs.length > 0 && typeof window !== 'undefined' && hasAttemptedAny) {
@@ -1101,14 +1104,41 @@ Return only JSON in this exact shape: {"matchingIndexes":[0,2]}. Include only sn
   if (loading || profileLoading) {
     return (
       <div className="fixed inset-0 z-[100] bg-background flex flex-col">
-        <div className="h-14 bg-slate-100 dark:bg-slate-800 animate-pulse" />
-        <div className="flex-1 p-4 space-y-4">
-          <div className="h-24 bg-slate-100 dark:bg-slate-800 rounded-lg animate-pulse" />
-          <div className="space-y-2">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-16 bg-slate-100 dark:bg-slate-800 rounded-lg animate-pulse" />
-            ))}
+        {/* Header skeleton */}
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <Skeleton className="w-8 h-8 rounded-lg" />
+            <Skeleton className="h-4 w-24" />
           </div>
+          <div className="flex items-center gap-1">
+            <Skeleton className="w-9 h-9 rounded-lg" />
+            <Skeleton className="w-9 h-9 rounded-lg" />
+            <Skeleton className="w-9 h-9 rounded-lg" />
+          </div>
+        </div>
+
+        {/* Progress bar skeleton */}
+        <div className="flex items-center gap-3 px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-slate-800">
+          <Skeleton className="h-4 w-12" />
+          <Skeleton className="flex-1 h-2 rounded-full" />
+        </div>
+
+        {/* Question text skeleton */}
+        <div className="px-4 sm:px-6 py-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+          <Skeleton className="h-3 w-24 mb-3" />
+          <Skeleton className="h-5 w-full mb-2" />
+          <Skeleton className="h-5 w-3/4" />
+        </div>
+
+        {/* Options skeleton */}
+        <div className="flex-1 px-4 sm:px-6 py-4 space-y-3">
+          <Skeleton className="h-3 w-28 mb-3" />
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="flex items-center gap-3 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+              <Skeleton className="w-8 h-8 rounded-lg shrink-0" />
+              <Skeleton className="flex-1 h-5" />
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -1177,7 +1207,13 @@ Return only JSON in this exact shape: {"matchingIndexes":[0,2]}. Include only sn
 
       {/* Main Content */}
       <div ref={contentRef} className="flex-1 relative z-10 flex flex-col overflow-y-auto">
-        <div key={currentQuestionIndex} className="flex flex-col flex-1">
+        <motion.div
+          key={currentQuestionIndex}
+          initial={{ opacity: 0, x: 30 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+          className="flex flex-col flex-1"
+        >
             {/* Question Section */}
             <div className="px-4 sm:px-6 py-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
               <p className="text-xs font-semibold text-primary mb-2">{mistakeMode ? 'Mistake correction' : 'Question'} {currentQuestionIndex + 1}</p>
@@ -1209,10 +1245,12 @@ Return only JSON in this exact shape: {"matchingIndexes":[0,2]}. Include only sn
                     key={index}
                     onClick={() => handleAnswerSelect(option)}
                     disabled={showExplanation}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className={`w-full p-3 sm:p-4 rounded-xl text-left border transition-all flex items-center gap-3 ${getThemeClasses()}`}
+                    initial={{ opacity: 0, y: 20, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ delay: index * 0.08, duration: 0.3, ease: "easeOut" }}
+                    whileHover={!showExplanation ? { scale: 1.02 } : {}}
+                    whileTap={!showExplanation ? { scale: 0.98 } : {}}
+                    className={`w-full p-3 sm:p-4 rounded-xl text-left border transition-all duration-200 flex items-center gap-3 ${getThemeClasses()}`}
                   >
                     <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 ${state === 'default' ? 'bg-slate-100 dark:bg-slate-800 text-slate-500' :
                       state === 'correct' ? 'bg-emerald-500 text-white' :
@@ -1231,8 +1269,15 @@ Return only JSON in this exact shape: {"matchingIndexes":[0,2]}. Include only sn
             </div>
 
             {/* Explanation */}
-            {showExplanation && (
-              <div className="px-4 sm:px-6 py-5 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-800">
+            <AnimatePresence>
+              {showExplanation && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
+                className="px-4 sm:px-6 py-5 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-800"
+              >
                 <div className="flex items-center gap-2 mb-3">
                   <BookOpen className="w-4 h-4 text-primary" />
                   <span className="text-sm font-semibold text-primary">Explanation</span>
@@ -1255,9 +1300,10 @@ Return only JSON in this exact shape: {"matchingIndexes":[0,2]}. Include only sn
                     <p className="text-xs text-destructive text-center mt-2">No references found.</p>
                   )}
                 </div>
-              </div>
+              </motion.div>
             )}
-          </div>
+            </AnimatePresence>
+          </motion.div>
         </div>
 
       <footer className="relative z-50 px-4 sm:px-6 py-3 pb-[env(safe-area-inset-bottom)] border-t border-slate-200 dark:border-slate-800 bg-background">

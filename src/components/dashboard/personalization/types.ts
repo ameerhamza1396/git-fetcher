@@ -14,6 +14,7 @@ export type WrongAttempt = {
     subjectId: string;
     subjectName: string;
     subjectIcon?: string;
+    year?: string | null;
   };
 };
 

@@ -11,10 +11,6 @@
       "destination": "/api/seq_ai.ts"
     },
     {
-      "source": "/api/reference",
-      "destination": "/api/reference.ts"
-    },
-    {
       "source": "/api/gamecontroller",
       "destination": "/api/gamecontroller.ts"
     },

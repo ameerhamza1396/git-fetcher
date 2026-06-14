@@ -11,7 +11,7 @@ export function useReferenceSearch() {
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch("https://medmacs.app/api/reference", {
+            const res = await fetch("https://xpxupanivlugsleqnvbr.supabase.co/functions/v1/reference-search", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ query, top_k: topK }),

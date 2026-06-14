@@ -13,36 +13,62 @@ export const usePersonalizationData = () => {
     queryKey: ['personalization-wrong-attempts', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const { data, error } = await supabase
-        .from('user_answers')
-        .select(`
-          id,
-          selected_answer,
-          created_at,
-          mcqs!inner(
+      const [profileResult, wrongResult, correctedResult] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('year')
+          .eq('id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('user_answers')
+          .select(`
             id,
-            question,
-            options,
-            correct_answer,
-            explanation,
-            chapter_id,
-            subject,
-            chapters(
+            selected_answer,
+            created_at,
+            mcqs!inner(
               id,
-              name,
-              chapter_number,
-              subject_id,
-              subjects(id, name, icon)
+              question,
+              options,
+              correct_answer,
+              explanation,
+              chapter_id,
+              subject,
+              chapters(
+                id,
+                name,
+                chapter_number,
+                subject_id,
+                subjects(id, name, icon, year)
+              )
             )
-          )
-        `)
-        .eq('user_id', user.id)
-        .eq('is_correct', false)
-        .order('created_at', { ascending: false })
-        .limit(500);
+          `)
+          .eq('user_id', user.id)
+          .eq('is_correct', false)
+          .order('created_at', { ascending: false })
+          .limit(500),
+        supabase
+          .from('user_answers')
+          .select('mcq_id')
+          .eq('user_id', user.id)
+          .eq('is_correct', true)
+          .eq('correction_mode', true),
+      ]);
 
-      if (error) throw error;
-      return normalizeWrongAttempts(data || []);
+      if (profileResult.error) throw profileResult.error;
+      if (wrongResult.error) throw wrongResult.error;
+      if (correctedResult.error) throw correctedResult.error;
+
+      const userYear = profileResult.data?.year || null;
+      const correctedMcqIds = new Set((correctedResult.data || []).map(row => row.mcq_id).filter(Boolean));
+      const seenWrongMcqIds = new Set<string>();
+
+      return normalizeWrongAttempts(wrongResult.data || []).filter(attempt => {
+        if (userYear && attempt.mcq.year && attempt.mcq.year !== userYear) return false;
+        if (correctedMcqIds.has(attempt.mcq.id)) return false;
+        if (seenWrongMcqIds.has(attempt.mcq.id)) return false;
+        seenWrongMcqIds.add(attempt.mcq.id);
+        return true;
+      });
     },
     enabled: !!user?.id,
   });

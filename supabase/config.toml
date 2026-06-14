@@ -37,6 +37,9 @@ verify_jwt = true
 enabled = true
 port = 54323
 
+[functions.reference-search]
+verify_jwt = false
+
 [functions.imagekit-auth]
 enabled = true
 verify_jwt = true

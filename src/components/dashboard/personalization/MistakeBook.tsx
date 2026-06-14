@@ -20,6 +20,7 @@ export const MistakeBook = ({ subjects, isPremium }: MistakeBookProps) => {
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [aiExplainTarget, setAiExplainTarget] = useState<WrongAttempt | null>(null);
+  const [explanationTarget, setExplanationTarget] = useState<WrongAttempt | null>(null);
   const [aiExplanation, setAiExplanation] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
@@ -49,22 +50,20 @@ export const MistakeBook = ({ subjects, isPremium }: MistakeBookProps) => {
     setAiLoading(true);
     try {
       const reference = await fetchReferenceSnippet(attempt.mcq.question);
-      const response = await fetch('https://medmacs.app/api/ai/study-chat', {
+      const response = await fetch('https://medmacs.app/api/ai/mistake-explain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          question: `Explain this wrong MCQ attempt positively and concisely for revision.
-Question: ${attempt.mcq.question}
-User selected: ${attempt.selectedAnswer}
-Correct answer: ${attempt.mcq.correctAnswer}
-Existing explanation: ${attempt.mcq.explanation || 'None'}
-Book reference: ${reference || 'No reference retrieved'}
-Avoid negative language. End with one memory hook.`,
+          question: attempt.mcq.question,
+          selectedAnswer: attempt.selectedAnswer,
+          correctAnswer: attempt.mcq.correctAnswer,
+          explanation: attempt.mcq.explanation || '',
+          reference,
         }),
       });
       if (!response.ok) throw new Error('AI explanation failed');
       const data = await response.json();
-      setAiExplanation(data.answer || 'Explanation generated, but no text was returned.');
+      setAiExplanation(data.explanation || 'Explanation generated, but no text was returned.');
     } catch {
       setAiExplanation(attempt.mcq.explanation || `Correct answer: ${attempt.mcq.correctAnswer}`);
     } finally {
@@ -159,10 +158,17 @@ Avoid negative language. End with one memory hook.`,
                     </div>
                   </div>
 
-                  <div className="mt-4 rounded-2xl bg-muted/50 p-3">
+                  <button
+                    type="button"
+                    onClick={() => setExplanationTarget(activeAttempt)}
+                    className="mt-4 w-full rounded-2xl bg-muted/50 p-3 text-left transition-colors hover:bg-muted"
+                  >
                     <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Explanation</p>
-                    <p className="mt-2 text-sm leading-relaxed text-foreground">{activeAttempt.mcq.explanation || 'No explanation provided.'}</p>
-                  </div>
+                    <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-foreground">
+                      {activeAttempt.mcq.explanation || 'No explanation provided.'}
+                    </p>
+                    <p className="mt-2 text-[10px] font-black uppercase tracking-widest text-primary">Tap to expand</p>
+                  </button>
 
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button
@@ -217,6 +223,23 @@ Avoid negative language. End with one memory hook.`,
               {aiExplanation}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!explanationTarget} onOpenChange={(open) => !open && setExplanationTarget(null)}>
+        <DialogContent className="max-w-lg rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              Explanation
+            </DialogTitle>
+            <DialogDescription>
+              {explanationTarget?.mcq.chapterName || 'Mistake Book MCQ'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto rounded-2xl bg-muted/60 p-4 text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+            {explanationTarget?.mcq.explanation || 'No explanation provided.'}
+          </div>
         </DialogContent>
       </Dialog>
 

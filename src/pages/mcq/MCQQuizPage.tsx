@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { MCQDisplay } from '@/components/mcq/MCQDisplay';
 import { useAuth } from '@/hooks/useAuth';
@@ -22,14 +22,7 @@ const MCQQuizPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading: authLoading } = useAuth();
-  const [initialIndex, setInitialIndex] = useState(0);
-
-  useEffect(() => {
-    const state = location.state as { autoResume?: boolean; startIndex?: number } | null;
-    if (state?.startIndex !== undefined) {
-      setInitialIndex(state.startIndex);
-    }
-  }, [location.state]);
+  const initialIndex = ((location.state as { startIndex?: number } | null)?.startIndex) || 0;
 
   const timerEnabled = searchParams.get('timer') === 'true';
   const mistakeMode = searchParams.get('mode') === 'mistakes';

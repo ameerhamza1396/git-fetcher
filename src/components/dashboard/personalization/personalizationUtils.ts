@@ -32,6 +32,7 @@ export const normalizeWrongAttempts = (rows: any[]): WrongAttempt[] => {
         subjectId: row.mcqs.chapters?.subjects?.id || row.mcqs.chapters?.subject_id,
         subjectName: row.mcqs.chapters?.subjects?.name || row.mcqs.subject || 'Unknown Subject',
         subjectIcon: row.mcqs.chapters?.subjects?.icon,
+        year: row.mcqs.chapters?.subjects?.year || null,
       },
     }));
 };
@@ -50,7 +51,7 @@ export const buildFallbackCards = (attempts: WrongAttempt[], batchIndex: number,
 
 export const fetchReferenceSnippet = async (question: string) => {
   try {
-    const response = await fetch('https://medmacs.app/api/reference', {
+    const response = await fetch('https://xpxupanivlugsleqnvbr.supabase.co/functions/v1/reference-search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: question, top_k: 2 }),
@@ -70,31 +71,22 @@ export const refineFlashcardsWithAI = async (attempts: WrongAttempt[], batchInde
   const cardSource = selected.length ? selected : attempts.slice(0, batchSize);
   const references = await Promise.all(cardSource.map(attempt => fetchReferenceSnippet(attempt.mcq.question)));
 
-  const prompt = `Create exactly ${cardSource.length} concise MBBS flashcards from this weak chapter.
-Use the MCQs, explanations, and reference snippets. Make each card focused, high-yield, and exam-ready.
-Return only JSON: {"cards":[{"front":"...","back":"...","source":"..."}]}.
-
-Items:
-${cardSource.map((attempt, index) => `
-${index + 1}. Question: ${attempt.mcq.question}
-Correct answer: ${attempt.mcq.correctAnswer}
-Explanation: ${attempt.mcq.explanation || 'None'}
-Reference: ${references[index] || 'No reference retrieved'}
-`).join('\n')}`;
-
-  const response = await fetch('https://medmacs.app/api/ai/study-chat', {
+  const response = await fetch('https://medmacs.app/api/ai/titration-flashcards', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question: prompt }),
+    body: JSON.stringify({
+      items: cardSource.map((attempt, index) => ({
+        question: attempt.mcq.question,
+        correctAnswer: attempt.mcq.correctAnswer,
+        explanation: attempt.mcq.explanation || '',
+        reference: references[index] || '',
+      })),
+    }),
   });
   if (!response.ok) throw new Error('AI flashcard generation failed');
 
   const data = await response.json();
-  const answer = data.answer || '';
-  const jsonMatch = answer.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('AI response was not JSON');
-  const parsed = JSON.parse(jsonMatch[0]);
-  const cards = Array.isArray(parsed.cards) ? parsed.cards : [];
+  const cards = Array.isArray(data.cards) ? data.cards : [];
 
   return cards
     .filter((card: any) => card.front && card.back)

@@ -12,18 +12,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    proxy: {
-      '/api/reference': {
-        target: 'https://medmacs-refs.onrender.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/reference/, '/search'),
-        configure: (proxy, _options) => {
-          proxy.on('error', (err, _req, _res) => {
-            console.log('proxy error', err);
-          });
-        },
-      },
-    },
+    proxy: {},
   },
   plugins: [
     react(),

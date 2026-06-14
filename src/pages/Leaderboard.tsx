@@ -297,11 +297,11 @@ const Leaderboard = () => {
                             </TabsTrigger>
                             <TabsTrigger disabled={!hasInstituteScope} value="institute" className="rounded-xl px-2 py-2 text-[11px] font-bold sm:text-sm">
                                 <School className="mr-1.5 h-3.5 w-3.5" />
-                                {instituteName}
+                                Your Institute
                             </TabsTrigger>
                             <TabsTrigger disabled={!hasYearCampusScope} value="year-campus" className="rounded-xl px-2 py-2 text-[11px] font-bold sm:text-sm">
                                 <Target className="mr-1.5 h-3.5 w-3.5" />
-                                {yearCampusLabel}
+                                Your Batch
                             </TabsTrigger>
                         </TabsList>
                     </Tabs>

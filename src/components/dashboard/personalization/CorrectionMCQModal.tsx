@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -20,11 +21,13 @@ type CorrectionMCQModalProps = {
 export const CorrectionMCQModal = ({ open, chapter, onOpenChange }: CorrectionMCQModalProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [activeIndex, setActiveIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [startedAt, setStartedAt] = useState(Date.now());
+  const [correctedMcqIds, setCorrectedMcqIds] = useState<Set<string>>(new Set());
 
   const attempts = chapter?.attempts || [];
   const activeAttempt = attempts[activeIndex];
@@ -36,7 +39,7 @@ export const CorrectionMCQModal = ({ open, chapter, onOpenChange }: CorrectionMC
     return Array.from(new Set(baseOptions));
   }, [activeAttempt]);
   const isCorrect = selectedAnswer === activeAttempt?.mcq.correctAnswer;
-  const completed = activeIndex >= attempts.length - 1;
+  const completed = !attempts.some((attempt, index) => index > activeIndex && !correctedMcqIds.has(attempt.mcq.id));
 
   useEffect(() => {
     if (!open) return;
@@ -44,6 +47,7 @@ export const CorrectionMCQModal = ({ open, chapter, onOpenChange }: CorrectionMC
     setSelectedAnswer('');
     setSubmitted(false);
     setSaving(false);
+    setCorrectedMcqIds(new Set());
     setStartedAt(Date.now());
   }, [open, chapter?.id]);
 
@@ -65,6 +69,10 @@ export const CorrectionMCQModal = ({ open, chapter, onOpenChange }: CorrectionMC
       });
       if (error) throw error;
       notifyAchievementProgress('correction_mcq');
+      if (correct) {
+        setCorrectedMcqIds(previous => new Set([...previous, activeAttempt.mcq.id]));
+        queryClient.invalidateQueries({ queryKey: ['personalization-wrong-attempts', user.id] });
+      }
       setSubmitted(true);
     } catch (error) {
       toast({ title: 'Answer Not Saved', description: error?.message || 'Please try again.', variant: 'destructive' });
@@ -74,11 +82,12 @@ export const CorrectionMCQModal = ({ open, chapter, onOpenChange }: CorrectionMC
   };
 
   const goNext = () => {
-    if (completed) {
+    const nextIndex = attempts.findIndex((attempt, index) => index > activeIndex && !correctedMcqIds.has(attempt.mcq.id));
+    if (completed || nextIndex === -1) {
       onOpenChange(false);
       return;
     }
-    setActiveIndex(index => Math.min(attempts.length - 1, index + 1));
+    setActiveIndex(nextIndex);
     setSelectedAnswer('');
     setSubmitted(false);
     setStartedAt(Date.now());
@@ -92,9 +101,6 @@ export const CorrectionMCQModal = ({ open, chapter, onOpenChange }: CorrectionMC
             <RotateCcw className="h-5 w-5 text-primary" />
             {chapter?.name || 'Correct MCQs'}
           </DialogTitle>
-          <DialogDescription>
-            Focused correction mode. No question map, no full practice session.
-          </DialogDescription>
         </DialogHeader>
 
         {activeAttempt ? (

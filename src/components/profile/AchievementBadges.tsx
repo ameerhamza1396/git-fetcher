@@ -464,7 +464,7 @@ export const AchievementBadges = ({ userId, compact = false }: { userId?: string
 
   if (isLoading) {
     return (
-      <div className="rounded-3xl border-2 border-border/60 bg-gradient-to-br from-card/95 via-card/90 to-primary/5 p-5 shadow-xl">
+      <div className="py-2">
         <div className="flex items-center gap-3 mb-4">
           <div className="h-12 w-12 animate-pulse rounded-2xl bg-gradient-to-br from-muted to-muted/50" />
           <div className="flex-1">
@@ -472,10 +472,9 @@ export const AchievementBadges = ({ userId, compact = false }: { userId?: string
             <div className="h-3 w-40 animate-pulse rounded bg-muted/70" />
           </div>
         </div>
-        <div className="h-2.5 w-full animate-pulse rounded-full bg-muted/50 mb-4" />
         <div className="flex gap-4 overflow-hidden">
           {[1, 2, 3].map((item) => (
-            <div key={item} className="h-36 w-44 shrink-0 animate-pulse rounded-2xl bg-muted/40" />
+            <div key={item} className="h-38 w-44 shrink-0 animate-pulse rounded-2xl bg-muted/40" />
           ))}
         </div>
       </div>
@@ -483,16 +482,16 @@ export const AchievementBadges = ({ userId, compact = false }: { userId?: string
   }
 
   return (
-    <div className="rounded-3xl border-2 border-border/60 bg-gradient-to-br from-card/95 via-card/90 to-primary/5 p-5 shadow-xl">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 shadow-lg shadow-amber-500/30">
-              <Trophy className="h-6 w-6 text-white" />
+    <div className="py-2">
+        <div className="mb-5 flex items-center justify-between gap-3 px-1">
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 shadow-lg shadow-amber-500/30">
+              <Trophy className="h-7 w-7 text-white" />
             </div>
             <div>
-              <h3 className="text-base font-black uppercase tracking-tight text-foreground flex items-center gap-2">
+              <h3 className="text-lg font-black uppercase tracking-tight text-foreground flex items-center gap-2">
                 Badges
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary">
                   {earnedBadgeIds.length}
                 </span>
               </h3>
@@ -501,65 +500,59 @@ export const AchievementBadges = ({ userId, compact = false }: { userId?: string
           </div>
         </div>
 
-        {/* Progress bar */}
-        <div className="mb-4 h-2.5 overflow-hidden rounded-full bg-muted/50">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500 transition-all duration-700 ease-out shadow-sm"
-            style={{ width: `${(earnedBadgeIds.length / BADGE_DEFINITIONS.length) * 100}%` }}
-          />
-        </div>
+        <div className="relative -mx-4 overflow-hidden">
+          <div className="flex gap-4 overflow-x-auto px-4 pb-3 pt-1">
+            {BADGE_DEFINITIONS.map((badge) => {
+              const earned = earnedSet.has(badge.id);
+              const Icon = badge.icon;
 
-        <div className="flex gap-4 overflow-x-auto pb-3 -mx-1 px-1">
-          {BADGE_DEFINITIONS.map((badge) => {
-            const earned = earnedSet.has(badge.id);
-            const Icon = badge.icon;
+              return (
+                <motion.div
+                  key={badge.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className={`relative w-44 shrink-0 rounded-2xl border-2 p-4 transition-all duration-300 ${
+                    earned
+                      ? `border-transparent bg-gradient-to-br ${badge.color} text-white shadow-2xl shadow-primary/20 scale-[1.02] hover:scale-105`
+                      : 'border-border/50 bg-muted/30 text-muted-foreground hover:border-border hover:bg-muted/50 backdrop-blur-sm'
+                  } ${compact ? 'min-h-[132px]' : 'min-h-[154px]'}`}
+                >
+                  {/* Sparkle effect for earned badges */}
+                  {earned && (
+                    <div className="absolute top-2 right-2">
+                      <CheckCircle2 className="h-5 w-5 text-white drop-shadow-lg animate-bounce-gentle" />
+                    </div>
+                  )}
 
-            return (
-              <motion.div
-                key={badge.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className={`relative w-44 shrink-0 rounded-2xl border-2 p-4 transition-all duration-300 ${
-                  earned
-                    ? `border-transparent bg-gradient-to-br ${badge.color} text-white shadow-2xl shadow-primary/20 scale-[1.02] hover:scale-105`
-                    : 'border-border/50 bg-muted/30 text-muted-foreground hover:border-border hover:bg-muted/50 backdrop-blur-sm'
-                } ${compact ? 'min-h-[130px]' : 'min-h-[148px]'}`}
-              >
-                {/* Sparkle effect for earned badges */}
-                {earned && (
-                  <div className="absolute top-2 right-2">
-                    <CheckCircle2 className="h-5 w-5 text-white drop-shadow-lg animate-bounce-gentle" />
+                  <div className={`mb-3 flex h-12 w-12 items-center justify-center rounded-xl transition-all duration-300 ${
+                    earned
+                      ? 'bg-white/25 backdrop-blur-sm shadow-lg'
+                      : 'bg-background/80 border border-border/50'
+                  }`}>
+                    <Icon className={`h-6 w-6 transition-all ${earned ? 'text-white' : 'text-muted-foreground/60'}`} />
                   </div>
-                )}
 
-                <div className={`mb-3 flex h-12 w-12 items-center justify-center rounded-xl transition-all duration-300 ${
-                  earned
-                    ? 'bg-white/25 backdrop-blur-sm shadow-lg'
-                    : 'bg-background/80 border border-border/50'
-                }`}>
-                  <Icon className={`h-6 w-6 transition-all ${earned ? 'text-white' : 'text-muted-foreground/60'}`} />
-                </div>
+                  <p className={`text-sm font-black leading-tight mb-1.5 ${
+                    earned ? 'text-white drop-shadow-md' : 'text-foreground/70'
+                  }`}>
+                    {badge.name}
+                  </p>
 
-                <p className={`text-sm font-black leading-tight mb-1.5 ${
-                  earned ? 'text-white drop-shadow-md' : 'text-foreground/70'
-                }`}>
-                  {badge.name}
-                </p>
+                  <p className={`text-[11px] leading-snug ${
+                    earned ? 'text-white/85' : 'text-muted-foreground/60'
+                  }`}>
+                    {badge.details}
+                  </p>
 
-                <p className={`text-[11px] leading-snug ${
-                  earned ? 'text-white/85' : 'text-muted-foreground/60'
-                }`}>
-                  {badge.details}
-                </p>
-
-                {/* Shine effect for earned badges */}
-                {earned && (
-                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-transparent via-white/10 to-transparent opacity-0 hover:opacity-100 transition-opacity pointer-events-none" />
-                )}
-              </motion.div>
-            );
-          })}
+                  {/* Shine effect for earned badges */}
+                  {earned && (
+                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-transparent via-white/10 to-transparent opacity-0 hover:opacity-100 transition-opacity pointer-events-none" />
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
         </div>
     </div>
   );

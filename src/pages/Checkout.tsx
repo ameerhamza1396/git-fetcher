@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import {
-    CheckCircle, XCircle, BadgePercent, CreditCard, ArrowLeft, Loader2, Wallet, RefreshCw
+    CheckCircle, XCircle, BadgePercent, ArrowLeft, Loader2, RefreshCw
 } from 'lucide-react';
 import { Link, useLocation, Navigate } from 'react-router-dom';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
@@ -186,7 +186,7 @@ const Checkout = () => {
                 CUSTOMER_MOBILE_NO: mobileNumber || "03000000000",
                 CUSTOMER_EMAIL_ADDRESS: user?.email || "",
                 SUCCESS_URL: `${callbackBase}/payment-success?plan=${planName}&validity=${validity}&basket_id=${basketId}`,
-                FAILURE_URL: `${callbackBasewebhook}/payment-failure`,
+                FAILURE_URL: `${callbackBase}/payment-failure`,
                 CHECKOUT_URL: `https://medmacs.app/api/payment-`,
                 BASKET_ID: basketId, ORDER_DATE: new Date().toISOString().slice(0, 10),
                 SIGNATURE: "PAYMENT_REQ", VERSION: "V1.2",
@@ -217,7 +217,7 @@ const Checkout = () => {
     };
 
     return (
-        <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950">
+        <div className="min-h-screen w-full bg-background">
             <Seo title="Checkout | Medmacs" />
 
             <div className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
@@ -228,25 +228,32 @@ const Checkout = () => {
                         </Button>
                     </Link>
                     <div className="flex items-center gap-2">
-                        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-7 h-7" />
-                        <span className="text-lg font-black">Checkout</span>
+                        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-8 h-8" />
+                        <span className="text-xl font-bold text-foreground">Checkout</span>
                     </div>
                     <ProfileDropdown />
                 </div>
             </div>
 
-            <main className="container mx-auto px-4 py-8 max-w-lg mt-[var(--header-height)]">
-                <motion.div 
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
-                    className="text-center mb-8"
-                >
-                    <h1 className="text-2xl md:text-4xl font-black tracking-tight text-foreground uppercase italic">
-                        Complete <span className="text-blue-600">Payment</span>
-                    </h1>
-                    <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] mt-2">Secure checkout</p>
-                </motion.div>
+            <main className="container mx-auto px-4 lg:px-8 py-12 lg:py-16 max-w-4xl">
+                <div className="text-center mb-12 mt-[var(--header-height)]">
+                    <motion.h1 
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, ease: "easeOut" }}
+                        className="text-3xl md:text-5xl font-black tracking-tight text-foreground italic uppercase"
+                    >
+                        Complete <span className="text-primary">Payment</span>
+                    </motion.h1>
+                    <motion.p 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.15 }}
+                        className="text-muted-foreground text-xs uppercase tracking-[0.2em] mt-3"
+                    >
+                        Secure checkout
+                    </motion.p>
+                </div>
 
                 {/* Animated Container for Staggered Children */}
                 <motion.div
@@ -265,102 +272,126 @@ const Checkout = () => {
                     {/* Order Summary Card */}
                     <motion.div 
                         variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } } }}
-                        className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-blue-600/90 via-indigo-600/90 to-blue-800/90 text-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/10 p-1 mb-6"
+                        className="rounded-[2rem] border border-border/40 bg-card/80 backdrop-blur-xl overflow-hidden mb-6"
                     >
-                        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.2) 20px, rgba(255,255,255,0.2) 40px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
-                        <div className="relative z-10 bg-white/10 backdrop-blur-md rounded-[1.8rem] p-6 border border-white/10 shadow-inner">
-                        <h2 className="text-lg font-black uppercase tracking-tight mb-4">Order Summary</h2>
-                        <div className="flex justify-between items-start mb-3">
-                            <div>
-                                <p className="text-sm font-bold">{planName} Plan</p>
-                                <span className="text-[10px] mt-1 inline-block px-2 py-0.5 bg-white/20 rounded-full font-bold uppercase">{validityDisplay}</span>
+                        <div className="p-6">
+                            <h2 className="text-lg font-black uppercase tracking-tight text-foreground mb-4">Order Summary</h2>
+                            <div className="flex justify-between items-start mb-3">
+                                <div>
+                                    <p className="text-sm font-bold text-foreground">{planName} Plan</p>
+                                    <span className="text-[10px] mt-1 inline-block px-2 py-0.5 bg-primary/10 text-primary rounded-full font-bold uppercase">{validityDisplay}</span>
+                                </div>
+                                <span className="font-bold text-foreground">PKR {basePrice.toFixed(2)}</span>
                             </div>
-                            <span className="font-bold">PKR {basePrice.toFixed(2)}</span>
-                        </div>
-                        {isPromoApplied && (
-                            <div className="flex justify-between text-emerald-200 text-sm font-medium mb-3">
-                                <span className="flex items-center"><BadgePercent className="mr-1.5 h-4 w-4" /> {promoDiscountDisplay}</span>
-                                <span>- PKR {(basePrice - priceAfterPromo).toFixed(2)}</span>
+                            {isPromoApplied && (
+                                <div className="flex justify-between text-emerald-500 text-sm font-medium mb-3">
+                                    <span className="flex items-center"><BadgePercent className="mr-1.5 h-4 w-4" /> {promoDiscountDisplay}</span>
+                                    <span>- PKR {(basePrice - priceAfterPromo).toFixed(2)}</span>
+                                </div>
+                            )}
+                            <div className="pt-4 border-t border-border/40 flex justify-between items-center">
+                                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Grand Total</span>
+                                <span className="text-3xl font-black text-foreground">PKR {grandTotal.toFixed(2)}</span>
                             </div>
-                        )}
-                        <div className="pt-4 border-t border-white/20 flex justify-between items-center">
-                            <span className="text-xs font-bold uppercase tracking-widest text-white/70">Grand Total</span>
-                            <span className="text-3xl font-black">PKR {grandTotal.toFixed(2)}</span>
                         </div>
-                    </div>
                     </motion.div>
 
                     {/* Promo Code Card */}
                     <motion.div 
                         variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } } }}
-                        className="relative overflow-hidden rounded-[1.5rem] bg-slate-800/90 dark:bg-slate-900/90 text-white shadow-lg border border-white/5 p-4 mb-6"
+                        className="rounded-[2rem] border border-border/40 bg-card/80 backdrop-blur-xl overflow-hidden mb-6"
                     >
-                        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)' }} />
-                    <div className="relative z-10">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-2">Promo Code</p>
-                        <div className="flex gap-2">
-                            <Input placeholder="Enter code" value={promoCode} onChange={(e) => setPromoCode(e.target.value.toUpperCase())} disabled={isPromoApplied || isLoading} className="bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-xl h-11" />
-                            <Button onClick={handleApplyPromoCode} disabled={isLoading || isPromoApplied || !promoCode} className="bg-white text-slate-900 hover:bg-white/90 rounded-xl h-11 px-5 font-bold text-xs uppercase">
-                                {isPromoApplied ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : 'Apply'}
-                            </Button>
+                        <div className="p-5">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Promo Code</p>
+                            <div className="flex gap-2">
+                                <Input placeholder="Enter code" value={promoCode} onChange={(e) => setPromoCode(e.target.value.toUpperCase())} disabled={isPromoApplied || isLoading} className="rounded-xl h-11" />
+                                <Button onClick={handleApplyPromoCode} disabled={isLoading || isPromoApplied || !promoCode} className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl h-11 px-5 font-bold text-xs uppercase">
+                                    {isPromoApplied ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : 'Apply'}
+                                </Button>
+                            </div>
+                            {promoCodeError && <p className="text-destructive text-xs mt-2">{promoCodeError}</p>}
                         </div>
-                        {promoCodeError && <p className="text-red-300 text-xs mt-2">{promoCodeError}</p>}
-                        {promoCodeError && <p className="text-red-400 text-xs mt-2">{promoCodeError}</p>}
-                    </div>
                     </motion.div>
 
                     {/* Payment Methods */}
                     <motion.div 
                         variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } } }}
-                        className="space-y-3 mb-6"
+                        className="mb-6"
                     >
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Payment Method</p>
-                        <motion.div 
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => setPaymentMethod('easypaisa')}
-                            className={`relative overflow-hidden rounded-[1.5rem] p-4 shadow-md cursor-pointer transition-colors duration-300 border ${paymentMethod === 'easypaisa' ? 'bg-emerald-600/90 border-emerald-500 text-white' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'}`}
-                        >
-                            <div className="absolute inset-0 opacity-5" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)', display: paymentMethod === 'easypaisa' ? 'block' : 'none' }} />
-                        <div className="relative z-10">
-                            <div className="flex items-center gap-3">
-                                <Wallet className="w-5 h-5" />
-                                <span className="font-black text-sm uppercase">Easypaisa</span>
-                            </div>
-                            {paymentMethod === 'easypaisa' && (
-                                <div className="mt-3 animate-in fade-in zoom-in-95">
-                                    <label className="text-[10px] font-bold uppercase tracking-widest opacity-70">Mobile Account Number</label>
-                                    <Input placeholder="03XXXXXXXXX" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))} maxLength={11} className={`bg-white/10 text-white placeholder:text-white/50 rounded-xl h-11 mt-1 border-white/20`} />
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Payment Method</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+                            <motion.div 
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => setPaymentMethod('easypaisa')}
+                                className={`rounded-[2rem] p-5 cursor-pointer transition-all duration-300 border flex flex-col ${paymentMethod === 'easypaisa' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border/40 bg-card/80 backdrop-blur-xl'}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <svg className={`w-5 h-5 shrink-0 ${paymentMethod === 'easypaisa' ? 'text-primary' : 'text-muted-foreground'}`} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path fill="none" stroke="currentColor" strokeLinejoin="round" d="M24.6025,4.5c8.516,0,15.42,5.7166,15.42,12.7693S33.12,28.6141,24.6025,28.6141Q12.4689,28.3687,7.4111,20.972A1.6469,1.6469,0,0,1,7.1663,19.73Q10.0575,5.2982,24.6025,4.5Zm-.5751,7.9439q-7.3449.7437-8.9894,6.9928,2.2406,1.9754,8.9894,2.1927c4.5207-.0711,7.2591-1.389,7.3129-4.4525C31.0589,13.7933,27.7687,12.3159,24.0274,12.4439Z"/>
+                                        <path fill="none" stroke="currentColor" strokeLinejoin="round" d="M6.396,24.71C8.9221,31.9571,15.8885,35.99,23.05,35.99c5.9392,0,9.8755-2.5707,11.94-6.4492L41.6456,33.71c-2.32,5.6749-9.1977,9.79-17.3225,9.79-10.0289,0-18.617-6.7591-17.93-18.5113C6.393,24.8952,6.394,24.8017,6.396,24.71Z"/>
+                                    </svg>
+                                    <div>
+                                        <span className={`font-black text-sm uppercase ${paymentMethod === 'easypaisa' ? 'text-foreground' : 'text-muted-foreground'}`}>Easypaisa</span>
+                                        <p className="text-[10px] text-muted-foreground/70 mt-0.5 leading-relaxed">Pay using your mobile wallet</p>
+                                    </div>
                                 </div>
-                            )}
-                        </div>
-                        </motion.div>
+                            </motion.div>
 
-                        <motion.div 
-                            whileHover={{ scale: !isPayFastDisabled ? 1.02 : 1 }}
-                            whileTap={{ scale: !isPayFastDisabled ? 0.98 : 1 }}
-                            onClick={() => !isPayFastDisabled && setPaymentMethod('payfast')}
-                            className={`relative overflow-hidden rounded-[1.5rem] p-4 shadow-md transition-colors duration-300 border ${isPayFastDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 text-slate-400' : 'cursor-pointer'} ${paymentMethod === 'payfast' ? 'bg-blue-600/90 border-blue-500 text-white' : (!isPayFastDisabled ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300' : '')}`}
-                        >
-                            <div className="absolute inset-0 opacity-5" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`, maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)', display: paymentMethod === 'payfast' ? 'block' : 'none' }} />
-                        <div className="relative z-10 flex items-center gap-3">
-                            <CreditCard className="w-5 h-5" />
-                            <div>
-                                <span className="font-black text-sm uppercase">Cards / Bank (PayFast)</span>
-                            </div>
-                            </div>
-                        </motion.div>
+                            <motion.div 
+                                whileHover={{ scale: !isPayFastDisabled ? 1.02 : 1 }}
+                                whileTap={{ scale: !isPayFastDisabled ? 0.98 : 1 }}
+                                onClick={() => !isPayFastDisabled && setPaymentMethod('payfast')}
+                                className={`rounded-[2rem] p-5 transition-all duration-300 border flex flex-col ${isPayFastDisabled ? 'opacity-40 grayscale cursor-not-allowed border-border/40 bg-card/50' : 'cursor-pointer'} ${paymentMethod === 'payfast' ? 'border-primary bg-primary/5 ring-1 ring-primary' : (!isPayFastDisabled ? 'border-border/40 bg-card/80 backdrop-blur-xl' : '')}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <svg className={`w-5 h-5 shrink-0 ${paymentMethod === 'payfast' ? 'text-primary' : isPayFastDisabled ? 'text-muted-foreground/50' : 'text-muted-foreground'}`} viewBox="0 0 244.683 244.683" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="m244.054,118.587l-25.417-79.232c-1.073-3.344-3.384-6.07-6.508-7.676-3.123-1.605-6.685-1.898-10.029-0.827l-129.21,41.45c-6.904,2.215-10.718,9.633-8.504,16.537l5.171,16.12h-56.409c-7.25,0-13.148,5.898-13.148,13.148v83.209c0,7.25 5.898,13.148 13.148,13.148h144.695c7.25,0 13.148-5.898 13.148-13.148v-45.482l64.558-20.71c6.904-2.214 10.719-9.632 8.505-16.537zm-86.21,83.878h-144.696c-0.633,0-1.148-0.515-1.148-1.148v-83.209c0-0.633 0.515-1.148 1.148-1.148h144.695c0.633,0 1.148,0.515 1.148,1.148v83.209c0.001,0.633-0.514,1.148-1.147,1.148zm48.797-160.114c0.193,0.099 0.448,0.296 0.568,0.67l5.072,15.81-131.396,42.153-5.072-15.811c-0.194-0.603 0.14-1.251 0.743-1.444l129.209-41.45c0.126-0.041 0.245-0.057 0.354-0.057 0.215,7.10543e-15 0.394,0.063 0.522,0.129zm-48.797,62.608h-50.064l108.167-34.7 16.68,51.994c0.193,0.604-0.14,1.252-0.743,1.445l-60.892,19.534v-25.125c-2.84217e-14-7.25-5.898-13.148-13.148-13.148z"/>
+                                        <path d="m56.54,134.712h-25.666c-3.313,0-6,2.687-6,6s2.687,6 6,6h25.666c3.313,0 6-2.687 6-6s-2.686-6-6-6z"/>
+                                        <path d="m85.207,146.712c3.313,0 6-2.687 6-6s-2.687-6-6-6h-9.333c-3.313,0-6,2.687-6,6s2.687,6 6,6h9.333z"/>
+                                        <path d="m149.207,160.712c0-3.313-2.687-6-6-6h-29.333c-3.313,0-6,2.687-6,6v26c0,3.313 2.687,6 6,6h29.333c3.313,0 6-2.687 6-6v-26zm-12,6v14h-17.333v-14h17.333z"/>
+                                    </svg>
+                                    <div>
+                                        <span className={`font-black text-sm uppercase ${paymentMethod === 'payfast' ? 'text-foreground' : isPayFastDisabled ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>Cards / Bank (PayFast)</span>
+                                        <p className="text-[10px] text-muted-foreground/70 mt-0.5 leading-relaxed">Pay via card or internet banking</p>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </div>
+
+                        {paymentMethod === 'easypaisa' && (
+                            <motion.div 
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="mt-4 rounded-[2rem] border border-border/40 bg-card/80 backdrop-blur-xl p-5"
+                            >
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Mobile Account Number</label>
+                                <Input placeholder="03XXXXXXXXX" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))} maxLength={11} className="rounded-xl h-11 mt-1" />
+                            </motion.div>
+                        )}
+
+                        {paymentMethod === 'payfast' && !isPayFastDisabled && (
+                            <motion.div 
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="mt-4 rounded-[2rem] border border-border/40 bg-card/80 backdrop-blur-xl p-5"
+                            >
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    Your payment will be processed securely by our payment partner. You will be redirected to complete the transaction.
+                                </p>
+                            </motion.div>
+                        )}
                     </motion.div>
 
                     {/* Terms and Button */}
                     <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } } }}>
-                        <div className="flex items-start space-x-3 p-3 mb-4 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors">
+                        <div className="flex items-start space-x-3 p-3 mb-4 rounded-xl hover:bg-muted/50 transition-colors">
                             <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(checked) => setAgreedToTerms(checked)} className="mt-1" />
                             <label htmlFor="terms" className="text-xs leading-snug text-muted-foreground cursor-pointer">
                                 By continuing to pay to Medmacs/Hmacs Studios, you agree to our{' '}
-                                <Link to="/terms" className="text-blue-600 dark:text-blue-400 hover:underline font-medium transition-colors">Terms and Conditions</Link>,{' '}
-                                <Link to="/privacypolicy" className="text-blue-600 dark:text-blue-400 hover:underline font-medium transition-colors">Privacy Policy</Link>, and{' '}
-                                <Link to="/refund-policy" className="text-blue-600 dark:text-blue-400 hover:underline font-medium transition-colors">Refund Policy</Link>.
+                                <Link to="/terms" className="text-primary hover:underline font-medium transition-colors">Terms and Conditions</Link>,{' '}
+                                <Link to="/privacypolicy" className="text-primary hover:underline font-medium transition-colors">Privacy Policy</Link>, and{' '}
+                                <Link to="/refund-policy" className="text-primary hover:underline font-medium transition-colors">Refund Policy</Link>.
                             </label>
                         </div>
 
@@ -376,11 +407,11 @@ const Checkout = () => {
 
                         <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                             <Button 
-                                className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-2xl h-14 text-lg font-black uppercase tracking-widest shadow-[0_8px_30px_rgb(37,99,235,0.2)] transition-colors overflow-hidden relative" 
+                                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-2xl h-14 text-lg font-black uppercase tracking-widest shadow-lg transition-all duration-300" 
                                 onClick={processPayment} 
                                 disabled={isLoading || isRedirecting}
                             >
-                                <span className="relative z-10 flex items-center justify-center">
+                                <span className="flex items-center justify-center">
                                     {(isLoading || isRedirecting) ? <Loader2 className="animate-spin h-6 w-6" /> : `Pay PKR ${grandTotal.toFixed(2)}`}
                                 </span>
                             </Button>
