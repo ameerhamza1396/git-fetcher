@@ -7,7 +7,7 @@ import {
   Clock, CheckCircle, XCircle, Timer, Bot, MessageSquare, X, Bookmark,
   BookmarkCheck, Crown, LogOut, AlertTriangle, MoreVertical, Flag, BotOff,
   Moon, Sun, Zap, Sparkles, BookOpen, ChevronLeft, Loader2, Star, Award,
-  TrendingUp, Brain, Target, Shield, ShieldAlert, Trash2, PanelBottom, Lock, RotateCcw
+  TrendingUp, Brain, Target, Shield, ShieldAlert, Trash2, PanelBottom, Lock, RotateCcw, WifiOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
@@ -483,7 +483,8 @@ const ReferenceModal = ({
   isConfirming,
   onConfirm,
   isPremium,
-  canUseAiSummary
+  canUseAiSummary,
+  offlineMessage
 }) => {
   const hasConfirmed = Array.isArray(confirmedIndexes);
   const hasSummary = Boolean(summary?.summary);
@@ -515,6 +516,16 @@ const ReferenceModal = ({
           </div>
 
           <motion.div layout className="flex-1 overflow-y-auto px-5 py-4">
+            {offlineMessage ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-center text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/15">
+                  <WifiOff className="h-6 w-6" />
+                </div>
+                <p className="text-sm font-black uppercase tracking-wider">This feature is not available offline</p>
+                <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">{offlineMessage}</p>
+              </div>
+            ) : null}
+
             <AnimatePresence mode="wait" initial={false}>
             {isConfirming ? (
               <motion.div
@@ -622,13 +633,13 @@ const ReferenceModal = ({
             ) : null}
             </AnimatePresence>
 
-            {!isConfirming && !isSummarizing && !summary && error && (
+            {!offlineMessage && !isConfirming && !isSummarizing && !summary && error && (
               <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
                 AI summary is unavailable right now.
               </div>
             )}
 
-            {!isConfirming && isLoading && !verification && !isSummarizing && !summary && !error && (
+            {!offlineMessage && !isConfirming && isLoading && !verification && !isSummarizing && !summary && !error && (
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-zinc-950">
                 <Skeleton className="h-4 w-40" />
                 <Skeleton className="mt-3 h-3 w-full" />
@@ -636,7 +647,7 @@ const ReferenceModal = ({
               </div>
             )}
 
-            {!isConfirming && !isLoading && visibleReferences.length > 0 && (
+            {!offlineMessage && !isConfirming && !isLoading && visibleReferences.length > 0 && (
               <div className="mt-4 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
@@ -718,7 +729,7 @@ const ReferenceModal = ({
               <Button
                 variant="outline"
                 onClick={canUseAiSummary ? onSummarize : onSummaryUpgrade}
-                disabled={canUseAiSummary && (isSummarizing || isLoading || summaryLimitReached)}
+                disabled={Boolean(offlineMessage) || (canUseAiSummary && (isSummarizing || isLoading || summaryLimitReached))}
                 className="rounded-xl disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:disabled:border-slate-800 dark:disabled:bg-slate-900 dark:disabled:text-slate-600"
               >
                 {!canUseAiSummary ? (
@@ -735,7 +746,7 @@ const ReferenceModal = ({
               </Button>
               <Button
                 onClick={onConfirm}
-                disabled={!isPremium || isConfirming || isLoading || hasConfirmed}
+                disabled={Boolean(offlineMessage) || !isPremium || isConfirming || isLoading || hasConfirmed}
                 className="flex-1 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
               >
                 {isConfirming ? (
@@ -808,6 +819,7 @@ export const MCQDisplay = ({
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [usedAiHelpByQuestion, setUsedAiHelpByQuestion] = useState<Record<string, boolean>>({});
   const helpToastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasShownOfflineSyncToastRef = useRef(false);
   const [isCurrentMCQSaved, setIsCurrentMCQSaved] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
@@ -841,6 +853,7 @@ export const MCQDisplay = ({
   const [showUpgradeBanner, setShowUpgradeBanner] = useState(false);
   const [upgradeModalMessage, setUpgradeModalMessage] = useState("Upgrade to premium for unlimited access!");
   const [isReferenceModalOpen, setIsReferenceModalOpen] = useState(false);
+  const [offlineReferenceMessage, setOfflineReferenceMessage] = useState('');
   const [selectedReferenceIndex, setSelectedReferenceIndex] = useState<number | null>(null);
   const [confirmedReferenceIndexes, setConfirmedReferenceIndexes] = useState<number[] | null>(null);
   const [referenceVerification, setReferenceVerification] = useState<any>(null);
@@ -882,7 +895,8 @@ export const MCQDisplay = ({
   const currentMCQ = mcqs[currentQuestionIndex];
   const totalQuestions = mcqs.length;
   const progressPercentage = totalQuestions > 0 ? ((currentQuestionIndex + 1) / totalQuestions) * 100 : 0;
-  const effectiveQuickSubmit = quickSubmit && isOnline;
+  const effectiveQuickSubmit = quickSubmit;
+  const mistakeMcqIdsKey = mistakeMcqIds.join('|');
 
   const normalizeCitations = (citations: any) =>
     Array.isArray(citations)
@@ -1041,10 +1055,13 @@ export const MCQDisplay = ({
         console.error('Error saving answer, queued for offline sync:', error);
         try {
           await queueMCQAnswerForSync(answerRow);
-          toast({
-            title: 'Answer saved offline',
-            description: 'Your stats will sync automatically when the connection returns.',
-          });
+          if (!hasShownOfflineSyncToastRef.current) {
+            hasShownOfflineSyncToastRef.current = true;
+            toast({
+              title: 'Answers saved offline',
+              description: 'Your MCQ attempts will sync automatically when the connection returns.',
+            });
+          }
         } catch (queueError) {
           console.error('Error queueing offline answer:', queueError);
           toast({
@@ -1144,8 +1161,26 @@ export const MCQDisplay = ({
 
   const isQuestionAnswered = (mcqId: string) => answeredQuestions[mcqId] !== undefined;
 
+  const showOfflineFeatureToast = (feature = 'This feature') => {
+    toast({
+      title: `${feature} is not available offline`,
+      description: 'Connect to the internet and try again.',
+      variant: 'destructive',
+    });
+  };
+
   const handleSearchReference = async () => {
     if (!currentMCQ) return;
+    if (!isOnline) {
+      setSelectedReferenceIndex(null);
+      setConfirmedReferenceIndexes(null);
+      setReferenceVerification(null);
+      setReferenceSummary(null);
+      setReferenceData(null);
+      setOfflineReferenceMessage('Connect to the internet and try again.');
+      setIsReferenceModalOpen(true);
+      return;
+    }
     if (userPlanForChatbot === 'free') {
       setShowUpgradeBanner(true);
       setTimeout(() => setShowUpgradeBanner(false), 5000);
@@ -1155,6 +1190,7 @@ export const MCQDisplay = ({
     setConfirmedReferenceIndexes(null);
     setReferenceVerification(null);
     setReferenceSummary(null);
+    setOfflineReferenceMessage('');
     setIsReferenceModalOpen(true);
     await search(currentMCQ.question, 5);
   };
@@ -1200,6 +1236,10 @@ export const MCQDisplay = ({
   const handleConfirmReferences = async (localReferences = referenceResults) => {
     if (!isPremium) return;
     if (!currentMCQ || isConfirmingReferences) return;
+    if (!isOnline) {
+      showOfflineFeatureToast('AI reference verification');
+      return;
+    }
 
     setIsConfirmingReferences(true);
     try {
@@ -1292,6 +1332,10 @@ export const MCQDisplay = ({
       return;
     }
     if (!currentMCQ || isSummarizingReferences) return;
+    if (!isOnline) {
+      showOfflineFeatureToast('AI summary');
+      return;
+    }
     const summaryCount = summaryGenerationCounts[currentMCQ.id] || 0;
     if (summaryCount >= 3) return;
 
@@ -1455,21 +1499,27 @@ export const MCQDisplay = ({
       let firstUnattemptedIndex = 0;
       const answerMap: Record<string, { selectedAnswer: string }> = {};
 
-      if (user?.id && !mistakeMode) {
-        const queuedAnswers = await getQueuedMCQAnswerMap(user.id, data.map(m => m.id));
-        Object.assign(answerMap, queuedAnswers);
+      data.forEach(mcq => {
+        const selectedAnswer = (mcq as any).selected_answer || (mcq as any).selectedAnswer;
+        if (selectedAnswer) answerMap[mcq.id] = { selectedAnswer };
+      });
 
+      if (user?.id && !mistakeMode) {
         const { data: previousAnswers } = await supabase
           .from('user_answers')
-          .select('mcq_id, selected_answer')
+          .select('mcq_id, selected_answer, created_at')
           .eq('user_id', user.id)
-          .in('mcq_id', data.map(m => m.id));
+          .in('mcq_id', data.map(m => m.id))
+          .order('created_at', { ascending: true });
 
         if (previousAnswers) {
           previousAnswers.forEach(ans => {
             answerMap[ans.mcq_id] = { selectedAnswer: ans.selected_answer };
           });
         }
+
+        const queuedAnswers = await getQueuedMCQAnswerMap(user.id, data.map(m => m.id));
+        Object.assign(answerMap, queuedAnswers);
 
         setAnsweredQuestions(answerMap);
 
@@ -1498,7 +1548,7 @@ export const MCQDisplay = ({
 
     };
     loadMCQs();
-  }, [chapter, user?.id, mistakeMode, mistakeMcqIds, initialIndex]);
+  }, [chapter, user?.id, mistakeMode, mistakeMcqIdsKey, initialIndex]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1553,6 +1603,7 @@ export const MCQDisplay = ({
     setIsReferenceModalOpen(false);
     setSelectedReferenceIndex(null);
     setConfirmedReferenceIndexes(null);
+    setOfflineReferenceMessage('');
   }, [currentQuestionIndex, setReferenceData]);
 
   const QuestionMapGrid = () => (
@@ -1890,6 +1941,7 @@ export const MCQDisplay = ({
         onConfirm={handleConfirmReferences}
         isPremium={isPremium}
         canUseAiSummary={canUseAiSummary}
+        offlineMessage={offlineReferenceMessage}
       />
       <QuestionMapDrawer isOpen={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
         <QuestionMapGrid />
@@ -1905,7 +1957,14 @@ export const MCQDisplay = ({
           correctAnswer={currentMCQ.correct_answer}
           userPlan={userPlanForChatbot}
           isHidden={showExplanation || !effectiveQuickSubmit} // Hide when navigation (next/prev) or submit buttons are visible
-          onOpen={() => setIsChatbotOpen(true)}
+          isOnline={isOnline}
+          onOpen={() => {
+            if (!isOnline) {
+              showOfflineFeatureToast('AI chat');
+              return;
+            }
+            setIsChatbotOpen(true);
+          }}
           onQuestionHelp={() => setUsedAiHelpByQuestion(prev => ({ ...prev, [currentMCQ.id]: true }))}
         />
       )}

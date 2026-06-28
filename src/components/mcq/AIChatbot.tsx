@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, X, Loader2, Bot, Lock } from 'lucide-react';
+import { Send, X, Loader2, Lock, WifiOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { aiApiUrl, aiApiOrigin } from '@/utils/aiApi';
 import { logAiUsageEvent } from '@/utils/aiUsageEvents';
@@ -26,6 +26,7 @@ interface AIChatbotProps {
   isHidden?: boolean;
   onOpen: () => void;
   onQuestionHelp?: () => void;
+  isOnline?: boolean;
 }
 
 export const AIChatbot: React.FC<AIChatbotProps> = ({
@@ -38,7 +39,8 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
   userPlan,
   isHidden = false,
   onOpen,
-  onQuestionHelp
+  onQuestionHelp,
+  isOnline = true
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -53,6 +55,14 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
 
   const sendMessage = async (message: string) => {
     if (!hasPremiumAccess || !message.trim() || isLoading) return;
+    if (!isOnline) {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'This feature is not available offline. Connect to the internet and try again.',
+        timestamp: new Date().toISOString(),
+      }]);
+      return;
+    }
     const userMessage: Message = { role: 'user', content: message.trim(), timestamp: new Date().toISOString() };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
@@ -86,6 +96,14 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); sendMessage(input); };
   const handleQuestionHelp = () => {
     if (!hasPremiumAccess || !questionContext) return;
+    if (!isOnline) {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'This feature is not available offline. Connect to the internet and try again.',
+        timestamp: new Date().toISOString(),
+      }]);
+      return;
+    }
     onQuestionHelp?.();
     sendMessage(`Explain this MCQ:\n${questionContext}\nExplanation: ${explanationContext}`);
   };
@@ -151,7 +169,15 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
               <>
                 {/* Messages */}
                 <ScrollArea className="flex-1 px-4 py-4">
-                  {messages.length === 0 ? (
+                  {!isOnline ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                      <div className="w-16 h-16 rounded-full bg-amber-500/10 backdrop-blur-lg flex items-center justify-center mb-4">
+                        <WifiOff className="w-8 h-8 text-amber-600 dark:text-amber-300" />
+                      </div>
+                      <p className="text-sm font-bold text-foreground">This feature is not available offline.</p>
+                      <p className="text-xs text-muted-foreground mt-1">Connect to the internet and try again.</p>
+                    </div>
+                  ) : messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center py-12">
                       <div className="w-16 h-16 rounded-full bg-primary/10 backdrop-blur-lg flex items-center justify-center mb-4 overflow-hidden">
                         <img src="/mascots/Mascot12.png" alt="Dr. Ahroid" className="w-full h-full object-contain opacity-80" />
@@ -193,7 +219,7 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
                 {/* Help button */}
                 {questionContext && (
                   <div className="px-3 py-2 border-t border-border/30 flex-shrink-0">
-                    <Button variant="outline" size="sm" onClick={handleQuestionHelp} className="w-full text-xs rounded-xl h-9 bg-background/40 backdrop-blur-lg border-border/30">
+                    <Button variant="outline" size="sm" onClick={handleQuestionHelp} disabled={!isOnline} className="w-full text-xs rounded-xl h-9 bg-background/40 backdrop-blur-lg border-border/30">
                       Help with current question
                     </Button>
                   </div>
@@ -205,11 +231,11 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
                     <Input
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
-                      placeholder="Type your question..."
-                      disabled={isLoading}
+                      placeholder={isOnline ? 'Type your question...' : 'Connect to internet to use AI chat'}
+                      disabled={isLoading || !isOnline}
                       className="flex-1 rounded-xl h-10 text-sm bg-muted/40 backdrop-blur-lg border-border/30"
                     />
-                    <Button type="submit" disabled={isLoading || !input.trim()} size="sm" className="bg-primary/80 backdrop-blur-lg hover:bg-primary/90 rounded-xl h-10 w-10 p-0">
+                    <Button type="submit" disabled={isLoading || !isOnline || !input.trim()} size="sm" className="bg-primary/80 backdrop-blur-lg hover:bg-primary/90 rounded-xl h-10 w-10 p-0">
                       {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     </Button>
                   </form>

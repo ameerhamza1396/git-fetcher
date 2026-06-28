@@ -13,6 +13,7 @@ import { Lock } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import Seo from '@/components/Seo';
+import { getOfflineChapterSummaries, subscribeOfflineChapterChanges } from '@/utils/offlineChapters';
 
 const SubjectCardSkeleton = () => (
   <div className="relative overflow-hidden rounded-3xl bg-muted/20 p-6 animate-pulse border border-border/40">
@@ -208,6 +209,7 @@ const MCQSubjectSelectionPage = () => {
   const [loading, setLoading] = useState(true);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [isOfflineMode, setIsOfflineMode] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
+  const [offlineSubjectIds, setOfflineSubjectIds] = useState<Set<string>>(new Set());
   const [isHeadingStuck, setIsHeadingStuck] = useState(false);
   const [isAnalyticsCompact, setIsAnalyticsCompact] = useState(false);
   const [userStats, setUserStats] = useState({
@@ -243,6 +245,11 @@ const MCQSubjectSelectionPage = () => {
     setUserStats(stats);
   }, [isOfflineMode, user?.id]);
 
+  const loadOfflineAvailability = useCallback(async () => {
+    const summaries = await getOfflineChapterSummaries();
+    setOfflineSubjectIds(new Set(summaries.map(summary => summary.subjectId)));
+  }, []);
+
   useEffect(() => {
     const updateOnlineState = () => setIsOfflineMode(!navigator.onLine);
     const handleOnline = () => {
@@ -259,6 +266,17 @@ const MCQSubjectSelectionPage = () => {
       window.removeEventListener('offline', updateOnlineState);
     };
   }, [loadSubjects, loadUserStats]);
+
+  useEffect(() => {
+    loadOfflineAvailability();
+    return subscribeOfflineChapterChanges(loadOfflineAvailability);
+  }, [loadOfflineAvailability]);
+
+  useEffect(() => {
+    if (isOfflineMode && selectedSubject && !offlineSubjectIds.has(selectedSubject.id)) {
+      setSelectedSubject(null);
+    }
+  }, [isOfflineMode, offlineSubjectIds, selectedSubject]);
 
   useEffect(() => {
     loadSubjects();
@@ -313,7 +331,7 @@ const MCQSubjectSelectionPage = () => {
   }, [user?.id, authLoading, profileLoading, loadUserStats]);
 
   const handleContinue = () => {
-    if (selectedSubject) {
+    if (selectedSubject && (!isOfflineMode || offlineSubjectIds.has(selectedSubject.id))) {
       navigate(`/mcqs/chapter/${selectedSubject.id}`);
     }
   };
@@ -424,28 +442,38 @@ const MCQSubjectSelectionPage = () => {
         ) : (
           subjects.map((subject, index) => {
             const isSelected = selectedSubject?.id === subject.id;
+            const isOfflineUnavailable = isOfflineMode && !offlineSubjectIds.has(subject.id);
             return (
               <motion.div
                 key={subject.id}
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.05 }}
-                whileHover={{ scale: 1.02, y: -4 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setSelectedSubject(subject)}
-                className={`group cursor-pointer relative overflow-hidden rounded-3xl border-2 p-6 transition-all duration-300 ${
+                whileHover={isOfflineUnavailable ? {} : { scale: 1.02, y: -4 }}
+                whileTap={isOfflineUnavailable ? {} : { scale: 0.98 }}
+                onClick={() => !isOfflineUnavailable && setSelectedSubject(subject)}
+                aria-disabled={isOfflineUnavailable}
+                className={`group relative overflow-hidden rounded-3xl border-2 p-6 transition-all duration-300 ${
+                  isOfflineUnavailable ? 'cursor-not-allowed opacity-45 grayscale' : 'cursor-pointer'
+                } ${
                   isSelected 
                     ? 'border-primary bg-primary/5 shadow-2xl shadow-primary/10' 
                     : 'border-border/40 bg-white/5 dark:bg-zinc-900/50 hover:border-primary/30 hover:bg-primary/5'
                 }`}
               >
+                {isOfflineUnavailable && (
+                  <div className="absolute top-3 right-3 z-20 flex items-center gap-1 rounded-full bg-amber-500 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-white">
+                    <WifiOff className="h-3 w-3" />
+                    Not downloaded
+                  </div>
+                )}
                 {isSelected && (
                   <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 blur-[60px] -mr-16 -mt-16 pointer-events-none" />
                 )}
 
                 <div className="flex items-center gap-5 relative z-10">
                   <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-xl transition-transform duration-300 group-hover:scale-110 ${
-                    isSelected ? 'bg-primary text-white' : 'bg-muted/50 text-foreground/70'
+                    isSelected ? 'bg-primary text-white' : isOfflineUnavailable ? 'bg-muted/40 text-muted-foreground' : 'bg-muted/50 text-foreground/70'
                   }`}>
                     {subject.icon || '📚'}
                   </div>

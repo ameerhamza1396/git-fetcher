@@ -1,4 +1,5 @@
 import { fetchCloudContent } from '@/utils/cloudContent';
+import { supabase } from '@/integrations/supabase/client';
 
 export type OfflineChapterStatus = 'idle' | 'downloading' | 'downloaded';
 
@@ -29,12 +30,20 @@ type OfflineMCQ = {
   explanation: string;
   subject: string;
   chapter_id: string;
+  selected_answer?: string;
+};
+
+type OfflineAttemptedAnswer = {
+  selectedAnswer: string;
+  isCorrect?: boolean;
+  updatedAt?: string;
 };
 
 export type OfflineChapterPayload = {
   subject: OfflineSubject;
   chapter: OfflineChapter;
   mcqs: OfflineMCQ[];
+  attemptedAnswers?: Record<string, OfflineAttemptedAnswer>;
   downloadedAt: string;
 };
 
@@ -212,7 +221,33 @@ export const isChapterDownloaded = async (chapterId: string) => {
   return (await getOfflineChapterStatus(chapterId)) === 'downloaded';
 };
 
-export const downloadChapterForOffline = async (subject: OfflineSubject, chapter: OfflineChapter) => {
+const fetchLatestAttemptedAnswers = async (userId: string | undefined, mcqIds: string[]) => {
+  if (!userId || mcqIds.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from('user_answers')
+    .select('mcq_id, selected_answer, is_correct, created_at')
+    .eq('user_id', userId)
+    .in('mcq_id', mcqIds)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.warn('Unable to include attempted answers in offline chapter download', error);
+    return {};
+  }
+
+  return (data || []).reduce<Record<string, OfflineAttemptedAnswer>>((acc, answer) => {
+    if (!answer.mcq_id) return acc;
+    acc[answer.mcq_id] = {
+      selectedAnswer: answer.selected_answer,
+      isCorrect: answer.is_correct,
+      updatedAt: answer.created_at,
+    };
+    return acc;
+  }, {});
+};
+
+export const downloadChapterForOffline = async (subject: OfflineSubject, chapter: OfflineChapter, userId?: string) => {
   if (downloading.has(chapter.id)) return;
   downloading.add(chapter.id);
   emitOfflineChange();
@@ -223,10 +258,17 @@ export const downloadChapterForOffline = async (subject: OfflineSubject, chapter
       throw new Error('No MCQs were found for this chapter.');
     }
 
+    const attemptedAnswers = await fetchLatestAttemptedAnswers(userId, mcqs.map(mcq => mcq.id));
+    const mcqsWithAttempts = mcqs.map(mcq => {
+      const attempted = attemptedAnswers[mcq.id];
+      return attempted ? { ...mcq, selected_answer: attempted.selectedAnswer } : mcq;
+    });
+
     const payload: OfflineChapterPayload = {
       subject,
       chapter: { ...chapter, mcq_count: chapter.mcq_count ?? mcqs.length },
-      mcqs,
+      mcqs: mcqsWithAttempts,
+      attemptedAnswers,
       downloadedAt: new Date().toISOString(),
     };
     const encrypted = await encryptPayload(payload);

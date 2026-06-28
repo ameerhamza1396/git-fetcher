@@ -88,13 +88,15 @@ const deleteQueuedAnswer = async (id: string) => {
   await transactionDone(transaction);
 };
 
+const getQueueId = (userId: string, mcqId: string) => `${userId}:${mcqId}`;
+
 export const queueMCQAnswerForSync = async (
   answer: Omit<QueuedMCQAnswer, 'id' | 'queued_at'>,
 ) => {
   const db = await openDb();
   const queued: QueuedMCQAnswer = {
     ...answer,
-    id: `${answer.user_id}:${answer.mcq_id}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+    id: getQueueId(answer.user_id, answer.mcq_id),
     queued_at: new Date().toISOString(),
   };
 
@@ -107,8 +109,9 @@ export const queueMCQAnswerForSync = async (
 export const getQueuedMCQAnswerMap = async (userId: string, mcqIds: string[]) => {
   const idSet = new Set(mcqIds);
   const queued = await getAllQueuedAnswers();
+  const latest = compactLatestAnswers(queued);
 
-  return queued.reduce<Record<string, { selectedAnswer: string }>>((acc, answer) => {
+  return latest.reduce<Record<string, { selectedAnswer: string }>>((acc, answer) => {
     if (answer.user_id === userId && idSet.has(answer.mcq_id)) {
       acc[answer.mcq_id] = { selectedAnswer: answer.selected_answer };
     }
@@ -120,25 +123,77 @@ export const getQueuedMCQAnswerCount = async () => {
   return (await getAllQueuedAnswers()).length;
 };
 
+const compactLatestAnswers = (answers: QueuedMCQAnswer[]) => {
+  const byQuestion = new Map<string, QueuedMCQAnswer>();
+
+  answers.forEach(answer => {
+    const key = getQueueId(answer.user_id, answer.mcq_id);
+    const current = byQuestion.get(key);
+    if (!current || new Date(answer.queued_at).getTime() >= new Date(current.queued_at).getTime()) {
+      byQuestion.set(key, answer);
+    }
+  });
+
+  return Array.from(byQuestion.values()).sort(
+    (a, b) => new Date(a.queued_at).getTime() - new Date(b.queued_at).getTime(),
+  );
+};
+
+const saveLatestAnswer = async (answer: QueuedMCQAnswer) => {
+  const { id, queued_at, ...row } = answer;
+  const { data: existing, error: lookupError } = await supabase
+    .from('user_answers')
+    .select('id')
+    .eq('user_id', row.user_id)
+    .eq('mcq_id', row.mcq_id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (lookupError) return lookupError;
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from('user_answers')
+      .update({
+        selected_answer: row.selected_answer,
+        is_correct: row.is_correct,
+        time_taken: row.time_taken,
+        used_ai_help: row.used_ai_help,
+        correction_mode: row.correction_mode,
+      })
+      .eq('id', existing.id);
+    return error;
+  }
+
+  const { error } = await supabase.from('user_answers').insert(row);
+  return error;
+};
+
 export const syncQueuedMCQAnswers = async () => {
   const queued = await getAllQueuedAnswers();
   if (queued.length === 0) return { synced: 0, remaining: 0 };
 
   let synced = 0;
+  const latestQueued = compactLatestAnswers(queued);
+  const latestIds = new Set(latestQueued.map(answer => answer.id));
 
-  for (const answer of queued) {
-    const { id, queued_at, ...row } = answer;
-    const { error } = await supabase.from('user_answers').insert(row);
-
+  for (const answer of latestQueued) {
+    const error = await saveLatestAnswer(answer);
     if (error) {
       continue;
     }
 
-    await deleteQueuedAnswer(id);
+    await deleteQueuedAnswer(answer.id);
     synced += 1;
   }
 
-  if (synced > 0) emitSyncChange();
-  return { synced, remaining: queued.length - synced };
-};
+  await Promise.all(
+    queued
+      .filter(answer => !latestIds.has(answer.id))
+      .map(answer => deleteQueuedAnswer(answer.id).catch(() => undefined)),
+  );
 
+  if (synced > 0) emitSyncChange();
+  return { synced, remaining: latestQueued.length - synced };
+};

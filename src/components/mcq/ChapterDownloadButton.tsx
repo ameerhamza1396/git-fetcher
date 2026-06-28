@@ -2,6 +2,7 @@ import { MouseEvent, useState } from 'react';
 import { Download, Loader2, CheckCircle2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { Chapter, Subject } from '@/utils/mcqData';
 import {
   deleteOfflineChapter,
@@ -33,6 +34,7 @@ export const ChapterDownloadButton = ({
   className = '',
 }: ChapterDownloadButtonProps) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { status, refresh } = useOfflineChapterStatus(chapter.id);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
@@ -51,7 +53,7 @@ export const ChapterDownloadButton = ({
     if (status === 'downloading') return;
 
     try {
-      await downloadChapterForOffline(subject, chapter);
+      await downloadChapterForOffline(subject, chapter, user?.id);
       toast({
         title: 'Chapter downloaded',
         description: `${chapter.name} is available for offline use.`,
@@ -120,4 +122,3 @@ export const ChapterDownloadButton = ({
     </>
   );
 };
-

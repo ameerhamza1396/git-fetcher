@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect } from 'react';
+import { useEffect, useLayoutEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { MCQDisplay } from '@/components/mcq/MCQDisplay';
 import { useAuth } from '@/hooks/useAuth';
@@ -23,6 +23,10 @@ const MCQQuizPage = () => {
   const location = useLocation();
   const { user, loading: authLoading } = useAuth();
   const initialIndex = ((location.state as { startIndex?: number } | null)?.startIndex) || 0;
+  const mistakeMcqIds = useMemo(
+    () => (location.state as any)?.wrongMcqIds || [],
+    [location.state],
+  );
 
   const timerEnabled = searchParams.get('timer') === 'true';
   const mistakeMode = searchParams.get('mode') === 'mistakes';
@@ -96,7 +100,7 @@ const MCQQuizPage = () => {
       timePerQuestion={timePerQuestion}
       initialIndex={initialIndex}
       mistakeMode={mistakeMode}
-      mistakeMcqIds={(location.state as any)?.wrongMcqIds || []}
+      mistakeMcqIds={mistakeMcqIds}
     />
   );
 };

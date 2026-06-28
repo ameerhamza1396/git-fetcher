@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { CollaborateModal } from '@/components/CollaborateModal';
 import { ChapterDownloadButton } from '@/components/mcq/ChapterDownloadButton';
 import { useOfflineChapterStatus } from '@/hooks/useOfflineChapterStatus';
+import { getOfflineChapterSummaries, subscribeOfflineChapterChanges } from '@/utils/offlineChapters';
 
 const ChapterProgressDonut = ({
   attempted,
@@ -110,6 +111,7 @@ const MCQChapterSelectionPage = () => {
   const [subject, setSubject] = useState<Subject | null>(null);
   const [isHeadingStuck, setIsHeadingStuck] = useState(false);
   const [isOfflineMode, setIsOfflineMode] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
+  const [offlineChapterIds, setOfflineChapterIds] = useState<Set<string>>(new Set());
   const stickyHeadingRef = useRef<HTMLDivElement>(null);
   const stickyHeadingStartTop = useRef<number | null>(null);
 
@@ -170,6 +172,15 @@ const MCQChapterSelectionPage = () => {
     setLoading(false);
   }, [subjectId]);
 
+  const loadOfflineAvailability = useCallback(async () => {
+    const summaries = await getOfflineChapterSummaries();
+    setOfflineChapterIds(new Set(
+      summaries
+        .filter(summary => !subjectId || summary.subjectId === subjectId)
+        .map(summary => summary.id),
+    ));
+  }, [subjectId]);
+
   useEffect(() => {
     const updateOnlineState = () => setIsOfflineMode(!navigator.onLine);
     const handleOnline = () => {
@@ -191,6 +202,17 @@ const MCQChapterSelectionPage = () => {
   }, [loadData]);
 
   useEffect(() => {
+    loadOfflineAvailability();
+    return subscribeOfflineChapterChanges(loadOfflineAvailability);
+  }, [loadOfflineAvailability]);
+
+  useEffect(() => {
+    if (isOfflineMode && selectedChapter && !offlineChapterIds.has(selectedChapter.id)) {
+      setSelectedChapter(null);
+    }
+  }, [isOfflineMode, offlineChapterIds, selectedChapter]);
+
+  useEffect(() => {
     const handleScroll = () => {
       if (!stickyHeadingRef.current) return;
       if (stickyHeadingStartTop.current === null) {
@@ -209,7 +231,7 @@ const MCQChapterSelectionPage = () => {
   }, []);
 
   const handleContinue = () => {
-    if (selectedChapter && subjectId) {
+    if (selectedChapter && subjectId && (!isOfflineMode || offlineChapterIds.has(selectedChapter.id))) {
       navigate(`/mcqs/settings/${subjectId}/${selectedChapter.id}`);
     }
   };
@@ -306,6 +328,8 @@ const MCQChapterSelectionPage = () => {
           allChapters.map((ch, idx) => {
             const isComingSoon = (ch.mcq_count || 0) === 0;
             const isSelected = selectedChapter?.id === ch.id;
+            const isOfflineUnavailable = isOfflineMode && !offlineChapterIds.has(ch.id);
+            const isDisabled = isComingSoon || isOfflineUnavailable;
             const attemptedCount = attemptedByChapter[ch.id] || 0;
             const totalCount = ch.mcq_count || 0;
             
@@ -315,11 +339,12 @@ const MCQChapterSelectionPage = () => {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: idx * 0.03 }}
-                whileHover={!isComingSoon ? { scale: 1.02, x: 5 } : {}}
-                whileTap={isComingSoon ? {} : { scale: 0.98 }}
-                onClick={() => !isComingSoon && setSelectedChapter(ch)}
+                whileHover={!isDisabled ? { scale: 1.02, x: 5 } : {}}
+                whileTap={isDisabled ? {} : { scale: 0.98 }}
+                onClick={() => !isDisabled && setSelectedChapter(ch)}
+                aria-disabled={isDisabled}
                 className={`group relative overflow-hidden rounded-2xl border-2 p-4 transition-all duration-300 ${
-                  isComingSoon ? 'opacity-40 cursor-not-allowed grayscale' : 'cursor-pointer'
+                  isDisabled ? 'opacity-40 cursor-not-allowed grayscale' : 'cursor-pointer'
                 } ${
                   isSelected 
                     ? 'border-primary bg-primary/5 shadow-xl shadow-primary/10' 
@@ -331,10 +356,16 @@ const MCQChapterSelectionPage = () => {
                     Coming Soon
                   </div>
                 )}
+                {isOfflineUnavailable && (
+                  <div className="absolute top-2 right-2 z-20 flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-white">
+                    <WifiOff className="h-3 w-3" />
+                    Not downloaded
+                  </div>
+                )}
 
                 <div className="relative z-10 flex items-center gap-3">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center">
-                    {!isComingSoon && subject ? (
+                    {!isDisabled && subject ? (
                       <ChapterDownloadButton
                         subject={subject}
                         chapter={ch}
@@ -370,7 +401,7 @@ const MCQChapterSelectionPage = () => {
                     </p>
                   </div>
 
-                  {!isComingSoon && (
+                  {!isDisabled && (
                     <div className="ml-auto flex shrink-0 items-center justify-end">
                       {isOfflineMode ? (
                         <div className="flex w-12 flex-col items-center justify-center">
