@@ -77,6 +77,7 @@ export const BattleGame = ({ roomData, userId, onGameComplete, onExit }: BattleG
   const [gameFinishedLocally, setGameFinishedLocally] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const botAnswerRef = useRef<Set<string>>(new Set());
+  const finishInFlightRef = useRef(false);
 
   const isHost = roomData.host_id === userId;
 
@@ -351,23 +352,32 @@ export const BattleGame = ({ roomData, userId, onGameComplete, onExit }: BattleG
   };
 
   const finishGame = async () => {
+    if (finishInFlightRef.current) return;
+    finishInFlightRef.current = true;
     setGameFinishedLocally(true);
 
     try {
-      await supabase
+      const { error: finishError } = await supabase
         .from('battle_participants')
         .update({ is_finished: true })
         .eq('battle_room_id', roomData.id)
         .eq('user_id', userId);
+
+      if (finishError) {
+        console.error('BattleGame: Failed to mark participant as finished.', finishError);
+      }
 
       const { data: latestParticipants, error } = await supabase
         .from('battle_participants')
         .select('user_id, username, team, score, answers')
         .eq('battle_room_id', roomData.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('BattleGame: Failed to fetch final participants. Using local results.', error);
+      }
 
-      const rows = (latestParticipants || []).map((participant: any) => ({
+      const sourceParticipants = error ? participants : (latestParticipants || participants);
+      const rows = (sourceParticipants || []).map((participant: any) => ({
         ...participant,
         score: participant.user_id === userId ? Math.max(participant.score || 0, score) : participant.score || 0,
         correctAnswers: ((participant.answers as any[]) || []).filter(answer => answer.isCorrect).length,
@@ -388,31 +398,37 @@ export const BattleGame = ({ roomData, userId, onGameComplete, onExit }: BattleG
         return map;
       }, new Map()).values()).sort((a: any, b: any) => b.score - a.score);
 
-      await supabase
+      const results = {
+        finalScore,
+        totalQuestions: questions.length,
+        correctAnswers: totalCorrect,
+        accuracy: accuracyPercentage,
+        rank: playerRank || 1,
+        roomCode: roomData.room_code,
+        battleType: roomData.battle_type,
+        rankings,
+        teamRankings,
+        answers: (me?.answers as any[]) || [],
+      };
+
+      onGameComplete(results);
+
+      const { error: resultError } = await supabase
         .from('battle_results')
         .upsert({
           battle_room_id: roomData.id,
           user_id: userId,
           final_score: finalScore,
-          rank: playerRank,
+          rank: results.rank,
           total_correct: totalCorrect,
           total_questions: questions.length,
           accuracy_percentage: accuracyPercentage,
           time_bonus: finalScore - (totalCorrect * 100),
         }, { onConflict: 'battle_room_id,user_id' });
 
-      onGameComplete({
-        finalScore,
-        totalQuestions: questions.length,
-        correctAnswers: totalCorrect,
-        accuracy: accuracyPercentage,
-        rank: playerRank,
-        roomCode: roomData.room_code,
-        battleType: roomData.battle_type,
-        rankings,
-        teamRankings,
-        answers: (me?.answers as any[]) || [],
-      });
+      if (resultError) {
+        throw resultError;
+      }
     } catch (error: any) {
       toast({ title: 'Results Not Saved', description: error.message, variant: 'destructive' });
     }
