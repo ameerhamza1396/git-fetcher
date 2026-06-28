@@ -30,11 +30,50 @@ const rollout = Number(readOption('rollout', '0'));
 const minNativeVersionCode = Number(readOption('min-native-version-code', '14'));
 const mandatory = hasFlag('mandatory');
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://pxjvltgarzvoptdfdkxq.supabase.co';
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const cleanSecret = value => {
+  if (!value) return '';
+  return value.trim().replace(/^['"]|['"]$/g, '');
+};
+
+const isBase64UrlSegment = value => /^[A-Za-z0-9_-]+$/.test(value);
+
+const validateJwt = value => {
+  const parts = value.split('.');
+  if (parts.length !== 3 || parts.some(part => !part || !isBase64UrlSegment(part))) {
+    return false;
+  }
+
+  try {
+    JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'));
+    JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+    Buffer.from(parts[2], 'base64url');
+    return true;
+  } catch (_error) {
+    return false;
+  }
+};
+
+const supabaseUrl = cleanSecret(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL) || 'https://pxjvltgarzvoptdfdkxq.supabase.co';
+const serviceRoleKey = cleanSecret(process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 if (!serviceRoleKey) {
   console.error('Missing SUPABASE_SERVICE_ROLE_KEY. This script needs service-role access to upload OTA bundles and publish releases.');
+  process.exit(1);
+}
+
+if (/[\r\n\t]/.test(serviceRoleKey)) {
+  console.error('Invalid SUPABASE_SERVICE_ROLE_KEY: remove line breaks/tabs and paste it as one single-line value.');
+  process.exit(1);
+}
+
+if (!serviceRoleKey.startsWith('eyJ')) {
+  console.error('Invalid SUPABASE_SERVICE_ROLE_KEY: expected the JWT service_role key from Supabase Project Settings > API.');
+  process.exit(1);
+}
+
+if (!validateJwt(serviceRoleKey)) {
+  console.error('Invalid SUPABASE_SERVICE_ROLE_KEY: the key is not a complete JWT. It should have three dot-separated parts and no spaces or line breaks.');
+  console.error('Copy the full service_role key again from Supabase Project Settings > API.');
   process.exit(1);
 }
 
@@ -92,35 +131,57 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
   },
 });
 
+const explainSupabaseFailure = error => {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes('fetch failed') || message.includes('invalid apikey header')) {
+    console.error('Supabase request failed before reaching the server.');
+    console.error('Check SUPABASE_SERVICE_ROLE_KEY: it must be the single-line service_role JWT, not the anon/publishable key and not a copied value with hidden line breaks.');
+    console.error(`Original error: ${message}`);
+    process.exit(1);
+  }
+
+  throw error;
+};
+
 const uploadBody = readFileSync(zipPath);
-const { error: uploadError } = await supabase.storage
-  .from('ota-bundles')
-  .upload(bundlePath, uploadBody, {
-    contentType: 'application/zip',
-    upsert: true,
-  });
+let uploadError;
+try {
+  ({ error: uploadError } = await supabase.storage
+    .from('ota-bundles')
+    .upload(bundlePath, uploadBody, {
+      contentType: 'application/zip',
+      upsert: true,
+    }));
+} catch (error) {
+  explainSupabaseFailure(error);
+}
 
 if (uploadError) {
   console.error('OTA bundle upload failed:', uploadError.message);
   process.exit(1);
 }
 
-const { error: releaseError } = await supabase
-  .from('ota_releases')
-  .upsert({
-    version,
-    channel,
-    platform,
-    min_native_version_code: minNativeVersionCode,
-    bundle_path: bundlePath,
-    checksum,
-    enabled: true,
-    mandatory,
-    rollout_percent: rollout,
-    notes: notes || null,
-  }, {
-    onConflict: 'version,channel,platform',
-  });
+let releaseError;
+try {
+  ({ error: releaseError } = await supabase
+    .from('ota_releases')
+    .upsert({
+      version,
+      channel,
+      platform,
+      min_native_version_code: minNativeVersionCode,
+      bundle_path: bundlePath,
+      checksum,
+      enabled: true,
+      mandatory,
+      rollout_percent: rollout,
+      notes: notes || null,
+    }, {
+      onConflict: 'version,channel,platform',
+    }));
+} catch (error) {
+  explainSupabaseFailure(error);
+}
 
 if (releaseError) {
   console.error('OTA release publish failed:', releaseError.message);
