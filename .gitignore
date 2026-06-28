@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+.ota-releases
 *.local
 
 # Editor directories and files
@@ -25,4 +26,5 @@ dist-ssr
 .turb
 .env
 *.mjs
+!scripts/create-ota-release.mjs
 nul

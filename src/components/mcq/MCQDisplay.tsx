@@ -24,7 +24,12 @@ import { useTheme } from 'next-themes';
 import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
 import { ChapterDownloadButton } from '@/components/mcq/ChapterDownloadButton';
 import { useOfflineChapterStatus } from '@/hooks/useOfflineChapterStatus';
-import { getQueuedMCQAnswerMap, queueMCQAnswerForSync } from '@/utils/offlineAnswerSync';
+import {
+  getQueuedMCQAnswerIds,
+  getQueuedMCQAnswerMap,
+  queueMCQAnswerForSync,
+  subscribeOfflineAnswerChanges,
+} from '@/utils/offlineAnswerSync';
 
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -839,6 +844,7 @@ export const MCQDisplay = ({
   });
   const [feedbackType, setFeedbackType] = useState<'correct' | 'incorrect' | null>(null);
   const [answeredQuestions, setAnsweredQuestions] = useState<Record<string, { selectedAnswer: string }>>({});
+  const [queuedAnswerIds, setQueuedAnswerIds] = useState<Set<string>>(new Set());
   const [aiPopupsDisabled, setAiPopupsDisabled] = useState(() => {
     if (typeof window !== 'undefined') return localStorage.getItem('aiPopupsDisabled') === 'true';
     return false;
@@ -1055,6 +1061,7 @@ export const MCQDisplay = ({
         console.error('Error saving answer, queued for offline sync:', error);
         try {
           await queueMCQAnswerForSync(answerRow);
+          setQueuedAnswerIds(prev => new Set(prev).add(currentMCQ.id));
           if (!hasShownOfflineSyncToastRef.current) {
             hasShownOfflineSyncToastRef.current = true;
             toast({
@@ -1606,12 +1613,32 @@ export const MCQDisplay = ({
     setOfflineReferenceMessage('');
   }, [currentQuestionIndex, setReferenceData]);
 
+  useEffect(() => {
+    if (!user?.id || mcqs.length === 0) {
+      setQueuedAnswerIds(new Set());
+      return;
+    }
+
+    let cancelled = false;
+    const refreshQueuedAnswers = async () => {
+      const ids = await getQueuedMCQAnswerIds(user.id, mcqs.map(mcq => mcq.id));
+      if (!cancelled) setQueuedAnswerIds(new Set(ids));
+    };
+
+    refreshQueuedAnswers();
+    const unsubscribe = subscribeOfflineAnswerChanges(refreshQueuedAnswers);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [user?.id, mcqs]);
+
   const QuestionMapGrid = () => (
     <>
       <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
         {mcqs.map((mcq, index) => (
           <button key={mcq.id}
-            className={`w-full h-10 rounded-xl text-sm font-bold transition-all ${
+            className={`relative w-full h-10 rounded-xl text-sm font-bold transition-all ${
               currentQuestionIndex === index
                 ? 'bg-gradient-to-br from-primary to-blue-600 text-white border-transparent shadow-lg shadow-primary/30'
                 : isQuestionAnswered(mcq.id)
@@ -1619,6 +1646,9 @@ export const MCQDisplay = ({
                   : 'bg-muted text-muted-foreground border border-transparent'
             }`}
             onClick={() => goToQuestion(index)}>
+            {queuedAnswerIds.has(mcq.id) && (
+              <Clock className="absolute right-1 top-1 h-2.5 w-2.5 text-amber-500" />
+            )}
             {index + 1}
           </button>
         ))}
@@ -1958,13 +1988,7 @@ export const MCQDisplay = ({
           userPlan={userPlanForChatbot}
           isHidden={showExplanation || !effectiveQuickSubmit} // Hide when navigation (next/prev) or submit buttons are visible
           isOnline={isOnline}
-          onOpen={() => {
-            if (!isOnline) {
-              showOfflineFeatureToast('AI chat');
-              return;
-            }
-            setIsChatbotOpen(true);
-          }}
+          onOpen={() => setIsChatbotOpen(true)}
           onQuestionHelp={() => setUsedAiHelpByQuestion(prev => ({ ...prev, [currentMCQ.id]: true }))}
         />
       )}

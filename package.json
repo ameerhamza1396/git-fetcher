@@ -10,6 +10,7 @@
     "zip": "cd dist && zip -r ../dist.zip .",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "ota:release": "node scripts/create-ota-release.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

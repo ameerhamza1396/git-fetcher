@@ -7,7 +7,11 @@ const config: CapacitorConfig = {
   plugins: {
     // 🎯 ADDED: Capgo Capacitor Updater Configuration
     CapacitorUpdater: {
-      autoUpdate: false, // Set to false to use your custom manual logic
+      autoUpdate: false,
+      appReadyTimeout: 10000,
+      autoDeleteFailed: true,
+      autoDeletePrevious: true,
+      resetWhenUpdate: true,
     },
     GoogleAuth: {
       scopes: ['profile', 'email'],

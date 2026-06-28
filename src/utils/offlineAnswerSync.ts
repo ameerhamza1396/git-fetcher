@@ -119,6 +119,16 @@ export const getQueuedMCQAnswerMap = async (userId: string, mcqIds: string[]) =>
   }, {});
 };
 
+export const getQueuedMCQAnswerIds = async (userId: string, mcqIds: string[]) => {
+  const idSet = new Set(mcqIds);
+  const queued = await getAllQueuedAnswers();
+  const latest = compactLatestAnswers(queued);
+
+  return latest
+    .filter(answer => answer.user_id === userId && idSet.has(answer.mcq_id))
+    .map(answer => answer.mcq_id);
+};
+
 export const getQueuedMCQAnswerCount = async () => {
   return (await getAllQueuedAnswers()).length;
 };

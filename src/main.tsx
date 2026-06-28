@@ -6,6 +6,7 @@ import { HelmetProvider } from "react-helmet-async";
 
 import { StatusBar } from "@capacitor/status-bar";
 import { Capacitor } from "@capacitor/core";
+import { initializeOtaUpdates } from "@/services/otaUpdateService";
 
 import { setupIonicReact } from "@ionic/react";
 
@@ -30,6 +31,7 @@ const Root = () => {
   };
 
   useEffect(() => {
+    initializeOtaUpdates();
     initNativeFeatures();
   }, []);
 
@@ -40,7 +42,7 @@ const Root = () => {
   );
 };
 
-if ("serviceWorker" in navigator && import.meta.env.PROD) {
+if ("serviceWorker" in navigator && import.meta.env.PROD && !Capacitor.isNativePlatform()) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("./service-worker.js")

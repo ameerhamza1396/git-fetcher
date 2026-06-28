@@ -73,6 +73,7 @@ import { supabase } from '@/integrations/supabase/client';
 import BlockedUserOverlay from '@/components/auth/BlockedUserOverlay';
 import { AchievementUnlockNotifier } from '@/components/profile/AchievementBadges';
 import { useQuery } from '@tanstack/react-query';
+import OtaUpdateScreen from '@/components/OtaUpdateScreen';
 
 
 const queryClient = new QueryClient();
@@ -156,6 +157,7 @@ function App() {
         themes={['light', 'dark']}
       >
         <StatusBarHandler />
+        <OtaUpdateScreen />
 
         <Router>
           {/* Crucial: The bg-background class here ensures the div 
