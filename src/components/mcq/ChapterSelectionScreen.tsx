@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, BookOpen } from 'lucide-react';
+import { ArrowRight, BookOpen, CheckCircle2 } from 'lucide-react';
 import { fetchChaptersBySubject, Chapter, Subject } from '@/utils/mcqData';
-import { useAuth } from '@/hooks/useAuth';
+import { ChapterDownloadButton } from '@/components/mcq/ChapterDownloadButton';
+import { useOfflineChapterStatus } from '@/hooks/useOfflineChapterStatus';
 
 interface ChapterSelectionScreenProps {
   subject: Subject;
@@ -23,6 +24,19 @@ const ChapterCardSkeleton = () => (
     </div>
   </div>
 );
+
+const OfflineChapterNote = ({ chapterId }: { chapterId: string }) => {
+  const { status } = useOfflineChapterStatus(chapterId);
+
+  if (status !== 'downloaded') return null;
+
+  return (
+    <div className="mt-3 flex w-full items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+      <CheckCircle2 className="h-3 w-3" />
+      This chapter is available for offline use
+    </div>
+  );
+};
 
 export const ChapterSelectionScreen = ({
   subject,
@@ -126,13 +140,17 @@ export const ChapterSelectionScreen = ({
                   </div>
 
                   {!isComingSoon && (
-                    <div className="flex flex-col items-end shrink-0">
+                    <div className="flex items-center gap-2 shrink-0">
+                       <ChapterDownloadButton subject={subject} chapter={ch} compact />
+                       <div className="flex flex-col items-end">
                        <span className={`text-[10px] font-black uppercase tracking-widest ${
                          isSelected ? 'text-primary' : 'text-muted-foreground/60'
                        }`}>{ch.mcq_count} Qs</span>
+                      </div>
                     </div>
                   )}
                 </div>
+                <OfflineChapterNote chapterId={ch.id} />
               </motion.div>
             );
           })

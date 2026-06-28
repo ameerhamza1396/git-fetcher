@@ -1,4 +1,12 @@
 import { supabase } from '@/integrations/supabase/client';
+import { fetchCloudContent } from '@/utils/cloudContent';
+import {
+  getOfflineChapterById,
+  getOfflineChaptersBySubject,
+  getOfflineMCQsByChapter,
+  getOfflineSubjectById,
+  getOfflineSubjects,
+} from '@/utils/offlineChapters';
 
 export interface Subject {
   id: string;
@@ -63,90 +71,63 @@ export interface SEQEvaluationResult {
   explanation: string;
 }
 
+const mergeById = <T extends { id: string }>(primary: T[], fallback: T[]) => {
+  const merged = new Map<string, T>();
+  fallback.forEach(item => merged.set(item.id, item));
+  primary.forEach(item => merged.set(item.id, item));
+  return Array.from(merged.values());
+};
+
 export const fetchSubjects = async (): Promise<Subject[]> => {
-  try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) return [];
+  const [cloudSubjects, offlineSubjects] = await Promise.all([
+    fetchCloudContent<Subject[]>('mcq-subjects'),
+    getOfflineSubjects(),
+  ]);
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('year, institute')
-      .eq('id', user.id)
-      .single();
+  return mergeById(cloudSubjects ?? [], offlineSubjects as Subject[]);
+};
 
-    if (profileError || !profile) return [];
+export const fetchSubjectById = async (subjectId: string): Promise<Subject | null> => {
+  const subject = await fetchCloudContent<Subject>('mcq-subject', { subjectId });
+  if (subject) return subject;
 
-    let query = supabase
-      .from('subjects')
-      .select('*')
-      .eq('year', (profile as any).year)
-      .order('name');
+  const offlineSubject = await getOfflineSubjectById(subjectId);
+  if (offlineSubject) return offlineSubject as Subject;
 
-    const { data, error } = await query;
-    if (error) return [];
-
-    const userInstitute = (profile as any).institute;
-
-    // Filter subjects that include the user's institute in their institutes JSONB array
-    const filtered = (data || []).filter((subject: any) => {
-      // If subject has no institutes field or it's empty, show it (backward compat)
-      if (!subject.institutes || !Array.isArray(subject.institutes) || subject.institutes.length === 0) {
-        return true;
-      }
-      // If institutes contains "all" or "ALL", show to everyone
-      if (subject.institutes.map((i: string) => i.toLowerCase()).includes('all')) {
-        return true;
-      }
-      // Check if user's institute is in the subject's institutes array
-      return !userInstitute || subject.institutes.includes(userInstitute);
-    });
-
-    return filtered;
-  } catch {
-    return [];
-  }
+  const subjects = await fetchSubjects();
+  return subjects.find(item => item.id === subjectId) ?? null;
 };
 
 export const fetchChaptersBySubject = async (subjectId: string): Promise<Chapter[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('chapters')
-      .select('id, name, description, chapter_number, subject_id, mcqs(count)')
-      .eq('subject_id', subjectId)
-      .order('chapter_number');
+  const [cloudChapters, offlineChapters] = await Promise.all([
+    fetchCloudContent<Chapter[]>('mcq-chapters', { subjectId }),
+    getOfflineChaptersBySubject(subjectId),
+  ]);
 
-    if (error) return [];
+  return mergeById(cloudChapters ?? [], offlineChapters as Chapter[])
+    .sort((a, b) => a.chapter_number - b.chapter_number);
+};
 
-    return (data || []).map((ch: any) => ({
-      ...ch,
-      mcq_count: ch.mcqs?.[0]?.count || 0,
-    }));
-  } catch {
-    return [];
-  }
+export const fetchChapterById = async (chapterId: string, subjectId?: string): Promise<Chapter | null> => {
+  const chapter = await fetchCloudContent<Chapter>('mcq-chapter', { chapterId, subjectId });
+  if (chapter) return chapter;
+
+  const offlineChapter = await getOfflineChapterById(chapterId, subjectId);
+  if (offlineChapter) return offlineChapter as Chapter;
+
+  if (!subjectId) return null;
+  const chapters = await fetchChaptersBySubject(subjectId);
+  return chapters.find(item => item.id === chapterId) ?? null;
 };
 
 export const fetchMCQsByChapter = async (chapterId: string): Promise<MCQ[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('mcqs')
-      .select('*')
-      .eq('chapter_id', chapterId)
-      .order('created_at');
+  const cloudMcqs = await fetchCloudContent<MCQ[]>('mcqs', { chapterId });
+  if (cloudMcqs?.length) return cloudMcqs;
+  return await getOfflineMCQsByChapter(chapterId) as MCQ[];
+};
 
-    if (error) return [];
-
-    return data?.map(mcq => ({
-      ...mcq,
-      options: Array.isArray(mcq.options)
-        ? mcq.options
-        : typeof mcq.options === 'string'
-          ? JSON.parse(mcq.options)
-          : []
-    })) || [];
-  } catch {
-    return [];
-  }
+export const fetchMCQsBySubject = async (subjectId: string): Promise<MCQ[]> => {
+  return await fetchCloudContent<MCQ[]>('mcqs-by-subject', { subjectId }) ?? [];
 };
 
 export const getUserStats = async (userId: string) => {
@@ -235,91 +216,43 @@ export const getUserStats = async (userId: string) => {
 };
 
 export const fetchSEQSubjects = async (): Promise<SEQSubject[]> => {
-  try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) return [];
+  return await fetchCloudContent<SEQSubject[]>('app-seq-subjects') ?? [];
+};
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('year, institute')
-      .eq('id', user.id)
-      .single();
+export const fetchSEQSubjectById = async (subjectId: string): Promise<SEQSubject | null> => {
+  const subject =
+    await fetchCloudContent<SEQSubject>('app-seq-subject', { subjectId }) ??
+    await fetchCloudContent<SEQSubject>('seq-subject', { subjectId });
+  if (subject) return subject;
 
-    if (profileError || !profile) return [];
-
-    let query = supabase
-      .from('seqs_subjects')
-      .select('*')
-      .eq('year', (profile as any).year)
-      .order('name');
-
-    const { data, error } = await query;
-    if (error) return [];
-
-    const userInstitute = (profile as any).institute;
-
-    const filtered = (data || []).filter((subject: any) => {
-      if (!subject.institutes || !Array.isArray(subject.institutes) || subject.institutes.length === 0) {
-        return true;
-      }
-      if (subject.institutes.map((i: string) => i.toLowerCase()).includes('all')) {
-        return true;
-      }
-      return !userInstitute || subject.institutes.includes(userInstitute);
-    });
-
-    return filtered;
-  } catch {
-    return [];
-  }
+  const subjects = await fetchSEQSubjects();
+  return subjects.find(item => item.id === subjectId) ?? null;
 };
 
 export const fetchSEQChaptersBySubject = async (subjectId: string): Promise<SEQChapter[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('seqs_chapters')
-      .select('id, name, description, chapter_number, subject_id, seqs(count)')
-      .eq('subject_id', subjectId)
-      .order('chapter_number');
+  return await fetchCloudContent<SEQChapter[]>('app-seq-chapters', { subjectId }) ?? [];
+};
 
-    if (error) return [];
+export const fetchSEQChapterById = async (chapterId: string, subjectId?: string): Promise<SEQChapter | null> => {
+  const chapter =
+    await fetchCloudContent<SEQChapter>('app-seq-chapter', { chapterId, subjectId }) ??
+    await fetchCloudContent<SEQChapter>('seq-chapter', { chapterId, subjectId });
+  if (chapter) return chapter;
 
-    return (data || []).map((ch: any) => ({
-      ...ch,
-      seq_count: ch.seqs?.[0]?.count || 0,
-    }));
-  } catch {
-    return [];
-  }
+  if (!subjectId) return null;
+  const chapters = await fetchSEQChaptersBySubject(subjectId);
+  return chapters.find(item => item.id === chapterId) ?? null;
 };
 
 export const fetchSEQByChapter = async (chapterId: string): Promise<SEQ[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('seqs')
-      .select('*')
-      .eq('chapter_id', chapterId)
-      .order('created_at');
-
-    if (error) return [];
-    return data || [];
-  } catch {
-    return [];
-  }
+  return await fetchCloudContent<SEQ[]>('app-seqs', { chapterId }) ?? [];
 };
 
 export const fetchRandomSEQ = async (chapterId: string): Promise<SEQ | null> => {
   try {
-    const { data, error } = await supabase
-      .from('seqs')
-      .select('*')
-      .eq('chapter_id', chapterId)
-      .order('RANDOM()')
-      .limit(1)
-      .maybeSingle();
-
-    if (error || !data) return null;
-    return data;
+    const seqs = await fetchSEQByChapter(chapterId);
+    if (seqs.length === 0) return null;
+    return seqs[Math.floor(Math.random() * seqs.length)];
   } catch {
     return null;
   }
@@ -331,7 +264,7 @@ export const evaluateSEQAnswer = async (
   bookReferences: string
 ): Promise<SEQEvaluationResult> => {
   try {
-    const response = await fetch('https://medmacs.app/api/seq_ai', {
+    const response = await fetch('https://ai.medmacs.app/api/seq_ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -430,12 +363,7 @@ export const getUserSEQStats = async (userId: string) => {
 
 export const getUserSEQAnswersByChapter = async (userId: string, chapterId: string) => {
   try {
-    const { data: seqs, error: seqsError } = await supabase
-      .from('seqs')
-      .select('id')
-      .eq('chapter_id', chapterId);
-
-    if (seqsError || !seqs) return {};
+    const seqs = await fetchSEQByChapter(chapterId);
 
     const seqIds = seqs.map(s => s.id);
     

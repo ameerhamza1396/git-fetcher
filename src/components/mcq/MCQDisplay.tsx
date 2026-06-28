@@ -7,13 +7,14 @@ import {
   Clock, CheckCircle, XCircle, Timer, Bot, MessageSquare, X, Bookmark,
   BookmarkCheck, Crown, LogOut, AlertTriangle, MoreVertical, Flag, BotOff,
   Moon, Sun, Zap, Sparkles, BookOpen, ChevronLeft, Loader2, Star, Award,
-  TrendingUp, Brain, Target, Shield, ShieldAlert, Trash2, PanelBottom, Lock
+  TrendingUp, Brain, Target, Shield, ShieldAlert, Trash2, PanelBottom, Lock, RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useReferenceSearch } from '@/hooks/useReferenceSearch';
-import { fetchMCQsByChapter, MCQ } from '@/utils/mcqData';
+import { aiApiUrl } from '@/utils/aiApi';
+import { fetchChapterById, fetchMCQsByChapter, fetchSubjectById, Chapter, MCQ, Subject } from '@/utils/mcqData';
 import { supabase } from '@/integrations/supabase/client';
 import { AIChatbot } from './AIChatbot';
 import { useQuery } from '@tanstack/react-query';
@@ -21,6 +22,9 @@ import { playCorrectSound, playIncorrectSound } from '@/utils/soundEffects';
 import { Textarea } from '@/components/ui/textarea';
 import { useTheme } from 'next-themes';
 import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
+import { ChapterDownloadButton } from '@/components/mcq/ChapterDownloadButton';
+import { useOfflineChapterStatus } from '@/hooks/useOfflineChapterStatus';
+import { getQueuedMCQAnswerMap, queueMCQAnswerForSync } from '@/utils/offlineAnswerSync';
 
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -140,12 +144,15 @@ const MCQSettingsModal = ({
   quickSubmit, toggleQuickSubmit,
   soundEnabled, toggleSound,
   aiPopupsDisabled, toggleAiPopups,
-  onReport, isPremium, theme, setTheme, onReset
-}) => (
-  <DialogPrimitive.Root open={isOpen} onOpenChange={onClose}>
-    <ModalContent className="sm:max-w-[400px]">
-      {/* Solid card — no bg-background (CSS var can be transparent) */}
-      <div className="bg-white dark:bg-zinc-900 border-2 border-primary/20 rounded-3xl overflow-hidden shadow-2xl">
+  onReport, isPremium, theme, setTheme, onReset, downloadSubject, downloadChapter
+}) => {
+  const { status: offlineStatus } = useOfflineChapterStatus(downloadChapter?.id);
+
+  return (
+    <DialogPrimitive.Root open={isOpen} onOpenChange={onClose}>
+      <ModalContent className="sm:max-w-[400px]">
+        {/* Solid card — no bg-background (CSS var can be transparent) */}
+        <div className="bg-white dark:bg-zinc-900 border-2 border-primary/20 rounded-3xl overflow-hidden shadow-2xl">
         <div className="p-6 pb-0">
           <DialogPrimitive.Title className="flex items-center gap-2 mb-1">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center shadow-lg shrink-0">
@@ -161,6 +168,20 @@ const MCQSettingsModal = ({
         </div>
 
         <div className="p-6 pt-4 space-y-3">
+          {downloadSubject && downloadChapter && (
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-zinc-900 dark:text-zinc-100">{downloadChapter.name}</p>
+                <p className="text-[10px] text-emerald-700 dark:text-emerald-300 uppercase tracking-widest font-black">
+                  {offlineStatus === 'downloaded'
+                    ? 'This chapter is available for offline use'
+                    : 'Save this chapter offline'}
+                </p>
+              </div>
+              <ChapterDownloadButton subject={downloadSubject} chapter={downloadChapter} compact />
+            </div>
+          )}
+
           {/* Quick Submit */}
           <div className="flex items-center justify-between p-4 rounded-2xl bg-orange-500/10 border border-orange-500/20">
             <div className="flex items-center gap-3">
@@ -233,9 +254,10 @@ const MCQSettingsModal = ({
           </div>
         </div>
       </div>
-    </ModalContent>
-  </DialogPrimitive.Root>
-);
+      </ModalContent>
+    </DialogPrimitive.Root>
+  );
+};
 
 const UpgradeAccountModal = ({ isOpen, onClose, onUpgradeClick, message }) => (
   <DialogPrimitive.Root open={isOpen} onOpenChange={onClose}>
@@ -378,40 +400,69 @@ const formatSimilarity = (score?: number) => {
   return `${Math.round(percent)}%`;
 };
 
-const mergedReferenceContent = (references, selectedIndex) => {
-  if (selectedIndex === null || selectedIndex === undefined) return '';
-  const selectedReference = references[selectedIndex];
-  if (!selectedReference) return '';
-
-  const getChunkOrder = (ref) => {
-    const rawOrder =
-      ref.chunk_index ??
-      ref.chunkIndex ??
-      ref.index ??
-      ref.metadata?.chunk_index ??
-      ref.metadata?.chunkIndex ??
-      ref.metadata?.index;
-    const parsedOrder = Number(rawOrder);
-    return Number.isFinite(parsedOrder) ? parsedOrder : null;
-  };
-
-  const selectedOrder = getChunkOrder(selectedReference);
-  if (selectedOrder === null) return selectedReference.content || '';
-
-  const sameSourceReferences = references
-    .map((ref, index) => ({ ref, index, order: getChunkOrder(ref) }))
-    .filter(item => item.order !== null && item.ref.book === selectedReference.book)
-    .sort((a, b) => a.order - b.order);
-
-  const linearIndex = sameSourceReferences.findIndex(item => item.index === selectedIndex);
-  if (linearIndex === -1) return selectedReference.content || '';
-
-  return [sameSourceReferences[linearIndex - 1], sameSourceReferences[linearIndex], sameSourceReferences[linearIndex + 1]]
-    .filter(Boolean)
-    .map(item => item.ref.content)
-    .filter(Boolean)
-    .join('\n\n');
+const REFERENCE_VERIFICATION_COPY = {
+  verified: {
+    label: 'Question verified',
+    tone: 'text-emerald-700 dark:text-emerald-300',
+    border: 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-950/30',
+  },
+  incorrect: {
+    label: 'Question appears incorrect',
+    tone: 'text-red-700 dark:text-red-300',
+    border: 'border-red-200 bg-red-50 dark:border-red-900/60 dark:bg-red-950/30',
+  },
+  no_references: {
+    label: 'No references found',
+    tone: 'text-amber-700 dark:text-amber-300',
+    border: 'border-amber-200 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30',
+  },
+  unconfirmed: {
+    label: 'Could not confirm authenticity',
+    tone: 'text-slate-700 dark:text-slate-300',
+    border: 'border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-zinc-950',
+  },
 };
+
+const isInternalVerification = (sourceBasis = '') =>
+  ['internal', 'book', 'books', 'rag'].includes(String(sourceBasis).toLowerCase());
+
+const isGenericReferenceBook = (book = '') =>
+  /^(reference source|referece source|reference)$/i.test(String(book).trim());
+
+const getVerificationDisplay = (verification) => {
+  if (verification?.verdict === 'incorrect' || verification?.markedAnswerWrong) {
+    return {
+      icon: XCircle,
+      label: 'Question proven incorrect',
+      tone: 'text-red-700 dark:text-red-300',
+      border: 'border-red-200 bg-red-50 dark:border-red-900/60 dark:bg-red-950/30',
+      chip: 'bg-red-500/10 text-red-700 dark:text-red-300',
+    };
+  }
+
+  if (verification?.verdict === 'verified') {
+    const internal = isInternalVerification(verification?.sourceBasis);
+    return {
+      icon: CheckCircle,
+      label: internal ? 'Reference found' : 'Reference found externally',
+      tone: internal ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300',
+      border: internal ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-950/30' : 'border-amber-200 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30',
+      chip: internal ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+    };
+  }
+
+  return {
+    icon: XCircle,
+    label: 'Question unverified',
+    tone: 'text-amber-700 dark:text-amber-300',
+    border: 'border-amber-200 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30',
+    chip: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+  };
+};
+
+const VerificationStatusIcon = ({ icon: Icon, className }) => (
+  <Icon aria-hidden="true" className={`shrink-0 ${className}`} />
+);
 
 const ReferenceModal = ({
   isOpen,
@@ -422,69 +473,25 @@ const ReferenceModal = ({
   selectedIndex,
   setSelectedIndex,
   confirmedIndexes,
+  verification,
+  summary,
+  isSummarizing,
+  onSummarize,
+  onSummaryUpgrade,
+  summaryCount,
+  summaryLimitReached,
   isConfirming,
   onConfirm,
-  isPremium
+  isPremium,
+  canUseAiSummary
 }) => {
-  const displayedReferences = selectedIndex === null
-    ? references
-    : references.filter((_, index) => index === selectedIndex);
-
-  const hasReferences = references.length > 0;
   const hasConfirmed = Array.isArray(confirmedIndexes);
-  const skeletonItems = Array.from({ length: 5 });
-
-  const renderReference = (ref, actualIndex) => {
-    const similarity = formatSimilarity(ref.score);
-    const content = selectedIndex === actualIndex
-      ? mergedReferenceContent(references, actualIndex)
-      : ref.content;
-    const isConfirmedMatch = hasConfirmed && confirmedIndexes.includes(actualIndex);
-    const isConfirmedMiss = hasConfirmed && !isConfirmedMatch;
-
-    return (
-      <button
-        key={`${ref.book}-${ref.page}-${actualIndex}`}
-        type="button"
-        onClick={() => setSelectedIndex(actualIndex)}
-        className={`w-full text-left rounded-2xl border-2 p-4 transition-all ${
-          isConfirmedMiss
-            ? 'border-slate-200 bg-slate-100 opacity-55 grayscale dark:border-slate-800 dark:bg-zinc-900'
-            : selectedIndex === actualIndex
-            ? 'border-emerald-400 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950/30'
-            : 'border-slate-200 bg-white hover:border-primary/40 dark:border-slate-800 dark:bg-zinc-950'
-        }`}
-      >
-        <div className="flex items-start gap-2">
-          <Badge variant="secondary" className="max-w-[180px] truncate text-[10px] font-bold">
-            {ref.book}
-          </Badge>
-          <span className="ml-auto shrink-0 text-[10px] font-bold text-muted-foreground">p. {ref.page}</span>
-          {isConfirmedMatch && <CheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />}
-        </div>
-        <div className="mt-2 flex items-center gap-2">
-          {similarity && (
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-primary">
-              {similarity} similarity
-            </span>
-          )}
-          {selectedIndex === actualIndex && (
-            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-              Expanded
-            </span>
-          )}
-          {isConfirmedMiss && (
-            <span className="rounded-full bg-slate-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-slate-500">
-              Non-standard
-            </span>
-          )}
-        </div>
-        <p className={`mt-3 whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground ${selectedIndex === actualIndex ? '' : 'line-clamp-4'}`}>
-          "{content}"
-        </p>
-      </button>
-    );
-  };
+  const hasSummary = Boolean(summary?.summary);
+  const visibleReferences = Array.isArray(references)
+    ? hasConfirmed
+      ? confirmedIndexes.map(index => references[index]).filter(Boolean)
+      : references
+    : [];
 
   return (
     <DialogPrimitive.Root open={isOpen} onOpenChange={onClose}>
@@ -493,11 +500,11 @@ const ReferenceModal = ({
           <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-800">
             <div>
               <DialogPrimitive.Title className="flex items-center gap-2 text-lg font-black text-zinc-900 dark:text-zinc-100">
-                <BookOpen className="h-5 w-5 text-primary" />
-                Book References
+                <CheckCircle className="h-5 w-5 text-primary" />
+                Question Verification
               </DialogPrimitive.Title>
               <DialogPrimitive.Description className="mt-1 text-xs text-muted-foreground">
-                Select one reference to expand it with adjacent snippets when the source order is available.
+                Dr Ahroid verifies the question first. Summary is optional.
               </DialogPrimitive.Description>
             </div>
             <DialogPrimitive.Close asChild>
@@ -507,56 +514,228 @@ const ReferenceModal = ({
             </DialogPrimitive.Close>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-5 py-4">
-            {isLoading && (
-              <div className="space-y-3" aria-label="Loading references">
-                {skeletonItems.map((_, index) => (
-                  <div
-                    key={index}
-                    className="rounded-2xl border-2 border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-zinc-950"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="h-5 w-28 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
-                      <div className="ml-auto h-3 w-10 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-                    </div>
-                    <div className="mt-3 h-4 w-24 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
-                    <div className="mt-4 space-y-2">
-                      <div className="h-3 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-                      <div className="h-3 w-11/12 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-                      <div className="h-3 w-2/3 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+          <motion.div layout className="flex-1 overflow-y-auto px-5 py-4">
+            <AnimatePresence mode="wait" initial={false}>
+            {isConfirming ? (
+              <motion.div
+                key="verification-skeleton"
+                layout
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.22, ease: 'easeOut' }}
+                className="mb-4 min-h-[156px] rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-zinc-950"
+              >
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-7 w-7 rounded-full" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-36" />
+                    <Skeleton className="h-3 w-28" />
+                  </div>
+                </div>
+                <div className="mt-5 space-y-2">
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-11/12" />
+                  <Skeleton className="h-3 w-8/12" />
+                </div>
+                <div className="mt-4 flex gap-2 overflow-hidden">
+                  <Skeleton className="h-6 w-32 shrink-0 rounded-full" />
+                  <Skeleton className="h-6 w-28 shrink-0 rounded-full" />
+                  <Skeleton className="h-6 w-36 shrink-0 rounded-full" />
+                </div>
+              </motion.div>
+            ) : verification ? (() => {
+              const display = getVerificationDisplay(verification);
+              return (
+                <motion.div
+                  key="verification-result"
+                  layout
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.22, ease: 'easeOut' }}
+                  className={`mb-4 min-h-[156px] rounded-2xl border p-4 text-sm ${display.border}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <VerificationStatusIcon icon={display.icon} className={`h-7 w-7 ${display.tone}`} />
+                    <div>
+                      <div className={`font-black ${display.tone}`}>{display.label}</div>
+                      <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                        Dr Ahroid · {verification.cached ? 'cached · ' : ''}{verification.sourceBasis || 'none'}
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+                  {verification.summary && (
+                    <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{verification.summary}</p>
+                  )}
+                  {isInternalVerification(verification.sourceBasis) && verification.verdict !== 'no_references' && Array.isArray(verification.citations) && verification.citations.length > 0 && (
+                    <div className="mt-3 flex max-w-full flex-nowrap gap-2 overflow-x-auto pb-1">
+                      {verification.citations.map((citation, index) => (
+                        <span
+                          key={`${citation.book || citation.title}-${citation.page || index}-${index}`}
+                          className="shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                        >
+                          {citation.book || citation.title || 'Reference'}{citation.page ? ` p. ${citation.page}` : ''}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {verification.autoReported && (
+                    <p className="mt-2 text-xs font-bold text-red-600 dark:text-red-300">Auto-reported because Dr Ahroid found the marked answer likely wrong.</p>
+                  )}
+                </motion.div>
+              );
+            })() : null}
+            </AnimatePresence>
 
-            {!isLoading && error && !hasReferences && (
+            <AnimatePresence mode="wait" initial={false}>
+            {isSummarizing ? (
+              <motion.div
+                key="summary-skeleton"
+                layout
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.22, ease: 'easeOut' }}
+                className="mb-4 min-h-[132px] rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-zinc-950"
+              >
+                <Skeleton className="h-4 w-24" />
+                <div className="mt-4 space-y-2">
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-10/12" />
+                  <Skeleton className="h-3 w-7/12" />
+                </div>
+              </motion.div>
+            ) : summary ? (
+              <motion.div
+                key="summary-result"
+                layout
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.22, ease: 'easeOut' }}
+                className="mb-4 min-h-[132px] rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm"
+              >
+                <div className="font-black text-primary">AI Summary</div>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{summary.summary}</p>
+              </motion.div>
+            ) : null}
+            </AnimatePresence>
+
+            {!isConfirming && !isSummarizing && !summary && error && (
               <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
-                No references found.
+                AI summary is unavailable right now.
               </div>
             )}
 
-            {!isLoading && displayedReferences.length > 0 && (
-              <div className="space-y-3">
-                {displayedReferences.map(ref => renderReference(ref, references.indexOf(ref)))}
+            {!isConfirming && isLoading && !verification && !isSummarizing && !summary && !error && (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-zinc-950">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="mt-3 h-3 w-full" />
+                <Skeleton className="mt-2 h-3 w-8/12" />
               </div>
             )}
-          </div>
+
+            {!isConfirming && !isLoading && visibleReferences.length > 0 && (
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                    Book References
+                  </h3>
+                  <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-black text-primary">
+                    {visibleReferences.length}
+                  </span>
+                </div>
+
+                {visibleReferences.map((reference, index) => {
+                  const shouldShowText = reference.show_extracted_text === true || reference.showExtractedText === true;
+                  const contextScore = typeof reference.score === 'number'
+                    ? Math.max(0, Math.min(100, Math.round(reference.score <= 1 ? reference.score * 100 : reference.score)))
+                    : null;
+
+                  return (
+                    <div
+                      key={`${reference.book || 'Reference'}-${reference.page || index}-${index}`}
+                      className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-zinc-950/80"
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="text-sm font-black text-slate-900 dark:text-slate-100">
+                            {reference.book || 'Reference'}
+                          </p>
+                          <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                            {reference.page ? `Page ${reference.page}` : 'Page not listed'}
+                          </p>
+                        </div>
+                        <div className="min-w-[150px]">
+                          <div className="mb-1 flex items-center justify-between gap-3">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                              Context Match
+                            </span>
+                            <span className="text-[10px] font-black text-primary">
+                              {contextScore === null ? 'N/A' : `${contextScore}%`}
+                            </span>
+                          </div>
+                          <Progress value={contextScore ?? 0} className="h-2" />
+                        </div>
+                      </div>
+
+                      {shouldShowText && reference.content && (
+                        <div className="mt-3 rounded-xl border border-primary/10 bg-primary/5 p-3">
+                          <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-primary">
+                            Extracted Text
+                          </p>
+                          <p className="whitespace-pre-wrap text-xs font-medium leading-relaxed text-slate-700 dark:text-slate-300">
+                            {reference.content}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-4 text-xs font-medium leading-relaxed text-muted-foreground dark:border-slate-800 dark:bg-slate-900/40">
+                  <p className="font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">DCMA Disclaimer</p>
+                  <p className="mt-2">
+                    References are provided for educational verification and study support. If you believe any referenced
+                    material infringes your rights, please review our{' '}
+                    <a href="/dcma" className="font-bold text-slate-600 underline underline-offset-4 hover:text-primary dark:text-slate-300">
+                      DCMA Page
+                    </a>{' '}
+                    or contact{' '}
+                    <a href="mailto:legal@medmacs.app" className="font-bold text-slate-600 underline underline-offset-4 hover:text-primary dark:text-slate-300">
+                      legal@medmacs.app
+                    </a>
+                    .
+                  </p>
+                </div>
+              </div>
+            )}
+          </motion.div>
 
           <div className="border-t border-slate-200 px-5 py-4 dark:border-slate-800">
             <div className="flex flex-col gap-3 sm:flex-row">
-              {selectedIndex !== null && (
-                <Button
-                  variant="outline"
-                  onClick={() => setSelectedIndex(null)}
-                  className="rounded-xl"
-                >
-                  Show All
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                onClick={canUseAiSummary ? onSummarize : onSummaryUpgrade}
+                disabled={canUseAiSummary && (isSummarizing || isLoading || summaryLimitReached)}
+                className="rounded-xl disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:disabled:border-slate-800 dark:disabled:bg-slate-900 dark:disabled:text-slate-600"
+              >
+                {!canUseAiSummary ? (
+                  <><Lock className="mr-2 h-4 w-4" /> AI Summary</>
+                ) : isSummarizing ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Summarizing...</>
+                ) : summaryLimitReached ? (
+                  <><RotateCcw className="mr-2 h-4 w-4" /> Summary limit reached</>
+                ) : hasSummary ? (
+                  <><RotateCcw className="mr-2 h-4 w-4" /> Reload Summary {summaryCount}/3</>
+                ) : (
+                  <><Sparkles className="mr-2 h-4 w-4" /> AI Summary</>
+                )}
+              </Button>
               <Button
                 onClick={onConfirm}
-                disabled={!isPremium || isConfirming || isLoading || !hasReferences || hasConfirmed}
+                disabled={!isPremium || isConfirming || isLoading || hasConfirmed}
                 className="flex-1 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
               >
                 {isConfirming ? (
@@ -636,6 +815,12 @@ export const MCQDisplay = ({
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isReportSubmitting, setIsReportSubmitting] = useState(false);
   const [hasAttemptedAny, setHasAttemptedAny] = useState(false);
+  const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
+  const isSubmittingAnswerRef = useRef(false);
+  const [isOnline, setIsOnline] = useState(() => {
+    if (typeof navigator === 'undefined') return true;
+    return navigator.onLine;
+  });
   const [quickSubmit, setQuickSubmit] = useState(() => {
     if (typeof window !== 'undefined') return localStorage.getItem('quickSubmitEnabled') !== 'false';
     return true;
@@ -658,7 +843,13 @@ export const MCQDisplay = ({
   const [isReferenceModalOpen, setIsReferenceModalOpen] = useState(false);
   const [selectedReferenceIndex, setSelectedReferenceIndex] = useState<number | null>(null);
   const [confirmedReferenceIndexes, setConfirmedReferenceIndexes] = useState<number[] | null>(null);
+  const [referenceVerification, setReferenceVerification] = useState<any>(null);
+  const [referenceSummary, setReferenceSummary] = useState<any>(null);
+  const [isSummarizingReferences, setIsSummarizingReferences] = useState(false);
+  const [summaryGenerationCounts, setSummaryGenerationCounts] = useState<Record<string, number>>({});
   const [isConfirmingReferences, setIsConfirmingReferences] = useState(false);
+  const [downloadSubject, setDownloadSubject] = useState<Subject | null>(null);
+  const [downloadChapter, setDownloadChapter] = useState<Chapter | null>(null);
   const { search, loading: isSearchingReference, error: referenceError, data: referenceData, setData: setReferenceData } = useReferenceSearch();
   const referenceResults = referenceData?.results || [];
 
@@ -674,7 +865,8 @@ export const MCQDisplay = ({
   });
 
   const userPlanForChatbot = profile?.plan?.toLowerCase() || 'free';
-  const isPremium = userPlanForChatbot === 'premium' || userPlanForChatbot === 'iconic';
+  const isPremium = userPlanForChatbot === 'premium';
+  const canUseAiSummary = userPlanForChatbot === 'premium';
 
   const isNewDayPKT = (lastResetDateStr: string | null): boolean => {
     if (!lastResetDateStr) return true;
@@ -690,51 +882,183 @@ export const MCQDisplay = ({
   const currentMCQ = mcqs[currentQuestionIndex];
   const totalQuestions = mcqs.length;
   const progressPercentage = totalQuestions > 0 ? ((currentQuestionIndex + 1) / totalQuestions) * 100 : 0;
+  const effectiveQuickSubmit = quickSubmit && isOnline;
+
+  const normalizeCitations = (citations: any) =>
+    Array.isArray(citations)
+      ? citations
+          .map((citation: any) => ({
+            book: String(
+              citation?.book ||
+              citation?.title ||
+              citation?.source ||
+              citation?.source_name ||
+              citation?.metadata?.book ||
+              citation?.metadata?.title ||
+              citation?.metadata?.source ||
+              'Reference'
+            ),
+            page: Number(
+              citation?.page ||
+              citation?.page_number ||
+              citation?.pageNumber ||
+              citation?.metadata?.page ||
+              citation?.metadata?.page_number ||
+              0
+            ),
+            score: typeof citation?.score === 'number' ? citation.score : undefined,
+          }))
+          .filter(citation => citation.book && !isGenericReferenceBook(citation.book))
+      : [];
+
+  const readCachedVerification = async () => {
+    if (!currentMCQ?.id) return null;
+
+    const { data, error } = await (supabase.from('question_reference_verifications') as any)
+      .select('verdict, source_basis, summary, citations, correct_answer_suggestion, marked_answer_wrong, auto_reported')
+      .eq('mcq_id', currentMCQ.id)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('Reference verification cache read failed:', error);
+      return null;
+    }
+
+    if (!data) return null;
+    const cachedSourceBasis = data.source_basis || 'none';
+    const cachedVerdict = data.verdict || 'unconfirmed';
+    const citations = isInternalVerification(cachedSourceBasis) && cachedVerdict !== 'no_references'
+      ? normalizeCitations(data.citations)
+      : [];
+    const staleVerifiedBookCache =
+      data.verdict === 'verified' &&
+      isInternalVerification(cachedSourceBasis) &&
+      citations.length === 0;
+
+    if (staleVerifiedBookCache) return null;
+
+    return {
+      verdict: cachedVerdict,
+      sourceBasis: cachedSourceBasis,
+      summary: data.summary || '',
+      citations,
+      correctAnswerSuggestion: data.correct_answer_suggestion || '',
+      markedAnswerWrong: data.marked_answer_wrong === true,
+      autoReported: data.auto_reported === true,
+      cached: true,
+    };
+  };
+
+  const cacheVerification = async (verification: any) => {
+    if (!user || !currentMCQ?.id) return;
+
+    const { error } = await (supabase.from('question_reference_verifications') as any)
+      .upsert({
+        mcq_id: currentMCQ.id,
+        verdict: verification.verdict,
+        source_basis: verification.sourceBasis,
+        summary: verification.summary || '',
+        citations: normalizeCitations(verification.citations),
+        correct_answer_suggestion: verification.correctAnswerSuggestion || '',
+        marked_answer_wrong: verification.markedAnswerWrong === true,
+        auto_reported: verification.autoReported === true,
+        verified_by: user.id,
+      }, { onConflict: 'mcq_id' });
+
+    if (error) {
+      console.warn('Reference verification cache write failed:', error);
+    }
+  };
 
   const handleTimeUp = () => {
-    if (!showExplanation && !selectedAnswer) handleSubmitAnswer(true);
+    if (!showExplanation && !selectedAnswer && !isSubmittingAnswerRef.current) handleSubmitAnswer(true);
   };
 
   const handleAnswerSelect = (answer: string) => {
     if (showExplanation) return;
     setSelectedAnswer(answer);
-    if (quickSubmit) setTimeout(() => handleSubmitAnswer(false, answer), 150);
+    if (effectiveQuickSubmit) setTimeout(() => handleSubmitAnswer(false, answer), 150);
   };
 
   const handleSubmitAnswer = async (timeUp = false, providedAnswer?: string) => {
-    if (!currentMCQ || !user) return;
-    setHasAttemptedAny(true);
+    if (!currentMCQ || !user || showExplanation || isSubmittingAnswerRef.current) return;
+    isSubmittingAnswerRef.current = true;
+    setIsSubmittingAnswer(true);
 
-    if (userPlanForChatbot === 'free') {
-      const isNewDay = isNewDayPKT(lastSubmissionResetDate);
-      let currentSubmissions = dailySubmissionsCount;
-      let currentResetDate = lastSubmissionResetDate;
-      if (isNewDay) { currentSubmissions = 0; currentResetDate = new Date().toISOString(); }
-      if (currentSubmissions >= 50) { setUpgradeModalMessage("You've reached the daily limit of 50 free MCQ submissions. Upgrade to a premium plan for unlimited practice!"); setShowUpgradeModal(true); return; }
-      await supabase.from('profiles').update({ daily_mcq_submissions: currentSubmissions + 1, last_submission_reset_date: currentResetDate }).eq('id', user.id);
-      setDailySubmissionsCount(currentSubmissions + 1);
-      setLastSubmissionResetDate(currentResetDate);
-    }
-    const answer = timeUp ? '' : (providedAnswer || selectedAnswer);
-    const timeTaken = Math.floor((Date.now() - startTime) / 1000);
-    const isCorrect = answer === currentMCQ.correct_answer;
-    const usedAiHelp = !!usedAiHelpByQuestion[currentMCQ.id];
-
-    setFeedbackType(isCorrect ? 'correct' : 'incorrect');
-    setTimeout(() => setFeedbackType(null), 1000);
-
-    if (soundEnabled) {
-      if (isCorrect && !timeUp) playCorrectSound();
-      else playIncorrectSound();
-    }
-    if (isCorrect && !timeUp) setScore(prev => prev + 1);
-    setAnsweredQuestions(prev => ({ ...prev, [currentMCQ.id]: { selectedAnswer: answer || 'No answer (time up)' } }));
     try {
-      const { error } = await supabase.from('user_answers').insert({ user_id: user.id, mcq_id: currentMCQ.id, selected_answer: answer || 'No answer (time up)', is_correct: isCorrect, time_taken: timeTaken, used_ai_help: usedAiHelp, correction_mode: mistakeMode });
-      if (error) throw error;
-      notifyAchievementProgress('mcq_answer');
-    } catch (error) { console.error('Error saving answer:', error); }
-    setShowExplanation(true);
+      setHasAttemptedAny(true);
+
+      if (userPlanForChatbot === 'free') {
+        const isNewDay = isNewDayPKT(lastSubmissionResetDate);
+        let currentSubmissions = dailySubmissionsCount;
+        let currentResetDate = lastSubmissionResetDate;
+        if (isNewDay) { currentSubmissions = 0; currentResetDate = new Date().toISOString(); }
+        if (currentSubmissions >= 50) {
+          setUpgradeModalMessage(
+            isOnline
+              ? "You've reached the daily limit of 50 free MCQ submissions. Upgrade to a premium plan for unlimited practice!"
+              : "Offline mode: you've reached the locally known daily limit of 50 free MCQ submissions. Reconnect to sync your latest progress or upgrade for unlimited practice."
+          );
+          setShowUpgradeModal(true);
+          return;
+        }
+        const { error: limitUpdateError } = await supabase.from('profiles').update({ daily_mcq_submissions: currentSubmissions + 1, last_submission_reset_date: currentResetDate }).eq('id', user.id);
+        if (limitUpdateError && !isOnline) {
+          console.warn('Daily MCQ limit update deferred in offline mode:', limitUpdateError);
+        }
+        setDailySubmissionsCount(currentSubmissions + 1);
+        setLastSubmissionResetDate(currentResetDate);
+      }
+      const answer = timeUp ? '' : (providedAnswer || selectedAnswer);
+      const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+      const isCorrect = answer === currentMCQ.correct_answer;
+      const usedAiHelp = !!usedAiHelpByQuestion[currentMCQ.id];
+
+      setFeedbackType(isCorrect ? 'correct' : 'incorrect');
+      setTimeout(() => setFeedbackType(null), 1000);
+
+      if (soundEnabled) {
+        if (isCorrect && !timeUp) playCorrectSound();
+        else playIncorrectSound();
+      }
+      if (isCorrect && !timeUp) setScore(prev => prev + 1);
+      setAnsweredQuestions(prev => ({ ...prev, [currentMCQ.id]: { selectedAnswer: answer || 'No answer (time up)' } }));
+      const answerRow = {
+        user_id: user.id,
+        mcq_id: currentMCQ.id,
+        selected_answer: answer || 'No answer (time up)',
+        is_correct: isCorrect,
+        time_taken: timeTaken,
+        used_ai_help: usedAiHelp,
+        correction_mode: mistakeMode
+      };
+
+      try {
+        const { error } = await supabase.from('user_answers').insert(answerRow);
+        if (error) throw error;
+        notifyAchievementProgress('mcq_answer');
+      } catch (error) {
+        console.error('Error saving answer, queued for offline sync:', error);
+        try {
+          await queueMCQAnswerForSync(answerRow);
+          toast({
+            title: 'Answer saved offline',
+            description: 'Your stats will sync automatically when the connection returns.',
+          });
+        } catch (queueError) {
+          console.error('Error queueing offline answer:', queueError);
+          toast({
+            title: 'Answer not synced',
+            description: 'This answer could not be saved for sync on this device.',
+            variant: 'destructive',
+          });
+        }
+      }
+      setShowExplanation(true);
+    } finally {
+      isSubmittingAnswerRef.current = false;
+      setIsSubmittingAnswer(false);
+    }
   };
 
   const handleResetSession = async () => {
@@ -820,7 +1144,7 @@ export const MCQDisplay = ({
 
   const isQuestionAnswered = (mcqId: string) => answeredQuestions[mcqId] !== undefined;
 
-  const handleSearchReference = () => {
+  const handleSearchReference = async () => {
     if (!currentMCQ) return;
     if (userPlanForChatbot === 'free') {
       setShowUpgradeBanner(true);
@@ -829,11 +1153,13 @@ export const MCQDisplay = ({
     }
     setSelectedReferenceIndex(null);
     setConfirmedReferenceIndexes(null);
+    setReferenceVerification(null);
+    setReferenceSummary(null);
     setIsReferenceModalOpen(true);
-    if (referenceResults.length === 0) search(currentMCQ.question, 5);
+    await search(currentMCQ.question, 5);
   };
 
-  const getFallbackConfirmedReferenceIndexes = () => {
+  const getFallbackConfirmedReferenceIndexes = (references = referenceResults) => {
     const words = `${currentMCQ?.question || ''} ${currentMCQ?.correct_answer || ''} ${currentMCQ?.explanation || ''}`
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, ' ')
@@ -841,9 +1167,9 @@ export const MCQDisplay = ({
       .filter(word => word.length > 3);
     const uniqueWords = Array.from(new Set(words));
 
-    return referenceResults
+    return references
       .map((ref, index) => {
-        const content = `${ref.content || ''} ${ref.book || ''}`.toLowerCase();
+        const content = `${ref.content || ''}`.toLowerCase();
         const matches = uniqueWords.filter(word => content.includes(word)).length;
         return { index, matches, score: ref.score || 0 };
       })
@@ -853,47 +1179,161 @@ export const MCQDisplay = ({
       .map(item => item.index);
   };
 
-  const handleConfirmReferences = async () => {
+  const autoReportQuestion = async (reason: string) => {
+    if (!user || !currentMCQ) return false;
+
+    const { error } = await supabase.from('reported_questions').insert({
+      user_id: user.id,
+      mcq_id: currentMCQ.id,
+      reason,
+      status: 'pending'
+    });
+
+    if (error) {
+      console.error('Auto-report failed:', error);
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleConfirmReferences = async (localReferences = referenceResults) => {
     if (!isPremium) return;
-    if (!currentMCQ || referenceResults.length === 0 || isConfirmingReferences) return;
+    if (!currentMCQ || isConfirmingReferences) return;
 
     setIsConfirmingReferences(true);
     try {
-      const prompt = `You are Dr Ahroid, an MBBS tutor. Review these book reference snippets for compliance with the MCQ.
+      const cachedVerification = await readCachedVerification();
+      if (cachedVerification) {
+        setReferenceVerification(cachedVerification);
+        setConfirmedReferenceIndexes([]);
+        toast({ title: "Verification loaded", description: "Using saved Dr Ahroid verification for this question." });
+        return;
+      }
 
-Question: ${currentMCQ.question}
-Correct answer: ${currentMCQ.correct_answer}
-Explanation: ${currentMCQ.explanation || 'None'}
-
-References:
-${referenceResults.map((ref, index) => `${index}: ${ref.book}, page ${ref.page}\n${ref.content}`).join('\n\n')}
-
-Return only JSON in this exact shape: {"matchingIndexes":[0,2]}. Include only snippets that directly support the question, correct answer, or explanation.`;
-
-      const response = await fetch('https://medmacs.app/api/ai/study-chat', {
+      const response = await fetch(aiApiUrl('reference-verify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: prompt }),
+        body: JSON.stringify({
+          question: currentMCQ.question,
+          correctAnswer: currentMCQ.correct_answer,
+          options: currentMCQ.shuffledOptions || currentMCQ.options || [],
+          explanation: currentMCQ.explanation || '',
+        }),
       });
 
       if (!response.ok) throw new Error('AI confirmation failed');
-      const data = await response.json();
-      const answer = data.answer || '';
-      const jsonMatch = answer.match(/\{[\s\S]*\}/);
-      const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+      const parsed = await response.json();
+      const explicitNoInternalReferences =
+        parsed?.verdict === 'no_references' ||
+        ['none', 'external', 'llm_knowledge'].includes(String(parsed?.sourceBasis || '').toLowerCase());
       const matchingIndexes = Array.isArray(parsed?.matchingIndexes)
-        ? parsed.matchingIndexes.filter(index => Number.isInteger(index) && index >= 0 && index < referenceResults.length)
+        ? parsed.matchingIndexes.filter(index => Number.isInteger(index) && index >= 0 && index < localReferences.length)
         : [];
-      const finalIndexes = matchingIndexes.length > 0 ? matchingIndexes : getFallbackConfirmedReferenceIndexes();
+      const finalIndexes = explicitNoInternalReferences
+        ? []
+        : (matchingIndexes.length > 0 ? matchingIndexes : getFallbackConfirmedReferenceIndexes(localReferences));
+      const allowedVerdicts = ['verified', 'incorrect', 'no_references', 'unconfirmed'];
+      const verdict = allowedVerdicts.includes(parsed?.verdict)
+        ? parsed.verdict
+        : (finalIndexes.length > 0 ? 'verified' : 'unconfirmed');
+      const sourceBasis = explicitNoInternalReferences ? (parsed?.sourceBasis || 'none') : (parsed?.sourceBasis || 'internal');
+      const apiCitations = normalizeCitations(parsed?.citations);
+      const localCitations = normalizeCitations(finalIndexes.map(index => localReferences[index]).filter(Boolean));
+      const citations = isInternalVerification(sourceBasis) && verdict !== 'no_references'
+        ? (apiCitations.length > 0 ? apiCitations : localCitations)
+        : [];
+      const shouldAutoReport = verdict === 'incorrect' || parsed?.markedAnswerWrong === true;
+      let autoReported = false;
 
       setConfirmedReferenceIndexes(finalIndexes);
+      if (shouldAutoReport) {
+        autoReported = await autoReportQuestion(
+          `Auto-report by Dr Ahroid: marked answer likely incorrect. Suggested answer: ${parsed?.correctAnswerSuggestion || 'Not provided'}. Basis: ${parsed?.sourceBasis || 'unspecified'}. Summary: ${parsed?.summary || 'No summary.'}`
+        );
+        if (autoReported) {
+          toast({ title: "Question auto-reported", description: "Dr Ahroid found the marked answer may be wrong." });
+        }
+      }
+      const verification = {
+        verdict,
+        sourceBasis,
+        summary: parsed?.summary || '',
+        citations,
+        correctAnswerSuggestion: parsed?.correctAnswerSuggestion || '',
+        markedAnswerWrong: parsed?.markedAnswerWrong === true,
+        autoReported,
+      };
+      setReferenceVerification(verification);
+      await cacheVerification(verification);
     } catch (error) {
-      const fallbackIndexes = getFallbackConfirmedReferenceIndexes();
+      const fallbackIndexes = getFallbackConfirmedReferenceIndexes(localReferences);
+      const fallbackVerification = {
+        verdict: fallbackIndexes.length > 0 ? 'verified' : 'unconfirmed',
+        sourceBasis: 'internal',
+        summary: fallbackIndexes.length > 0
+          ? 'Dr Ahroid found local references that appear to support this question.'
+          : 'Dr Ahroid could not confirm this question from available local references.',
+        citations: normalizeCitations(fallbackIndexes.map(index => localReferences[index]).filter(Boolean)),
+        autoReported: false,
+      };
       setConfirmedReferenceIndexes(fallbackIndexes);
+      setReferenceVerification(fallbackVerification);
       toast({ title: "Dr Ahroid used local confirmation", description: "AI service was unavailable, so references were checked locally." });
     } finally {
       setIsConfirmingReferences(false);
     }
+  };
+
+  const handleSummarizeReferences = async () => {
+    if (!canUseAiSummary) {
+      setReferenceSummary(null);
+      setIsSummarizingReferences(false);
+      return;
+    }
+    if (!currentMCQ || isSummarizingReferences) return;
+    const summaryCount = summaryGenerationCounts[currentMCQ.id] || 0;
+    if (summaryCount >= 3) return;
+
+    setIsSummarizingReferences(true);
+    try {
+      const response = await fetch(aiApiUrl('reference-summary'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: currentMCQ.question,
+          top_k: 5,
+        }),
+      });
+
+      if (!response.ok) throw new Error('AI summary failed');
+      const data = await response.json();
+
+      if (data.status === 'no_references' || !data.summary) {
+        setReferenceSummary({
+          summary: 'No suitable references were found for a focused summary.',
+          citations: [],
+        });
+        setSummaryGenerationCounts(prev => ({ ...prev, [currentMCQ.id]: (prev[currentMCQ.id] || 0) + 1 }));
+        return;
+      }
+
+      setReferenceSummary({
+        summary: data.summary || '',
+        citations: normalizeCitations(data.citations),
+      });
+      setSummaryGenerationCounts(prev => ({ ...prev, [currentMCQ.id]: (prev[currentMCQ.id] || 0) + 1 }));
+    } catch (error) {
+      console.error('Reference summary failed:', error);
+      toast({ title: "AI summary unavailable", description: "Dr Ahroid could not summarize these references right now." });
+    } finally {
+      setIsSummarizingReferences(false);
+    }
+  };
+
+  const handleSummaryUpgradePrompt = () => {
+    setUpgradeModalMessage("AI Summary is a premium feature. Upgrade your plan to generate concise book-reference summaries.");
+    setShowUpgradeModal(true);
   };
 
   useEffect(() => {
@@ -902,6 +1342,20 @@ Return only JSON in this exact shape: {"matchingIndexes":[0,2]}. Include only sn
       setLastSubmissionResetDate(profile.last_submission_reset_date);
     }
   }, [profile, profileLoading]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const updateOnlineStatus = () => setIsOnline(navigator.onLine);
+    updateOnlineStatus();
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus);
+      window.removeEventListener('offline', updateOnlineStatus);
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -1002,6 +1456,9 @@ Return only JSON in this exact shape: {"matchingIndexes":[0,2]}. Include only sn
       const answerMap: Record<string, { selectedAnswer: string }> = {};
 
       if (user?.id && !mistakeMode) {
+        const queuedAnswers = await getQueuedMCQAnswerMap(user.id, data.map(m => m.id));
+        Object.assign(answerMap, queuedAnswers);
+
         const { data: previousAnswers } = await supabase
           .from('user_answers')
           .select('mcq_id, selected_answer')
@@ -1012,12 +1469,13 @@ Return only JSON in this exact shape: {"matchingIndexes":[0,2]}. Include only sn
           previousAnswers.forEach(ans => {
             answerMap[ans.mcq_id] = { selectedAnswer: ans.selected_answer };
           });
-          setAnsweredQuestions(answerMap);
-
-          const foundIndex = data.findIndex(m => !answerMap[m.id]);
-          if (foundIndex !== -1) firstUnattemptedIndex = foundIndex;
-          else firstUnattemptedIndex = data.length - 1;
         }
+
+        setAnsweredQuestions(answerMap);
+
+        const foundIndex = data.findIndex(m => !answerMap[m.id]);
+        if (foundIndex !== -1) firstUnattemptedIndex = foundIndex;
+        else firstUnattemptedIndex = data.length - 1;
       }
 
       const shuffledMCQs = data.map(mcq => {
@@ -1041,6 +1499,27 @@ Return only JSON in this exact shape: {"matchingIndexes":[0,2]}. Include only sn
     };
     loadMCQs();
   }, [chapter, user?.id, mistakeMode, mistakeMcqIds, initialIndex]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadDownloadContext = async () => {
+      const [subjectData, chapterData] = await Promise.all([
+        fetchSubjectById(subject),
+        fetchChapterById(chapter, subject),
+      ]);
+
+      if (!cancelled) {
+        setDownloadSubject(subjectData);
+        setDownloadChapter(chapterData);
+      }
+    };
+
+    loadDownloadContext();
+    return () => {
+      cancelled = true;
+    };
+  }, [subject, chapter]);
 
   // Keep skeleton until shuffled mcqs have been committed to the DOM
   useEffect(() => {
@@ -1290,15 +1769,15 @@ Return only JSON in this exact shape: {"matchingIndexes":[0,2]}. Include only sn
                     onClick={handleSearchReference}
                     variant="outline"
                     className="w-full h-10 rounded-lg text-sm font-medium"
-                    disabled={isSearchingReference}
+                    disabled={isConfirmingReferences}
                   >
-                    <BookOpen className="w-4 h-4 mr-2" />
-                    {isSearchingReference ? 'Searching Book References' : referenceResults.length > 0 ? 'Open Book References' : 'Find Book References'}
+                    {isConfirmingReferences ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                    )}
+                    {isConfirmingReferences ? 'Verifying Question' : 'Find Reference'}
                   </Button>
-
-                  {!isSearchingReference && referenceError && (
-                    <p className="text-xs text-destructive text-center mt-2">No references found.</p>
-                  )}
                 </div>
               </motion.div>
             )}
@@ -1336,14 +1815,18 @@ Return only JSON in this exact shape: {"matchingIndexes":[0,2]}. Include only sn
               )}
             </Button>
           ) : (
-            !quickSubmit && (
+            !effectiveQuickSubmit && (
               <Button
                 onClick={() => handleSubmitAnswer()}
-                disabled={!selectedAnswer}
+                disabled={!selectedAnswer || isSubmittingAnswer}
                 className="flex-1 h-11 rounded-lg font-semibold bg-primary hover:bg-primary/90 disabled:opacity-50"
               >
-                <Shield className="w-4 h-4 mr-2" />
-                Check Answer
+                {isSubmittingAnswer ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Shield className="w-4 h-4 mr-2" />
+                )}
+                {isSubmittingAnswer ? 'Checking...' : 'Check Answer'}
               </Button>
             )
           )}
@@ -1381,6 +1864,8 @@ Return only JSON in this exact shape: {"matchingIndexes":[0,2]}. Include only sn
         isPremium={isPremium}
         theme={theme}
         setTheme={setTheme}
+        downloadSubject={downloadSubject}
+        downloadChapter={downloadChapter}
       />
       <LeaveTestModal isOpen={showLeaveModal} onClose={() => setShowLeaveModal(false)} onConfirm={() => { setShowLeaveModal(false); onBack(); }} />
       <ReportMCQModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} onSubmit={handleReportSubmit} isSubmitting={isReportSubmitting} />
@@ -1394,9 +1879,17 @@ Return only JSON in this exact shape: {"matchingIndexes":[0,2]}. Include only sn
         selectedIndex={selectedReferenceIndex}
         setSelectedIndex={setSelectedReferenceIndex}
         confirmedIndexes={confirmedReferenceIndexes}
+        verification={referenceVerification}
+        summary={referenceSummary}
+        isSummarizing={isSummarizingReferences}
+        onSummarize={handleSummarizeReferences}
+        onSummaryUpgrade={handleSummaryUpgradePrompt}
+        summaryCount={currentMCQ ? (summaryGenerationCounts[currentMCQ.id] || 0) : 0}
+        summaryLimitReached={currentMCQ ? (summaryGenerationCounts[currentMCQ.id] || 0) >= 3 : false}
         isConfirming={isConfirmingReferences}
         onConfirm={handleConfirmReferences}
         isPremium={isPremium}
+        canUseAiSummary={canUseAiSummary}
       />
       <QuestionMapDrawer isOpen={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
         <QuestionMapGrid />
@@ -1411,7 +1904,7 @@ Return only JSON in this exact shape: {"matchingIndexes":[0,2]}. Include only sn
           currentAnswer={selectedAnswer}
           correctAnswer={currentMCQ.correct_answer}
           userPlan={userPlanForChatbot}
-          isHidden={showExplanation || !quickSubmit} // Hide when navigation (next/prev) or submit buttons are visible
+          isHidden={showExplanation || !effectiveQuickSubmit} // Hide when navigation (next/prev) or submit buttons are visible
           onOpen={() => setIsChatbotOpen(true)}
           onQuestionHelp={() => setUsedAiHelpByQuestion(prev => ({ ...prev, [currentMCQ.id]: true }))}
         />

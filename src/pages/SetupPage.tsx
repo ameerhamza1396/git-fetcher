@@ -2,14 +2,19 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ChevronRight, ChevronLeft, Sparkles, User, Building2, GraduationCap, CheckCircle2, Loader2
+  ChevronRight, ChevronLeft, Sparkles, User, Building2, GraduationCap, CheckCircle2, Loader2, Gift, HeartHandshake
 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { StatusBar, Style } from '@capacitor/status-bar';
+import { NavigationBar } from '@capgo/capacitor-navigation-bar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { fetchInstitutes, type Institute } from '@/utils/institutes';
+import { generateUniqueReferralCode, resolveReferralCode } from '@/utils/referral';
+import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
 
 const VALID_YEARS = ['1st', '2nd', '3rd', '4th', '5th'];
 
@@ -26,6 +31,48 @@ const SetupWizard = () => {
   const [year, setYear] = useState('');
   const [usernameError, setUsernameError] = useState('');
   const [existingProfile, setExistingProfile] = useState<any>(null);
+  const [setupLoadError, setSetupLoadError] = useState('');
+  const [referredByName, setReferredByName] = useState<string | null>(null);
+  const [referralStepCode, setReferralStepCode] = useState('');
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
+
+    const root = document.getElementById('root');
+    const previousHtmlBackground = document.documentElement.style.backgroundColor;
+    const previousBodyBackground = document.body.style.backgroundColor;
+    const previousRootBackground = root?.style.backgroundColor;
+    const fallbackColor = '#020617';
+
+    document.documentElement.style.backgroundColor = fallbackColor;
+    document.body.style.backgroundColor = fallbackColor;
+    if (root) root.style.backgroundColor = fallbackColor;
+
+    const applyNativeBars = async () => {
+      try {
+        await StatusBar.setStyle({ style: Style.Dark });
+        await StatusBar.setBackgroundColor({ color: 'transparent' });
+
+        if ((NavigationBar as any).setNavigationBarColor) {
+          await (NavigationBar as any).setNavigationBarColor({ color: 'transparent', darkButtons: false });
+        } else {
+          await (NavigationBar as any).set?.({ color: fallbackColor, darkButtons: false });
+          await (NavigationBar as any).setBackgroundColor?.({ color: fallbackColor });
+          await (NavigationBar as any).setButtonsColor?.({ dark: false });
+        }
+      } catch (error) {
+        console.warn('Failed to sync setup page native bars', error);
+      }
+    };
+
+    applyNativeBars();
+
+    return () => {
+      document.documentElement.style.backgroundColor = previousHtmlBackground;
+      document.body.style.backgroundColor = previousBodyBackground;
+      if (root && previousRootBackground !== undefined) root.style.backgroundColor = previousRootBackground;
+    };
+  }, []);
 
   const ensureProfile = useCallback(async () => {
     if (!user?.id) throw new Error('User not authenticated.');
@@ -37,12 +84,29 @@ const SetupWizard = () => {
       .maybeSingle();
 
     if (fetchError) throw fetchError;
-    if (existing) return existing;
+
+    if (existing) {
+      if (!existing.referral_code) {
+        const code = await generateUniqueReferralCode();
+        await supabase.from('profiles').update({ referral_code: code }).eq('id', user.id);
+        existing.referral_code = code;
+      }
+      return existing;
+    }
+
+    const referralCode = await generateUniqueReferralCode();
+    let referredBy: string | null = null;
+    const metaReferralCode = user.user_metadata?.referral_code as string | undefined;
+    if (metaReferralCode) {
+      referredBy = await resolveReferralCode(metaReferralCode);
+    }
 
     const profileSeed = {
       id: user.id,
       full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || null,
       avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
+      referral_code: referralCode,
+      referred_by: referredBy,
       updated_at: new Date().toISOString(),
     };
 
@@ -67,38 +131,68 @@ const SetupWizard = () => {
       throw error;
     }
 
+    if (data && referredBy) {
+      notifyAchievementProgress('referral');
+    }
+
     return data;
   }, [user]);
+
+  const getInitialStep = useCallback((profile: any) => {
+    const hasUsername = !!profile?.username;
+    const hasInstitute = !!profile?.institute;
+    const hasValidYear = !!profile?.year && VALID_YEARS.includes(profile.year);
+
+    // Brand-new users should see the welcome step first.
+    if (!hasUsername && !hasInstitute && !hasValidYear) return 0;
+    if (!hasUsername) return 1;
+    if (!hasInstitute) return 2;
+    if (!hasValidYear) return 3;
+    return 5;
+  }, []);
+
+  const loadSetupProfile = useCallback(async () => {
+    setLoading(true);
+    setSetupLoadError('');
+
+    try {
+      const [profile, insts] = await Promise.all([
+        ensureProfile(),
+        fetchInstitutes(),
+      ]);
+      setInstitutes(insts);
+      setExistingProfile(profile);
+
+      setUsername(profile?.username || '');
+      setInstitute((profile as any)?.institute || '');
+      setYear((profile as any)?.year || '');
+
+      if (profile?.referred_by) {
+        const { data: referrer } = await supabase.from('profiles').select('full_name, username').eq('id', profile.referred_by).maybeSingle();
+        if (referrer) setReferredByName(referrer.full_name || referrer.username || 'a friend');
+      }
+
+      const initialStep = getInitialStep(profile);
+      if (initialStep === 5) { navigate('/dashboard', { replace: true }); return; }
+      setCurrentStep(initialStep);
+    } catch (error) {
+      console.error('Failed to initialize setup profile:', error);
+      setSetupLoadError(
+        navigator.onLine
+          ? 'We could not load your profile from the server. Please try again.'
+          : 'You appear to be offline, so setup fields cannot be verified right now.'
+      );
+      toast.error('Failed to load setup. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [ensureProfile, getInitialStep, navigate]);
 
   useEffect(() => {
     if (authLoading) return;
     if (!user) { navigate('/login'); return; }
-
-    const load = async () => {
-      try {
-        const [profile, insts] = await Promise.all([
-          ensureProfile(),
-          fetchInstitutes(),
-        ]);
-        setInstitutes(insts);
-        setExistingProfile(profile);
-
-        if (profile?.username) setUsername(profile.username);
-        if ((profile as any)?.institute) setInstitute((profile as any).institute);
-        if ((profile as any)?.year) setYear((profile as any).year);
-
-        if (!profile?.username) { setCurrentStep(1); }
-        else if (!(profile as any).institute) { setCurrentStep(2); }
-        else if (!(profile as any).year || !VALID_YEARS.includes((profile as any).year)) { setCurrentStep(3); }
-        else { navigate('/dashboard'); return; }
-      } catch (error) {
-        console.error('Failed to initialize setup profile:', error);
-        toast.error('Failed to load setup. Please try again.');
-      }
-      setLoading(false);
-    };
-    load();
-  }, [user, authLoading, navigate, ensureProfile]);
+    loadSetupProfile();
+  }, [user, authLoading, navigate, loadSetupProfile]);
 
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'there';
 
@@ -154,7 +248,22 @@ const SetupWizard = () => {
       setCurrentStep(4);
       return;
     }
-    if (currentStep === 4) { navigate('/dashboard'); }
+    if (currentStep === 4) {
+      if (referralStepCode && !referredByName) {
+        setSaving(true);
+        const referrerId = await resolveReferralCode(referralStepCode);
+        if (referrerId) {
+          await supabase.from('profiles').update({ referred_by: referrerId }).eq('id', user!.id);
+          const { data: referrer } = await supabase.from('profiles').select('full_name, username').eq('id', referrerId).maybeSingle();
+          if (referrer) setReferredByName(referrer.full_name || referrer.username || 'a friend');
+          notifyAchievementProgress('referral');
+        }
+        setSaving(false);
+      }
+      setCurrentStep(5);
+      return;
+    }
+    if (currentStep === 5) { navigate('/dashboard'); }
   };
 
   const handleBack = () => {
@@ -166,6 +275,7 @@ const SetupWizard = () => {
     { title: 'Username', icon: User },
     { title: 'Institute', icon: Building2 },
     { title: 'Year', icon: GraduationCap },
+    { title: 'Referral', icon: Gift },
     { title: 'All Set', icon: CheckCircle2 },
   ];
 
@@ -174,6 +284,7 @@ const SetupWizard = () => {
     'from-blue-600 via-indigo-600 to-violet-700',
     'from-emerald-600 via-teal-600 to-cyan-700',
     'from-orange-500 via-amber-600 to-yellow-600',
+    'from-pink-500 via-rose-500 to-fuchsia-700',
     'from-emerald-500 via-green-500 to-teal-600',
   ];
 
@@ -185,13 +296,35 @@ const SetupWizard = () => {
     );
   }
 
+  if (setupLoadError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-6 text-center">
+        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-6 text-white shadow-2xl">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10">
+            <User className="h-8 w-8 text-white/80" />
+          </div>
+          <h1 className="text-2xl font-black">Profile Setup Unavailable</h1>
+          <p className="mt-3 text-sm leading-relaxed text-white/60">{setupLoadError}</p>
+          <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Button onClick={() => navigate('/dashboard', { replace: true })} variant="outline" className="h-12 rounded-2xl border-white/20 bg-white/5 text-white hover:bg-white/10">
+              Go Back
+            </Button>
+            <Button onClick={loadSetupProfile} className="h-12 rounded-2xl bg-white font-black text-black hover:bg-white/90">
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const renderStepContent = () => {
     switch (currentStep) {
       case 0:
         return (
           <div className="text-center">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.2 }}>
-              <img src="/mascots/Mascot1.png" alt="Welcome" className="w-48 h-48 mx-auto mb-6 drop-shadow-2xl" />
+              <img src="/mascots/Mascot1.png" alt="Welcome" className="w-48 h-auto mx-auto mb-6 drop-shadow-2xl" />
             </motion.div>
             <h2 className="text-3xl md:text-4xl font-black text-white mb-3">
               Welcome, <span className="text-yellow-300">{displayName}</span>!
@@ -314,6 +447,39 @@ const SetupWizard = () => {
 
       case 4:
         return (
+          <div className="text-center max-w-md mx-auto">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
+              <div className="w-20 h-20 rounded-3xl bg-white/15 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20">
+                <Gift className="w-10 h-10 text-white" />
+              </div>
+            </motion.div>
+            <h2 className="text-3xl font-black text-white mb-2">Referral</h2>
+            {referredByName ? (
+              <div className="rounded-2xl bg-white/5 border-2 border-white/10 p-5 opacity-60 select-none">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <HeartHandshake className="h-6 w-6 text-white/70" />
+                  <p className="text-lg font-bold text-white/70">You were referred to Medmacs by <span className="text-primary-foreground">{referredByName}</span></p>
+                </div>
+                <p className="text-xs text-white/40 mt-1">Referral already applied</p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-white/60 text-sm mb-6">Enter a referral code if you have one (optional).</p>
+                <Input
+                  value={referralStepCode}
+                  onChange={(e) => setReferralStepCode(e.target.value.toUpperCase().slice(0, 6))}
+                  placeholder="Enter referral code"
+                  className="h-14 rounded-2xl bg-white/10 border-white/20 text-white placeholder:text-white/40 text-center text-lg font-bold tracking-[0.25em] focus:ring-2 focus:ring-white/30 uppercase"
+                  maxLength={6}
+                />
+                <p className="text-white/30 text-xs mt-3">Ask a friend for their code</p>
+              </div>
+            )}
+          </div>
+        );
+
+      case 5:
+        return (
           <div className="text-center">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.2 }}>
               <img src="/mascots/Mascot14.png" alt="All Set" className="w-48 h-auto mx-auto mb-6 drop-shadow-2xl" />
@@ -334,11 +500,13 @@ const SetupWizard = () => {
     if (currentStep === 2) return !!institute;
     if (currentStep === 3) return !!year;
     if (currentStep === 4) return true;
+    if (currentStep === 5) return true;
     return false;
   };
 
   return (
-    <div className={`relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden transition-all duration-700 bg-gradient-to-br ${gradients[currentStep]}`}>
+    <div className={`fixed inset-0 isolate h-dvh w-full flex flex-col items-center justify-center overflow-hidden overscroll-none transition-all duration-700 bg-gradient-to-br ${gradients[currentStep]}`}>
+      <div className={`absolute inset-0 z-0 bg-gradient-to-br ${gradients[currentStep]}`} />
       <div className="absolute top-[calc(env(safe-area-inset-top,0px)+16px)] left-6 right-6 z-50">
         <div className="flex gap-2">
           {steps.map((_, i) => (
@@ -365,7 +533,7 @@ const SetupWizard = () => {
 
       {currentStep === 0 && (
         <button
-          onClick={() => navigate('/dashboard')}
+          onClick={() => setCurrentStep(1)}
           className="absolute top-[calc(env(safe-area-inset-top,0px)+16px)] right-6 z-50 text-white/40 hover:text-white text-xs font-bold uppercase tracking-widest"
         >
           Skip
@@ -388,7 +556,7 @@ const SetupWizard = () => {
 
       <div className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+24px)] left-6 right-6 z-50">
         <div className={`flex items-center gap-3 ${currentStep > 0 ? 'justify-between' : 'justify-center'}`}>
-          {currentStep > 0 && currentStep < 4 && (
+          {currentStep > 0 && currentStep < 5 && (
             <Button
               onClick={handleBack}
               variant="outline"
@@ -401,12 +569,12 @@ const SetupWizard = () => {
             onClick={handleNext}
             disabled={!canProceed() || saving}
             className={`h-14 rounded-2xl bg-white text-black hover:bg-white/90 font-black shadow-2xl transition-all active:scale-95 ${
-              currentStep > 0 && currentStep < 4 ? 'flex-1' : 'w-full max-w-md'
+              currentStep > 0 && currentStep < 5 ? 'flex-1' : 'w-full max-w-md'
             }`}
           >
             {saving ? (
               <Loader2 className="w-5 h-5 animate-spin" />
-            ) : currentStep === 4 ? (
+            ) : currentStep === 5 ? (
               <span className="flex items-center gap-2">Go to Dashboard <Sparkles className="h-5 w-5 fill-black" /></span>
             ) : currentStep === 0 ? (
               <span className="flex items-center gap-2">Let's Go <ChevronRight className="h-5 w-5" /></span>

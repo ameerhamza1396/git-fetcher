@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Crown, ArrowLeft, ArrowRight, ScrollText, Zap, Loader2, ChevronLeft, Sparkles, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import Seo from "@/components/Seo";
 import UpgradeAccountModal from "@/components/UpgradeAccountModal";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { fetchMCQsBySubject, fetchSubjects } from "@/utils/mcqData";
+import { CollaborateModal } from "@/components/CollaborateModal";
 
 interface MCQ {
   id: string;
@@ -26,6 +27,7 @@ interface Subject {
   year?: number;
   icon?: string;
   color?: string;
+  institutes?: string[] | null;
 }
 
 interface FLPSessionData {
@@ -55,6 +57,7 @@ const FLP = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [showCollaborateModal, setShowCollaborateModal] = useState(false);
 
   const [savedSession, setSavedSession] = useState<FLPSessionData | null>(null);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
@@ -99,17 +102,14 @@ const FLP = () => {
   // Fetch subjects when reaching step 2
   useEffect(() => {
     if (wizardStep !== 2 || !user) return;
-    const fetchSubjects = async () => {
+    const loadSubjects = async () => {
       setLoadingSubjects(true);
       try {
-        const { data: profile } = await supabase.from("profiles").select("year").eq("id", user.id).maybeSingle();
-        if (!profile?.year) { setSubjects([]); setLoadingSubjects(false); return; }
-        const { data } = await supabase.from("subjects").select("id, name, year, icon, color").eq("year", profile.year);
-        setSubjects(data || []);
+        setSubjects(await fetchSubjects());
       } catch { setSubjects([]); }
       finally { setLoadingSubjects(false); }
     };
-    fetchSubjects();
+    loadSubjects();
   }, [wizardStep, user]);
 
   const shuffleArray = <T,>(array: T[]): T[] => {
@@ -147,14 +147,10 @@ const FLP = () => {
     if (!user || !selectedSubject || selectedMcqCount === null) return;
     setIsFetchingMcqs(true);
     try {
-      const { data: subjectData } = await supabase.from("subjects").select("name").eq("id", selectedSubject).single();
-      const subjectName = subjectData?.name || '';
-      const { data: chapters, error: chaptersError } = await supabase.from("chapters").select("id").eq("subject_id", selectedSubject);
-      if (chaptersError) throw chaptersError;
-      const chapterIds = (chapters || []).map((c) => c.id);
-      if (chapterIds.length === 0) { toast({ title: "No Questions", description: "No chapters found.", variant: "warning" }); setIsFetchingMcqs(false); return; }
-      const { data: mcqsData, error: mcqsError } = await supabase.from("mcqs").select("*").in("chapter_id", chapterIds);
-      if (mcqsError) throw mcqsError;
+      const selectedSubjectRecord = subjects.find(subject => subject.id === selectedSubject);
+      const subjectName = selectedSubjectRecord?.name || '';
+      const mcqsData = await fetchMCQsBySubject(selectedSubject);
+
       if (!mcqsData || mcqsData.length === 0) { toast({ title: "No MCQs Found", variant: "warning" }); setIsFetchingMcqs(false); return; }
       const shuffled = shuffleArray(mcqsData as MCQ[]);
       if (shuffled.length < selectedMcqCount) { toast({ title: "Not Enough Questions", description: `Only ${shuffled.length} available.`, variant: "warning" }); setIsFetchingMcqs(false); return; }
@@ -387,7 +383,19 @@ const FLP = () => {
                     <p className="text-white/40 mt-3 text-sm">Loading subjects...</p>
                   </div>
                 ) : subjects.length === 0 ? (
-                  <p className="text-white/50 py-8">No subjects found for your year.</p>
+                  <div className="py-8 text-center">
+                    <p className="text-white/80 text-sm font-bold">We are not fully available in your institute yet.</p>
+                    <p className="text-white/50 mt-2 mb-4 text-xs">Help us bring Medmacs to your campus.</p>
+                    <div className="flex flex-col gap-2 max-w-xs mx-auto">
+                      <Button onClick={() => setShowCollaborateModal(true)} variant="outline" className="border-white/30 text-white hover:bg-white/10 rounded-xl">
+                        Request campus collaboration
+                      </Button>
+                      <Button onClick={() => setShowCollaborateModal(true)} className="bg-white text-slate-900 hover:bg-slate-100 rounded-xl">
+                        Become Medmacs Ambassador
+                      </Button>
+                    </div>
+                    <CollaborateModal open={showCollaborateModal} onOpenChange={setShowCollaborateModal} />
+                  </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-3 mb-6 max-h-[30vh] overflow-y-auto pr-1">
                     {subjects.map((subj) => {

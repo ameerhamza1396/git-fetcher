@@ -775,6 +775,8 @@ export type Database = {
           id: string
           plan: string
           plan_expiry_date: string | null
+          referral_code: string | null
+          referred_by: string | null
           role: string | null
           updated_at: string | null
           username: string | null
@@ -789,6 +791,8 @@ export type Database = {
           id: string
           plan?: string
           plan_expiry_date?: string | null
+          referral_code?: string | null
+          referred_by?: string | null
           role?: string | null
           updated_at?: string | null
           username?: string | null
@@ -802,6 +806,8 @@ export type Database = {
           id?: string
           plan?: string
           plan_expiry_date?: string | null
+          referral_code?: string | null
+          referred_by?: string | null
           role?: string | null
           updated_at?: string | null
           username?: string | null

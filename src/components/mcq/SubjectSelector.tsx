@@ -2,8 +2,10 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { fetchSubjects, Subject } from '@/utils/mcqData';
 import { Loader2 } from 'lucide-react';
+import { CollaborateModal } from '@/components/CollaborateModal';
 
 interface SubjectSelectorProps {
   selectedSubject: string | null;
@@ -13,6 +15,7 @@ interface SubjectSelectorProps {
 export const SubjectSelector = ({ selectedSubject, onSubjectSelect }: SubjectSelectorProps) => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCollaborateModal, setShowCollaborateModal] = useState(false);
 
   useEffect(() => {
     const loadSubjects = async () => {
@@ -37,7 +40,17 @@ export const SubjectSelector = ({ selectedSubject, onSubjectSelect }: SubjectSel
   if (subjects.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-gray-600 dark:text-gray-400">No subjects available.</p>
+        <p className="font-semibold text-gray-800 dark:text-gray-100">We are not fully available in your institute yet.</p>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Help us expand Medmacs for your campus.</p>
+        <div className="mt-5 flex flex-col sm:flex-row justify-center gap-3">
+          <Button onClick={() => setShowCollaborateModal(true)} variant="outline">
+            Request campus collaboration
+          </Button>
+          <Button onClick={() => setShowCollaborateModal(true)}>
+            Become Medmacs Ambassador
+          </Button>
+        </div>
+        <CollaborateModal open={showCollaborateModal} onOpenChange={setShowCollaborateModal} />
       </div>
     );
   }

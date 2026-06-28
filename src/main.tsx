@@ -40,12 +40,16 @@ const Root = () => {
   );
 };
 
-if ("serviceWorker" in navigator) {
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("./service-worker.js")
       .catch(err => console.log("SW failed", err));
   });
+} else if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.getRegistrations()
+    .then(registrations => registrations.forEach(registration => registration.unregister()))
+    .catch(err => console.log("SW cleanup failed", err));
 }
 
 const rootElement = document.getElementById("root");

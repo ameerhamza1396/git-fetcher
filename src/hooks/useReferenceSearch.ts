@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { ReferenceResponse } from "../types/reference";
+import { aiApiUrl } from "@/utils/aiApi";
 
 export function useReferenceSearch() {
     const [loading, setLoading] = useState(false);
@@ -11,7 +12,7 @@ export function useReferenceSearch() {
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch("https://xpxupanivlugsleqnvbr.supabase.co/functions/v1/reference-search", {
+            const res = await fetch(aiApiUrl('reference'), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ query, top_k: topK }),
@@ -31,9 +32,11 @@ export function useReferenceSearch() {
 
             const result: ReferenceResponse = await res.json();
             setData(result);
+            return result;
         } catch (err: any) {
             console.error("Reference search failed:", err);
             setError(err.message);
+            return null;
         } finally {
             setLoading(false);
         }

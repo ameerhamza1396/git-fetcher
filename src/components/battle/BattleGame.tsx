@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { shouldBotAnswerCorrectly } from '@/utils/gameController';
 import { App } from '@capacitor/app';
+import { fetchMCQsBySubject } from '@/utils/mcqData';
 
 interface Participant {
   id: string;
@@ -155,13 +156,9 @@ export const BattleGame = ({ roomData, userId, onGameComplete, onExit }: BattleG
         return;
       }
 
-      const { data: mcqs, error } = await supabase
-        .from('mcqs')
-        .select('id, question, options, correct_answer, explanation, chapters!inner(subject_id)')
-        .eq('chapters.subject_id', roomData.subject_id)
-        .limit(roomData.total_questions * 2);
+      const mcqs = await fetchMCQsBySubject(roomData.subject_id);
 
-      if (error || !mcqs || mcqs.length === 0) {
+      if (!mcqs || mcqs.length === 0) {
         loadSampleQuestions();
         return;
       }

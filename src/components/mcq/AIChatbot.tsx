@@ -4,6 +4,8 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, X, Loader2, Bot, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { aiApiUrl, aiApiOrigin } from '@/utils/aiApi';
+import { logAiUsageEvent } from '@/utils/aiUsageEvents';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -11,15 +13,7 @@ interface Message {
   timestamp: string;
 }
 
-const parseBoldText = (text: string) => {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i} className="font-bold">{part.slice(2, -2)}</strong>;
-    }
-    return part;
-  });
-};
+import { parseBoldText } from '@/utils/format';
 
 interface AIChatbotProps {
   isOpen: boolean;
@@ -51,8 +45,7 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const hasPremiumAccess = userPlan?.toLowerCase() === 'premium' || userPlan?.toLowerCase() === 'iconic';
-  const API_BASE_URL = 'https://medmacs.app/api/ai';
+  const hasPremiumAccess = userPlan?.toLowerCase() === 'premium';
 
   const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); };
   useEffect(() => { scrollToBottom(); }, [messages]);
@@ -69,15 +62,24 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
       if (questionContext) {
         composedPrompt = `MCQ Question: ${questionContext}\nCorrect Answer: ${correctAnswer}\nUser Selected: ${currentAnswer || 'None'}\nExplanation Provided: ${explanationContext}\n\nUser Query: ${message.trim()}`;
       }
-      const response = await fetch(`${API_BASE_URL}/study-chat`, {
+      const response = await fetch(aiApiUrl('ai/study-chat'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: composedPrompt }),
       });
       if (!response.ok) { const errorText = await response.text(); throw new Error(`Server responded with ${response.status}: ${errorText}`); }
       const data = await response.json();
-      setMessages(prev => [...prev, { role: 'assistant', content: data.answer || 'Sorry, I could not generate a response.', timestamp: new Date().toISOString() }]);
+      const answer = data.answer || 'Sorry, I could not generate a response.';
+      setMessages(prev => [...prev, { role: 'assistant', content: answer, timestamp: new Date().toISOString() }]);
+      await logAiUsageEvent({
+        source: 'mcq_chatbot',
+        metadata: {
+          hasQuestionContext: Boolean(questionContext),
+          promptLength: message.trim().length,
+          responseLength: String(answer).length,
+        },
+      });
     } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: `Sorry, there was an error connecting to the AI service. Please try again.`, timestamp: new Date().toISOString() }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: `Sorry, there was an error connecting to the AI service. Please check if the server at ${aiApiOrigin} is running and try again.`, timestamp: new Date().toISOString() }]);
     } finally { setIsLoading(false); }
   };
 

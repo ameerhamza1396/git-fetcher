@@ -51,7 +51,7 @@ export const buildFallbackCards = (attempts: WrongAttempt[], batchIndex: number,
 
 export const fetchReferenceSnippet = async (question: string) => {
   try {
-    const response = await fetch('https://xpxupanivlugsleqnvbr.supabase.co/functions/v1/reference-search', {
+    const response = await fetch('https://ai.medmacs.app/api/reference', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: question, top_k: 2 }),
@@ -71,7 +71,7 @@ export const refineFlashcardsWithAI = async (attempts: WrongAttempt[], batchInde
   const cardSource = selected.length ? selected : attempts.slice(0, batchSize);
   const references = await Promise.all(cardSource.map(attempt => fetchReferenceSnippet(attempt.mcq.question)));
 
-  const response = await fetch('https://medmacs.app/api/ai/titration-flashcards', {
+  const response = await fetch('https://ai.medmacs.app/api/ai/titration-flashcards', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

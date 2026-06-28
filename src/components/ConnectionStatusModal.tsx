@@ -1,7 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { WifiOff, RefreshCw, Wifi } from 'lucide-react';
+import { BookOpen, Lock, PlayCircle, RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useLocation, useNavigate } from 'react-router-dom';
+import {
+  getOfflineChapterSummaries,
+  isChapterDownloaded,
+  OfflineChapterSummary,
+  subscribeOfflineChapterChanges,
+} from '@/utils/offlineChapters';
+import {
+  getQueuedMCQAnswerCount,
+  subscribeOfflineAnswerChanges,
+  syncQueuedMCQAnswers,
+} from '@/utils/offlineAnswerSync';
 
 const OFFLINE_TOLERANCE_MS = 2000;
 
@@ -9,7 +21,13 @@ const ConnectionStatusModal = () => {
   const [isOffline, setIsOffline] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [showRestored, setShowRestored] = useState(false);
+  const [downloadedChapters, setDownloadedChapters] = useState<OfflineChapterSummary[]>([]);
+  const [routeAllowsOffline, setRouteAllowsOffline] = useState(false);
+  const [queuedAnswerCount, setQueuedAnswerCount] = useState(0);
+  const [isSyncingAnswers, setIsSyncingAnswers] = useState(false);
   const toleranceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const handleOnline = useCallback(() => {
     // Double check navigator.onLine to avoid false positives from browser events
@@ -20,6 +38,7 @@ const ConnectionStatusModal = () => {
       toleranceTimer.current = null;
     }
     setIsRetrying(false);
+    syncOfflineAnswers();
     setIsOffline((prev) => {
       if (prev) {
         setShowRestored(true);
@@ -28,6 +47,20 @@ const ConnectionStatusModal = () => {
       return false;
     });
   }, []);
+
+  const syncOfflineAnswers = useCallback(async () => {
+    if (isSyncingAnswers || !navigator.onLine) return;
+
+    setIsSyncingAnswers(true);
+    try {
+      await syncQueuedMCQAnswers();
+      setQueuedAnswerCount(await getQueuedMCQAnswerCount());
+    } catch (error) {
+      console.warn('Offline answer sync failed:', error);
+    } finally {
+      setIsSyncingAnswers(false);
+    }
+  }, [isSyncingAnswers]);
 
   const handleOffline = useCallback(() => {
     toleranceTimer.current = setTimeout(() => {
@@ -47,6 +80,52 @@ const ConnectionStatusModal = () => {
       if (toleranceTimer.current) clearTimeout(toleranceTimer.current);
     };
   }, [handleOnline, handleOffline]);
+
+  const refreshOfflineContext = useCallback(async () => {
+    const summaries = await getOfflineChapterSummaries();
+    setDownloadedChapters(summaries);
+
+    const pathname = location.pathname;
+    const subjectMatch = pathname.match(/^\/mcqs\/chapter\/([^/]+)$/);
+    const chapterRouteMatch = pathname.match(/^\/mcqs\/(?:settings|quiz)\/([^/]+)\/([^/]+)/);
+
+    if (pathname === '/dashboard') {
+      setRouteAllowsOffline(true);
+      return;
+    }
+
+    if (pathname === '/mcqs') {
+      setRouteAllowsOffline(summaries.length > 0);
+      return;
+    }
+
+    if (subjectMatch) {
+      setRouteAllowsOffline(summaries.some(chapter => chapter.subjectId === subjectMatch[1]));
+      return;
+    }
+
+    if (chapterRouteMatch) {
+      setRouteAllowsOffline(await isChapterDownloaded(chapterRouteMatch[2]));
+      return;
+    }
+
+    setRouteAllowsOffline(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    refreshOfflineContext();
+    return subscribeOfflineChapterChanges(refreshOfflineContext);
+  }, [refreshOfflineContext]);
+
+  useEffect(() => {
+    const refreshQueuedAnswers = async () => {
+      setQueuedAnswerCount(await getQueuedMCQAnswerCount());
+    };
+
+    refreshQueuedAnswers();
+    if (navigator.onLine) syncOfflineAnswers();
+    return subscribeOfflineAnswerChanges(refreshQueuedAnswers);
+  }, [syncOfflineAnswers]);
 
   const handleRetry = async () => {
     setIsRetrying(true);
@@ -79,6 +158,16 @@ const ConnectionStatusModal = () => {
     }
   };
 
+  const goToOfflineMcqs = () => {
+    setIsOffline(false);
+    navigate('/mcqs');
+  };
+
+  const goToDownloadedChapter = (chapter: OfflineChapterSummary) => {
+    setIsOffline(false);
+    navigate(`/mcqs/settings/${chapter.subjectId}/${chapter.id}`);
+  };
+
   return (
     <>
       {/* Restored toast */}
@@ -99,7 +188,7 @@ const ConnectionStatusModal = () => {
 
       {/* Offline modal */}
       <AnimatePresence>
-        {isOffline && (
+        {isOffline && !routeAllowsOffline && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -117,7 +206,7 @@ const ConnectionStatusModal = () => {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.92, opacity: 0, y: 24 }}
               transition={{ type: 'spring', damping: 22, stiffness: 260 }}
-              className="relative mx-6 max-w-sm w-full rounded-3xl border border-border/30 bg-card/80 backdrop-blur-xl p-8 text-center shadow-2xl"
+              className="relative mx-6 max-w-sm w-full rounded-3xl border border-border/30 bg-card/80 backdrop-blur-xl p-7 text-center shadow-2xl"
             >
               {/* Animated icon */}
               <div className="mx-auto mb-6 w-20 h-20 rounded-3xl bg-destructive/10 flex items-center justify-center">
@@ -130,9 +219,49 @@ const ConnectionStatusModal = () => {
               </div>
 
               <h2 className="text-xl font-black text-foreground mb-2">No Connection</h2>
-              <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-                It looks like you're offline. Please check your internet connection and try again.
+              <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
+                You're offline. Dashboard links and non-downloaded chapters are unavailable until your connection returns.
+                {queuedAnswerCount > 0 ? ` ${queuedAnswerCount} answer${queuedAnswerCount === 1 ? '' : 's'} waiting to sync.` : ''}
               </p>
+
+              {downloadedChapters.length > 0 ? (
+                <div className="mb-5 space-y-2 text-left">
+                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-emerald-600" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300">Downloaded chapters</span>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={goToOfflineMcqs} className="h-7 rounded-lg px-2 text-[10px] font-black uppercase">
+                      MCQs
+                    </Button>
+                  </div>
+                  <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
+                    {downloadedChapters.map(chapter => (
+                      <button
+                        key={chapter.id}
+                        type="button"
+                        onClick={() => goToDownloadedChapter(chapter)}
+                        className="flex w-full items-center gap-3 rounded-2xl border border-border/40 bg-background/80 p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+                      >
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                          <PlayCircle className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-black text-foreground">{chapter.chapterName}</p>
+                          <p className="truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            {chapter.subjectName} · Chapter {chapter.chapterNumber}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-5 flex items-center gap-3 rounded-2xl border border-border/40 bg-muted/40 p-3 text-left opacity-60">
+                  <Lock className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <p className="text-xs font-bold text-muted-foreground">No chapters are downloaded on this device yet.</p>
+                </div>
+              )}
 
               <Button
                 onClick={handleRetry}

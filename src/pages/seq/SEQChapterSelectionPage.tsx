@@ -1,13 +1,14 @@
 import { useState, useEffect, useLayoutEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, BookOpen } from 'lucide-react';
-import { fetchSEQChaptersBySubject, SEQChapter, SEQSubject } from '@/utils/mcqData';
+import { fetchSEQChaptersBySubject, fetchSEQSubjectById, SEQChapter, SEQSubject } from '@/utils/mcqData';
 import { useAuth } from '@/hooks/useAuth';
 import { MCQPageLayout } from '@/pages/mcq/MCQPageLayout';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { CollaborateModal } from '@/components/CollaborateModal';
 
 const ChapterCardSkeleton = () => (
   <div className="relative overflow-hidden rounded-2xl bg-muted/20 p-4 animate-pulse border border-border/30">
@@ -37,6 +38,7 @@ const SEQChapterSelectionPage = () => {
   const [loading, setLoading] = useState(true);
   const [selectedChapter, setSelectedChapter] = useState<SEQChapter | null>(null);
   const [subject, setSubject] = useState<SEQSubject | null>(null);
+  const [showCollaborateModal, setShowCollaborateModal] = useState(false);
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['profile', 'seq-chapter-select'],
@@ -55,13 +57,13 @@ const SEQChapterSelectionPage = () => {
       
       setLoadingChapters(true);
       
-      const [{ data: subjectData }, chapters] = await Promise.all([
-        supabase.from('seqs_subjects').select('*').eq('id', subjectId).single(),
+      const [subjectData, chapters] = await Promise.all([
+        fetchSEQSubjectById(subjectId),
         fetchSEQChaptersBySubject(subjectId)
       ]);
       
       if (subjectData) {
-        setSubject(subjectData as SEQSubject);
+        setSubject(subjectData);
       }
       setAllChapters(chapters);
       setLoadingChapters(false);
@@ -93,8 +95,14 @@ const SEQChapterSelectionPage = () => {
     return (
       <MCQPageLayout backTo="/seqs">
         <div className="text-center py-20">
-          <p className="text-muted-foreground">Subject not found</p>
-          <Button onClick={() => navigate('/seqs')} className="mt-4">Go Back</Button>
+          <p className="font-semibold text-foreground">We are not fully available in your institute yet.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Help us bring SEQ content to your campus.</p>
+          <div className="mt-5 flex flex-col sm:flex-row justify-center gap-3">
+            <Button asChild variant="outline"><Link to="/contact-us?subject=campus-collaboration">Request campus collaboration</Link></Button>
+            <Button onClick={() => setShowCollaborateModal(true)}>Become Medmacs Ambassador</Button>
+          </div>
+          <Button onClick={() => navigate('/seqs')} variant="ghost" className="mt-4">Go Back</Button>
+          <CollaborateModal open={showCollaborateModal} onOpenChange={setShowCollaborateModal} />
         </div>
       </MCQPageLayout>
     );
@@ -132,6 +140,16 @@ const SEQChapterSelectionPage = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-0 pb-32 grid grid-cols-1 md:grid-cols-2 gap-4">
         {loadingChapters ? (
           Array.from({ length: 6 }).map((_, i) => <ChapterCardSkeleton key={i} />)
+        ) : allChapters.length === 0 ? (
+          <div className="col-span-full text-center py-16">
+            <p className="font-semibold text-foreground">We are not fully available in your institute yet.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Help us bring chapter-wise SEQ content to your campus.</p>
+            <div className="mt-5 flex flex-col sm:flex-row justify-center gap-3">
+              <Button asChild variant="outline"><Link to="/contact-us?subject=campus-collaboration">Request campus collaboration</Link></Button>
+              <Button onClick={() => setShowCollaborateModal(true)}>Become Medmacs Ambassador</Button>
+            </div>
+            <CollaborateModal open={showCollaborateModal} onOpenChange={setShowCollaborateModal} />
+          </div>
         ) : (
           allChapters.map((ch, idx) => {
             const isComingSoon = (ch.seq_count || 0) === 0;

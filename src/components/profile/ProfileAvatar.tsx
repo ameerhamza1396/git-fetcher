@@ -31,6 +31,7 @@ import {
     DialogClose
 } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useCachedImage } from '@/hooks/useCachedImage';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import Cropper from 'react-easy-crop';
@@ -98,6 +99,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
     const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
 
     const userAvatarUrl = profileData?.avatar_url;
+    const cachedAvatarUrl = useCachedImage(userAvatarUrl);
     const currentPlanColorClasses = planColors[rawUserPlan] || planColors['default'];
 
     const onCropComplete = useCallback((_croppedArea: any, croppedPixels: any) => {
@@ -274,7 +276,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                         {userPlanDisplayName}
                     </Badge>
                     <Avatar className="h-8 w-8">
-                        <AvatarImage src={userAvatarUrl || undefined} alt={`${displayName.substring(0, 2).toUpperCase() || 'U'} avatar`} />
+                        <AvatarImage src={cachedAvatarUrl || undefined} alt={`${displayName.substring(0, 2).toUpperCase() || 'U'} avatar`} />
                         <AvatarFallback className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-sm">
                             {displayName.substring(0, 2).toUpperCase() || 'U'}
                         </AvatarFallback>
@@ -283,7 +285,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
             ) : (
                 <div className="relative w-20 h-20 rounded-full overflow-hidden border-[3px] border-white/30 shadow-lg group cursor-pointer" onClick={() => setShowAvatarEditDialog(true)}>
                     <Avatar className="w-full h-full">
-                        <AvatarImage src={userAvatarUrl || undefined} alt="Profile Avatar" className="w-full h-full object-cover transition-all duration-300" />
+                        <AvatarImage src={cachedAvatarUrl || undefined} alt="Profile Avatar" className="w-full h-full object-cover transition-all duration-300" />
                         <AvatarFallback className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white text-2xl font-bold">
                             {displayName.substring(0, 1).toUpperCase()}
                         </AvatarFallback>
@@ -311,7 +313,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                         {!imageSrc && (
                             <div className="relative w-48 h-48 rounded-2xl overflow-hidden border-2 border-border shadow-md bg-muted">
                                 <Avatar className="w-full h-full rounded-none">
-                                    <AvatarImage src={userAvatarUrl || undefined} alt="Current Avatar" className="w-full h-full object-cover" />
+                                    <AvatarImage src={cachedAvatarUrl || undefined} alt="Current Avatar" className="w-full h-full object-cover" />
                                     <AvatarFallback className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white text-6xl font-bold rounded-none">
                                         {displayName.substring(0, 1).toUpperCase()}
                                     </AvatarFallback>

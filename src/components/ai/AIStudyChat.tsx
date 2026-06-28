@@ -9,8 +9,8 @@ import { Loader2, Send, MessageSquare, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Message, ChatSession, ChatSessionInsert, ChatSessionUpdate } from '@/types/ai';
 import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://medistics-ai-bot.vercel.app';
+import { aiApiUrl } from '@/utils/aiApi';
+import { logAiUsageEvent } from '@/utils/aiUsageEvents';
 
 export const AIStudyChat = () => {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
@@ -120,7 +120,7 @@ export const AIStudyChat = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/study-chat`, {
+      const response = await fetch(aiApiUrl('ai/study-chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -136,6 +136,14 @@ export const AIStudyChat = () => {
       const final = [...newMsgs, aiMsg];
       setMessages(final);
       await saveSession(final);
+      await logAiUsageEvent({
+        source: 'ai_study_chat',
+        metadata: {
+          sessionId: currentSession.id,
+          promptLength: userMsg.content.length,
+          responseLength: String(answer || '').length,
+        },
+      });
     } catch (e: any) {
       console.error('Error sending message:', e);
       toast({ title: 'Error', description: e.message || 'Failed to send message', variant: 'destructive' });

@@ -13,6 +13,8 @@ import { ProfileDropdown } from '@/components/ProfileDropdown';
 import Seo from '@/components/Seo';
 import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
 import { motion, AnimatePresence } from 'framer-motion';
+import { aiApiUrl } from '@/utils/aiApi';
+import { logAiUsageEvent } from '@/utils/aiUsageEvents';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,17 +39,22 @@ interface SavedChat {
   session_name?: string;
 }
 
-const API_BASE_URL = 'https://medmacs.app/api/ai';
+import { parseBoldText } from '@/utils/format';
 
-const parseBoldText = (text: string) => {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i} className="font-bold">{part.slice(2, -2)}</strong>;
-    }
-    return part;
-  });
-};
+const fallbackSuggestions = [
+  'Osteomyelitis',
+  'Types of MI',
+  'Azithromycin SE',
+  'McBurney point',
+  'Explain nephrotic syndrome',
+  'Causes of clubbing',
+  'Brachial plexus summary',
+  'Insulin mechanism',
+  'Tetralogy of Fallot',
+  'Appendicitis signs',
+  'Shock types',
+  'Antibiotic resistance',
+];
 
 const DrSultanChat: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
@@ -63,6 +70,7 @@ const DrSultanChat: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const [suggestionTick, setSuggestionTick] = useState(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -98,7 +106,44 @@ const DrSultanChat: React.FC = () => {
     enabled: !!user?.id
   });
 
+  const { data: chatSuggestions = fallbackSuggestions } = useQuery({
+    queryKey: ['aiChatSuggestions'],
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await (supabase.from('ai_chat_suggestions') as any)
+        .select('prompt')
+        .eq('is_active', true)
+        .order('order_index', { ascending: true })
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn('Unable to load AI chat suggestions', error);
+        return fallbackSuggestions;
+      }
+
+      const prompts = (data || [])
+        .map((item: any) => String(item.prompt || '').trim())
+        .filter(Boolean);
+
+      return prompts.length >= 4 ? prompts : fallbackSuggestions;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
   const canUseChat = profile?.plan?.toLowerCase() === 'premium';
+  const visibleSuggestions = React.useMemo(() => {
+    const source = chatSuggestions.length >= 4 ? chatSuggestions : fallbackSuggestions;
+    const start = suggestionTick % source.length;
+
+    return Array.from({ length: Math.min(4, source.length) }, (_, index) => source[(start + index) % source.length]);
+  }, [chatSuggestions, suggestionTick]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setSuggestionTick((tick) => tick + 1);
+    }, 30000);
+
+    return () => window.clearInterval(interval);
+  }, []);
 
   // --- 2. MUTATIONS ---
   const deleteSessionMutation = useMutation({
@@ -171,7 +216,7 @@ const DrSultanChat: React.FC = () => {
     const questionWithContext = context ? `${context}\n\nUser: ${trimmedInput}` : trimmedInput;
 
     try {
-      const res = await fetch(`${API_BASE_URL}/study-chat`, {
+      const res = await fetch(aiApiUrl('ai/study-chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: questionWithContext })
@@ -193,6 +238,13 @@ const DrSultanChat: React.FC = () => {
       const finalMessages = [...messagesWithUser, aiMsg];
       setMessages(finalMessages);
       await syncChatToDb(finalMessages, currentSessionId);
+      await logAiUsageEvent({
+        source: 'ai_chatbot_page',
+        metadata: {
+          promptLength: trimmedInput.length,
+          responseLength: aiResponseText.length,
+        },
+      });
     } catch (err: any) {
       setMessages(prev => [...prev, {
         sender: 'ai',
@@ -349,7 +401,7 @@ const DrSultanChat: React.FC = () => {
                 <p className="text-sm text-muted-foreground font-medium max-w-sm mb-6">Ask about anatomy, pharmacology, procedures, or test cases.</p>
                 {canUseChat && (
                   <div className="grid grid-cols-2 gap-2 w-full max-w-md">
-                    {['Osteomyelitis', 'Types of MI', 'Azithromycin SE', 'McBurney point'].map(q => (
+                    {visibleSuggestions.map(q => (
                       <button
                         key={q}
                         onClick={() => setInputMessage(q)}

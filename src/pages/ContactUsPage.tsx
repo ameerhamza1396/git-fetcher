@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,7 @@ import {
     Loader2, CheckCircle, Send, ArrowLeft
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { fetchInstitutes, getInstituteDisplayName } from '@/utils/institutes';
 import Seo from '@/components/Seo';
 
 const ContactUsPage = () => {
@@ -22,15 +23,23 @@ const ContactUsPage = () => {
     const lastScrollY = useRef(0);
     const [headerVisible, setHeaderVisible] = useState(true);
 
+    const [searchParams] = useSearchParams();
+    const isCampusCollaboration = searchParams.get('subject') === 'campus-collaboration';
     const [formData, setFormData] = useState({ fullName: '', email: '', message: '' });
     const [formErrors, setFormErrors] = useState({});
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+
+    const { data: institutes } = useQuery({
+        queryKey: ['institutesForContact'],
+        queryFn: fetchInstitutes,
+        staleTime: 5 * 60 * 1000,
+    });
 
     const { data: profile } = useQuery({
         queryKey: ['profileForContact', user?.id],
         queryFn: async () => {
             if (!user?.id) return null;
-            const { data, error } = await supabase.from('profiles').select('full_name, email, avatar_url, plan').eq('id', user.id).maybeSingle();
+            const { data, error } = await supabase.from('profiles').select('full_name, email, avatar_url, plan, institute').eq('id', user.id).maybeSingle();
             if (error) return null;
             return data;
         },
@@ -48,15 +57,28 @@ const ContactUsPage = () => {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
+    const userInstituteName = getInstituteDisplayName((profile as any)?.institute || '', institutes || []);
+    const campusCollaborationMessage = userInstituteName
+        ? `Hi Medmacs team, I'm interested in bringing Medmacs to my campus/institute (${userInstituteName}). Please share more details about campus collaboration.`
+        : "Hi Medmacs team, I'm interested in bringing Medmacs to my campus/institute. Please share more details about campus collaboration.";
+
     useEffect(() => {
         if (user) {
             setFormData(prev => ({
                 ...prev,
                 email: user.email || '',
                 fullName: profile?.full_name || user.user_metadata?.full_name || '',
+                message: isCampusCollaboration && !prev.message
+                    ? campusCollaborationMessage
+                    : prev.message,
+            }));
+        } else if (isCampusCollaboration) {
+            setFormData(prev => ({
+                ...prev,
+                message: prev.message || campusCollaborationMessage,
             }));
         }
-    }, [user, profile]);
+    }, [user, profile, institutes, isCampusCollaboration, campusCollaborationMessage]);
 
     const handleInputChange = (e) => {
         const { id, value } = e.target;

@@ -86,14 +86,18 @@ export const useAuth = () => {
 
   const signUp = async (email: string, password: string, userData: any) => {
     try {
+      const meta: Record<string, any> = {
+        full_name: userData.fullName || userData.full_name,
+        username: userData.username,
+      };
+      if (userData.referralCode) {
+        meta.referral_code = userData.referralCode;
+      }
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: {
-            full_name: userData.fullName || userData.full_name,
-            username: userData.username,
-          },
+          data: meta,
           emailRedirectTo: `${window.location.origin}/dashboard`
         }
       });

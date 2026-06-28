@@ -1,8 +1,10 @@
 export interface ReferenceChunk {
     book: string;
     page: number;
-    content: string;
+    content?: string;
     score: number;
+    show_extracted_text?: boolean;
+    showExtractedText?: boolean;
 }
 
 export interface ReferenceResponse {

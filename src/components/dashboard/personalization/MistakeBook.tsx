@@ -5,9 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { BookOpen, ChevronLeft, ChevronRight, Loader2, Lock, RotateCcw, Sparkles, Target, XCircle } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { CorrectionMCQModal } from './CorrectionMCQModal';
 import { fetchReferenceSnippet } from './personalizationUtils';
 import { MistakeChapter, MistakeSubject, WrongAttempt } from './types';
+import { parseBoldText } from '@/utils/format';
 
 type MistakeBookProps = {
   subjects: MistakeSubject[];
@@ -50,7 +52,7 @@ export const MistakeBook = ({ subjects, isPremium }: MistakeBookProps) => {
     setAiLoading(true);
     try {
       const reference = await fetchReferenceSnippet(attempt.mcq.question);
-      const response = await fetch('https://medmacs.app/api/ai/mistake-explain', {
+      const response = await fetch('https://ai.medmacs.app/api/ai/mistake-explain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -107,8 +109,8 @@ export const MistakeBook = ({ subjects, isPremium }: MistakeBookProps) => {
       </div>
 
       <Dialog open={!!activeChapter} onOpenChange={(open) => !open && setActiveChapter(null)}>
-        <DialogContent className="max-w-2xl overflow-hidden rounded-3xl border-border/40 p-0">
-          <DialogHeader className="border-b border-border/40 bg-background px-5 py-4 text-left">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden rounded-3xl border-border/40 p-0 flex flex-col">
+          <DialogHeader className="shrink-0 border-b border-border/40 bg-background px-5 py-4 text-left">
             <DialogTitle className="flex items-center gap-2 text-base font-black">
               <BookOpen className="h-5 w-5 text-primary" />
               {activeChapter?.name}
@@ -119,7 +121,7 @@ export const MistakeBook = ({ subjects, isPremium }: MistakeBookProps) => {
           </DialogHeader>
 
           {activeAttempt && (
-            <div className="p-4">
+            <div className="overflow-y-auto flex-1 p-4">
               <div className="mb-3 flex items-center justify-between">
                 <Badge variant="secondary">{activeIndex + 1}/{activeChapter?.attempts.length}</Badge>
                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{activeChapter?.subjectName}</span>
@@ -205,7 +207,7 @@ export const MistakeBook = ({ subjects, isPremium }: MistakeBookProps) => {
       </Dialog>
 
       <Dialog open={!!aiExplainTarget} onOpenChange={(open) => !open && setAiExplainTarget(null)}>
-        <DialogContent className="max-w-lg rounded-3xl">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto rounded-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary" />
@@ -214,20 +216,25 @@ export const MistakeBook = ({ subjects, isPremium }: MistakeBookProps) => {
             <DialogDescription>Premium revision for this mistake-book MCQ.</DialogDescription>
           </DialogHeader>
           {aiLoading ? (
-            <div className="flex items-center gap-2 rounded-2xl bg-muted p-4 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Dr Ahroid is preparing the explanation.
+            <div className="space-y-3 rounded-2xl bg-muted/60 p-4">
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-11/12" />
+              <Skeleton className="h-3 w-4/5" />
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-3/4" />
+              <Skeleton className="h-3 w-9/10" />
+              <Skeleton className="h-3 w-5/6" />
             </div>
           ) : (
             <div className="max-h-[55vh] overflow-y-auto rounded-2xl bg-muted/60 p-4 text-sm leading-relaxed text-foreground whitespace-pre-wrap">
-              {aiExplanation}
+              {parseBoldText(aiExplanation)}
             </div>
           )}
         </DialogContent>
       </Dialog>
 
       <Dialog open={!!explanationTarget} onOpenChange={(open) => !open && setExplanationTarget(null)}>
-        <DialogContent className="max-w-lg rounded-3xl">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto rounded-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-primary" />
@@ -238,7 +245,7 @@ export const MistakeBook = ({ subjects, isPremium }: MistakeBookProps) => {
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto rounded-2xl bg-muted/60 p-4 text-sm leading-relaxed text-foreground whitespace-pre-wrap">
-            {explanationTarget?.mcq.explanation || 'No explanation provided.'}
+            {parseBoldText(explanationTarget?.mcq.explanation || 'No explanation provided.')}
           </div>
         </DialogContent>
       </Dialog>

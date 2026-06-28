@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
@@ -9,11 +9,11 @@ import { MCQPageLayout } from '@/pages/mcq/MCQPageLayout';
 import { SEQProgressTracker } from '@/components/seq/SEQProgressTracker';
 import PageSkeleton from '@/components/skeletons/PageSkeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Link } from 'react-router-dom';
 import { Lock } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import Seo from '@/components/Seo';
+import { CollaborateModal } from '@/components/CollaborateModal';
 
 const SubjectCardSkeleton = () => (
   <div className="relative overflow-hidden rounded-3xl bg-muted/20 p-6 animate-pulse border border-border/40">
@@ -40,6 +40,7 @@ const SEQSubjectSelectionPage = () => {
   const [loadingSubjects, setLoadingSubjects] = useState(true);
   const [loading, setLoading] = useState(true);
   const [selectedSubject, setSelectedSubject] = useState<SEQSubject | null>(null);
+  const [showCollaborateModal, setShowCollaborateModal] = useState(false);
 
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -186,7 +187,17 @@ const SEQSubjectSelectionPage = () => {
           Array.from({ length: 4 }).map((_, i) => <SubjectCardSkeleton key={i} />)
         ) : subjects.length === 0 ? (
           <div className="col-span-full text-center py-12">
-            <p className="text-muted-foreground">No subjects available for your year/institute.</p>
+            <p className="font-semibold text-foreground">We are not fully available in your institute yet.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Help us bring SEQ content to your campus.</p>
+            <div className="mt-5 flex flex-col sm:flex-row justify-center gap-3">
+              <Button asChild variant="outline">
+                <Link to="/contact-us?subject=campus-collaboration">Request campus collaboration</Link>
+              </Button>
+              <Button onClick={() => setShowCollaborateModal(true)}>
+                Become Medmacs Ambassador
+              </Button>
+            </div>
+            <CollaborateModal open={showCollaborateModal} onOpenChange={setShowCollaborateModal} />
           </div>
         ) : (
           subjects.map((subject, index) => {

@@ -27,6 +27,8 @@ import Profile from '@/pages/Profile';
 import Pricing from '@/pages/Pricing';
 import TermsAndConditions from '@/pages/TermsAndConditions';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
+import RefundPolicy from '@/pages/RefundPolicy';
+import DCMAPolicy from '@/pages/DCMAPolicy';
 import Checkout from '@/pages/Checkout';
 import NotFound from '@/pages/NotFound';
 import ChangePassword from '@/pages/ChangePassword';
@@ -60,6 +62,7 @@ import SEQs from '@/pages/SEQs';
 import { SEQSubjectSelectionPage, SEQChapterSelectionPage, SEQQuizPage } from '@/pages/seq';
 import PracticalNotesDetails from "@/components/PracticalNotes/PracticalNotesDetails";
 import RedeemCode from '@/pages/RedeemCode';
+import Referrals from '@/pages/Referrals';
 import PurchaseHistory from '@/pages/PurchaseHistory';
 import PaymentFailure from "@/pages/PaymentFailure.tsx";
 import PaymentSuccess from "@/pages/PaymentSuccess.tsx";
@@ -183,6 +186,8 @@ function App() {
                 <Route path="/profile/upgrade" element={<Profile />} />
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/privacypolicy" element={<PrivacyPolicy />} />
+                <Route path="/refund-policy" element={<RefundPolicy />} />
+                <Route path="/dcma" element={<DCMAPolicy />} />
                 <Route path="/mock-test" element={<MockTest />} />
                 <Route path="/test-completed" element={<TestCompletionPage />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
@@ -218,6 +223,7 @@ function App() {
                 <Route path="/practical-notes" element={<PracticalPage />} />
                 <Route path="/practical-notes/subject/:id" element={<PracticalNotesDetails />} />
                 <Route path="/redeem" element={<RedeemCode />} />
+                <Route path="/referrals" element={<Referrals />} />
                 <Route path="/purchase-history" element={<PurchaseHistory />} />
                 <Route path="/payment-failure" element={<PaymentFailure />} />
                 <Route path="/payment-success" element={<PaymentSuccess />} />

@@ -12,7 +12,7 @@ import {
   TrendingUp, Award, Briefcase, BellRing, Bookmark, ScrollText,
   Home, User, Settings, ChevronRight, ChevronLeft, LogOut, Lock, CreditCard,
   Megaphone, BarChart3, Sun, Moon, ArrowRight, Crown, Mail, X,
-  Receipt, Shield, FileText, RefreshCw, Sparkles, Stethoscope, PieChart, Info, Star, Loader2, Microscope, FlaskConical,
+  Receipt, Shield, FileText, RefreshCw, Sparkles, Stethoscope, PieChart, Info, Star, Loader2, Microscope, FlaskConical, WifiOff,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
@@ -34,6 +34,7 @@ import { AchievementBadges } from '@/components/profile/AchievementBadges';
 import { MCQProgressWidget } from '@/components/dashboard/MCQProgressWidget';
 import { ProgressTracker } from '@/components/mcq/ProgressTracker';
 import { fetchInstitutes, getInstituteByCode } from '@/utils/institutes';
+import { useCachedImage } from '@/hooks/useCachedImage';
 
 // Types
 type TermOfDay = {
@@ -260,13 +261,30 @@ const CaseOfDayCard = ({ caseOfDay, onClose, isPremium, onNavigateToChat, onNavi
   );
 };
 
-const ActionCard = ({ action, isExternal = false, fixedHeight = false }: any) => {
+const ActionCard = ({ action, isExternal = false, fixedHeight = false, offlineMode = false }: any) => {
+  const isDisabled = action.disabled || (offlineMode && action.link !== '/mcqs');
+  const cardClassName = [
+    'dashboard-action-card relative overflow-hidden rounded-2xl p-4',
+    'bg-gradient-to-br bg-clip-padding',
+    action.gradient,
+    'shadow-lg shadow-black/5 dark:shadow-black/20',
+    'active:scale-[0.97] transition-transform duration-150',
+    'flex min-h-[112px] w-full flex-col justify-start',
+    isDisabled ? 'grayscale opacity-45' : '',
+    fixedHeight ? 'h-[120px]' : '',
+  ].filter(Boolean).join(' ');
+
   const content = (
-    <div className={`relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br ${action.gradient} shadow-lg shadow-black/5 dark:shadow-black/20 active:scale-[0.97] transition-all duration-150 alive-card ${fixedHeight ? 'h-[120px]' : ''}`}>
-      <div className="absolute -right-3 -bottom-3 opacity-15">
+    <div className={cardClassName}>
+      <div className="pointer-events-none absolute -right-3 -bottom-3 opacity-15">
         <action.icon className={`w-20 h-20 ${action.iconColor}`} />
       </div>
       <div className="relative z-10">
+        {offlineMode && action.link !== '/mcqs' && (
+          <span className="mb-1 inline-block rounded-full bg-black/20 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-white/70">
+            Offline
+          </span>
+        )}
         {action.tag && (
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mb-1 ${action.tagColor || 'bg-white/20 text-white'}`}>
             {action.tag}
@@ -278,9 +296,96 @@ const ActionCard = ({ action, isExternal = false, fixedHeight = false }: any) =>
     </div>
   );
 
-  if (isExternal) return <a href={action.link} target="_blank" rel="noopener noreferrer">{content}</a>;
-  if (action.onClick) return <button type="button" onClick={action.onClick} className="w-full text-left">{content}</button>;
-  return <Link to={action.disabled ? '#' : action.link} className={action.disabled ? 'opacity-50 pointer-events-none' : ''}>{content}</Link>;
+  if (isExternal) {
+    return <a href={isDisabled ? undefined : action.link} target="_blank" rel="noopener noreferrer" className={`dashboard-action-link ${isDisabled ? 'pointer-events-none' : ''}`}>{content}</a>;
+  }
+  if (action.onClick) {
+    return <button type="button" onClick={isDisabled ? undefined : action.onClick} disabled={isDisabled} className="dashboard-action-link text-left disabled:cursor-not-allowed">{content}</button>;
+  }
+  return (
+    <Link
+      to={isDisabled ? '#' : action.link}
+      className={`dashboard-action-link ${isDisabled ? 'pointer-events-none' : ''}`}
+    >
+      {content}
+    </Link>
+  );
+};
+
+const AccuracyDonut = ({ value = 0, solved = 0 }: { value?: number; solved?: number }) => {
+  const safeValue = Math.max(0, Math.min(100, Number(value) || 0));
+  const radius = 16;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference - (safeValue / 100) * circumference;
+
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-primary/25 bg-background/95 py-1 pl-1 pr-2 shadow-lg shadow-primary/10 backdrop-blur-xl">
+      <div className="relative h-10 w-10 shrink-0">
+        <svg viewBox="0 0 40 40" className="h-10 w-10 -rotate-90">
+          <circle cx="20" cy="20" r={radius} className="fill-none stroke-primary/15" strokeWidth="4" />
+          <circle
+            cx="20"
+            cy="20"
+            r={radius}
+            className="fill-none stroke-primary transition-[stroke-dashoffset] duration-300 ease-out"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+          />
+        </svg>
+        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-primary">
+          {safeValue}%
+        </span>
+      </div>
+      <div className="min-w-0 leading-none">
+        <p className="text-[10px] font-black uppercase tracking-wide text-foreground">Accuracy</p>
+        <p className="text-[9px] font-semibold text-muted-foreground">{solved} solved</p>
+      </div>
+    </div>
+  );
+};
+
+const StickyQuickActions = ({ actions, offlineMode = false }: { actions: any[]; offlineMode?: boolean }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 18, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 18, scale: 0.96 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+92px)] z-[60] flex justify-center px-4"
+    >
+      <div className="flex items-center gap-3 rounded-full border border-border/40 bg-card/95 px-3 py-2 shadow-2xl shadow-black/10 backdrop-blur-2xl dark:shadow-black/40">
+        {actions.map((action) => {
+          const Icon = action.icon;
+          const isDisabled = action.disabled || (offlineMode && action.link !== '/mcqs');
+          const button = (
+            <span
+              className={`flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br ${action.gradient} text-white shadow-lg shadow-black/10 transition active:scale-95 ${isDisabled ? 'grayscale opacity-40' : ''}`}
+              title={isDisabled ? `${action.title} unavailable in offline mode` : action.title}
+            >
+              <Icon className="h-5 w-5" />
+              <span className="sr-only">{action.title}</span>
+            </span>
+          );
+
+          if (action.onClick) {
+            return (
+              <button key={action.title} type="button" onClick={isDisabled ? undefined : action.onClick} disabled={isDisabled} className="rounded-full disabled:cursor-not-allowed">
+                {button}
+              </button>
+            );
+          }
+
+          return (
+            <Link key={action.title} to={isDisabled ? '#' : action.link} className={isDisabled ? 'pointer-events-none' : 'rounded-full'}>
+              {button}
+            </Link>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
 };
 
 const InstituteDetailCard = ({ institute }: { institute: any }) => {
@@ -423,6 +528,10 @@ const Dashboard = () => {
   const [showCaseOfDay, setShowCaseOfDay] = useState(false);
   const [showCollaborateModal, setShowCollaborateModal] = useState(false);
   const [showHeaderScore, setShowHeaderScore] = useState(true);
+  const [isAccuracyCompact, setIsAccuracyCompact] = useState(false);
+  const [showStickyQuickActions, setShowStickyQuickActions] = useState(false);
+  const quickActionsRef = useRef<HTMLDivElement>(null);
+  const headerHapticReadyRef = useRef(false);
   const [selectedDashboardAnnouncement, setSelectedDashboardAnnouncement] = useState<DashboardAnnouncement | null>(null);
   const [appVersion, setAppVersion] = useState<string>('Loading...');
   const [reviewCompleted, setReviewCompleted] = useState(() => {
@@ -431,6 +540,8 @@ const Dashboard = () => {
     }
     return false;
   });
+  const [isOfflineMode, setIsOfflineMode] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
+  const [profileVerifiedFromServer, setProfileVerifiedFromServer] = useState(false);
 
   type Profile = {
     avatar_url: string;
@@ -448,15 +559,51 @@ const Dashboard = () => {
     role?: string;
   };
 
-  const { data: profile, isLoading: profileLoading } = useQuery<Profile | null>({
+  const getProfileCacheKey = () => user?.id ? `medmacs_profile_cache_${user.id}` : null;
+
+  const readCachedProfile = (): Profile | null => {
+    if (typeof window === 'undefined') return null;
+    const cacheKey = getProfileCacheKey();
+    if (!cacheKey) return null;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const requiredProfileFieldsMissing = (profileData: Profile | null) => {
+    if (!profileData) return true;
+    const validYears = ["1st", "2nd", "3rd", "4th", "5th"];
+    return (
+      profileData.username === null ||
+      profileData.username === undefined ||
+      String(profileData.username).trim() === '' ||
+      (profileData as any).institute === null ||
+      (profileData as any).institute === undefined ||
+      String((profileData as any).institute).trim() === '' ||
+      (profileData as any).year === null ||
+      (profileData as any).year === undefined ||
+      !validYears.includes((profileData as any).year)
+    );
+  };
+
+  const { data: profile, isLoading: profileLoading, isError: profileFetchFailed } = useQuery<Profile | null>({
     queryKey: ['profile', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
       const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-      if (error) return null;
+      if (error) throw error;
+      setProfileVerifiedFromServer(true);
+      if (data && typeof window !== 'undefined') {
+        localStorage.setItem(`medmacs_profile_cache_${user.id}`, JSON.stringify(data));
+      }
       return data;
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    initialData: readCachedProfile,
+    retry: 1,
   });
 
   const { data: userStats, isLoading: userStatsLoading } = useQuery({
@@ -539,7 +686,7 @@ const Dashboard = () => {
 
       return { totalQuestions, correctAnswers, accuracy, currentStreak, rankPoints, battlesWon, totalBattles: battles?.length || 0, savedQuestions: savedCount || 0 };
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !isOfflineMode,
     retry: 1,
     staleTime: 1000 * 60 * 5,
   });
@@ -682,6 +829,21 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
+    const updateOnlineState = () => setIsOfflineMode(!navigator.onLine);
+    updateOnlineState();
+    window.addEventListener('online', updateOnlineState);
+    window.addEventListener('offline', updateOnlineState);
+    return () => {
+      window.removeEventListener('online', updateOnlineState);
+      window.removeEventListener('offline', updateOnlineState);
+    };
+  }, []);
+
+  useEffect(() => {
+    setProfileVerifiedFromServer(false);
+  }, [user?.id]);
+
+  useEffect(() => {
     setShowHeaderScore(true);
     const timer = window.setTimeout(() => setShowHeaderScore(false), 10000);
     return () => window.clearTimeout(timer);
@@ -700,15 +862,71 @@ const Dashboard = () => {
   }, [activeTab, announcements, user]);
 
   useEffect(() => {
+    const handleScroll = (event?: Event) => {
+      const target = event?.target as HTMLElement | Document | null;
+      const targetScrollTop =
+        target && 'scrollTop' in target
+          ? Number(target.scrollTop || 0)
+          : 0;
+      const scrollTop = Math.max(
+        window.scrollY || 0,
+        document.documentElement.scrollTop || 0,
+        document.body.scrollTop || 0,
+        targetScrollTop,
+      );
+      const nextAccuracyCompact = activeTab === 'home' && scrollTop > 72;
+      setIsAccuracyCompact((current) => {
+        if (current === nextAccuracyCompact) return current;
+        if (headerHapticReadyRef.current && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+          navigator.vibrate(6);
+        }
+        headerHapticReadyRef.current = true;
+        return nextAccuracyCompact;
+      });
+
+      const quickActionsTop = quickActionsRef.current?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
+      const nextShowStickyQuickActions = activeTab === 'home' && quickActionsTop <= 96;
+      setShowStickyQuickActions((current) => current === nextShowStickyQuickActions ? current : nextShowStickyQuickActions);
+    };
+
+    handleScroll();
+    document.addEventListener('scroll', handleScroll, { passive: true, capture: true });
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleScroll);
+
+    return () => {
+      document.removeEventListener('scroll', handleScroll, { capture: true });
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [activeTab]);
+
+  useEffect(() => {
     if (authLoading || profileLoading) { setIsNavigating(true); return; }
     if (!user) { setIsNavigating(false); return; }
-    if (!profile) { navigate('/setup'); return; }
-    // Redirect to setup wizard if any required field is missing
-    const validYears = ["1st", "2nd", "3rd", "4th", "5th"];
-    const needsSetup = !profile.username || !(profile as any).institute || !((profile as any).year && validYears.includes((profile as any).year));
-    if (needsSetup) { navigate('/setup'); return; }
+
+    if (profileFetchFailed && !profile) {
+      setIsNavigating(false);
+      return;
+    }
+
+    if (profile === undefined) {
+      setIsNavigating(false);
+      return;
+    }
+
+    if (!profileVerifiedFromServer) {
+      setIsNavigating(false);
+      return;
+    }
+
+    if (requiredProfileFieldsMissing(profile)) {
+      navigate('/setup');
+      return;
+    }
+
     setIsNavigating(false);
-  }, [authLoading, profileLoading, user, profile, navigate]);
+  }, [authLoading, profileLoading, profileFetchFailed, profileVerifiedFromServer, user, profile, navigate]);
 
   const flpAction = { title: 'Full-Length Paper', description: 'Timed mixed exams', icon: ScrollText, link: '/flp', gradient: 'from-fuchsia-600 to-rose-600', iconColor: 'text-fuchsia-100' };
   const collaborateAction = { title: 'Collaborate', description: 'Why Medmacs needs you', icon: Briefcase, onClick: () => setShowCollaborateModal(true), gradient: 'from-rose-500 to-pink-600', iconColor: 'text-rose-100' };
@@ -737,9 +955,17 @@ const Dashboard = () => {
   ].filter(m => m.enabled);
 
   const displayName = profile?.full_name || profile?.username || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Medmacs User';
+  const currentHour = new Date().getHours();
+  const greetingMessage =
+    currentHour < 5 ? 'Burning the midnight oil' :
+      currentHour < 12 ? 'Good Morning' :
+        currentHour < 17 ? 'Good Afternoon' :
+          currentHour < 21 ? 'Good Evening' :
+            'Good Night';
   const rawUserPlan = profile?.plan?.toLowerCase() || 'free';
   const userPlanDisplayName = rawUserPlan.charAt(0).toUpperCase() + rawUserPlan.slice(1) + ' Plan';
   const dashboardAnnouncement = dashboardAnnouncements[0] || null;
+  const cachedAvatarUrl = useCachedImage(profile?.avatar_url);
 
   const openExternalUrl = async (url?: string | null) => {
     if (!url) return;
@@ -836,6 +1062,28 @@ const Dashboard = () => {
         );
 
       case 'analytics':
+        if (isOfflineMode) {
+          return (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+              <h1 className="text-xl font-bold text-foreground mb-1">📊 Analytics</h1>
+              <p className="text-xs text-muted-foreground mb-5">Cloud analytics are unavailable in offline mode</p>
+              <div className="rounded-3xl border border-amber-500/20 bg-amber-500/10 p-6 text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/15">
+                  <WifiOff className="h-8 w-8 text-amber-600 dark:text-amber-300" />
+                </div>
+                <h2 className="text-lg font-black text-foreground">Offline Mode</h2>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  Analytics, streaks, accuracy, and deep analysis will refresh after your queued MCQ activity syncs.
+                </p>
+                <Button onClick={() => navigate('/mcqs')} className="mt-5 rounded-2xl font-black">
+                  <BookOpen className="mr-2 h-4 w-4" />
+                  Practice Downloaded MCQs
+                </Button>
+              </div>
+            </div>
+          );
+        }
+
         return (
           <div className="animate-in fade-in slide-in-from-right-4 duration-300">
             <h1 className="text-xl font-bold text-foreground mb-1">📊 Analytics</h1>
@@ -867,8 +1115,8 @@ const Dashboard = () => {
           <div className="animate-in fade-in slide-in-from-right-4 duration-300 space-y-4">
             <div className="flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-br from-primary/10 to-accent border border-border/40 shadow-sm">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center overflow-hidden shrink-0 shadow-md">
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                {cachedAvatarUrl ? (
+                  <img src={cachedAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-primary-foreground font-bold text-lg">{displayName.substring(0, 2).toUpperCase()}</span>
                 )}
@@ -977,55 +1225,83 @@ const Dashboard = () => {
             {/* Greeting - no avatar here */}
             <div className="mb-5">
               <h1 className="text-2xl sm:text-3xl font-black text-foreground leading-tight">
-                Hi, <span className="text-shimmer">{displayName}</span> ✨
+                {greetingMessage}, <span className="text-shimmer">{displayName}</span> ✨
               </h1>
-              <p className="text-xs text-muted-foreground mt-0.5 font-medium">How's you doing today?</p>
+              <p className="text-xs text-muted-foreground mt-0.5 font-medium">Ready for your next study move?</p>
             </div>
 
-            {/* Streak bar - elevated */}
-            <div className="relative min-h-[100px] mb-6">
-              <motion.div
-                animate={{ opacity: userStatsLoading ? 0 : 1, y: userStatsLoading ? 4 : 0 }}
-                transition={{ duration: 0.25 }}
-                className="bg-gradient-to-r from-primary/12 to-accent border border-primary/20 rounded-2xl p-4 shadow-md shadow-primary/5 glow-breathe"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                    <Flame className="w-4 h-4 text-orange-500" /> {userStats?.currentStreak || 0} day streak
-                  </span>
-                  <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-0 text-[10px] px-2 font-bold shadow-sm">
-                    Keep it up!
-                  </Badge>
+            {isOfflineMode ? (
+              <div className="mb-6 rounded-2xl border border-amber-500/20 bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-4 shadow-md shadow-amber-500/5">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500/15">
+                    <WifiOff className="h-5 w-5 text-amber-600 dark:text-amber-300" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-foreground">Offline study mode</p>
+                    <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+                      Cloud streak and accuracy pause here. Downloaded MCQs stay available.
+                    </p>
+                  </div>
                 </div>
-                <Progress value={userStats?.accuracy || 0} className="h-2.5 mb-2" />
-                <div className="flex justify-between text-[11px] font-semibold">
-                  <span className="text-primary">{userStats?.accuracy || 0}% accuracy</span>
-                  <span className="text-muted-foreground">{userStats?.totalQuestions || 0} solved</span>
-                </div>
-              </motion.div>
+              </div>
+            ) : (
+              <div className={`relative transition-all duration-300 ${isAccuracyCompact ? 'mb-2 min-h-0' : 'mb-6 min-h-[100px]'}`}>
+                <motion.div
+                  animate={{
+                    opacity: userStatsLoading || isAccuracyCompact ? 0 : 1,
+                    y: userStatsLoading || isAccuracyCompact ? -8 : 0,
+                    height: isAccuracyCompact ? 0 : 'auto',
+                    marginBottom: isAccuracyCompact ? 0 : undefined,
+                  }}
+                  transition={{ duration: 0.25 }}
+                  className={`overflow-hidden rounded-2xl bg-gradient-to-r from-primary/12 to-accent shadow-md shadow-primary/5 glow-breathe transition-all duration-300 ${isAccuracyCompact ? 'border-0 p-0' : 'border border-primary/20 p-4'}`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      <Flame className="w-4 h-4 text-orange-500" /> {userStats?.currentStreak || 0} day streak
+                    </span>
+                    <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-0 text-[10px] px-2 font-bold shadow-sm">
+                      Keep it up!
+                    </Badge>
+                  </div>
+                  <Progress value={userStats?.accuracy || 0} className="h-2.5 mb-2" />
+                  <div className="flex justify-between text-[11px] font-semibold">
+                    <span className="text-primary">{userStats?.accuracy || 0}% accuracy</span>
+                    <span className="text-muted-foreground">{userStats?.totalQuestions || 0} solved</span>
+                  </div>
+                </motion.div>
 
-              {userStatsLoading && (
-                <div className="absolute inset-0 bg-muted/50 rounded-2xl p-4 animate-pulse pointer-events-none">
-                  <div className="h-4 bg-muted rounded w-1/3 mb-3" />
-                  <div className="h-2.5 bg-muted rounded w-full mb-2" />
-                  <div className="flex justify-between"><div className="h-3 bg-muted rounded w-1/4" /><div className="h-3 bg-muted rounded w-1/4" /></div>
-                </div>
-              )}
-            </div>
+                {userStatsLoading && !isAccuracyCompact && (
+                  <div className="absolute inset-0 bg-muted/50 rounded-2xl p-4 animate-pulse pointer-events-none">
+                    <div className="h-4 bg-muted rounded w-1/3 mb-3" />
+                    <div className="h-2.5 bg-muted rounded w-full mb-2" />
+                    <div className="flex justify-between"><div className="h-3 bg-muted rounded w-1/4" /><div className="h-3 bg-muted rounded w-1/4" /></div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Quick Actions - elevated cards */}
             <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-1.5">
               <Zap className="text-amber-500 fill-amber-500 w-3.5 h-3.5" /> Quick Actions
             </h2>
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              {quickActions.map((action, i) => <ActionCard key={i} action={action} fixedHeight />)}
+            <div ref={quickActionsRef} className="grid grid-cols-2 gap-3 mb-6">
+              {quickActions.map((action, i) => <ActionCard key={i} action={action} fixedHeight offlineMode={isOfflineMode} />)}
             </div>
 
             {/* Plan Status & Term of Day - side by side */}
             <div className="grid grid-cols-2 gap-3 mb-6">
               {/* Plan Pie Chart */}
               <div className="rounded-2xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 flex flex-col items-center justify-center">
-                {rawUserPlan === 'free' ? (
+                {isOfflineMode ? (
+                  <div className="flex h-full flex-col items-center justify-center text-center">
+                    <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/15">
+                      <WifiOff className="h-6 w-6 text-amber-600 dark:text-amber-300" />
+                    </div>
+                    <p className="text-xs font-black uppercase text-foreground">Offline Mode</p>
+                    <p className="mt-0.5 text-[10px] text-muted-foreground">MCQs only</p>
+                  </div>
+                ) : rawUserPlan === 'free' ? (
                   <>
                     <div className="relative w-20 h-20 mb-2">
                       <svg viewBox="0 0 36 36" className="w-full h-full">
@@ -1101,7 +1377,7 @@ const Dashboard = () => {
               )}
             </div>
 
-            <MCQProgressWidget />
+            {!isOfflineMode && <MCQProgressWidget />}
 
             {/* Institute Modules */}
             {instituteModules.length > 0 && (
@@ -1111,7 +1387,7 @@ const Dashboard = () => {
                   <h2 className="text-sm font-bold text-foreground">Study Modules</h2>
                 </div>
                 <div className="grid grid-cols-2 gap-3 mb-6">
-                  {instituteModules.map((action, i) => <ActionCard key={i} action={action} />)}
+                  {instituteModules.map((action, i) => <ActionCard key={i} action={action} offlineMode={isOfflineMode} />)}
                 </div>
               </div>
             )}
@@ -1139,7 +1415,7 @@ const Dashboard = () => {
               <h2 className="text-sm font-bold text-foreground">Personalization</h2>
             </div>
             <div className="grid grid-cols-2 gap-3 mb-6">
-              {personalizationActions.map((action, i) => <ActionCard key={i} action={action} />)}
+              {personalizationActions.map((action, i) => <ActionCard key={i} action={action} offlineMode={isOfflineMode} />)}
             </div>
 
             {/* Premium Perks with animated crown */}
@@ -1148,7 +1424,7 @@ const Dashboard = () => {
               <h2 className="text-sm font-bold text-foreground">Premium Perks</h2>
             </div>
             <div className="grid grid-cols-1 gap-3 mb-8">
-              {premiumPerks.map((action, i) => <ActionCard key={i} action={action} />)}
+              {premiumPerks.map((action, i) => <ActionCard key={i} action={action} offlineMode={isOfflineMode} />)}
             </div>
 
             {/* Explore */}
@@ -1157,7 +1433,7 @@ const Dashboard = () => {
                 <TrendingUp className="w-3.5 h-3.5 text-violet-500" /> Explore
               </h2>
               <div className="mb-3">
-                <ActionCard action={collaborateAction} />
+                <ActionCard action={collaborateAction} offlineMode={isOfflineMode} />
               </div>
               <a href="https://medistics.app" target="_blank" rel="noopener noreferrer">
                 <div className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-violet-600 to-purple-700 shadow-lg shadow-violet-500/10 active:scale-[0.97] transition-all">
@@ -1174,7 +1450,7 @@ const Dashboard = () => {
             </div>
 
             {/* Footer */}
-            <div className="text-center pt-2 pb-4">
+            <div className="text-center pt-2 pb-16">
               <p className="text-[10px] text-muted-foreground font-medium">A Project by Hmacs Studios.</p>
               <p className="text-[10px] text-muted-foreground mt-1">© 2026 Hmacs Studios. All rights reserved</p>
             </div>
@@ -1195,9 +1471,36 @@ const Dashboard = () => {
       {/* Minimal top bar with avatar */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-2xl border-b border-border/30 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between px-5 h-14">
-          <div className="flex items-center gap-2.5">
-            <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-6 h-6" />
-            <span className="text-sm font-extrabold text-foreground tracking-tight">Medmacs</span>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <AnimatePresence mode="wait" initial={false}>
+              {activeTab === 'home' && isAccuracyCompact && !userStatsLoading && !isOfflineMode ? (
+                <motion.div
+                  key="compact-identity"
+                  initial={{ opacity: 0, x: -8, scale: 0.96 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: -8, scale: 0.96 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex min-w-0 items-center gap-2"
+                >
+                  <span className="max-w-[34vw] truncate text-sm font-black text-foreground tracking-tight">
+                    {displayName.split(' ')[0]}
+                  </span>
+                  <AccuracyDonut value={userStats?.accuracy || 0} solved={userStats?.totalQuestions || 0} />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="brand-identity"
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -8 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex items-center gap-2.5"
+                >
+                  <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-6 h-6" />
+                  <span className="text-sm font-extrabold text-foreground tracking-tight">Medmacs</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
           <div className="flex items-center gap-2">
             <Badge className="text-[10px] font-bold bg-primary/10 text-primary border-0 px-2.5">
@@ -1205,8 +1508,8 @@ const Dashboard = () => {
             </Badge>
             <button onClick={() => setActiveTab('profile')} className="shrink-0">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center overflow-hidden ring-1 ring-primary/20">
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                {cachedAvatarUrl ? (
+                  <img src={cachedAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-primary-foreground font-bold text-[10px]">{displayName.substring(0, 2).toUpperCase()}</span>
                 )}
@@ -1220,6 +1523,12 @@ const Dashboard = () => {
       <div className="px-5 mt-[var(--header-height)]">
         {renderTabContent()}
       </div>
+
+      <AnimatePresence>
+        {showStickyQuickActions && (
+          <StickyQuickActions actions={quickActions} offlineMode={isOfflineMode} />
+        )}
+      </AnimatePresence>
 
       {/* What's New Dialog */}
       <Dialog open={showWhatsNew} onOpenChange={setShowWhatsNew}>

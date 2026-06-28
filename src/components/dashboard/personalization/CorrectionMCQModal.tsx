@@ -11,6 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { MistakeChapter } from './types';
+import { parseBoldText } from '@/utils/format';
 
 type CorrectionMCQModalProps = {
   open: boolean;
@@ -159,7 +160,7 @@ export const CorrectionMCQModal = ({ open, chapter, onOpenChange }: CorrectionMC
                       {isCorrect ? 'Corrected' : 'Review'}
                     </p>
                     <p className="mt-2 text-sm leading-relaxed text-foreground">
-                      {activeAttempt.mcq.explanation || `Correct answer: ${activeAttempt.mcq.correctAnswer}`}
+                      {parseBoldText(activeAttempt.mcq.explanation || `Correct answer: ${activeAttempt.mcq.correctAnswer}`)}
                     </p>
                   </div>
                 )}

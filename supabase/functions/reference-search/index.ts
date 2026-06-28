@@ -11,7 +11,7 @@ interface Mapping {
 interface ReferenceChunk {
   book: string;
   page: number;
-  content: string;
+  content?: string;
   score: number;
 }
 
@@ -19,6 +19,30 @@ interface ReferenceResponse {
   results: ReferenceChunk[];
   total_vectors: number;
 }
+
+const hasSuspiciousSourceName = (value = '') =>
+  /medicalstudyzone/i.test(value) ||
+  /pdf\s*drive/i.test(value) ||
+  /pdfdrive/i.test(value) ||
+  /^356\s+20190306181657/i.test(value);
+
+const normalizeSourceKey = (value = '') =>
+  value
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '');
+
+const sourceMatches = (rawBook: string, pattern: string) => {
+  const rawLower = rawBook.toLowerCase();
+  const patternLower = pattern.toLowerCase();
+  const rawKey = normalizeSourceKey(rawBook);
+  const patternKey = normalizeSourceKey(pattern);
+
+  return rawLower.includes(patternLower) ||
+    (patternKey.length > 0 && rawKey.includes(patternKey));
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -79,13 +103,13 @@ serve(async (req) => {
     const data: ReferenceResponse = await refRes.json();
 
     const normalizedResults: ReferenceChunk[] = (data.results || []).map((chunk) => {
-      if (!mappings || mappings.length === 0) return chunk;
+      if (!mappings || mappings.length === 0) {
+        return hasSuspiciousSourceName(chunk.book) ? { ...chunk, book: 'Reference Source' } : chunk;
+      }
 
-      const match = mappings.find((m: Mapping) =>
-        chunk.book.toLowerCase().includes(m.source_pattern.toLowerCase())
-      );
+      const match = mappings.find((m: Mapping) => sourceMatches(chunk.book, m.source_pattern));
 
-      if (!match) return chunk;
+      if (!match) return hasSuspiciousSourceName(chunk.book) ? { ...chunk, book: 'Reference Source' } : chunk;
 
       const displayName = match.edition
         ? `${match.canonical_name}, ${match.edition}`
@@ -97,8 +121,9 @@ serve(async (req) => {
         page: chunk.page + match.page_offset,
       };
     });
+    const publicResults = normalizedResults.map(({ content, ...chunk }) => chunk);
 
-    return new Response(JSON.stringify({ results: normalizedResults, total_vectors: data.total_vectors }), {
+    return new Response(JSON.stringify({ results: publicResults, total_vectors: data.total_vectors }), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',

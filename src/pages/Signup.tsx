@@ -159,7 +159,7 @@ const Signup = () => {
     email: "",
     fullName: "",
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
   });
 
   const [showPassword, setShowPassword] = useState(false);

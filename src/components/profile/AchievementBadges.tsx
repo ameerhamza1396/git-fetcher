@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
-import { Award, BookOpenCheck, CheckCircle2, Flame, HelpCircle, Library, MessageSquare, ScrollText, ShieldCheck, Swords, Target, Trophy } from 'lucide-react';
+import { Award, BookOpenCheck, CheckCircle2, Flame, HelpCircle, Library, MessageSquare, ScrollText, ShieldCheck, Swords, Target, Trophy, UserPlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 export type AchievementStats = {
@@ -20,6 +20,7 @@ export type AchievementStats = {
   currentStreak: number;
   correctedMcqs: number;
   flashcardsGenerated: number;
+  referralCount: number;
 };
 
 type BadgeDefinition = {
@@ -174,6 +175,14 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     color: 'from-purple-500 to-pink-500',
     isEarned: (stats) => stats.battleWins >= 1,
   },
+  {
+    id: 'invite_a_friend',
+    name: 'Social Butterfly',
+    details: 'Invite a friend to join Medmacs.',
+    icon: UserPlus,
+    color: 'from-pink-500 to-rose-500',
+    isEarned: (stats) => stats.referralCount >= 1,
+  },
 ];
 
 const defaultStats: AchievementStats = {
@@ -190,6 +199,7 @@ const defaultStats: AchievementStats = {
   currentStreak: 0,
   correctedMcqs: 0,
   flashcardsGenerated: 0,
+  referralCount: 0,
 };
 
 const arraysEqual = (a: string[], b: string[]) => a.length === b.length && a.every((value, index) => value === b[index]);
@@ -344,6 +354,7 @@ export const useAchievementData = (userId?: string, queryOptions: any = {}) => {
         savedResult,
         battleResult,
         profileResult,
+        referralResult,
       ] = await Promise.all([
         supabase.from('user_answers').select('is_correct, time_taken, created_at, used_ai_help, correction_mode').eq('user_id', userId),
         (supabase as any).from('flp_user_attempts').select('id').eq('user_id', userId),
@@ -351,6 +362,7 @@ export const useAchievementData = (userId?: string, queryOptions: any = {}) => {
         supabase.from('saved_mcqs').select('id').eq('user_id', userId),
         supabase.from('battle_results').select('rank').eq('user_id', userId),
         supabase.from('profiles').select('badges, flashcard_generated').eq('id', userId).maybeSingle(),
+        supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('referred_by', userId),
       ]);
 
       const answers = answersResult.data || [];
@@ -374,6 +386,7 @@ export const useAchievementData = (userId?: string, queryOptions: any = {}) => {
         currentStreak: calculateCurrentStreak(answers),
         correctedMcqs: answers.filter((answer) => answer.correction_mode && answer.is_correct).length,
         flashcardsGenerated: Number(profileResult.data?.flashcard_generated || previousStats.flashcardsGeneratedCount || 0),
+        referralCount: referralResult.count || 0,
       };
 
       const newlyEarnedBadgeIds = BADGE_DEFINITIONS

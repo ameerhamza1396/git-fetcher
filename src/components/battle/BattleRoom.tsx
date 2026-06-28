@@ -9,6 +9,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { createBotAccuracy, getBotName, getGameControllerConfig } from '@/utils/gameController';
+import { fetchMCQsBySubject } from '@/utils/mcqData';
 
 type BattleType = '1v1' | '2v2' | 'ffa' | 'rapid_fire';
 
@@ -644,13 +645,8 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
     if (!room?.subject_id) return [];
 
     const requestedQuestions = Math.max(20, room.total_questions || 20);
-    const { data: mcqs, error } = await supabase
-      .from('mcqs')
-      .select('id, question, options, correct_answer, explanation, chapters!inner(subject_id)')
-      .eq('chapters.subject_id', room.subject_id)
-      .limit(requestedQuestions * 2);
+    const mcqs = await fetchMCQsBySubject(room.subject_id);
 
-    if (error) throw error;
     if (!mcqs || mcqs.length === 0) {
       throw new Error("No MCQs found for this Rapid Fire subject.");
     }

@@ -2,9 +2,9 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, Zap, ArrowLeft, ArrowRight } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { motion } from "framer-motion";
+import { fetchSubjects } from "@/utils/mcqData";
+import { CollaborateModal } from "@/components/CollaborateModal";
 
 interface FlpSettingsProps {
   selectedMcqCount: number | null;
@@ -19,14 +19,15 @@ interface Subject {
   year?: number;
   icon?: string;
   color?: string;
+  institutes?: string[] | null;
 }
 
 const FlpSettings: React.FC<FlpSettingsProps> = ({ selectedMcqCount, setSelectedMcqCount, isFetchingMcqs, onStartTest }) => {
-  const { user } = useAuth();
   const [step, setStep] = useState<"mcq" | "subject">("mcq");
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [showCollaborateModal, setShowCollaborateModal] = useState(false);
 
   const messages = [
     "Hold tight, we are preparing the test for you.",
@@ -55,19 +56,12 @@ const FlpSettings: React.FC<FlpSettingsProps> = ({ selectedMcqCount, setSelected
     const fetchSubjectsForUserYear = async () => {
       setLoadingSubjects(true);
       try {
-        if (!user) { setSubjects([]); setLoadingSubjects(false); return; }
-        const { data: profile, error: profileError } = await supabase.from("profiles").select("year").eq("id", user.id).maybeSingle();
-        if (profileError) throw profileError;
-        const userYear = profile?.year;
-        if (!userYear) { setSubjects([]); setLoadingSubjects(false); return; }
-        const { data: subjectsData, error: subjectsError } = await supabase.from("subjects").select("id, name, year, icon, color").eq("year", userYear);
-        if (subjectsError) throw subjectsError;
-        setSubjects(subjectsData || []);
+        setSubjects(await fetchSubjects());
       } catch (err) { setSubjects([]); }
       finally { setLoadingSubjects(false); }
     };
     if (step === "subject") fetchSubjectsForUserYear();
-  }, [step, user]);
+  }, [step]);
 
   if (isFetchingMcqs) {
     return (
@@ -129,7 +123,17 @@ const FlpSettings: React.FC<FlpSettingsProps> = ({ selectedMcqCount, setSelected
             </div>
           ) : subjects.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-white/60 mb-4 text-sm">No subjects found for your year.</p>
+              <p className="text-white/80 mb-2 text-sm font-bold">We are not fully available in your institute yet.</p>
+              <p className="text-white/50 mb-4 text-xs">Help us bring Medmacs to your campus.</p>
+              <div className="flex flex-col gap-2 mb-4">
+                <Button onClick={() => setShowCollaborateModal(true)} variant="outline" className="border-white/30 text-white hover:bg-white/10 rounded-xl">
+                  Request campus collaboration
+                </Button>
+                <Button onClick={() => setShowCollaborateModal(true)} className="bg-white text-slate-900 rounded-xl">
+                  Become Medmacs Ambassador
+                </Button>
+              </div>
+              <CollaborateModal open={showCollaborateModal} onOpenChange={setShowCollaborateModal} />
               <Button variant="outline" onClick={() => setStep("mcq")} className="border-white/30 text-white hover:bg-white/10 rounded-xl">
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back
               </Button>

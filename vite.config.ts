@@ -12,7 +12,17 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    proxy: {},
+    proxy: {
+      '/api/content': {
+        target: 'https://medmacs.app',
+        changeOrigin: true,
+      },
+      '/api/reference': {
+        target: 'https://reference.medmacs.app',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/reference/, '/search'),
+      },
+    },
   },
   plugins: [
     react(),

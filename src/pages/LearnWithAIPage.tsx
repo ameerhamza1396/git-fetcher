@@ -17,6 +17,7 @@ import { fetchReferenceSnippet } from '@/components/dashboard/personalization/pe
 import { getFlashcardQuota, recordGeneratedFlashcards } from '@/components/profile/AchievementBadges';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { logAiUsageEvent } from '@/utils/aiUsageEvents';
 
 type Flashcard = {
   front: string;
@@ -100,7 +101,7 @@ Explanation: ${mcq.explanation || 'None'}
 Reference: ${references[index] || 'No reference retrieved'}
 `).join('\n')}`;
 
-  const response = await fetch('https://medmacs.app/api/ai/study-chat', {
+  const response = await fetch('https://ai.medmacs.app/api/ai/study-chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ question: prompt }),
@@ -114,7 +115,7 @@ Reference: ${references[index] || 'No reference retrieved'}
   const parsed = JSON.parse(jsonMatch[0]);
   const cards = Array.isArray(parsed.cards) ? parsed.cards : [];
 
-  return cards
+  const normalizedCards = cards
     .filter((card: any) => card.front && card.back)
     .slice(0, batchSize)
     .map((card: any, index: number) => ({
@@ -122,6 +123,19 @@ Reference: ${references[index] || 'No reference retrieved'}
       back: String(card.back),
       source: card.source ? String(card.source) : `AI card ${start + index + 1}`,
     }));
+
+  await logAiUsageEvent({
+    source: 'learn_with_ai_flashcards',
+    metadata: {
+      scopeLabel,
+      batchIndex,
+      promptLength: prompt.length,
+      responseLength: answer.length,
+      cards: normalizedCards.length,
+    },
+  });
+
+  return normalizedCards;
 };
 
 const LearnWithAIPage = () => {

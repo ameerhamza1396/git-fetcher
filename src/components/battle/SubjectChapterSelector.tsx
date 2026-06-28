@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { BookOpen, ChevronDown, Check } from 'lucide-react';
+import { fetchSubjects } from '@/utils/mcqData';
 
 interface Subject {
   id: string;
   name: string;
+  institutes?: string[] | null;
 }
 
 interface SubjectChapterSelectorProps {
@@ -26,9 +27,7 @@ export const SubjectChapterSelector = ({
 
   const loadSubjects = async () => {
     try {
-      const { data, error } = await supabase.from('subjects').select('id, name').order('name');
-      if (error) throw error;
-      setSubjects(data || []);
+      setSubjects(await fetchSubjects());
     } catch (e) {
       console.error(e);
     } finally {

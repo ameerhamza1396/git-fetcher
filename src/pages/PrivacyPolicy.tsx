@@ -1,5 +1,6 @@
 import { ArrowLeft } from 'lucide-react';
 import Seo from '@/components/Seo';
+import { renderMarkdown } from '@/utils/format';
 
 
 const PrivacyPolicy = () => {
@@ -409,45 +410,55 @@ page.
 
 If you have any questions about this Privacy Policy, You can contact us:
 
-* By email: medistics@dr.com
+* By email: [hi@medmacs.app](mailto:hi@medmacs.app)
 
 * By visiting this page on our website:
     [instagram.com/medistics.app](instagram.com/medistics.app)
 `;
 
     return (
-        <div className="min-h-screen w-full bg-background">
+        <div className="h-dvh w-full overflow-y-auto bg-background">
             <Seo
             title="Privacy Policy"
             description="Understand how Medmacs App collects, uses, and protects your personal data in our comprehensive Privacy Policy."
             canonical="https://medmacs.app/privacypolicy"
             />
-            {/* Header */}
-            <div className="absolute top-0 left-0 right-0 z-50 bg-background/30 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-                <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
-                    <button onClick={() => window.history.back()} className="flex items-center space-x-2 text-primary hover:text-primary/80 transition-colors">
-                        <ArrowLeft className="w-4 h-4" />
+
+            <div className="sticky top-0 z-50 border-b border-border/60 bg-background/85 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
+                <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
+                    <button
+                        type="button"
+                        onClick={() => window.history.back()}
+                        aria-label="Go back"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
                     </button>
 
-                    <div className="flex items-center space-x-3">
-                        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs Logo" className="w-8 h-8 object-contain" />
-                        <span className="text-xl font-bold text-foreground">Medmacs</span>
+                    <div className="flex items-center gap-3">
+                        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs Logo" className="h-8 w-8 object-contain" />
+                        <span className="text-lg font-bold text-foreground">Medmacs</span>
                     </div>
 
-                    <div className="w-8" />
+                    <div className="h-9 w-9" />
                 </div>
             </div>
 
-            <div className="container mx-auto px-4 lg:px-8 py-8 max-w-4xl mt-[var(--header-height)]">
-                <div className="mb-8 animate-fade-in">
-                    <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4 text-center">
+            <main className="mx-auto max-w-5xl px-4 py-8 pb-[calc(env(safe-area-inset-bottom)+2rem)] sm:px-6 lg:py-12">
+                <header className="mx-auto mb-8 max-w-3xl text-center">
+                    <p className="mb-3 text-sm font-semibold uppercase text-primary">Legal</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
                         Privacy Policy
                     </h1>
-                    <div className="text-muted-foreground leading-relaxed space-y-4">
-                        <pre className="whitespace-pre-wrap text-sm">{privacyPolicyContent}</pre>
-                    </div>
-                </div>
-            </div>
+                    <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
+                        How Medmacs collects, uses, shares, and protects your information.
+                    </p>
+                </header>
+
+                <article className="mx-auto max-w-3xl rounded-lg border border-border/70 bg-card px-5 py-6 shadow-sm sm:px-8 sm:py-8 lg:px-10">
+                    {renderMarkdown(privacyPolicyContent, { skipFirstH1: true })}
+                </article>
+            </main>
         </div>
     );
 };

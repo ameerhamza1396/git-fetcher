@@ -3,9 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Play, Clock, Zap, ArrowRight, CheckCircle, Timer } from 'lucide-react';
-import { Subject, Chapter } from '@/utils/mcqData';
+import { fetchChapterById, fetchSubjectById, Subject, Chapter } from '@/utils/mcqData';
 import { MCQPageLayout } from './MCQPageLayout';
-import { supabase } from '@/integrations/supabase/client';
 
 interface TimerPreset {
   value: number;
@@ -107,13 +106,13 @@ const MCQSettingsPage = () => {
       
       setLoading(true);
       
-      const [{ data: subjectData }, { data: chapterData }] = await Promise.all([
-        supabase.from('subjects').select('*').eq('id', subjectId).single(),
-        supabase.from('chapters').select('*').eq('id', chapterId).single(),
+      const [subjectData, chapterData] = await Promise.all([
+        fetchSubjectById(subjectId),
+        fetchChapterById(chapterId, subjectId),
       ]);
       
-      if (subjectData) setSubject(subjectData as Subject);
-      if (chapterData) setChapter(chapterData as Chapter);
+      if (subjectData) setSubject(subjectData);
+      if (chapterData) setChapter(chapterData);
       
       setLoading(false);
     };

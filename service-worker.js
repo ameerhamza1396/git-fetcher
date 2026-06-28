@@ -11,9 +11,12 @@ const urlsToCache = [
 
 // Install event: cache files
 self.addEventListener('install', event => {
+    self.skipWaiting();
     event.waitUntil(
         caches.open(CACHE_NAME).then(cache => {
-            return cache.addAll(urlsToCache);
+            return cache.addAll(urlsToCache).catch(error => {
+                console.warn('Service worker cache warmup failed', error);
+            });
         })
     );
 });
@@ -25,13 +28,28 @@ self.addEventListener('activate', event => {
             Promise.all(keys.map(key => {
                 if (key !== CACHE_NAME) return caches.delete(key);
             }))
-        )
+        ).then(() => self.clients.claim())
     );
 });
 
 // Fetch event: serve cached content if available
 self.addEventListener('fetch', event => {
+    const requestUrl = new URL(event.request.url);
+
+    if (requestUrl.pathname.startsWith('/api/')) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+
     event.respondWith(
-        caches.match(event.request).then(response => response || fetch(event.request))
+        caches.match(event.request).then(response => {
+            if (response) return response;
+            return fetch(event.request).catch(() => {
+                if (event.request.mode === 'navigate') {
+                    return caches.match('/offline.html').then(fallback => fallback || caches.match('/index.html'));
+                }
+                return Response.error();
+            });
+        })
     );
 });

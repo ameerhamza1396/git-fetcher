@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
+import { aiApiUrl } from '@/utils/aiApi';
 
 interface Question {
   question: string;
@@ -79,10 +80,10 @@ export const AITestGenerator: React.FC = () => {
     }
     setIsGenerating(true);
     try {
-      const res = await fetch('https://medistics-ai-bot.vercel.app/generate-ai-test', {
+      const res = await fetch(aiApiUrl('ai/generate-test'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: topic.trim(), difficulty, questionCount, customPrompt: customPrompt.trim() }),
+        body: JSON.stringify({ topic: topic.trim(), difficulty, count: questionCount, prompt: customPrompt.trim() }),
       });
 
       if (!res.ok) throw new Error(`Server error ${res.status}`);

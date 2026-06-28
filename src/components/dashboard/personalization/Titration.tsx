@@ -11,6 +11,7 @@ import { CorrectionMCQModal } from './CorrectionMCQModal';
 import { FlashcardLimitModal } from './FlashcardLimitModal';
 import { buildFallbackCards, refineFlashcardsWithAI } from './personalizationUtils';
 import { Flashcard, MistakeChapter } from './types';
+import { parseBoldText } from '@/utils/format';
 
 type TitrationProps = {
   weakestChapter: MistakeChapter | null;
@@ -159,7 +160,7 @@ export const Titration = ({ weakestChapter }: TitrationProps) => {
                   </div>
                   <p className="text-sm font-black text-foreground">{currentCard.front}</p>
                   <div className="mt-4 rounded-2xl bg-muted/60 p-3">
-                    <p className="text-xs leading-relaxed text-muted-foreground">{currentCard.back}</p>
+                    <p className="text-xs leading-relaxed text-muted-foreground">{parseBoldText(currentCard.back)}</p>
                   </div>
                 </div>
 

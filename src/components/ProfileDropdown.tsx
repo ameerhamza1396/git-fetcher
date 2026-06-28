@@ -23,6 +23,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useCachedImage } from '@/hooks/useCachedImage';
 
 export const ProfileDropdown = () => {
     const { user, signOut } = useAuth();
@@ -50,6 +51,7 @@ export const ProfileDropdown = () => {
 
     // Robust displayName logic
     const displayName = profile?.full_name || profile?.username || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Student';
+    const cachedAvatarUrl = useCachedImage(profile?.avatar_url);
 
     const handleLogout = async () => {
         await signOut();
@@ -64,7 +66,7 @@ export const ProfileDropdown = () => {
                     className="w-8 h-8 rounded-full flex items-center justify-center hover:scale-110 transition-transform duration-200 p-0 overflow-hidden"
                 >
                     <Avatar className="w-full h-full"> {/* Avatar takes full size of the button */}
-                        <AvatarImage src={profile?.avatar_url || undefined} alt={`${displayName} avatar`} />
+                        <AvatarImage src={cachedAvatarUrl || undefined} alt={`${displayName} avatar`} />
                         <AvatarFallback className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-sm">
                             {displayName.substring(0, 2).toUpperCase() || 'U'}
                         </AvatarFallback>

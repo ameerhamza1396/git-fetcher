@@ -1,12 +1,15 @@
-import { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, BookOpen } from 'lucide-react';
-import { fetchChaptersBySubject, Subject, Chapter } from '@/utils/mcqData';
+import { ArrowRight, BookOpen, CheckCircle2, WifiOff } from 'lucide-react';
+import { fetchChaptersBySubject, fetchSubjectById, Subject, Chapter } from '@/utils/mcqData';
 import { MCQPageLayout } from './MCQPageLayout';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { CollaborateModal } from '@/components/CollaborateModal';
+import { ChapterDownloadButton } from '@/components/mcq/ChapterDownloadButton';
+import { useOfflineChapterStatus } from '@/hooks/useOfflineChapterStatus';
 
 const ChapterProgressDonut = ({
   attempted,
@@ -26,7 +29,7 @@ const ChapterProgressDonut = ({
   const dashOffset = circumference - (percentage / 100) * circumference;
 
   return (
-    <div className="flex items-center gap-3 shrink-0">
+    <div className="flex shrink-0 flex-col items-center justify-center gap-1">
       <div className="relative h-12 w-12">
         <svg className="-rotate-90 h-12 w-12" viewBox="0 0 48 48" aria-hidden="true">
           <circle
@@ -55,16 +58,11 @@ const ChapterProgressDonut = ({
           </span>
         </div>
       </div>
-      <div className="flex w-16 flex-col items-start">
-        <span className={`text-[10px] font-black uppercase tracking-widest ${
-          isSelected ? 'text-primary' : 'text-muted-foreground/70'
-        }`}>
-          {isLoading ? 'Loading' : `${clampedAttempted}/${total}`}
-        </span>
-        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">
-          Attempted
-        </span>
-      </div>
+      <span className={`text-[9px] font-black uppercase tracking-widest ${
+        isSelected ? 'text-primary' : 'text-muted-foreground/60'
+      }`}>
+        Progress
+      </span>
     </div>
   );
 };
@@ -81,6 +79,19 @@ const ChapterCardSkeleton = () => (
   </div>
 );
 
+const OfflineChapterNote = ({ chapterId }: { chapterId: string }) => {
+  const { status } = useOfflineChapterStatus(chapterId);
+
+  if (status !== 'downloaded') return null;
+
+  return (
+    <div className="mt-3 flex w-full items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+      <CheckCircle2 className="h-3 w-3" />
+      This chapter is available for offline use
+    </div>
+  );
+};
+
 const MCQChapterSelectionPage = () => {
   useLayoutEffect(() => {
     requestAnimationFrame(() => {
@@ -95,8 +106,10 @@ const MCQChapterSelectionPage = () => {
   const [allChapters, setAllChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
+  const [showCollaborateModal, setShowCollaborateModal] = useState(false);
   const [subject, setSubject] = useState<Subject | null>(null);
   const [isHeadingStuck, setIsHeadingStuck] = useState(false);
+  const [isOfflineMode, setIsOfflineMode] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
   const stickyHeadingRef = useRef<HTMLDivElement>(null);
   const stickyHeadingStartTop = useRef<number | null>(null);
 
@@ -137,29 +150,45 @@ const MCQChapterSelectionPage = () => {
         return acc;
       }, {});
     },
-    enabled: allChapters.length > 0
+    enabled: allChapters.length > 0 && !isOfflineMode
   });
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (!subjectId) return;
-      
-      setLoading(true);
-      
-      const [{ data: subjectData }, chapters] = await Promise.all([
-        supabase.from('subjects').select('*').eq('id', subjectId).single(),
-        fetchChaptersBySubject(subjectId)
-      ]);
-      
-      if (subjectData) {
-        setSubject(subjectData as Subject);
-      }
-      setAllChapters(chapters);
-      setLoading(false);
-    };
-    
-    loadData();
+  const loadData = useCallback(async () => {
+    if (!subjectId) return;
+
+    setLoading(true);
+
+    const [subjectData, chapters] = await Promise.all([
+      fetchSubjectById(subjectId),
+      fetchChaptersBySubject(subjectId)
+    ]);
+
+    if (subjectData) {
+      setSubject(subjectData);
+    }
+    setAllChapters(chapters);
+    setLoading(false);
   }, [subjectId]);
+
+  useEffect(() => {
+    const updateOnlineState = () => setIsOfflineMode(!navigator.onLine);
+    const handleOnline = () => {
+      updateOnlineState();
+      loadData();
+    };
+
+    updateOnlineState();
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', updateOnlineState);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', updateOnlineState);
+    };
+  }, [loadData]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -189,8 +218,14 @@ const MCQChapterSelectionPage = () => {
     return (
       <MCQPageLayout backTo="/mcqs">
         <div className="text-center py-20">
-          <p className="text-muted-foreground">Subject not found</p>
-          <Button onClick={() => navigate('/mcqs')} className="mt-4">Go Back</Button>
+          <p className="font-semibold text-foreground">We are not fully available in your institute yet.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Help us bring Medmacs to your campus.</p>
+          <div className="mt-5 flex flex-col sm:flex-row justify-center gap-3">
+            <Button asChild variant="outline"><Link to="/contact-us?subject=campus-collaboration">Request campus collaboration</Link></Button>
+            <Button onClick={() => setShowCollaborateModal(true)}>Become Medmacs Ambassador</Button>
+          </div>
+          <CollaborateModal open={showCollaborateModal} onOpenChange={setShowCollaborateModal} />
+          <Button onClick={() => navigate('/mcqs')} variant="ghost" className="mt-4">Go Back</Button>
         </div>
       </MCQPageLayout>
     );
@@ -242,7 +277,9 @@ const MCQChapterSelectionPage = () => {
             >
               <p className="text-muted-foreground text-sm font-bold uppercase tracking-widest">{subject?.name}</p>
               <p className="text-muted-foreground/60 text-[10px] font-medium uppercase tracking-[0.2em]">
-                {profile?.plan === 'free'
+                {isOfflineMode
+                  ? 'Offline mode - downloaded MCQs only'
+                  : profile?.plan === 'free'
                   ? 'Free daily limits apply'
                   : 'Unlimited Premium Access'}
               </p>
@@ -255,10 +292,22 @@ const MCQChapterSelectionPage = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-0 pb-32 grid grid-cols-1 md:grid-cols-2 gap-4">
         {loading ? (
           Array.from({ length: 6 }).map((_, i) => <ChapterCardSkeleton key={i} />)
+        ) : allChapters.length === 0 ? (
+          <div className="col-span-full text-center py-16">
+            <p className="font-semibold text-foreground">We are not fully available in your institute yet.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Help us bring chapter-wise content to your campus.</p>
+            <div className="mt-5 flex flex-col sm:flex-row justify-center gap-3">
+              <Button asChild variant="outline"><Link to="/contact-us?subject=campus-collaboration">Request campus collaboration</Link></Button>
+              <Button onClick={() => setShowCollaborateModal(true)}>Become Medmacs Ambassador</Button>
+            </div>
+            <CollaborateModal open={showCollaborateModal} onOpenChange={setShowCollaborateModal} />
+          </div>
         ) : (
           allChapters.map((ch, idx) => {
             const isComingSoon = (ch.mcq_count || 0) === 0;
             const isSelected = selectedChapter?.id === ch.id;
+            const attemptedCount = attemptedByChapter[ch.id] || 0;
+            const totalCount = ch.mcq_count || 0;
             
             return (
               <motion.div
@@ -283,35 +332,65 @@ const MCQChapterSelectionPage = () => {
                   </div>
                 )}
 
-                <div className="flex items-center gap-4 relative z-10">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
-                    isSelected ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'bg-muted/50 text-foreground/70'
-                  }`}>
-                    <BookOpen className="w-5 h-5" />
+                <div className="relative z-10 flex items-center gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center">
+                    {!isComingSoon && subject ? (
+                      <ChapterDownloadButton
+                        subject={subject}
+                        chapter={ch}
+                        compact
+                        className={`h-12 w-12 rounded-xl ${
+                          isSelected ? 'border-primary/30 shadow-lg shadow-primary/20' : ''
+                        }`}
+                      />
+                    ) : (
+                      <div className={`flex h-12 w-12 items-center justify-center rounded-xl transition-all ${
+                        isSelected ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'bg-muted/50 text-foreground/70'
+                      }`}>
+                        <BookOpen className="h-5 w-5" />
+                      </div>
+                    )}
                   </div>
                   
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1 pr-1">
                     <h3 className={`text-sm font-black uppercase italic tracking-tight transition-colors ${
                       isSelected ? 'text-primary' : 'text-foreground'
                     }`}>
                       Chapter {ch.chapter_number}
                     </h3>
-                    <p className="text-muted-foreground text-xs font-medium truncate">
+                    <p className="mt-0.5 text-sm font-bold leading-snug text-foreground/90 break-words">
                       {ch.name}
+                    </p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground/70">
+                      {isOfflineMode
+                        ? `${totalCount} questions`
+                        : progressLoading
+                        ? '--/-- questions'
+                        : `${Math.min(attemptedCount, totalCount)}/${totalCount} questions`}
                     </p>
                   </div>
 
                   {!isComingSoon && (
-                    <div className="shrink-0">
-                      <ChapterProgressDonut
-                        attempted={attemptedByChapter[ch.id] || 0}
-                        total={ch.mcq_count || 0}
-                        isSelected={isSelected}
-                        isLoading={progressLoading}
-                      />
+                    <div className="ml-auto flex shrink-0 items-center justify-end">
+                      {isOfflineMode ? (
+                        <div className="flex w-12 flex-col items-center justify-center">
+                          <WifiOff className="mb-1 h-4 w-4 text-amber-600 dark:text-amber-300" />
+                          <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/70">
+                            Offline
+                          </span>
+                        </div>
+                      ) : (
+                        <ChapterProgressDonut
+                          attempted={attemptedCount}
+                          total={totalCount}
+                          isSelected={isSelected}
+                          isLoading={progressLoading}
+                        />
+                      )}
                     </div>
                   )}
                 </div>
+                <OfflineChapterNote chapterId={ch.id} />
               </motion.div>
             );
           })

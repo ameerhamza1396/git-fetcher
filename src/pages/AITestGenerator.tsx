@@ -150,7 +150,7 @@ const AITestGenerator: React.FC = () => {
 
     const fetchBatch = async (batchSize: number, batchNumber: number, totalBatches: number) => {
         const apiTopic = topicMapping(selectedChapters[0]);
-        const res = await fetch(`https://medmacs.app/api/ai/generate-test`, {
+        const res = await fetch(`https://ai.medmacs.app/api/ai/generate-test`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
