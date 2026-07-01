@@ -29,6 +29,7 @@ const notes = readOption('notes', '');
 const rollout = Number(readOption('rollout', '0'));
 const minNativeVersionCode = Number(readOption('min-native-version-code', '14'));
 const mandatory = hasFlag('mandatory');
+const prunePrevious = hasFlag('prune-previous');
 
 const cleanSecret = value => {
   if (!value) return '';
@@ -188,6 +189,43 @@ if (releaseError) {
   process.exit(1);
 }
 
+if (prunePrevious) {
+  const { data: previousReleases, error: previousLookupError } = await supabase
+    .from('ota_releases')
+    .select('id, bundle_path')
+    .eq('channel', channel)
+    .eq('platform', platform)
+    .neq('version', version);
+
+  if (previousLookupError) {
+    console.warn(`Could not look up previous OTA releases for pruning: ${previousLookupError.message}`);
+  } else {
+    const previousIds = previousReleases?.map(release => release.id).filter(Boolean) ?? [];
+    const previousPaths = previousReleases?.map(release => release.bundle_path).filter(Boolean) ?? [];
+
+    if (previousIds.length) {
+      const { error: disableError } = await supabase
+        .from('ota_releases')
+        .update({ enabled: false })
+        .in('id', previousIds);
+
+      if (disableError) {
+        console.warn(`Could not disable previous OTA releases: ${disableError.message}`);
+      }
+    }
+
+    if (previousPaths.length) {
+      const { error: removeError } = await supabase.storage
+        .from('ota-bundles')
+        .remove(previousPaths);
+
+      if (removeError) {
+        console.warn(`Could not delete previous OTA bundle files: ${removeError.message}`);
+      }
+    }
+  }
+}
+
 console.log('');
 console.log('OTA release published');
 console.log(`Version: ${version}`);
@@ -198,3 +236,4 @@ console.log(`Min native version code: ${minNativeVersionCode}`);
 console.log(`Bundle: ota-bundles/${bundlePath}`);
 console.log(`Zip: ${basename(zipPath)} (${zipSizeMb} MB)`);
 console.log(`SHA-256: ${checksum}`);
+console.log(`Pruned previous releases: ${prunePrevious ? 'yes' : 'no'}`);

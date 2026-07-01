@@ -74,6 +74,7 @@ import BlockedUserOverlay from '@/components/auth/BlockedUserOverlay';
 import { AchievementUnlockNotifier } from '@/components/profile/AchievementBadges';
 import { useQuery } from '@tanstack/react-query';
 import OtaUpdateScreen from '@/components/OtaUpdateScreen';
+import OtaDiagnosticsPanel from '@/components/OtaDiagnosticsPanel';
 
 
 const queryClient = new QueryClient();
@@ -158,6 +159,7 @@ function App() {
       >
         <StatusBarHandler />
         <OtaUpdateScreen />
+        <OtaDiagnosticsPanel />
 
         <Router>
           {/* Crucial: The bg-background class here ensures the div 

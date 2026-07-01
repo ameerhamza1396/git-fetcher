@@ -7,7 +7,7 @@ import {
   type OtaUpdateState,
 } from '@/services/otaUpdateService';
 
-const activePhases = new Set(['downloading', 'preparing', 'ready', 'error']);
+const activePhases = new Set(['downloading', 'preparing', 'installing', 'complete', 'failed', 'error']);
 
 const OtaUpdateScreen = () => {
   const [state, setState] = useState<OtaUpdateState>({ phase: 'idle', progress: 0 });
@@ -16,7 +16,9 @@ const OtaUpdateScreen = () => {
 
   if (!activePhases.has(state.phase)) return null;
 
-  const isReady = state.phase === 'ready';
+  const isInstalling = state.phase === 'installing';
+  const isComplete = state.phase === 'complete';
+  const isFailed = state.phase === 'failed';
   const isError = state.phase === 'error';
   const isPreparing = state.phase === 'preparing';
   const progress = Math.max(0, Math.min(100, state.progress));
@@ -26,9 +28,9 @@ const OtaUpdateScreen = () => {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(20,184,166,0.26),_transparent_36%),radial-gradient(circle_at_bottom,_rgba(59,130,246,0.18),_transparent_34%)]" />
       <div className="relative w-full max-w-sm text-center space-y-7">
         <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-white/10 border border-white/15 shadow-2xl">
-          {isReady ? (
+          {isInstalling || isComplete ? (
             <CheckCircle2 className="h-12 w-12 text-emerald-300" />
-          ) : isError ? (
+          ) : isError || isFailed ? (
             <AlertCircle className="h-12 w-12 text-amber-300" />
           ) : isPreparing ? (
             <Loader2 className="h-12 w-12 animate-spin text-cyan-200" />
@@ -39,7 +41,7 @@ const OtaUpdateScreen = () => {
 
         <div className="space-y-3">
           <h1 className="text-3xl font-black tracking-normal">
-            {isReady ? 'Update ready' : isError ? 'Update paused' : 'Getting new features ready'}
+            {isComplete ? 'Update complete' : isInstalling ? 'Installing update' : isError || isFailed ? 'Update paused' : 'Getting new features ready'}
           </h1>
           <p className="text-sm leading-6 text-slate-200">
             {state.message || 'This will only take a moment.'}
@@ -51,7 +53,7 @@ const OtaUpdateScreen = () => {
           )}
         </div>
 
-        {!isReady && !isError && (
+        {!isError && !isFailed && (
           <div className="space-y-3">
             <div className="h-3 overflow-hidden rounded-full bg-white/15">
               <div
@@ -65,7 +67,7 @@ const OtaUpdateScreen = () => {
           </div>
         )}
 
-        {(isReady || isError) && (
+        {(isError || isFailed || isComplete) && (
           <Button
             onClick={dismissOtaUpdateScreen}
             className="h-12 w-full rounded-lg bg-white text-slate-950 hover:bg-slate-100 font-black"

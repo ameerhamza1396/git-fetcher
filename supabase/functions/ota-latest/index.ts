@@ -11,6 +11,7 @@ type OtaRequest = {
   platform?: string;
   nativeVersionCode?: number;
   currentBundleVersion?: string;
+  failedBundleVersions?: string[];
   channel?: string;
   installId?: string;
 };
@@ -68,6 +69,9 @@ serve(async (req) => {
   const installId = typeof payload.installId === 'string' && payload.installId.trim()
     ? payload.installId.trim()
     : req.headers.get('x-forwarded-for') ?? 'anonymous';
+  const failedBundleVersions = Array.isArray(payload.failedBundleVersions)
+    ? payload.failedBundleVersions.filter((value): value is string => typeof value === 'string')
+    : [];
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -92,6 +96,10 @@ serve(async (req) => {
   for (const release of releases ?? []) {
     if (release.version === currentBundleVersion) {
       return json({ available: false, reason: 'up_to_date' });
+    }
+
+    if (failedBundleVersions.includes(release.version)) {
+      continue;
     }
 
     const rolloutPercent = Number(release.rollout_percent ?? 0);

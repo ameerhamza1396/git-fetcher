@@ -6,7 +6,7 @@ import { HelmetProvider } from "react-helmet-async";
 
 import { StatusBar } from "@capacitor/status-bar";
 import { Capacitor } from "@capacitor/core";
-import { initializeOtaUpdates } from "@/services/otaUpdateService";
+import { markOtaBundleReady } from "@/services/otaUpdateService";
 
 import { setupIonicReact } from "@ionic/react";
 
@@ -17,6 +17,8 @@ setupIonicReact({
 });
 
 const BUILD_ID = "v10-STABLE";
+
+void markOtaBundleReady();
 
 const Root = () => {
   const initNativeFeatures = async () => {
@@ -31,7 +33,6 @@ const Root = () => {
   };
 
   useEffect(() => {
-    initializeOtaUpdates();
     initNativeFeatures();
   }, []);
 

@@ -1,3 +1,4 @@
+
 // @ts-nocheck
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
@@ -944,9 +945,9 @@ const Dashboard = () => {
   ];
 
   const premiumPerks = [
-    { title: 'AI Chatbot', description: 'Instant AI tutor', icon: Zap, link: '/ai/chatbot', gradient: 'from-amber-400 to-orange-500', iconColor: 'text-yellow-100' },
-    { title: 'AI Test Generator', description: 'Custom tests with AI', icon: Brain, link: '/ai/test-generator', gradient: 'from-cyan-500 to-blue-600', iconColor: 'text-cyan-100' },
-    { title: 'Learn with Dr Ahroid', description: 'AI flashcards by chapter', icon: Sparkles, link: '/learn-with-ai', gradient: 'from-violet-500 to-fuchsia-600', iconColor: 'text-violet-100' },
+    { title: 'Ask Dr Ahroid', description: 'Instant AI tutor', icon: Zap, link: '/ai/chatbot', gradient: 'from-amber-400 to-orange-500', iconColor: 'text-yellow-100' },
+    { title: 'AI Test Attempt', description: 'Custom tests with AI', icon: Brain, link: '/ai/test-generator', gradient: 'from-cyan-500 to-blue-600', iconColor: 'text-cyan-100' },
+    { title: 'AI Flashcards', description: 'AI flashcards by chapter', icon: Sparkles, link: '/learn-with-ai', gradient: 'from-violet-500 to-fuchsia-600', iconColor: 'text-violet-100' },
   ];
 
   const instituteModules = [
@@ -1161,7 +1162,7 @@ const Dashboard = () => {
                   { label: 'Subscription', icon: CreditCard, link: '/pricing' },
                   { label: 'Redeem Code', icon: Award, link: '/redeem' },
                   { label: 'Purchase History', icon: Receipt, link: '/purchase-history' },
-                  { label: 'About Us', icon: Users, link: '/teams' },
+                  { label: 'About Medmacs', icon: Users, link: '/teams' },
                   { label: 'Contact Us', icon: Mail, link: '/contact-us' },
                 ].map((item, i) => (
                   <Link key={i} to={item.link} className="flex items-center justify-between p-4 hover:bg-accent/50 active:bg-accent transition-colors">
