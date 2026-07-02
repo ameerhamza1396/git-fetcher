@@ -21,6 +21,7 @@ import { notifyAchievementProgress } from '@/components/profile/AchievementBadge
 const VALID_YEARS = ['1st', '2nd', '3rd', '4th', '5th'];
 type SetupSelectionCategory = 'institute' | 'specialized_test';
 type SetupThemeChoice = 'light' | 'dark';
+type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
 
 const SetupWizard = () => {
   const { user, loading: authLoading } = useAuth();
@@ -36,6 +37,7 @@ const SetupWizard = () => {
   const [institute, setInstitute] = useState('');
   const [year, setYear] = useState('');
   const [usernameError, setUsernameError] = useState('');
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle');
   const [existingProfile, setExistingProfile] = useState<any>(null);
   const [setupLoadError, setSetupLoadError] = useState('');
   const [referredByName, setReferredByName] = useState<string | null>(null);
@@ -163,13 +165,13 @@ const SetupWizard = () => {
     const selectedInstitute = hasInstitute ? getInstituteByCode(profile.institute, instituteRows) : null;
     const selectedSpecializedTest = isSpecializedTestInstitute(selectedInstitute);
 
-    // Brand-new users should choose their theme before the rest of setup.
+    // Brand-new users should see the welcome step first.
     if (!hasUsername && !hasInstitute && !hasValidYear) return 0;
-    if (!hasUsername) return 2;
-    if (!hasInstitute) return 3;
-    if (selectedSpecializedTest) return 5;
-    if (!hasValidYear) return 4;
-    return 6;
+    if (!hasUsername) return 1;
+    if (!hasInstitute) return 2;
+    if (selectedSpecializedTest) return 4;
+    if (!hasValidYear) return 3;
+    return 5;
   }, []);
 
   const loadSetupProfile = useCallback(async () => {
@@ -196,7 +198,7 @@ const SetupWizard = () => {
       }
 
       const initialStep = getInitialStep(profile, insts);
-      if (initialStep === 6) { navigate('/dashboard', { replace: true }); return; }
+      if (initialStep === 5) { navigate('/dashboard', { replace: true }); return; }
       setCurrentStep(initialStep);
     } catch (error) {
       console.error('Failed to initialize setup profile:', error);
@@ -219,10 +221,74 @@ const SetupWizard = () => {
 
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'there';
 
+  useEffect(() => {
+    const value = username.trim();
+    if (!user?.id) return;
+
+    if (!value) {
+      setUsernameStatus('idle');
+      setUsernameError('');
+      return;
+    }
+
+    if (value.length < 3) {
+      setUsernameStatus('invalid');
+      setUsernameError('At least 3 characters');
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(value)) {
+      setUsernameStatus('invalid');
+      setUsernameError('Letters, numbers, underscores only');
+      return;
+    }
+
+    if (existingProfile?.username === value) {
+      setUsernameStatus('available');
+      setUsernameError('');
+      return;
+    }
+
+    let cancelled = false;
+    setUsernameStatus('checking');
+    setUsernameError('');
+
+    const timer = window.setTimeout(async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', value)
+        .neq('id', user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error) {
+        setUsernameStatus('idle');
+        setUsernameError('Could not check username');
+        return;
+      }
+
+      if (data) {
+        setUsernameStatus('taken');
+        setUsernameError('Username already taken');
+      } else {
+        setUsernameStatus('available');
+        setUsernameError('');
+      }
+    }, 450);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [username, user?.id, existingProfile?.username]);
+
   const validateUsername = async (value: string) => {
-    if (value.length < 3) { setUsernameError('At least 3 characters'); return false; }
-    if (!/^[a-zA-Z0-9_]+$/.test(value)) { setUsernameError('Letters, numbers, underscores only'); return false; }
-    const { data } = await supabase.from('profiles').select('id').eq('username', value).neq('id', user!.id).maybeSingle();
+    const normalizedValue = value.trim();
+    if (normalizedValue.length < 3) { setUsernameError('At least 3 characters'); return false; }
+    if (!/^[a-zA-Z0-9_]+$/.test(normalizedValue)) { setUsernameError('Letters, numbers, underscores only'); return false; }
+    const { data } = await supabase.from('profiles').select('id').eq('username', normalizedValue).neq('id', user!.id).maybeSingle();
     if (data) { setUsernameError('Username already taken'); return false; }
     setUsernameError('');
     return true;
@@ -230,23 +296,22 @@ const SetupWizard = () => {
 
   const handleNext = async () => {
     if (currentStep === 0) { setCurrentStep(1); return; }
-    if (currentStep === 1) { setCurrentStep(2); return; }
-    if (currentStep === 2) {
+    if (currentStep === 1) {
       setSaving(true);
       const valid = await validateUsername(username);
       if (!valid) { setSaving(false); return; }
       const { error } = await supabase.from('profiles').upsert({
         id: user!.id,
-        username,
+        username: username.trim(),
         full_name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || null,
         updated_at: new Date().toISOString(),
       } as any, { onConflict: 'id' });
       setSaving(false);
       if (error) { toast.error('Failed to save username'); return; }
-      setCurrentStep(3);
+      setCurrentStep(2);
       return;
     }
-    if (currentStep === 3) {
+    if (currentStep === 2) {
       if (!institute) {
         toast.error(selectionCategory === 'specialized_test' ? 'Please select a specialized test' : 'Please select an institute');
         return;
@@ -266,10 +331,10 @@ const SetupWizard = () => {
         toast.error(selectedSpecializedTest ? 'Failed to save specialized test' : 'Failed to save institute');
         return;
       }
-      setCurrentStep(selectedSpecializedTest ? 5 : 4);
+      setCurrentStep(selectedSpecializedTest ? 4 : 3);
       return;
     }
-    if (currentStep === 4) {
+    if (currentStep === 3) {
       if (!year) { toast.error('Please select your year'); return; }
       setSaving(true);
       const { error } = await supabase.from('profiles').upsert({
@@ -279,10 +344,10 @@ const SetupWizard = () => {
       } as any, { onConflict: 'id' });
       setSaving(false);
       if (error) { toast.error('Failed to save year'); return; }
-      setCurrentStep(5);
+      setCurrentStep(4);
       return;
     }
-    if (currentStep === 5) {
+    if (currentStep === 4) {
       if (referralStepCode && !referredByName) {
         setSaving(true);
         const referrerId = await resolveReferralCode(referralStepCode);
@@ -294,17 +359,17 @@ const SetupWizard = () => {
         }
         setSaving(false);
       }
-      setCurrentStep(6);
+      setCurrentStep(5);
       return;
     }
-    if (currentStep === 6) { navigate('/dashboard'); }
+    if (currentStep === 5) { navigate('/dashboard'); }
   };
 
   const handleBack = () => {
-    if (currentStep === 5) {
+    if (currentStep === 4) {
       const selectedInstitute = getInstituteByCode(institute, institutes);
       if (isSpecializedTestInstitute(selectedInstitute)) {
-        setCurrentStep(3);
+        setCurrentStep(2);
         return;
       }
     }
@@ -312,7 +377,6 @@ const SetupWizard = () => {
   };
 
   const steps = [
-    { title: 'Theme', icon: setupTheme === 'dark' ? Moon : Sun },
     { title: 'Welcome', icon: Sparkles },
     { title: 'Username', icon: User },
     { title: 'Study Path', icon: Building2 },
@@ -382,13 +446,17 @@ const SetupWizard = () => {
       case 0:
         return (
           <div className="text-center max-w-lg mx-auto">
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
-              <div className="w-20 h-20 rounded-3xl bg-white/15 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20">
-                {setupTheme === 'dark' ? <Moon className="w-10 h-10 text-white" /> : <Sun className="w-10 h-10 text-white" />}
-              </div>
+            <motion.div initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', delay: 0.12 }}>
+              <img
+                src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png"
+                alt="Medmacs"
+                className="w-36 h-36 md:w-44 md:h-44 object-contain mx-auto mb-6 drop-shadow-2xl"
+              />
             </motion.div>
-            <h2 className="text-3xl md:text-4xl font-black text-white mb-3">Choose Your Look</h2>
-            <p className="text-white/60 text-sm mb-8">Pick the theme you want Medmacs to use.</p>
+            <h2 className="text-3xl md:text-4xl font-black text-white mb-3">
+              Welcome, <span className="text-cyan-300">{displayName}</span>!
+            </h2>
+            <p className="text-white/70 text-lg mb-6">Let's set up your profile in 3 quick steps.</p>
             <div className="grid grid-cols-2 gap-3">
               {([
                 { value: 'dark' as const, label: 'Dark', icon: Moon, description: 'Pitch black setup' },
@@ -402,15 +470,15 @@ const SetupWizard = () => {
                     onClick={() => chooseSetupTheme(option.value)}
                     className={`rounded-3xl border-2 p-5 text-left transition-all duration-200 ${
                       selected
-                        ? 'border-white bg-white/20 shadow-2xl'
+                        ? 'border-cyan-300 bg-cyan-400/15 shadow-2xl shadow-cyan-500/20'
                         : 'border-white/10 bg-white/5 hover:bg-white/10'
                     }`}
                   >
                     <div className="mb-5 flex items-center justify-between">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-400/15">
                         <Icon className="h-6 w-6 text-white" />
                       </div>
-                      {selected && <CheckCircle2 className="h-5 w-5 text-white" />}
+                      {selected && <CheckCircle2 className="h-5 w-5 text-cyan-300" />}
                     </div>
                     <p className="text-lg font-black text-white">{option.label}</p>
                     <p className="mt-1 text-xs font-semibold text-white/50">{option.description}</p>
@@ -423,20 +491,6 @@ const SetupWizard = () => {
 
       case 1:
         return (
-          <div className="text-center">
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.2 }}>
-              <img src="/mascots/Mascot1.png" alt="Welcome" className="w-48 h-auto mx-auto mb-6 drop-shadow-2xl" />
-            </motion.div>
-            <h2 className="text-3xl md:text-4xl font-black text-white mb-3">
-              Welcome, <span className="text-yellow-300">{displayName}</span>!
-            </h2>
-            <p className="text-white/70 text-lg mb-2">Let's set up your profile in 3 quick steps.</p>
-            <p className="text-white/50 text-sm">This will personalize your learning experience.</p>
-          </div>
-        );
-
-      case 2:
-        return (
           <div className="text-center max-w-md mx-auto">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
               <div className="w-20 h-20 rounded-3xl bg-white/15 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20">
@@ -448,19 +502,25 @@ const SetupWizard = () => {
             <div className="relative">
               <Input
                 value={username}
-                onChange={(e) => { setUsername(e.target.value); setUsernameError(''); }}
+                onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter your username"
                 className="h-14 rounded-2xl bg-white/10 border-white/20 text-white placeholder:text-white/40 text-center text-lg font-bold focus:ring-2 focus:ring-white/30"
                 maxLength={20}
               />
-              {usernameError && (
+              {usernameStatus === 'checking' && (
+                <p className="text-cyan-300 text-xs mt-2 font-semibold">Checking availability...</p>
+              )}
+              {usernameStatus === 'available' && username.trim().length >= 3 && (
+                <p className="text-emerald-300 text-xs mt-2 font-semibold">Username is available</p>
+              )}
+              {usernameError && usernameStatus !== 'checking' && usernameStatus !== 'available' && (
                 <p className="text-red-300 text-xs mt-2 font-semibold">{usernameError}</p>
               )}
             </div>
           </div>
         );
 
-      case 3:
+      case 2:
         return (
           <div className="text-center max-w-lg mx-auto">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
@@ -539,7 +599,7 @@ const SetupWizard = () => {
           </div>
         );
 
-      case 4:
+      case 3:
         return (
           <div className="text-center max-w-md mx-auto">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
@@ -567,7 +627,7 @@ const SetupWizard = () => {
           </div>
         );
 
-      case 5:
+      case 4:
         return (
           <div className="text-center max-w-md mx-auto">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
@@ -600,7 +660,7 @@ const SetupWizard = () => {
           </div>
         );
 
-      case 6:
+      case 5:
         return (
           <div className="text-center">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.2 }}>
@@ -618,12 +678,11 @@ const SetupWizard = () => {
 
   const canProceed = () => {
     if (currentStep === 0) return true;
-    if (currentStep === 1) return true;
-    if (currentStep === 2) return username.length >= 3;
-    if (currentStep === 3) return !!institute;
-    if (currentStep === 4) return !!year;
+    if (currentStep === 1) return usernameStatus === 'available';
+    if (currentStep === 2) return !!institute;
+    if (currentStep === 3) return !!year;
+    if (currentStep === 4) return true;
     if (currentStep === 5) return true;
-    if (currentStep === 6) return true;
     return false;
   };
 
@@ -638,12 +697,23 @@ const SetupWizard = () => {
           .setup-theme-light .text-white\\/50 { color: rgba(15, 23, 42, 0.52) !important; }
           .setup-theme-light .text-white\\/40 { color: rgba(15, 23, 42, 0.42) !important; }
           .setup-theme-light .text-white\\/30 { color: rgba(15, 23, 42, 0.32) !important; }
+          .setup-theme-light .text-cyan-300 { color: rgb(8 145 178) !important; }
+          .setup-theme-light .text-emerald-300 { color: rgb(5 150 105) !important; }
+          .setup-theme-light .text-black { color: rgb(255 255 255) !important; }
+          .setup-theme-light .bg-white { background-color: rgb(8 145 178) !important; }
+          .setup-theme-light .bg-white\\/20 { background-color: rgba(8, 145, 178, 0.14) !important; }
+          .setup-theme-light .bg-white\\/15 { background-color: rgba(8, 145, 178, 0.12) !important; }
+          .setup-theme-light .bg-white\\/10 { background-color: rgba(8, 145, 178, 0.08) !important; }
+          .setup-theme-light .bg-white\\/5 { background-color: rgba(8, 145, 178, 0.05) !important; }
+          .setup-theme-light .border-white { border-color: rgb(8 145 178) !important; }
+          .setup-theme-light .border-white\\/20 { border-color: rgba(8, 145, 178, 0.22) !important; }
+          .setup-theme-light .border-white\\/10 { border-color: rgba(8, 145, 178, 0.16) !important; }
           .setup-theme-light .placeholder\\:text-white\\/40::placeholder { color: rgba(15, 23, 42, 0.42) !important; }
         `}</style>
       )}
-      <div className={`absolute h-80 w-80 rounded-full blur-3xl transition-all duration-700 ${haloLayout.primary} ${setupIsDark ? 'bg-cyan-500/25' : 'bg-white/90'}`} />
-      <div className={`absolute h-96 w-96 rounded-full blur-3xl transition-all duration-700 ${haloLayout.secondary} ${setupIsDark ? 'bg-fuchsia-500/20' : 'bg-sky-100/80'}`} />
-      <div className={`absolute inset-0 z-0 transition-all duration-700 ${setupIsDark ? 'bg-black/45' : 'bg-white/25'}`} />
+      <div className={`absolute h-80 w-80 rounded-full blur-3xl transition-all duration-700 ${haloLayout.primary} ${setupIsDark ? 'bg-cyan-500/25' : 'bg-cyan-300/45'}`} />
+      <div className={`absolute h-96 w-96 rounded-full blur-3xl transition-all duration-700 ${haloLayout.secondary} ${setupIsDark ? 'bg-teal-400/20' : 'bg-teal-200/50'}`} />
+      <div className={`absolute inset-0 z-0 transition-all duration-700 ${setupIsDark ? 'bg-black/45' : 'bg-white/55'}`} />
       <div className="absolute top-[calc(env(safe-area-inset-top,0px)+16px)] left-6 right-6 z-50">
         <div className="flex gap-2">
           {steps.map((_, i) => (
@@ -668,9 +738,9 @@ const SetupWizard = () => {
         </div>
       </div>
 
-      {currentStep === 1 && (
+      {currentStep === 0 && (
         <button
-          onClick={() => setCurrentStep(2)}
+          onClick={() => setCurrentStep(1)}
           className="absolute top-[calc(env(safe-area-inset-top,0px)+16px)] right-6 z-50 text-white/40 hover:text-white text-xs font-bold uppercase tracking-widest"
         >
           Skip
@@ -693,11 +763,15 @@ const SetupWizard = () => {
 
       <div className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+24px)] left-6 right-6 z-50">
         <div className={`flex items-center gap-3 ${currentStep > 0 ? 'justify-between' : 'justify-center'}`}>
-          {currentStep > 0 && currentStep < 6 && (
+          {currentStep > 0 && currentStep < 5 && (
             <Button
               onClick={handleBack}
               variant="outline"
-              className="flex-1 h-14 rounded-2xl border-2 border-white/20 bg-white/5 text-white hover:bg-white/10 font-bold"
+              className={`flex-1 h-14 rounded-2xl border-2 font-bold ${
+                setupIsDark
+                  ? 'border-white/20 bg-white/5 text-white hover:bg-white/10'
+                  : 'border-cyan-600/20 bg-cyan-600/5 text-cyan-700 hover:bg-cyan-600/10'
+              }`}
             >
               <ChevronLeft className="mr-1 h-4 w-4" /> Back
             </Button>
@@ -705,17 +779,19 @@ const SetupWizard = () => {
           <Button
             onClick={handleNext}
             disabled={!canProceed() || saving}
-            className={`h-14 rounded-2xl bg-white text-black hover:bg-white/90 font-black shadow-2xl transition-all active:scale-95 ${
-              currentStep > 0 && currentStep < 6 ? 'flex-1' : 'w-full max-w-md'
+            className={`h-14 rounded-2xl font-black shadow-2xl transition-all active:scale-95 ${
+              setupIsDark
+                ? 'bg-white text-black hover:bg-white/90'
+                : 'bg-gradient-to-r from-cyan-600 to-teal-500 text-white hover:from-cyan-500 hover:to-teal-400 shadow-cyan-700/20'
+            } ${
+              currentStep > 0 && currentStep < 5 ? 'flex-1' : 'w-full max-w-md'
             }`}
           >
             {saving ? (
               <Loader2 className="w-5 h-5 animate-spin" />
-            ) : currentStep === 6 ? (
-              <span className="flex items-center gap-2">Go to Dashboard <Sparkles className="h-5 w-5 fill-black" /></span>
+            ) : currentStep === 5 ? (
+              <span className="flex items-center gap-2">Go to Dashboard <Sparkles className={`h-5 w-5 ${setupIsDark ? 'fill-black' : 'fill-white'}`} /></span>
             ) : currentStep === 0 ? (
-              <span className="flex items-center gap-2">Continue <ChevronRight className="h-5 w-5" /></span>
-            ) : currentStep === 1 ? (
               <span className="flex items-center gap-2">Let's Go <ChevronRight className="h-5 w-5" /></span>
             ) : (
               <span className="flex items-center gap-2">Next <ChevronRight className="h-5 w-5" /></span>
