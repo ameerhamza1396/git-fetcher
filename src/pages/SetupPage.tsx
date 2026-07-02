@@ -436,6 +436,7 @@ const SetupWizard = () => {
   ];
   const haloLayout = haloLayouts[currentStep] || haloLayouts[0];
   const setupIsDark = setupTheme === 'dark';
+  const progressFillDuration = 0.28;
 
   if (loading || authLoading) {
     return (
@@ -945,7 +946,11 @@ const SetupWizard = () => {
                 className="h-full bg-white rounded-full"
                 initial={{ width: '0%' }}
                 animate={{ width: i <= currentStep ? '100%' : '0%' }}
-                transition={{ duration: 0.4, ease: 'easeOut' }}
+                transition={{
+                  duration: progressFillDuration,
+                  ease: 'linear',
+                  delay: i <= currentStep ? i * progressFillDuration : 0,
+                }}
               />
             </div>
           ))}
