@@ -596,7 +596,12 @@ const Dashboard = () => {
     );
   };
 
-  const { data: profile, isLoading: profileLoading, isError: profileFetchFailed } = useQuery<Profile | null>({
+  const {
+    data: profile,
+    isLoading: profileLoading,
+    isFetchedAfterMount: profileFetchedAfterMount,
+    isError: profileFetchFailed
+  } = useQuery<Profile | null>({
     queryKey: ['profile', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
@@ -617,6 +622,16 @@ const Dashboard = () => {
     initialData: readCachedProfile,
     retry: 1,
   });
+
+  useEffect(() => {
+    setProfileVerifiedFromServer(false);
+  }, [user?.id]);
+
+  const waitingForLiveProfileConfirmation = !!user && !profileFetchFailed && (
+    profileLoading ||
+    !profileFetchedAfterMount ||
+    !profileVerifiedFromServer
+  );
 
   const { data: userStats, isLoading: userStatsLoading } = useQuery({
     queryKey: ['user-stats', user?.id],
@@ -914,7 +929,7 @@ const Dashboard = () => {
   }, [activeTab]);
 
   useEffect(() => {
-    if (authLoading || profileLoading) { setIsNavigating(true); return; }
+    if (authLoading || waitingForLiveProfileConfirmation) { setIsNavigating(true); return; }
     if (!user) { setIsNavigating(false); return; }
 
     if (profileFetchFailed) {
@@ -959,7 +974,7 @@ const Dashboard = () => {
     }
 
     setIsNavigating(false);
-  }, [authLoading, profileLoading, profileFetchFailed, profileVerifiedFromServer, user, profile, instituteData, instituteDataLoading, navigate]);
+  }, [authLoading, waitingForLiveProfileConfirmation, profileFetchFailed, profileVerifiedFromServer, user, profile, instituteData, instituteDataLoading, navigate]);
 
   const flpAction = { title: 'Full-Length Paper', description: 'Timed mixed exams', icon: ScrollText, link: '/flp', gradient: 'from-fuchsia-600 to-rose-600', iconColor: 'text-fuchsia-100' };
   const collaborateAction = { title: 'Collaborate', description: 'Why Medmacs needs you', icon: Briefcase, onClick: () => setShowCollaborateModal(true), gradient: 'from-rose-500 to-pink-600', iconColor: 'text-rose-100' };
@@ -1011,7 +1026,7 @@ const Dashboard = () => {
     }
   };
 
-  if (isNavigating || authLoading || profileLoading) {
+  if (isNavigating || authLoading || waitingForLiveProfileConfirmation) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-24 h-24 object-contain animate-pulse" />
