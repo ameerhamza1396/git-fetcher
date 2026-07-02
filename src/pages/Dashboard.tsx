@@ -603,8 +603,13 @@ const Dashboard = () => {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
       if (error) throw error;
       setProfileVerifiedFromServer(true);
-      if (data && typeof window !== 'undefined') {
-        localStorage.setItem(`medmacs_profile_cache_${user.id}`, JSON.stringify(data));
+      if (typeof window !== 'undefined') {
+        const cacheKey = `medmacs_profile_cache_${user.id}`;
+        if (data) {
+          localStorage.setItem(cacheKey, JSON.stringify(data));
+        } else {
+          localStorage.removeItem(cacheKey);
+        }
       }
       return data;
     },
@@ -912,18 +917,28 @@ const Dashboard = () => {
     if (authLoading || profileLoading) { setIsNavigating(true); return; }
     if (!user) { setIsNavigating(false); return; }
 
-    if (profileFetchFailed && !profile) {
-      setIsNavigating(false);
+    if (profileFetchFailed) {
+      const canUseCachedProfile = typeof navigator !== 'undefined' && !navigator.onLine && !!profile;
+      if (canUseCachedProfile) {
+        setIsNavigating(false);
+        return;
+      }
+      navigate('/setup', { replace: true });
       return;
     }
 
     if (profile === undefined) {
-      setIsNavigating(false);
+      setIsNavigating(true);
       return;
     }
 
     if (!profileVerifiedFromServer) {
-      setIsNavigating(false);
+      setIsNavigating(true);
+      return;
+    }
+
+    if (!profile) {
+      navigate('/setup', { replace: true });
       return;
     }
 
@@ -932,8 +947,14 @@ const Dashboard = () => {
       return;
     }
 
+    const isOnline = typeof navigator === 'undefined' || navigator.onLine;
+    if (isOnline && (profile as any)?.institute && !instituteData) {
+      navigate('/setup', { replace: true });
+      return;
+    }
+
     if (requiredProfileFieldsMissing(profile, instituteData)) {
-      navigate('/setup');
+      navigate('/setup', { replace: true });
       return;
     }
 
