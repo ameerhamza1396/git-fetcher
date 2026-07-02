@@ -8,6 +8,7 @@ export interface Institute {
   short_name: string;
   image_url: string | null;
   enabled: boolean;
+  category?: 'institute' | 'specialized_test' | string | null;
   years: string[];
   dashboard_components?: {
     mcqs: boolean;
@@ -51,4 +52,12 @@ export function getInstituteDisplayName(code: string, institutes: Institute[]): 
 
 export function getInstituteByCode(code: string, institutes: Institute[]): Institute | undefined {
   return institutes.find(i => i.code === code);
+}
+
+export function getInstituteCategory(institute?: Pick<Institute, 'category'> | null): 'institute' | 'specialized_test' {
+  return institute?.category === 'specialized_test' ? 'specialized_test' : 'institute';
+}
+
+export function isSpecializedTestInstitute(institute?: Pick<Institute, 'category'> | null): boolean {
+  return getInstituteCategory(institute) === 'specialized_test';
 }

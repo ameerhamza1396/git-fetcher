@@ -9,14 +9,16 @@ import { StatusBar, Style } from '@capacitor/status-bar';
 import { NavigationBar } from '@capgo/capacitor-navigation-bar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { fetchInstitutes, type Institute } from '@/utils/institutes';
+import { fetchInstitutes, getInstituteByCode, isSpecializedTestInstitute, type Institute } from '@/utils/institutes';
 import { generateUniqueReferralCode, resolveReferralCode } from '@/utils/referral';
 import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
 
 const VALID_YEARS = ['1st', '2nd', '3rd', '4th', '5th'];
+type SetupSelectionCategory = 'institute' | 'specialized_test';
 
 const SetupWizard = () => {
   const { user, loading: authLoading } = useAuth();
@@ -25,6 +27,7 @@ const SetupWizard = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [institutes, setInstitutes] = useState<Institute[]>([]);
+  const [selectionCategory, setSelectionCategory] = useState<SetupSelectionCategory>('institute');
 
   const [username, setUsername] = useState('');
   const [institute, setInstitute] = useState('');
@@ -138,15 +141,18 @@ const SetupWizard = () => {
     return data;
   }, [user]);
 
-  const getInitialStep = useCallback((profile: any) => {
+  const getInitialStep = useCallback((profile: any, instituteRows: Institute[]) => {
     const hasUsername = !!profile?.username;
     const hasInstitute = !!profile?.institute;
     const hasValidYear = !!profile?.year && VALID_YEARS.includes(profile.year);
+    const selectedInstitute = hasInstitute ? getInstituteByCode(profile.institute, instituteRows) : null;
+    const selectedSpecializedTest = isSpecializedTestInstitute(selectedInstitute);
 
     // Brand-new users should see the welcome step first.
     if (!hasUsername && !hasInstitute && !hasValidYear) return 0;
     if (!hasUsername) return 1;
     if (!hasInstitute) return 2;
+    if (selectedSpecializedTest) return 4;
     if (!hasValidYear) return 3;
     return 5;
   }, []);
@@ -166,13 +172,15 @@ const SetupWizard = () => {
       setUsername(profile?.username || '');
       setInstitute((profile as any)?.institute || '');
       setYear((profile as any)?.year || '');
+      const selectedInstitute = getInstituteByCode((profile as any)?.institute || '', insts);
+      setSelectionCategory(isSpecializedTestInstitute(selectedInstitute) ? 'specialized_test' : 'institute');
 
       if (profile?.referred_by) {
         const { data: referrer } = await supabase.from('profiles').select('full_name, username').eq('id', profile.referred_by).maybeSingle();
         if (referrer) setReferredByName(referrer.full_name || referrer.username || 'a friend');
       }
 
-      const initialStep = getInitialStep(profile);
+      const initialStep = getInitialStep(profile, insts);
       if (initialStep === 5) { navigate('/dashboard', { replace: true }); return; }
       setCurrentStep(initialStep);
     } catch (error) {
@@ -223,16 +231,26 @@ const SetupWizard = () => {
       return;
     }
     if (currentStep === 2) {
-      if (!institute) { toast.error('Please select an institute'); return; }
-      setSaving(true);
-      const { error } = await supabase.from('profiles').upsert({
+      if (!institute) {
+        toast.error(selectionCategory === 'specialized_test' ? 'Please select a specialized test' : 'Please select an institute');
+        return;
+      }
+      const selectedInstitute = getInstituteByCode(institute, institutes);
+      const selectedSpecializedTest = isSpecializedTestInstitute(selectedInstitute);
+      const profilePatch: any = {
         id: user!.id,
         institute,
         updated_at: new Date().toISOString(),
-      } as any, { onConflict: 'id' });
+      };
+      if (selectedSpecializedTest) profilePatch.year = null;
+      setSaving(true);
+      const { error } = await supabase.from('profiles').upsert(profilePatch, { onConflict: 'id' });
       setSaving(false);
-      if (error) { toast.error('Failed to save institute'); return; }
-      setCurrentStep(3);
+      if (error) {
+        toast.error(selectedSpecializedTest ? 'Failed to save specialized test' : 'Failed to save institute');
+        return;
+      }
+      setCurrentStep(selectedSpecializedTest ? 4 : 3);
       return;
     }
     if (currentStep === 3) {
@@ -267,13 +285,20 @@ const SetupWizard = () => {
   };
 
   const handleBack = () => {
+    if (currentStep === 4) {
+      const selectedInstitute = getInstituteByCode(institute, institutes);
+      if (isSpecializedTestInstitute(selectedInstitute)) {
+        setCurrentStep(2);
+        return;
+      }
+    }
     if (currentStep > 0) setCurrentStep(prev => prev - 1);
   };
 
   const steps = [
     { title: 'Welcome', icon: Sparkles },
     { title: 'Username', icon: User },
-    { title: 'Institute', icon: Building2 },
+    { title: 'Study Path', icon: Building2 },
     { title: 'Year', icon: GraduationCap },
     { title: 'Referral', icon: Gift },
     { title: 'All Set', icon: CheckCircle2 },
@@ -319,6 +344,20 @@ const SetupWizard = () => {
   }
 
   const renderStepContent = () => {
+    const visibleInstitutes = institutes.filter(inst => {
+      const category = isSpecializedTestInstitute(inst) ? 'specialized_test' : 'institute';
+      return category === selectionCategory;
+    });
+    const handleSelectionCategoryChange = (value: string) => {
+      const nextCategory = value as SetupSelectionCategory;
+      setSelectionCategory(nextCategory);
+      const selectedInstitute = getInstituteByCode(institute, institutes);
+      const selectedCategory = isSpecializedTestInstitute(selectedInstitute) ? 'specialized_test' : 'institute';
+      if (selectedInstitute && selectedCategory !== nextCategory) {
+        setInstitute('');
+      }
+    };
+
     switch (currentStep) {
       case 0:
         return (
@@ -367,10 +406,24 @@ const SetupWizard = () => {
                 <Building2 className="w-10 h-10 text-white" />
               </div>
             </motion.div>
-            <h2 className="text-3xl font-black text-white mb-2">Select Your Institute</h2>
-            <p className="text-white/60 text-sm mb-6">We'll tailor content for your college.</p>
+            <h2 className="text-3xl font-black text-white mb-2">Choose Your Study Path</h2>
+            <p className="text-white/60 text-sm mb-5">
+              {selectionCategory === 'specialized_test'
+                ? "We'll tailor content for your selected exam."
+                : "We'll tailor content for your college."}
+            </p>
+            <Tabs value={selectionCategory} onValueChange={handleSelectionCategoryChange} className="mb-4">
+              <TabsList className="grid h-12 w-full grid-cols-2 rounded-2xl bg-white/10 p-1">
+                <TabsTrigger value="institute" className="rounded-xl text-xs font-black text-white/70 data-[state=active]:bg-white data-[state=active]:text-black">
+                  Institutes
+                </TabsTrigger>
+                <TabsTrigger value="specialized_test" className="rounded-xl text-xs font-black text-white/70 data-[state=active]:bg-white data-[state=active]:text-black">
+                  Specialized Tests
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
             <div className="space-y-3 max-h-[40vh] overflow-y-auto px-1 overscroll-contain">
-              {institutes.map((inst) => (
+              {visibleInstitutes.map((inst) => (
                 <button
                   key={inst.code}
                   onClick={() => inst.enabled && setInstitute(inst.code)}
@@ -413,6 +466,13 @@ const SetupWizard = () => {
                   )}
                 </button>
               ))}
+              {visibleInstitutes.length === 0 && (
+                <div className="rounded-2xl border-2 border-white/10 bg-white/5 p-5 text-sm font-semibold text-white/60">
+                  {selectionCategory === 'specialized_test'
+                    ? 'Specialized tests are coming soon.'
+                    : 'No institutes are available right now.'}
+                </div>
+              )}
             </div>
           </div>
         );

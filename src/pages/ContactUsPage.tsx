@@ -14,7 +14,7 @@ import {
     Loader2, CheckCircle, Send, ArrowLeft
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { fetchInstitutes, getInstituteDisplayName } from '@/utils/institutes';
+import { fetchInstitutes, getInstituteByCode, getInstituteDisplayName, isSpecializedTestInstitute } from '@/utils/institutes';
 import Seo from '@/components/Seo';
 
 const ContactUsPage = () => {
@@ -57,10 +57,15 @@ const ContactUsPage = () => {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    const userInstituteName = getInstituteDisplayName((profile as any)?.institute || '', institutes || []);
-    const campusCollaborationMessage = userInstituteName
-        ? `Hi Medmacs team, I'm interested in bringing Medmacs to my campus/institute (${userInstituteName}). Please share more details about campus collaboration.`
-        : "Hi Medmacs team, I'm interested in bringing Medmacs to my campus/institute. Please share more details about campus collaboration.";
+    const userInstituteCode = (profile as any)?.institute || '';
+    const userInstituteName = getInstituteDisplayName(userInstituteCode, institutes || []);
+    const selectedInstitute = getInstituteByCode(userInstituteCode, institutes || []);
+    const selectedSpecializedTest = isSpecializedTestInstitute(selectedInstitute);
+    const campusCollaborationMessage = selectedSpecializedTest
+        ? `Hi Medmacs team, I'm preparing for ${userInstituteName}. Please share how specialized test content can be added or improved.`
+        : userInstituteName
+            ? `Hi Medmacs team, I'm interested in bringing Medmacs to my campus/institute (${userInstituteName}). Please share more details about campus collaboration.`
+            : "Hi Medmacs team, I'm interested in bringing Medmacs to my campus/institute. Please share more details about campus collaboration.";
 
     useEffect(() => {
         if (user) {

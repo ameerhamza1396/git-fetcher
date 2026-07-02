@@ -34,7 +34,7 @@ import ProfileAvatar from '@/components/profile/ProfileAvatar';
 import { AchievementBadges } from '@/components/profile/AchievementBadges';
 import { MCQProgressWidget } from '@/components/dashboard/MCQProgressWidget';
 import { ProgressTracker } from '@/components/mcq/ProgressTracker';
-import { fetchInstitutes, getInstituteByCode } from '@/utils/institutes';
+import { fetchInstitutes, getInstituteByCode, isSpecializedTestInstitute } from '@/utils/institutes';
 import { useCachedImage } from '@/hooks/useCachedImage';
 
 // Types
@@ -391,6 +391,7 @@ const StickyQuickActions = ({ actions, offlineMode = false }: { actions: any[]; 
 
 const InstituteDetailCard = ({ institute }: { institute: any }) => {
   if (!institute) return null;
+  const specializedTest = isSpecializedTestInstitute(institute);
 
   return (
     <div className="relative overflow-hidden rounded-[2rem] h-32 mb-6 group shadow-xl">
@@ -407,7 +408,9 @@ const InstituteDetailCard = ({ institute }: { institute: any }) => {
       <div className="relative z-10 h-full flex flex-col justify-end p-6">
         <div className="flex items-center gap-2 mb-1">
           <Stethoscope className="w-4 h-4 text-[#2dd4bf]" />
-          <span className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em]">Your Institute</span>
+          <span className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em]">
+            {specializedTest ? 'Your Specialized Test' : 'Your Institute'}
+          </span>
         </div>
         <h3 className="text-lg font-black text-white tracking-tight leading-tight">{institute.name}</h3>
       </div>
@@ -574,9 +577,10 @@ const Dashboard = () => {
     }
   };
 
-  const requiredProfileFieldsMissing = (profileData: Profile | null) => {
+  const requiredProfileFieldsMissing = (profileData: Profile | null, selectedInstitute?: any) => {
     if (!profileData) return true;
     const validYears = ["1st", "2nd", "3rd", "4th", "5th"];
+    const selectedSpecializedTest = isSpecializedTestInstitute(selectedInstitute);
     return (
       profileData.username === null ||
       profileData.username === undefined ||
@@ -584,9 +588,11 @@ const Dashboard = () => {
       (profileData as any).institute === null ||
       (profileData as any).institute === undefined ||
       String((profileData as any).institute).trim() === '' ||
-      (profileData as any).year === null ||
-      (profileData as any).year === undefined ||
-      !validYears.includes((profileData as any).year)
+      (!selectedSpecializedTest && (
+        (profileData as any).year === null ||
+        (profileData as any).year === undefined ||
+        !validYears.includes((profileData as any).year)
+      ))
     );
   };
 
@@ -771,7 +777,7 @@ const Dashboard = () => {
     },
   });
 
-  const { data: instituteData } = useQuery({
+  const { data: instituteData, isLoading: instituteDataLoading } = useQuery({
     queryKey: ['instituteData', (profile as any)?.institute],
     queryFn: async () => {
       if (!(profile as any)?.institute) return null;
@@ -921,13 +927,18 @@ const Dashboard = () => {
       return;
     }
 
-    if (requiredProfileFieldsMissing(profile)) {
+    if ((profile as any)?.institute && instituteDataLoading) {
+      setIsNavigating(true);
+      return;
+    }
+
+    if (requiredProfileFieldsMissing(profile, instituteData)) {
       navigate('/setup');
       return;
     }
 
     setIsNavigating(false);
-  }, [authLoading, profileLoading, profileFetchFailed, profileVerifiedFromServer, user, profile, navigate]);
+  }, [authLoading, profileLoading, profileFetchFailed, profileVerifiedFromServer, user, profile, instituteData, instituteDataLoading, navigate]);
 
   const flpAction = { title: 'Full-Length Paper', description: 'Timed mixed exams', icon: ScrollText, link: '/flp', gradient: 'from-fuchsia-600 to-rose-600', iconColor: 'text-fuchsia-100' };
   const collaborateAction = { title: 'Collaborate', description: 'Why Medmacs needs you', icon: Briefcase, onClick: () => setShowCollaborateModal(true), gradient: 'from-rose-500 to-pink-600', iconColor: 'text-rose-100' };

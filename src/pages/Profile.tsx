@@ -17,7 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import Seo from '@/components/Seo';
 import ProfileAvatar from '@/components/profile/ProfileAvatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { fetchInstitutes, getInstituteDisplayName, type Institute } from '@/utils/institutes';
+import { fetchInstitutes, getInstituteByCode, getInstituteDisplayName, isSpecializedTestInstitute, type Institute } from '@/utils/institutes';
 import PageSkeleton from '@/components/skeletons/PageSkeleton';
 import { AchievementBadges, useAchievementData } from '@/components/profile/AchievementBadges';
 import { motion } from 'framer-motion';
@@ -96,6 +96,8 @@ const Profile = () => {
 
     const userInstituteCode = (profileData as any)?.institute || '';
     const userInstituteName = getInstituteDisplayName(userInstituteCode, institutes);
+    const selectedInstitute = getInstituteByCode(userInstituteCode, institutes);
+    const selectedSpecializedTest = isSpecializedTestInstitute(selectedInstitute);
     const { data: achievementData } = useAchievementData(user?.id);
     const achievementStats = achievementData?.stats || {
         lifetimeMcqs: 0, flpCompletions: 0, aiChatSessions: 0, points: 0, accuracy: 0,
@@ -103,7 +105,7 @@ const Profile = () => {
 
     const updateProfile = async (e) => {
         e.preventDefault();
-        if (!editableProfile.full_name.trim() || !editableProfile.username.trim() || !editableProfile.year.trim()) {
+        if (!editableProfile.full_name.trim() || !editableProfile.username.trim() || (!selectedSpecializedTest && !editableProfile.year.trim())) {
             toast.error("Please fill in all required fields.");
             return;
         }
@@ -114,7 +116,8 @@ const Profile = () => {
             if (existingProfile) { toast.error("Username already in use."); setLoadingUpdateProfile(false); return; }
             const { error } = await supabase.from('profiles').upsert({
                 id: user?.id, full_name: editableProfile.full_name.trim(),
-                username: editableProfile.username.trim(), year: editableProfile.year.trim(),
+                username: editableProfile.username.trim(),
+                year: selectedSpecializedTest ? null : editableProfile.year.trim(),
                 updated_at: new Date().toISOString()
             }, { onConflict: 'id' });
             if (error) throw error;
@@ -313,10 +316,10 @@ const Profile = () => {
                                         </div>
                                         <div>
                                             <Label htmlFor="institute" className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
-                                                <Building2 className="mr-1 inline h-3 w-3" /> Institute
+                                                <Building2 className="mr-1 inline h-3 w-3" /> {selectedSpecializedTest ? 'Specialized Test' : 'Institute'}
                                             </Label>
                                             <Input id="institute" value={userInstituteName} disabled
-                                                onClick={() => toast.info('Institute can only be set once. To request a change, please contact us at hi@medmacs.app.')}
+                                                onClick={() => toast.info(`${selectedSpecializedTest ? 'Specialized test' : 'Institute'} can only be set once. To request a change, please contact us at hi@medmacs.app.`)}
                                                 className="mt-1.5 h-11 rounded-xl border-border/40 bg-muted/30 text-muted-foreground cursor-not-allowed" />
                                             <p className="mt-1 text-[10px] text-muted-foreground/60">Contact hi@medmacs.app to change</p>
                                         </div>
@@ -337,21 +340,23 @@ const Profile = () => {
                                                 className="mt-1.5 h-11 rounded-xl border-border/40 bg-muted/20 text-foreground placeholder:text-muted-foreground/50" required />
                                             <p className="mt-1 text-[10px] text-muted-foreground/60">Displayed on leaderboards</p>
                                         </div>
-                                        <div>
-                                            <Label htmlFor="year" className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
-                                                <GraduationCap className="mr-1 inline h-3 w-3" /> Year of Study *
-                                            </Label>
-                                            <Select value={editableProfile.year} onValueChange={(value) => setEditableProfile({ ...editableProfile, year: value })}>
-                                                <SelectTrigger className="mt-1.5 h-11 rounded-xl border-border/40 bg-muted/20 text-foreground">
-                                                    <SelectValue placeholder="Select your year" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {validYears.map((year) => (
-                                                        <SelectItem key={year} value={year}>{year} Year MBBS</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
+                                        {!selectedSpecializedTest && (
+                                            <div>
+                                                <Label htmlFor="year" className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                                                    <GraduationCap className="mr-1 inline h-3 w-3" /> Year of Study *
+                                                </Label>
+                                                <Select value={editableProfile.year} onValueChange={(value) => setEditableProfile({ ...editableProfile, year: value })}>
+                                                    <SelectTrigger className="mt-1.5 h-11 rounded-xl border-border/40 bg-muted/20 text-foreground">
+                                                        <SelectValue placeholder="Select your year" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {validYears.map((year) => (
+                                                            <SelectItem key={year} value={year}>{year} Year MBBS</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        )}
                                         <Button type="submit" disabled={loadingUpdateProfile}
                                             className="h-12 w-full rounded-xl bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] font-extrabold text-white shadow-lg shadow-[#0ea5e9]/20 transition-all hover:scale-[1.02] active:scale-95">
                                             {loadingUpdateProfile ? (

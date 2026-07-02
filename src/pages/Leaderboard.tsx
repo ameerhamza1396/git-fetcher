@@ -11,7 +11,7 @@ import PlanBadge from '@/components/PlanBadge';
 import PageSkeleton from '@/components/skeletons/PageSkeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { fetchInstitutes, getInstituteDisplayName } from '@/utils/institutes';
+import { fetchInstitutes, getInstituteByCode, getInstituteDisplayName, isSpecializedTestInstitute } from '@/utils/institutes';
 
 type LeaderboardScope = 'pakistan' | 'institute' | 'year-campus';
 type LeaderboardPeriod = 'all-time' | 'monthly' | 'weekly';
@@ -134,12 +134,16 @@ const Leaderboard = () => {
     const instituteName = currentProfile?.institute
         ? getInstituteDisplayName(currentProfile.institute, institutes)
         : 'Institute Name';
+    const selectedInstitute = currentProfile?.institute
+        ? getInstituteByCode(currentProfile.institute, institutes)
+        : null;
+    const selectedSpecializedTest = isSpecializedTestInstitute(selectedInstitute);
     const yearCampusLabel = currentProfile?.year && currentProfile?.institute
         ? `${currentProfile.year} Year ${currentProfile.institute}`
         : 'Year Campus';
 
     const hasInstituteScope = !!currentProfile?.institute;
-    const hasYearCampusScope = !!currentProfile?.institute && !!currentProfile?.year;
+    const hasYearCampusScope = !!currentProfile?.institute && !!currentProfile?.year && !selectedSpecializedTest;
 
     useEffect(() => {
         if (activeScope === 'institute' && !hasInstituteScope) setActiveScope('pakistan');
@@ -297,7 +301,7 @@ const Leaderboard = () => {
                             </TabsTrigger>
                             <TabsTrigger disabled={!hasInstituteScope} value="institute" className="rounded-xl px-2 py-2 text-[11px] font-bold sm:text-sm">
                                 <School className="mr-1.5 h-3.5 w-3.5" />
-                                Your Institute
+                                {selectedSpecializedTest ? 'Your Test' : 'Your Institute'}
                             </TabsTrigger>
                             <TabsTrigger disabled={!hasYearCampusScope} value="year-campus" className="rounded-xl px-2 py-2 text-[11px] font-bold sm:text-sm">
                                 <Target className="mr-1.5 h-3.5 w-3.5" />
