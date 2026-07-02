@@ -465,15 +465,17 @@ const SetupWizard = () => {
           .map(getInstituteProvince)
       )
     ).sort((a, b) => a.localeCompare(b));
-    const visibleInstitutes = categoryInstitutes.filter(inst => {
-      const searchable = `${inst.name} ${inst.short_name} ${getInstituteProvince(inst)} ${formatOwnership(getInstituteOwnership(inst))}`.toLowerCase();
-      const matchesSearch = !searchTerm || searchable.includes(searchTerm);
+    const filteredInstitutes = categoryInstitutes.filter(inst => {
       const matchesProvince = selectionCategory !== 'institute' || provinceFilter === 'all' || getInstituteProvince(inst) === provinceFilter;
       const ownership = getInstituteOwnership(inst);
       const matchesOwnership = selectionCategory !== 'institute' || ownershipFilter === 'all' || ownership === ownershipFilter;
-      return matchesSearch && matchesProvince && matchesOwnership;
+      return matchesProvince && matchesOwnership;
     });
-    const groupedInstitutes = visibleInstitutes.reduce<Record<string, Institute[]>>((groups, inst) => {
+    const searchResults = searchTerm ? filteredInstitutes.filter(inst => {
+      const searchable = `${inst.name} ${inst.short_name} ${getInstituteProvince(inst)} ${formatOwnership(getInstituteOwnership(inst))}`.toLowerCase();
+      return searchable.includes(searchTerm);
+    }) : [];
+    const groupedInstitutes = filteredInstitutes.reduce<Record<string, Institute[]>>((groups, inst) => {
       const groupName = selectionCategory === 'institute' ? getInstituteProvince(inst) : 'Specialized Tests';
       if (!groups[groupName]) groups[groupName] = [];
       groups[groupName].push(inst);
@@ -484,6 +486,57 @@ const SetupWizard = () => {
       if (b === 'Other') return -1;
       return a.localeCompare(b);
     });
+    const renderStudyPathRow = (inst: Institute, compact = false) => {
+      const ownership = getInstituteOwnership(inst);
+      const selected = institute === inst.code;
+      const metadata = selectionCategory === 'institute'
+        ? [inst.short_name, formatOwnership(ownership)].filter(Boolean).join(' · ')
+        : 'Specialized test';
+
+      return (
+        <button
+          key={inst.code}
+          onClick={() => inst.enabled && setInstitute(inst.code)}
+          disabled={!inst.enabled}
+          className={`w-full flex items-center gap-3 ${compact ? 'p-2.5' : 'p-3'} rounded-2xl border-2 transition-all duration-200 text-left ${
+            selected
+              ? 'border-white bg-white/20 shadow-lg'
+              : inst.enabled
+                ? 'border-white/10 bg-white/5 hover:bg-white/10'
+                : 'border-white/5 bg-white/[0.02] opacity-50 cursor-not-allowed'
+          }`}
+        >
+          <div className={`${compact ? 'w-11 h-11' : 'w-14 h-14'} relative rounded-xl overflow-hidden shrink-0 bg-white/10`}>
+            {inst.image_url ? (
+              <img
+                src={inst.image_url}
+                alt={inst.short_name}
+                className="w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            ) : null}
+            <div className="absolute inset-0 bg-gradient-to-l from-transparent to-white/5" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Building2 className={`${compact ? 'w-5 h-5' : 'w-6 h-6'} text-white/30`} />
+            </div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className={`text-sm font-bold leading-tight ${selected ? 'text-white' : 'text-white/80'}`}>
+              {inst.name}
+            </p>
+            <p className="text-[11px] text-white/40 mt-0.5">{metadata}</p>
+          </div>
+          {!inst.enabled && (
+            <span className="text-[10px] font-bold text-amber-300 bg-amber-300/10 px-2 py-1 rounded-full shrink-0 whitespace-nowrap">
+              Coming Soon
+            </span>
+          )}
+          {selected && (
+            <CheckCircle2 className="w-5 h-5 text-white shrink-0" />
+          )}
+        </button>
+      );
+    };
     const handleSelectionCategoryChange = (value: string) => {
       const nextCategory = value as SetupSelectionCategory;
       setSelectionCategory(nextCategory);
@@ -577,38 +630,62 @@ const SetupWizard = () => {
         return (
           <div className="text-center max-w-lg mx-auto">
             <div className="relative mb-5">
-              <div className="absolute right-0 top-0 flex items-center justify-end gap-2">
+              <div className="absolute right-0 top-0 z-40 flex items-start justify-end gap-2">
                 <motion.div
                   initial={false}
                   animate={{ width: studySearchExpanded ? 210 : 44 }}
-                  className="h-11 overflow-hidden rounded-2xl border border-white/10 bg-white/10 backdrop-blur-md"
+                  className="relative rounded-2xl border border-white/10 bg-white/10 backdrop-blur-md"
                 >
                   {studySearchExpanded ? (
-                    <div className="flex h-full items-center gap-2 px-3">
-                      <Search className="h-4 w-4 shrink-0 text-white/50" />
-                      <input
-                        value={studySearch}
-                        onChange={(event) => setStudySearch(event.target.value)}
-                        placeholder="Search"
-                        autoFocus
-                        className="min-w-0 flex-1 bg-transparent text-sm font-bold text-white outline-none placeholder:text-white/40"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setStudySearch('');
-                          setStudySearchExpanded(false);
-                        }}
-                        className="rounded-full p-1 text-white/50 hover:bg-white/10 hover:text-white"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
+                    <>
+                      <div className="flex h-11 items-center gap-2 px-3">
+                        <Search className="h-4 w-4 shrink-0 text-white/50" />
+                        <input
+                          value={studySearch}
+                          onChange={(event) => setStudySearch(event.target.value)}
+                          placeholder="Search"
+                          autoFocus
+                          className="min-w-0 flex-1 bg-transparent text-sm font-bold text-white outline-none placeholder:text-white/40"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStudySearch('');
+                            setStudySearchExpanded(false);
+                          }}
+                          className="rounded-full p-1 text-white/50 hover:bg-white/10 hover:text-white"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <AnimatePresence>
+                        {searchTerm && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 8, scale: 1 }}
+                            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                            className={`absolute right-0 top-11 z-50 w-[min(22rem,calc(100vw-3rem))] rounded-3xl border p-2 shadow-2xl backdrop-blur-2xl ${
+                              setupIsDark ? 'border-white/10 bg-black/80 shadow-black/60' : 'border-cyan-600/15 bg-white/90 shadow-cyan-950/10'
+                            }`}
+                          >
+                            <div className="max-h-72 space-y-2 overflow-y-auto overscroll-contain pr-1">
+                              {searchResults.length > 0 ? (
+                                searchResults.map((inst) => renderStudyPathRow(inst, true))
+                              ) : (
+                                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-xs font-bold text-white/50">
+                                  No matches found
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </>
                   ) : (
                     <button
                       type="button"
                       onClick={() => setStudySearchExpanded(true)}
-                      className="flex h-full w-full items-center justify-center text-white/70 hover:text-white"
+                      className="flex h-11 w-full items-center justify-center text-white/70 hover:text-white"
                     >
                       <Search className="h-5 w-5" />
                     </button>
@@ -626,6 +703,7 @@ const SetupWizard = () => {
                   <SlidersHorizontal className="h-5 w-5" />
                 </button>
               </div>
+              <div className={`transition-all duration-300 ${studySearchExpanded ? 'pointer-events-none blur-[2px] opacity-55' : ''}`}>
               <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
                 <div className="w-20 h-20 rounded-3xl bg-white/15 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20">
                   <Building2 className="w-10 h-10 text-white" />
@@ -637,7 +715,9 @@ const SetupWizard = () => {
                   ? "We'll tailor content for your selected exam."
                   : "We'll tailor content for your college."}
               </p>
+              </div>
             </div>
+            <div className={`transition-all duration-300 ${studySearchExpanded ? 'pointer-events-none blur-[2px] opacity-55' : ''}`}>
             <Tabs value={selectionCategory} onValueChange={handleSelectionCategoryChange} className="mb-4">
               <TabsList className="grid h-12 w-full grid-cols-2 rounded-2xl bg-white/10 p-1">
                 <TabsTrigger value="institute" className="rounded-xl text-xs font-black text-white/70 data-[state=active]:bg-white data-[state=active]:text-black">
@@ -702,63 +782,17 @@ const SetupWizard = () => {
                     <h3 className="text-[11px] font-black uppercase tracking-widest text-white/70">{groupName}</h3>
                     <span className="text-[10px] font-bold text-white/40">{groupedInstitutes[groupName].length}</span>
                   </div>
-                  {groupedInstitutes[groupName].map((inst) => {
-                    const ownership = getInstituteOwnership(inst);
-                    return (
-                      <button
-                        key={inst.code}
-                        onClick={() => inst.enabled && setInstitute(inst.code)}
-                        disabled={!inst.enabled}
-                        className={`w-full flex items-center gap-3 p-3 rounded-2xl border-2 transition-all duration-200 text-left ${
-                          institute === inst.code
-                            ? 'border-white bg-white/20 shadow-lg'
-                            : inst.enabled
-                              ? 'border-white/10 bg-white/5 hover:bg-white/10'
-                              : 'border-white/5 bg-white/[0.02] opacity-50 cursor-not-allowed'
-                        }`}
-                      >
-                        <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-white/10">
-                          {inst.image_url ? (
-                            <img
-                              src={inst.image_url}
-                              alt={inst.short_name}
-                              className="w-full h-full object-cover"
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                            />
-                          ) : null}
-                          <div className="absolute inset-0 bg-gradient-to-l from-transparent to-white/5" />
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <Building2 className="w-6 h-6 text-white/30" />
-                          </div>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className={`text-sm font-bold leading-tight ${institute === inst.code ? 'text-white' : 'text-white/80'}`}>
-                            {inst.name}
-                          </p>
-                          <p className="text-[11px] text-white/40 mt-0.5">
-                            {[inst.short_name, selectionCategory === 'institute' ? formatOwnership(ownership) : null].filter(Boolean).join(' · ')}
-                          </p>
-                        </div>
-                        {!inst.enabled && (
-                          <span className="text-[10px] font-bold text-amber-300 bg-amber-300/10 px-2 py-1 rounded-full shrink-0 whitespace-nowrap">
-                            Coming Soon
-                          </span>
-                        )}
-                        {institute === inst.code && (
-                          <CheckCircle2 className="w-5 h-5 text-white shrink-0" />
-                        )}
-                      </button>
-                    );
-                  })}
+                  {groupedInstitutes[groupName].map((inst) => renderStudyPathRow(inst))}
                 </section>
               ))}
-              {visibleInstitutes.length === 0 && (
+              {filteredInstitutes.length === 0 && (
                 <div className="rounded-2xl border-2 border-white/10 bg-white/5 p-5 text-sm font-semibold text-white/60">
                   {selectionCategory === 'specialized_test'
-                    ? 'No specialized tests match your search.'
+                    ? 'Specialized tests are coming soon.'
                     : 'No institutes match your filters.'}
                 </div>
               )}
+            </div>
             </div>
           </div>
         );
