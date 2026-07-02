@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -68,12 +68,27 @@ const SetupWizard = () => {
   const [studySearch, setStudySearch] = useState('');
   const [provinceFilter, setProvinceFilter] = useState('all');
   const [ownershipFilter, setOwnershipFilter] = useState<OwnershipFilter>('all');
+  const studyOverlayRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (resolvedTheme === 'light' || resolvedTheme === 'dark') {
       setSetupTheme(resolvedTheme);
     }
   }, [resolvedTheme]);
+
+  useEffect(() => {
+    if (!studySearchExpanded && !studyFiltersExpanded) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (studyOverlayRef.current?.contains(target)) return;
+      setStudySearchExpanded(false);
+      setStudyFiltersExpanded(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [studySearchExpanded, studyFiltersExpanded]);
 
   const chooseSetupTheme = (theme: SetupThemeChoice) => {
     setSetupTheme(theme);
@@ -486,6 +501,7 @@ const SetupWizard = () => {
       if (b === 'Other') return -1;
       return a.localeCompare(b);
     });
+    const studyOverlayOpen = studySearchExpanded || studyFiltersExpanded;
     const renderStudyPathRow = (inst: Institute, compact = false) => {
       const ownership = getInstituteOwnership(inst);
       const selected = institute === inst.code;
@@ -541,6 +557,7 @@ const SetupWizard = () => {
       const nextCategory = value as SetupSelectionCategory;
       setSelectionCategory(nextCategory);
       setStudyFiltersExpanded(false);
+      setStudySearchExpanded(false);
       const selectedInstitute = getInstituteByCode(institute, institutes);
       const selectedCategory = isSpecializedTestInstitute(selectedInstitute) ? 'specialized_test' : 'institute';
       if (selectedInstitute && selectedCategory !== nextCategory) {
@@ -630,7 +647,7 @@ const SetupWizard = () => {
         return (
           <div className="text-center max-w-lg mx-auto">
             <div className="relative mb-5">
-              <div className="absolute right-0 top-0 z-40 flex items-start justify-end gap-2">
+              <div ref={studyOverlayRef} className="absolute right-0 top-0 z-40 flex items-start justify-end gap-2">
                 <motion.div
                   initial={false}
                   animate={{ width: studySearchExpanded ? 210 : 44 }}
@@ -684,7 +701,10 @@ const SetupWizard = () => {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setStudySearchExpanded(true)}
+                      onClick={() => {
+                        setStudyFiltersExpanded(false);
+                        setStudySearchExpanded(true);
+                      }}
                       className="flex h-11 w-full items-center justify-center text-white/70 hover:text-white"
                     >
                       <Search className="h-5 w-5" />
@@ -693,7 +713,10 @@ const SetupWizard = () => {
                 </motion.div>
                 <button
                   type="button"
-                  onClick={() => setStudyFiltersExpanded((value) => !value)}
+                  onClick={() => {
+                    setStudySearchExpanded(false);
+                    setStudyFiltersExpanded((value) => !value);
+                  }}
                   className={`flex h-11 w-11 items-center justify-center rounded-2xl border transition-all ${
                     studyFiltersExpanded || provinceFilter !== 'all' || ownershipFilter !== 'all'
                       ? 'border-cyan-300 bg-cyan-400/15 text-cyan-300'
@@ -702,8 +725,55 @@ const SetupWizard = () => {
                 >
                   <SlidersHorizontal className="h-5 w-5" />
                 </button>
+                <AnimatePresence>
+                  {studyFiltersExpanded && selectionCategory === 'institute' && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 8, scale: 1 }}
+                      exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                      className={`absolute right-0 top-11 z-50 w-[min(22rem,calc(100vw-3rem))] rounded-3xl border p-3 text-left shadow-2xl backdrop-blur-2xl ${
+                        setupIsDark ? 'border-white/10 bg-black/80 shadow-black/60' : 'border-cyan-600/15 bg-white/90 shadow-cyan-950/10'
+                      }`}
+                    >
+                      <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-white/50">Province</p>
+                      <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+                        {['all', ...availableProvinces].map((province) => (
+                          <button
+                            key={province}
+                            type="button"
+                            onClick={() => setProvinceFilter(province)}
+                            className={`shrink-0 rounded-full px-3 py-2 text-xs font-black transition-all ${
+                              provinceFilter === province
+                                ? 'bg-cyan-500 text-white'
+                                : 'bg-white/10 text-white/60 hover:bg-white/15 hover:text-white'
+                            }`}
+                          >
+                            {province === 'all' ? 'All' : province}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-white/50">Ownership</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(['all', 'public', 'private'] as OwnershipFilter[]).map((ownership) => (
+                          <button
+                            key={ownership}
+                            type="button"
+                            onClick={() => setOwnershipFilter(ownership)}
+                            className={`rounded-xl px-3 py-2 text-xs font-black capitalize transition-all ${
+                              ownershipFilter === ownership
+                                ? 'bg-cyan-500 text-white'
+                                : 'bg-white/10 text-white/60 hover:bg-white/15 hover:text-white'
+                            }`}
+                          >
+                            {ownership}
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
-              <div className={`transition-all duration-300 ${studySearchExpanded ? 'pointer-events-none blur-[2px] opacity-55' : ''}`}>
+              <div className={`transition-all duration-300 ${studyOverlayOpen ? 'pointer-events-none blur-[2px] opacity-55' : ''}`}>
               <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
                 <div className="w-20 h-20 rounded-3xl bg-white/15 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20">
                   <Building2 className="w-10 h-10 text-white" />
@@ -717,7 +787,7 @@ const SetupWizard = () => {
               </p>
               </div>
             </div>
-            <div className={`transition-all duration-300 ${studySearchExpanded ? 'pointer-events-none blur-[2px] opacity-55' : ''}`}>
+            <div className={`transition-all duration-300 ${studyOverlayOpen ? 'pointer-events-none blur-[2px] opacity-55' : ''}`}>
             <Tabs value={selectionCategory} onValueChange={handleSelectionCategoryChange} className="mb-4">
               <TabsList className="grid h-12 w-full grid-cols-2 rounded-2xl bg-white/10 p-1">
                 <TabsTrigger value="institute" className="rounded-xl text-xs font-black text-white/70 data-[state=active]:bg-white data-[state=active]:text-black">
@@ -728,51 +798,6 @@ const SetupWizard = () => {
                 </TabsTrigger>
               </TabsList>
             </Tabs>
-            <AnimatePresence>
-              {studyFiltersExpanded && selectionCategory === 'institute' && (
-                <motion.div
-                  initial={{ opacity: 0, y: -8, height: 0 }}
-                  animate={{ opacity: 1, y: 0, height: 'auto' }}
-                  exit={{ opacity: 0, y: -8, height: 0 }}
-                  className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-3 text-left backdrop-blur-md"
-                >
-                  <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-white/50">Province</p>
-                  <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
-                    {['all', ...availableProvinces].map((province) => (
-                      <button
-                        key={province}
-                        type="button"
-                        onClick={() => setProvinceFilter(province)}
-                        className={`shrink-0 rounded-full px-3 py-2 text-xs font-black transition-all ${
-                          provinceFilter === province
-                            ? 'bg-cyan-500 text-white'
-                            : 'bg-white/10 text-white/60 hover:bg-white/15 hover:text-white'
-                        }`}
-                      >
-                        {province === 'all' ? 'All' : province}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-white/50">Ownership</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(['all', 'public', 'private'] as OwnershipFilter[]).map((ownership) => (
-                      <button
-                        key={ownership}
-                        type="button"
-                        onClick={() => setOwnershipFilter(ownership)}
-                        className={`rounded-xl px-3 py-2 text-xs font-black capitalize transition-all ${
-                          ownershipFilter === ownership
-                            ? 'bg-cyan-500 text-white'
-                            : 'bg-white/10 text-white/60 hover:bg-white/15 hover:text-white'
-                        }`}
-                      >
-                        {ownership}
-                      </button>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
             <div className="space-y-3 max-h-[40vh] overflow-y-auto px-1 overscroll-contain">
               {sortedGroupNames.map((groupName) => (
                 <section key={groupName} className="space-y-2">
