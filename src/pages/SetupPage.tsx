@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ChevronRight, ChevronLeft, Sparkles, User, Building2, GraduationCap, CheckCircle2, Loader2, Gift, HeartHandshake
+  ChevronRight, ChevronLeft, Sparkles, User, Building2, GraduationCap, CheckCircle2, Loader2, Gift, HeartHandshake, Moon, Sun
 } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { NavigationBar } from '@capgo/capacitor-navigation-bar';
@@ -19,10 +20,12 @@ import { notifyAchievementProgress } from '@/components/profile/AchievementBadge
 
 const VALID_YEARS = ['1st', '2nd', '3rd', '4th', '5th'];
 type SetupSelectionCategory = 'institute' | 'specialized_test';
+type SetupThemeChoice = 'light' | 'dark';
 
 const SetupWizard = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { resolvedTheme, setTheme } = useTheme();
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -37,6 +40,18 @@ const SetupWizard = () => {
   const [setupLoadError, setSetupLoadError] = useState('');
   const [referredByName, setReferredByName] = useState<string | null>(null);
   const [referralStepCode, setReferralStepCode] = useState('');
+  const [setupTheme, setSetupTheme] = useState<SetupThemeChoice>('dark');
+
+  useEffect(() => {
+    if (resolvedTheme === 'light' || resolvedTheme === 'dark') {
+      setSetupTheme(resolvedTheme);
+    }
+  }, [resolvedTheme]);
+
+  const chooseSetupTheme = (theme: SetupThemeChoice) => {
+    setSetupTheme(theme);
+    setTheme(theme);
+  };
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
@@ -45,7 +60,7 @@ const SetupWizard = () => {
     const previousHtmlBackground = document.documentElement.style.backgroundColor;
     const previousBodyBackground = document.body.style.backgroundColor;
     const previousRootBackground = root?.style.backgroundColor;
-    const fallbackColor = '#020617';
+    const fallbackColor = setupTheme === 'dark' ? '#000000' : '#f8fafc';
 
     document.documentElement.style.backgroundColor = fallbackColor;
     document.body.style.backgroundColor = fallbackColor;
@@ -53,15 +68,15 @@ const SetupWizard = () => {
 
     const applyNativeBars = async () => {
       try {
-        await StatusBar.setStyle({ style: Style.Dark });
+        await StatusBar.setStyle({ style: setupTheme === 'dark' ? Style.Dark : Style.Light });
         await StatusBar.setBackgroundColor({ color: 'transparent' });
 
         if ((NavigationBar as any).setNavigationBarColor) {
-          await (NavigationBar as any).setNavigationBarColor({ color: 'transparent', darkButtons: false });
+          await (NavigationBar as any).setNavigationBarColor({ color: 'transparent', darkButtons: setupTheme === 'light' });
         } else {
-          await (NavigationBar as any).set?.({ color: fallbackColor, darkButtons: false });
+          await (NavigationBar as any).set?.({ color: fallbackColor, darkButtons: setupTheme === 'light' });
           await (NavigationBar as any).setBackgroundColor?.({ color: fallbackColor });
-          await (NavigationBar as any).setButtonsColor?.({ dark: false });
+          await (NavigationBar as any).setButtonsColor?.({ dark: setupTheme === 'light' });
         }
       } catch (error) {
         console.warn('Failed to sync setup page native bars', error);
@@ -75,7 +90,7 @@ const SetupWizard = () => {
       document.body.style.backgroundColor = previousBodyBackground;
       if (root && previousRootBackground !== undefined) root.style.backgroundColor = previousRootBackground;
     };
-  }, []);
+  }, [setupTheme]);
 
   const ensureProfile = useCallback(async () => {
     if (!user?.id) throw new Error('User not authenticated.');
@@ -148,13 +163,13 @@ const SetupWizard = () => {
     const selectedInstitute = hasInstitute ? getInstituteByCode(profile.institute, instituteRows) : null;
     const selectedSpecializedTest = isSpecializedTestInstitute(selectedInstitute);
 
-    // Brand-new users should see the welcome step first.
+    // Brand-new users should choose their theme before the rest of setup.
     if (!hasUsername && !hasInstitute && !hasValidYear) return 0;
-    if (!hasUsername) return 1;
-    if (!hasInstitute) return 2;
-    if (selectedSpecializedTest) return 4;
-    if (!hasValidYear) return 3;
-    return 5;
+    if (!hasUsername) return 2;
+    if (!hasInstitute) return 3;
+    if (selectedSpecializedTest) return 5;
+    if (!hasValidYear) return 4;
+    return 6;
   }, []);
 
   const loadSetupProfile = useCallback(async () => {
@@ -181,7 +196,7 @@ const SetupWizard = () => {
       }
 
       const initialStep = getInitialStep(profile, insts);
-      if (initialStep === 5) { navigate('/dashboard', { replace: true }); return; }
+      if (initialStep === 6) { navigate('/dashboard', { replace: true }); return; }
       setCurrentStep(initialStep);
     } catch (error) {
       console.error('Failed to initialize setup profile:', error);
@@ -215,7 +230,8 @@ const SetupWizard = () => {
 
   const handleNext = async () => {
     if (currentStep === 0) { setCurrentStep(1); return; }
-    if (currentStep === 1) {
+    if (currentStep === 1) { setCurrentStep(2); return; }
+    if (currentStep === 2) {
       setSaving(true);
       const valid = await validateUsername(username);
       if (!valid) { setSaving(false); return; }
@@ -227,10 +243,10 @@ const SetupWizard = () => {
       } as any, { onConflict: 'id' });
       setSaving(false);
       if (error) { toast.error('Failed to save username'); return; }
-      setCurrentStep(2);
+      setCurrentStep(3);
       return;
     }
-    if (currentStep === 2) {
+    if (currentStep === 3) {
       if (!institute) {
         toast.error(selectionCategory === 'specialized_test' ? 'Please select a specialized test' : 'Please select an institute');
         return;
@@ -250,10 +266,10 @@ const SetupWizard = () => {
         toast.error(selectedSpecializedTest ? 'Failed to save specialized test' : 'Failed to save institute');
         return;
       }
-      setCurrentStep(selectedSpecializedTest ? 4 : 3);
+      setCurrentStep(selectedSpecializedTest ? 5 : 4);
       return;
     }
-    if (currentStep === 3) {
+    if (currentStep === 4) {
       if (!year) { toast.error('Please select your year'); return; }
       setSaving(true);
       const { error } = await supabase.from('profiles').upsert({
@@ -263,10 +279,10 @@ const SetupWizard = () => {
       } as any, { onConflict: 'id' });
       setSaving(false);
       if (error) { toast.error('Failed to save year'); return; }
-      setCurrentStep(4);
+      setCurrentStep(5);
       return;
     }
-    if (currentStep === 4) {
+    if (currentStep === 5) {
       if (referralStepCode && !referredByName) {
         setSaving(true);
         const referrerId = await resolveReferralCode(referralStepCode);
@@ -278,17 +294,17 @@ const SetupWizard = () => {
         }
         setSaving(false);
       }
-      setCurrentStep(5);
+      setCurrentStep(6);
       return;
     }
-    if (currentStep === 5) { navigate('/dashboard'); }
+    if (currentStep === 6) { navigate('/dashboard'); }
   };
 
   const handleBack = () => {
-    if (currentStep === 4) {
+    if (currentStep === 5) {
       const selectedInstitute = getInstituteByCode(institute, institutes);
       if (isSpecializedTestInstitute(selectedInstitute)) {
-        setCurrentStep(2);
+        setCurrentStep(3);
         return;
       }
     }
@@ -296,6 +312,7 @@ const SetupWizard = () => {
   };
 
   const steps = [
+    { title: 'Theme', icon: setupTheme === 'dark' ? Moon : Sun },
     { title: 'Welcome', icon: Sparkles },
     { title: 'Username', icon: User },
     { title: 'Study Path', icon: Building2 },
@@ -304,14 +321,17 @@ const SetupWizard = () => {
     { title: 'All Set', icon: CheckCircle2 },
   ];
 
-  const gradients = [
-    'from-violet-600 via-purple-600 to-indigo-700',
-    'from-blue-600 via-indigo-600 to-violet-700',
-    'from-emerald-600 via-teal-600 to-cyan-700',
-    'from-orange-500 via-amber-600 to-yellow-600',
-    'from-pink-500 via-rose-500 to-fuchsia-700',
-    'from-emerald-500 via-green-500 to-teal-600',
+  const haloLayouts = [
+    { primary: '-left-28 -top-28', secondary: '-right-24 bottom-16' },
+    { primary: 'left-[8%] -top-32', secondary: '-right-28 top-[42%]' },
+    { primary: '-right-20 -top-24', secondary: 'left-[-6rem] bottom-20' },
+    { primary: 'right-[12%] bottom-[-7rem]', secondary: 'left-[8%] top-[18%]' },
+    { primary: '-left-24 top-[34%]', secondary: 'right-[-5rem] top-12' },
+    { primary: 'left-[22%] bottom-[-8rem]', secondary: 'right-[10%] top-[20%]' },
+    { primary: 'right-[18%] -top-28', secondary: 'left-[12%] bottom-[-7rem]' },
   ];
+  const haloLayout = haloLayouts[currentStep] || haloLayouts[0];
+  const setupIsDark = setupTheme === 'dark';
 
   if (loading || authLoading) {
     return (
@@ -361,6 +381,48 @@ const SetupWizard = () => {
     switch (currentStep) {
       case 0:
         return (
+          <div className="text-center max-w-lg mx-auto">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
+              <div className="w-20 h-20 rounded-3xl bg-white/15 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20">
+                {setupTheme === 'dark' ? <Moon className="w-10 h-10 text-white" /> : <Sun className="w-10 h-10 text-white" />}
+              </div>
+            </motion.div>
+            <h2 className="text-3xl md:text-4xl font-black text-white mb-3">Choose Your Look</h2>
+            <p className="text-white/60 text-sm mb-8">Pick the theme you want Medmacs to use.</p>
+            <div className="grid grid-cols-2 gap-3">
+              {([
+                { value: 'dark' as const, label: 'Dark', icon: Moon, description: 'Pitch black setup' },
+                { value: 'light' as const, label: 'Light', icon: Sun, description: 'Bright and soft' },
+              ]).map((option) => {
+                const Icon = option.icon;
+                const selected = setupTheme === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    onClick={() => chooseSetupTheme(option.value)}
+                    className={`rounded-3xl border-2 p-5 text-left transition-all duration-200 ${
+                      selected
+                        ? 'border-white bg-white/20 shadow-2xl'
+                        : 'border-white/10 bg-white/5 hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="mb-5 flex items-center justify-between">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
+                        <Icon className="h-6 w-6 text-white" />
+                      </div>
+                      {selected && <CheckCircle2 className="h-5 w-5 text-white" />}
+                    </div>
+                    <p className="text-lg font-black text-white">{option.label}</p>
+                    <p className="mt-1 text-xs font-semibold text-white/50">{option.description}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+
+      case 1:
+        return (
           <div className="text-center">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.2 }}>
               <img src="/mascots/Mascot1.png" alt="Welcome" className="w-48 h-auto mx-auto mb-6 drop-shadow-2xl" />
@@ -373,7 +435,7 @@ const SetupWizard = () => {
           </div>
         );
 
-      case 1:
+      case 2:
         return (
           <div className="text-center max-w-md mx-auto">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
@@ -398,7 +460,7 @@ const SetupWizard = () => {
           </div>
         );
 
-      case 2:
+      case 3:
         return (
           <div className="text-center max-w-lg mx-auto">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
@@ -477,7 +539,7 @@ const SetupWizard = () => {
           </div>
         );
 
-      case 3:
+      case 4:
         return (
           <div className="text-center max-w-md mx-auto">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
@@ -505,7 +567,7 @@ const SetupWizard = () => {
           </div>
         );
 
-      case 4:
+      case 5:
         return (
           <div className="text-center max-w-md mx-auto">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
@@ -538,7 +600,7 @@ const SetupWizard = () => {
           </div>
         );
 
-      case 5:
+      case 6:
         return (
           <div className="text-center">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.2 }}>
@@ -556,17 +618,32 @@ const SetupWizard = () => {
 
   const canProceed = () => {
     if (currentStep === 0) return true;
-    if (currentStep === 1) return username.length >= 3;
-    if (currentStep === 2) return !!institute;
-    if (currentStep === 3) return !!year;
-    if (currentStep === 4) return true;
+    if (currentStep === 1) return true;
+    if (currentStep === 2) return username.length >= 3;
+    if (currentStep === 3) return !!institute;
+    if (currentStep === 4) return !!year;
     if (currentStep === 5) return true;
+    if (currentStep === 6) return true;
     return false;
   };
 
   return (
-    <div className={`fixed inset-0 isolate h-dvh w-full flex flex-col items-center justify-center overflow-hidden overscroll-none transition-all duration-700 bg-gradient-to-br ${gradients[currentStep]}`}>
-      <div className={`absolute inset-0 z-0 bg-gradient-to-br ${gradients[currentStep]}`} />
+    <div className={`setup-theme-${setupTheme} fixed inset-0 isolate h-dvh w-full flex flex-col items-center justify-center overflow-hidden overscroll-none transition-all duration-700 ${setupIsDark ? 'bg-black' : 'bg-slate-50'}`}>
+      {!setupIsDark && (
+        <style>{`
+          .setup-theme-light .text-white { color: rgb(15 23 42) !important; }
+          .setup-theme-light .text-white\\/80 { color: rgba(15, 23, 42, 0.80) !important; }
+          .setup-theme-light .text-white\\/70 { color: rgba(15, 23, 42, 0.70) !important; }
+          .setup-theme-light .text-white\\/60 { color: rgba(15, 23, 42, 0.62) !important; }
+          .setup-theme-light .text-white\\/50 { color: rgba(15, 23, 42, 0.52) !important; }
+          .setup-theme-light .text-white\\/40 { color: rgba(15, 23, 42, 0.42) !important; }
+          .setup-theme-light .text-white\\/30 { color: rgba(15, 23, 42, 0.32) !important; }
+          .setup-theme-light .placeholder\\:text-white\\/40::placeholder { color: rgba(15, 23, 42, 0.42) !important; }
+        `}</style>
+      )}
+      <div className={`absolute h-80 w-80 rounded-full blur-3xl transition-all duration-700 ${haloLayout.primary} ${setupIsDark ? 'bg-cyan-500/25' : 'bg-white/90'}`} />
+      <div className={`absolute h-96 w-96 rounded-full blur-3xl transition-all duration-700 ${haloLayout.secondary} ${setupIsDark ? 'bg-fuchsia-500/20' : 'bg-sky-100/80'}`} />
+      <div className={`absolute inset-0 z-0 transition-all duration-700 ${setupIsDark ? 'bg-black/45' : 'bg-white/25'}`} />
       <div className="absolute top-[calc(env(safe-area-inset-top,0px)+16px)] left-6 right-6 z-50">
         <div className="flex gap-2">
           {steps.map((_, i) => (
@@ -591,9 +668,9 @@ const SetupWizard = () => {
         </div>
       </div>
 
-      {currentStep === 0 && (
+      {currentStep === 1 && (
         <button
-          onClick={() => setCurrentStep(1)}
+          onClick={() => setCurrentStep(2)}
           className="absolute top-[calc(env(safe-area-inset-top,0px)+16px)] right-6 z-50 text-white/40 hover:text-white text-xs font-bold uppercase tracking-widest"
         >
           Skip
@@ -616,7 +693,7 @@ const SetupWizard = () => {
 
       <div className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+24px)] left-6 right-6 z-50">
         <div className={`flex items-center gap-3 ${currentStep > 0 ? 'justify-between' : 'justify-center'}`}>
-          {currentStep > 0 && currentStep < 5 && (
+          {currentStep > 0 && currentStep < 6 && (
             <Button
               onClick={handleBack}
               variant="outline"
@@ -629,14 +706,16 @@ const SetupWizard = () => {
             onClick={handleNext}
             disabled={!canProceed() || saving}
             className={`h-14 rounded-2xl bg-white text-black hover:bg-white/90 font-black shadow-2xl transition-all active:scale-95 ${
-              currentStep > 0 && currentStep < 5 ? 'flex-1' : 'w-full max-w-md'
+              currentStep > 0 && currentStep < 6 ? 'flex-1' : 'w-full max-w-md'
             }`}
           >
             {saving ? (
               <Loader2 className="w-5 h-5 animate-spin" />
-            ) : currentStep === 5 ? (
+            ) : currentStep === 6 ? (
               <span className="flex items-center gap-2">Go to Dashboard <Sparkles className="h-5 w-5 fill-black" /></span>
             ) : currentStep === 0 ? (
+              <span className="flex items-center gap-2">Continue <ChevronRight className="h-5 w-5" /></span>
+            ) : currentStep === 1 ? (
               <span className="flex items-center gap-2">Let's Go <ChevronRight className="h-5 w-5" /></span>
             ) : (
               <span className="flex items-center gap-2">Next <ChevronRight className="h-5 w-5" /></span>
