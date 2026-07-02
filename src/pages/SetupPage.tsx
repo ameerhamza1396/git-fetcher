@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ChevronRight, ChevronLeft, Sparkles, User, Building2, GraduationCap, CheckCircle2, Loader2, Gift, HeartHandshake, Moon, Sun
+  ChevronRight, ChevronLeft, Sparkles, User, Building2, GraduationCap, CheckCircle2, Loader2, Gift, HeartHandshake, Moon, Sun, Search, SlidersHorizontal, X
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Capacitor } from '@capacitor/core';
@@ -22,6 +22,26 @@ const VALID_YEARS = ['1st', '2nd', '3rd', '4th', '5th'];
 type SetupSelectionCategory = 'institute' | 'specialized_test';
 type SetupThemeChoice = 'light' | 'dark';
 type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
+type OwnershipFilter = 'all' | 'public' | 'private';
+
+const getInstituteProvince = (inst: Institute) => {
+  const value = (inst.province || inst.region || '').trim();
+  return value || 'Other';
+};
+
+const getInstituteOwnership = (inst: Institute): 'public' | 'private' | 'unknown' => {
+  if (typeof inst.is_public === 'boolean') return inst.is_public ? 'public' : 'private';
+  const value = String(inst.ownership || inst.sector || inst.institute_type || inst.type || '').toLowerCase();
+  if (value.includes('private')) return 'private';
+  if (value.includes('public') || value.includes('government') || value.includes('govt')) return 'public';
+  return 'unknown';
+};
+
+const formatOwnership = (ownership: ReturnType<typeof getInstituteOwnership>) => {
+  if (ownership === 'public') return 'Public';
+  if (ownership === 'private') return 'Private';
+  return 'Unspecified';
+};
 
 const SetupWizard = () => {
   const { user, loading: authLoading } = useAuth();
@@ -43,6 +63,11 @@ const SetupWizard = () => {
   const [referredByName, setReferredByName] = useState<string | null>(null);
   const [referralStepCode, setReferralStepCode] = useState('');
   const [setupTheme, setSetupTheme] = useState<SetupThemeChoice>('dark');
+  const [studySearchExpanded, setStudySearchExpanded] = useState(false);
+  const [studyFiltersExpanded, setStudyFiltersExpanded] = useState(false);
+  const [studySearch, setStudySearch] = useState('');
+  const [provinceFilter, setProvinceFilter] = useState('all');
+  const [ownershipFilter, setOwnershipFilter] = useState<OwnershipFilter>('all');
 
   useEffect(() => {
     if (resolvedTheme === 'light' || resolvedTheme === 'dark') {
@@ -428,13 +453,41 @@ const SetupWizard = () => {
   }
 
   const renderStepContent = () => {
-    const visibleInstitutes = institutes.filter(inst => {
+    const searchTerm = studySearch.trim().toLowerCase();
+    const categoryInstitutes = institutes.filter(inst => {
       const category = isSpecializedTestInstitute(inst) ? 'specialized_test' : 'institute';
       return category === selectionCategory;
+    });
+    const availableProvinces = Array.from(
+      new Set(
+        institutes
+          .filter(inst => !isSpecializedTestInstitute(inst))
+          .map(getInstituteProvince)
+      )
+    ).sort((a, b) => a.localeCompare(b));
+    const visibleInstitutes = categoryInstitutes.filter(inst => {
+      const searchable = `${inst.name} ${inst.short_name} ${getInstituteProvince(inst)} ${formatOwnership(getInstituteOwnership(inst))}`.toLowerCase();
+      const matchesSearch = !searchTerm || searchable.includes(searchTerm);
+      const matchesProvince = selectionCategory !== 'institute' || provinceFilter === 'all' || getInstituteProvince(inst) === provinceFilter;
+      const ownership = getInstituteOwnership(inst);
+      const matchesOwnership = selectionCategory !== 'institute' || ownershipFilter === 'all' || ownership === ownershipFilter;
+      return matchesSearch && matchesProvince && matchesOwnership;
+    });
+    const groupedInstitutes = visibleInstitutes.reduce<Record<string, Institute[]>>((groups, inst) => {
+      const groupName = selectionCategory === 'institute' ? getInstituteProvince(inst) : 'Specialized Tests';
+      if (!groups[groupName]) groups[groupName] = [];
+      groups[groupName].push(inst);
+      return groups;
+    }, {});
+    const sortedGroupNames = Object.keys(groupedInstitutes).sort((a, b) => {
+      if (a === 'Other') return 1;
+      if (b === 'Other') return -1;
+      return a.localeCompare(b);
     });
     const handleSelectionCategoryChange = (value: string) => {
       const nextCategory = value as SetupSelectionCategory;
       setSelectionCategory(nextCategory);
+      setStudyFiltersExpanded(false);
       const selectedInstitute = getInstituteByCode(institute, institutes);
       const selectedCategory = isSpecializedTestInstitute(selectedInstitute) ? 'specialized_test' : 'institute';
       if (selectedInstitute && selectedCategory !== nextCategory) {
@@ -523,17 +576,68 @@ const SetupWizard = () => {
       case 2:
         return (
           <div className="text-center max-w-lg mx-auto">
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
-              <div className="w-20 h-20 rounded-3xl bg-white/15 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20">
-                <Building2 className="w-10 h-10 text-white" />
+            <div className="relative mb-5">
+              <div className="absolute right-0 top-0 flex items-center justify-end gap-2">
+                <motion.div
+                  initial={false}
+                  animate={{ width: studySearchExpanded ? 210 : 44 }}
+                  className="h-11 overflow-hidden rounded-2xl border border-white/10 bg-white/10 backdrop-blur-md"
+                >
+                  {studySearchExpanded ? (
+                    <div className="flex h-full items-center gap-2 px-3">
+                      <Search className="h-4 w-4 shrink-0 text-white/50" />
+                      <input
+                        value={studySearch}
+                        onChange={(event) => setStudySearch(event.target.value)}
+                        placeholder="Search"
+                        autoFocus
+                        className="min-w-0 flex-1 bg-transparent text-sm font-bold text-white outline-none placeholder:text-white/40"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStudySearch('');
+                          setStudySearchExpanded(false);
+                        }}
+                        className="rounded-full p-1 text-white/50 hover:bg-white/10 hover:text-white"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setStudySearchExpanded(true)}
+                      className="flex h-full w-full items-center justify-center text-white/70 hover:text-white"
+                    >
+                      <Search className="h-5 w-5" />
+                    </button>
+                  )}
+                </motion.div>
+                <button
+                  type="button"
+                  onClick={() => setStudyFiltersExpanded((value) => !value)}
+                  className={`flex h-11 w-11 items-center justify-center rounded-2xl border transition-all ${
+                    studyFiltersExpanded || provinceFilter !== 'all' || ownershipFilter !== 'all'
+                      ? 'border-cyan-300 bg-cyan-400/15 text-cyan-300'
+                      : 'border-white/10 bg-white/10 text-white/70 hover:text-white'
+                  }`}
+                >
+                  <SlidersHorizontal className="h-5 w-5" />
+                </button>
               </div>
-            </motion.div>
-            <h2 className="text-3xl font-black text-white mb-2">Choose Your Study Path</h2>
-            <p className="text-white/60 text-sm mb-5">
-              {selectionCategory === 'specialized_test'
-                ? "We'll tailor content for your selected exam."
-                : "We'll tailor content for your college."}
-            </p>
+              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
+                <div className="w-20 h-20 rounded-3xl bg-white/15 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20">
+                  <Building2 className="w-10 h-10 text-white" />
+                </div>
+              </motion.div>
+              <h2 className="text-3xl font-black text-white mb-2">Choose Your Study Path</h2>
+              <p className="text-white/60 text-sm">
+                {selectionCategory === 'specialized_test'
+                  ? "We'll tailor content for your selected exam."
+                  : "We'll tailor content for your college."}
+              </p>
+            </div>
             <Tabs value={selectionCategory} onValueChange={handleSelectionCategoryChange} className="mb-4">
               <TabsList className="grid h-12 w-full grid-cols-2 rounded-2xl bg-white/10 p-1">
                 <TabsTrigger value="institute" className="rounded-xl text-xs font-black text-white/70 data-[state=active]:bg-white data-[state=active]:text-black">
@@ -544,55 +648,115 @@ const SetupWizard = () => {
                 </TabsTrigger>
               </TabsList>
             </Tabs>
-            <div className="space-y-3 max-h-[40vh] overflow-y-auto px-1 overscroll-contain">
-              {visibleInstitutes.map((inst) => (
-                <button
-                  key={inst.code}
-                  onClick={() => inst.enabled && setInstitute(inst.code)}
-                  disabled={!inst.enabled}
-                  className={`w-full flex items-center gap-3 p-3 rounded-2xl border-2 transition-all duration-200 text-left ${
-                    institute === inst.code
-                      ? 'border-white bg-white/20 shadow-lg'
-                      : inst.enabled
-                        ? 'border-white/10 bg-white/5 hover:bg-white/10'
-                        : 'border-white/5 bg-white/[0.02] opacity-50 cursor-not-allowed'
-                  }`}
+            <AnimatePresence>
+              {studyFiltersExpanded && selectionCategory === 'institute' && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: 'auto' }}
+                  exit={{ opacity: 0, y: -8, height: 0 }}
+                  className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-3 text-left backdrop-blur-md"
                 >
-                  <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-white/10">
-                    {inst.image_url ? (
-                      <img
-                        src={inst.image_url}
-                        alt={inst.short_name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      />
-                    ) : null}
-                    <div className="absolute inset-0 bg-gradient-to-l from-transparent to-white/5" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Building2 className="w-6 h-6 text-white/30" />
-                    </div>
+                  <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-white/50">Province</p>
+                  <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+                    {['all', ...availableProvinces].map((province) => (
+                      <button
+                        key={province}
+                        type="button"
+                        onClick={() => setProvinceFilter(province)}
+                        className={`shrink-0 rounded-full px-3 py-2 text-xs font-black transition-all ${
+                          provinceFilter === province
+                            ? 'bg-cyan-500 text-white'
+                            : 'bg-white/10 text-white/60 hover:bg-white/15 hover:text-white'
+                        }`}
+                      >
+                        {province === 'all' ? 'All' : province}
+                      </button>
+                    ))}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className={`text-sm font-bold leading-tight ${institute === inst.code ? 'text-white' : 'text-white/80'}`}>
-                      {inst.name}
-                    </p>
-                    <p className="text-[11px] text-white/40 mt-0.5">{inst.short_name}</p>
+                  <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-white/50">Ownership</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['all', 'public', 'private'] as OwnershipFilter[]).map((ownership) => (
+                      <button
+                        key={ownership}
+                        type="button"
+                        onClick={() => setOwnershipFilter(ownership)}
+                        className={`rounded-xl px-3 py-2 text-xs font-black capitalize transition-all ${
+                          ownershipFilter === ownership
+                            ? 'bg-cyan-500 text-white'
+                            : 'bg-white/10 text-white/60 hover:bg-white/15 hover:text-white'
+                        }`}
+                      >
+                        {ownership}
+                      </button>
+                    ))}
                   </div>
-                  {!inst.enabled && (
-                    <span className="text-[10px] font-bold text-amber-300 bg-amber-300/10 px-2 py-1 rounded-full shrink-0 whitespace-nowrap">
-                      Coming Soon
-                    </span>
-                  )}
-                  {institute === inst.code && (
-                    <CheckCircle2 className="w-5 h-5 text-white shrink-0" />
-                  )}
-                </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <div className="space-y-3 max-h-[40vh] overflow-y-auto px-1 overscroll-contain">
+              {sortedGroupNames.map((groupName) => (
+                <section key={groupName} className="space-y-2">
+                  <div className={`sticky top-0 z-10 flex items-center justify-between rounded-xl border px-3 py-2 text-left backdrop-blur-md ${
+                    setupIsDark ? 'border-white/10 bg-black/30' : 'border-cyan-600/15 bg-white/70'
+                  }`}>
+                    <h3 className="text-[11px] font-black uppercase tracking-widest text-white/70">{groupName}</h3>
+                    <span className="text-[10px] font-bold text-white/40">{groupedInstitutes[groupName].length}</span>
+                  </div>
+                  {groupedInstitutes[groupName].map((inst) => {
+                    const ownership = getInstituteOwnership(inst);
+                    return (
+                      <button
+                        key={inst.code}
+                        onClick={() => inst.enabled && setInstitute(inst.code)}
+                        disabled={!inst.enabled}
+                        className={`w-full flex items-center gap-3 p-3 rounded-2xl border-2 transition-all duration-200 text-left ${
+                          institute === inst.code
+                            ? 'border-white bg-white/20 shadow-lg'
+                            : inst.enabled
+                              ? 'border-white/10 bg-white/5 hover:bg-white/10'
+                              : 'border-white/5 bg-white/[0.02] opacity-50 cursor-not-allowed'
+                        }`}
+                      >
+                        <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-white/10">
+                          {inst.image_url ? (
+                            <img
+                              src={inst.image_url}
+                              alt={inst.short_name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          ) : null}
+                          <div className="absolute inset-0 bg-gradient-to-l from-transparent to-white/5" />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Building2 className="w-6 h-6 text-white/30" />
+                          </div>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-sm font-bold leading-tight ${institute === inst.code ? 'text-white' : 'text-white/80'}`}>
+                            {inst.name}
+                          </p>
+                          <p className="text-[11px] text-white/40 mt-0.5">
+                            {[inst.short_name, selectionCategory === 'institute' ? formatOwnership(ownership) : null].filter(Boolean).join(' · ')}
+                          </p>
+                        </div>
+                        {!inst.enabled && (
+                          <span className="text-[10px] font-bold text-amber-300 bg-amber-300/10 px-2 py-1 rounded-full shrink-0 whitespace-nowrap">
+                            Coming Soon
+                          </span>
+                        )}
+                        {institute === inst.code && (
+                          <CheckCircle2 className="w-5 h-5 text-white shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </section>
               ))}
               {visibleInstitutes.length === 0 && (
                 <div className="rounded-2xl border-2 border-white/10 bg-white/5 p-5 text-sm font-semibold text-white/60">
                   {selectionCategory === 'specialized_test'
-                    ? 'Specialized tests are coming soon.'
-                    : 'No institutes are available right now.'}
+                    ? 'No specialized tests match your search.'
+                    : 'No institutes match your filters.'}
                 </div>
               )}
             </div>

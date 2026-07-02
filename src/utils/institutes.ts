@@ -9,6 +9,13 @@ export interface Institute {
   image_url: string | null;
   enabled: boolean;
   category?: 'institute' | 'specialized_test' | string | null;
+  province?: string | null;
+  region?: string | null;
+  sector?: string | null;
+  ownership?: string | null;
+  type?: string | null;
+  institute_type?: string | null;
+  is_public?: boolean | null;
   years: string[];
   dashboard_components?: {
     mcqs: boolean;
