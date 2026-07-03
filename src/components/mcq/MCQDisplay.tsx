@@ -1511,12 +1511,13 @@ export const MCQDisplay = ({
         if (selectedAnswer) answerMap[mcq.id] = { selectedAnswer };
       });
 
-      if (user?.id && !mistakeMode) {
+      if (user?.id && !mistakeMode && data.length > 0) {
+        const mcqIds = data.map(m => m.id);
         const { data: previousAnswers } = await supabase
           .from('user_answers')
           .select('mcq_id, selected_answer, created_at')
           .eq('user_id', user.id)
-          .in('mcq_id', data.map(m => m.id))
+          .in('mcq_id', mcqIds)
           .order('created_at', { ascending: true });
 
         if (previousAnswers) {
@@ -1525,7 +1526,7 @@ export const MCQDisplay = ({
           });
         }
 
-        const queuedAnswers = await getQueuedMCQAnswerMap(user.id, data.map(m => m.id));
+        const queuedAnswers = await getQueuedMCQAnswerMap(user.id, mcqIds);
         Object.assign(answerMap, queuedAnswers);
 
         setAnsweredQuestions(answerMap);
@@ -1540,6 +1541,9 @@ export const MCQDisplay = ({
         return { ...mcq, shuffledOptions, originalCorrectIndex: shuffledOptions.indexOf(mcq.correct_answer) };
       });
       setMcqs(shuffledMCQs);
+      if (shuffledMCQs.length === 0) {
+        setLoading(false);
+      }
 
       if (initialIndex > 0) {
         // Find nearest unanswered from initialIndex going forward
