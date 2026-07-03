@@ -65,6 +65,8 @@ const LAST_ATTEMPTED_MCQ_KEY = 'lastAttemptedMCQIndex';
 const LAST_ATTEMPTED_SUBJECT_KEY = 'lastAttemptedMCQSubject';
 const LAST_ATTEMPTED_CHAPTER_KEY = 'lastAttemptedMCQChapter';
 const SAVED_SESSIONS_LIST_KEY = 'mcq_saved_sessions';
+const isAiPolicyNotice = (text = '') =>
+  /(not available for your current plan|quota|limit|login|required|reached|not enabled|upgrade)/i.test(text);
 
 export interface SavedMCQSession {
   subjectId: string;
@@ -213,8 +215,7 @@ const MCQSettingsModal = ({
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {!isPremium && <Crown className="w-4 h-4 text-yellow-500 animate-pulse" />}
-              <Switch checked={!aiPopupsDisabled} disabled={!isPremium} onCheckedChange={toggleAiPopups} className="data-[state=checked]:bg-blue-500" />
+              <Switch checked={!aiPopupsDisabled} onCheckedChange={toggleAiPopups} className="data-[state=checked]:bg-blue-500" />
             </div>
           </div>
 
@@ -493,6 +494,7 @@ const ReferenceModal = ({
 }) => {
   const hasConfirmed = Array.isArray(confirmedIndexes);
   const hasSummary = Boolean(summary?.summary);
+  const policyError = error && isAiPolicyNotice(error);
   const visibleReferences = Array.isArray(references)
     ? hasConfirmed
       ? confirmedIndexes.map(index => references[index]).filter(Boolean)
@@ -639,8 +641,16 @@ const ReferenceModal = ({
             </AnimatePresence>
 
             {!offlineMessage && !isConfirming && !isSummarizing && !summary && error && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
-                AI summary is unavailable right now.
+              <div className={policyError
+                ? "mx-auto max-w-sm py-6 text-center text-sm text-muted-foreground"
+                : "rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
+              }>
+                <p>{policyError ? error : 'AI references are unavailable right now.'}</p>
+                {policyError && (
+                  <a href="/pricing" className="mt-2 inline-flex text-xs font-semibold text-primary underline-offset-4 hover:underline">
+                    View upgrade options
+                  </a>
+                )}
               </div>
             )}
 
@@ -733,33 +743,27 @@ const ReferenceModal = ({
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button
                 variant="outline"
-                onClick={canUseAiSummary ? onSummarize : onSummaryUpgrade}
-                disabled={Boolean(offlineMessage) || (canUseAiSummary && (isSummarizing || isLoading || summaryLimitReached))}
+                onClick={onSummarize}
+                disabled={Boolean(offlineMessage) || isSummarizing || isLoading}
                 className="rounded-xl disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:disabled:border-slate-800 dark:disabled:bg-slate-900 dark:disabled:text-slate-600"
               >
-                {!canUseAiSummary ? (
-                  <><Lock className="mr-2 h-4 w-4" /> AI Summary</>
-                ) : isSummarizing ? (
+                {isSummarizing ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Summarizing...</>
-                ) : summaryLimitReached ? (
-                  <><RotateCcw className="mr-2 h-4 w-4" /> Summary limit reached</>
                 ) : hasSummary ? (
-                  <><RotateCcw className="mr-2 h-4 w-4" /> Reload Summary {summaryCount}/3</>
+                  <><RotateCcw className="mr-2 h-4 w-4" /> Reload Summary</>
                 ) : (
                   <><Sparkles className="mr-2 h-4 w-4" /> AI Summary</>
                 )}
               </Button>
               <Button
                 onClick={onConfirm}
-                disabled={Boolean(offlineMessage) || !isPremium || isConfirming || isLoading || hasConfirmed}
+                disabled={Boolean(offlineMessage) || isConfirming || isLoading || hasConfirmed}
                 className="flex-1 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
               >
                 {isConfirming ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Confirming...</>
                 ) : hasConfirmed ? (
                   <><CheckCircle className="mr-2 h-4 w-4" /> Confirmed by Dr Ahroid</>
-                ) : !isPremium ? (
-                  <><Lock className="mr-2 h-4 w-4" /> Confirm with Dr Ahroid requires plan upgrade</>
                 ) : (
                   <><Sparkles className="mr-2 h-4 w-4" /> Confirm with Dr Ahroid</>
                 )}
@@ -856,7 +860,6 @@ export const MCQDisplay = ({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [dailySubmissionsCount, setDailySubmissionsCount] = useState(0);
   const [lastSubmissionResetDate, setLastSubmissionResetDate] = useState<string | null>(null);
-  const [showUpgradeBanner, setShowUpgradeBanner] = useState(false);
   const [upgradeModalMessage, setUpgradeModalMessage] = useState("Upgrade to premium for unlimited access!");
   const [isReferenceModalOpen, setIsReferenceModalOpen] = useState(false);
   const [offlineReferenceMessage, setOfflineReferenceMessage] = useState('');
@@ -864,6 +867,7 @@ export const MCQDisplay = ({
   const [confirmedReferenceIndexes, setConfirmedReferenceIndexes] = useState<number[] | null>(null);
   const [referenceVerification, setReferenceVerification] = useState<any>(null);
   const [referenceSummary, setReferenceSummary] = useState<any>(null);
+  const [referenceActionError, setReferenceActionError] = useState('');
   const [isSummarizingReferences, setIsSummarizingReferences] = useState(false);
   const [summaryGenerationCounts, setSummaryGenerationCounts] = useState<Record<string, number>>({});
   const [isConfirmingReferences, setIsConfirmingReferences] = useState(false);
@@ -884,8 +888,8 @@ export const MCQDisplay = ({
   });
 
   const userPlanForChatbot = profile?.plan?.toLowerCase() || 'free';
-  const isPremium = userPlanForChatbot === 'premium';
-  const canUseAiSummary = userPlanForChatbot === 'premium';
+  const isPremium = true;
+  const canUseAiSummary = true;
 
   const isNewDayPKT = (lastResetDateStr: string | null): boolean => {
     if (!lastResetDateStr) return true;
@@ -1183,20 +1187,17 @@ export const MCQDisplay = ({
       setConfirmedReferenceIndexes(null);
       setReferenceVerification(null);
       setReferenceSummary(null);
+      setReferenceActionError('');
       setReferenceData(null);
       setOfflineReferenceMessage('Connect to the internet and try again.');
       setIsReferenceModalOpen(true);
-      return;
-    }
-    if (userPlanForChatbot === 'free') {
-      setShowUpgradeBanner(true);
-      setTimeout(() => setShowUpgradeBanner(false), 5000);
       return;
     }
     setSelectedReferenceIndex(null);
     setConfirmedReferenceIndexes(null);
     setReferenceVerification(null);
     setReferenceSummary(null);
+    setReferenceActionError('');
     setOfflineReferenceMessage('');
     setIsReferenceModalOpen(true);
     await search(currentMCQ.question, 5);
@@ -1241,7 +1242,6 @@ export const MCQDisplay = ({
   };
 
   const handleConfirmReferences = async (localReferences = referenceResults) => {
-    if (!isPremium) return;
     if (!currentMCQ || isConfirmingReferences) return;
     if (!isOnline) {
       showOfflineFeatureToast('AI reference verification');
@@ -1249,6 +1249,7 @@ export const MCQDisplay = ({
     }
 
     setIsConfirmingReferences(true);
+    setReferenceActionError('');
     try {
       const cachedVerification = await readCachedVerification();
       if (cachedVerification) {
@@ -1307,6 +1308,10 @@ export const MCQDisplay = ({
       setReferenceVerification(verification);
       await cacheVerification(verification);
     } catch (error) {
+      if (isAiPolicyNotice(error?.message || '')) {
+        setReferenceActionError(error.message);
+        return;
+      }
       const fallbackIndexes = getFallbackConfirmedReferenceIndexes(localReferences);
       const fallbackVerification = {
         verdict: fallbackIndexes.length > 0 ? 'verified' : 'unconfirmed',
@@ -1326,11 +1331,6 @@ export const MCQDisplay = ({
   };
 
   const handleSummarizeReferences = async () => {
-    if (!canUseAiSummary) {
-      setReferenceSummary(null);
-      setIsSummarizingReferences(false);
-      return;
-    }
     if (!currentMCQ || isSummarizingReferences) return;
     if (!isOnline) {
       showOfflineFeatureToast('AI summary');
@@ -1340,6 +1340,7 @@ export const MCQDisplay = ({
     if (summaryCount >= 3) return;
 
     setIsSummarizingReferences(true);
+    setReferenceActionError('');
     try {
       const data = await aiApiJson<any>('reference-summary', {
         question: currentMCQ.question,
@@ -1362,16 +1363,17 @@ export const MCQDisplay = ({
       setSummaryGenerationCounts(prev => ({ ...prev, [currentMCQ.id]: (prev[currentMCQ.id] || 0) + 1 }));
     } catch (error) {
       console.error('Reference summary failed:', error);
+      if (isAiPolicyNotice(error?.message || '')) {
+        setReferenceActionError(error.message);
+        return;
+      }
       toast({ title: "AI summary unavailable", description: "Dr Ahroid could not summarize these references right now." });
     } finally {
       setIsSummarizingReferences(false);
     }
   };
 
-  const handleSummaryUpgradePrompt = () => {
-    setUpgradeModalMessage("AI Summary is a premium feature. Upgrade your plan to generate concise book-reference summaries.");
-    setShowUpgradeModal(true);
-  };
+  const handleSummaryUpgradePrompt = () => handleSummarizeReferences();
 
   useEffect(() => {
     if (profile && !profileLoading) {
@@ -1946,7 +1948,7 @@ export const MCQDisplay = ({
         onClose={() => setIsReferenceModalOpen(false)}
         references={referenceResults}
         isLoading={isSearchingReference}
-        error={referenceError}
+        error={referenceActionError || referenceError}
         selectedIndex={selectedReferenceIndex}
         setSelectedIndex={setSelectedReferenceIndex}
         confirmedIndexes={confirmedReferenceIndexes}
@@ -1983,35 +1985,6 @@ export const MCQDisplay = ({
         />
       )}
 
-      {/* Upgrade Reminder Banner */}
-      <AnimatePresence>
-        {showUpgradeBanner && (
-          <motion.div
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-10 left-6 right-6 z-[200]"
-          >
-            <div className="p-4 rounded-[2.5rem] bg-gradient-to-r from-orange-500 to-amber-500 shadow-2xl shadow-orange-500/30 flex items-center gap-4 border border-white/20">
-              <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                <ShieldAlert className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs font-black uppercase tracking-widest text-white/80 mb-0.5">Feature Locked</p>
-                <p className="text-sm font-bold text-white tracking-tight leading-tight">Upgrade to Premium to access book references!</p>
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => { setShowUpgradeBanner(false); setUpgradeModalMessage("Book references are a premium feature. Upgrade to access our complete medical library!"); setShowUpgradeModal(true); }}
-                className="rounded-full h-10 px-6 font-black uppercase text-[10px] tracking-widest"
-              >
-                Upgrade
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

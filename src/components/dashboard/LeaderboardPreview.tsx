@@ -23,17 +23,19 @@ export const LeaderboardPreview = () => {
     queryKey: ['leaderboard-preview'],
     queryFn: async () => {
       try {
-        const { data: userAnswers, error: answersError } = await supabase
-          .from('user_answers')
-          .select('user_id, is_correct, time_taken, created_at');
-        
-        if (answersError) return { allEntries: [], topUsers: [] };
+        const [answersResult, profilesResult] = await Promise.all([
+          supabase
+            .from('user_answers')
+            .select('user_id, is_correct, time_taken, created_at'),
+          supabase
+            .from('profiles')
+            .select('id, username, full_name'),
+        ]);
 
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, username, full_name');
+        const { data: userAnswers, error: answersError } = answersResult;
+        const { data: profiles, error: profilesError } = profilesResult;
         
-        if (profilesError) return { allEntries: [], topUsers: [] };
+        if (answersError || profilesError) return { allEntries: [], topUsers: [] };
 
         const userStats: Record<string, any> = {};
         
@@ -73,7 +75,8 @@ export const LeaderboardPreview = () => {
         const sorted = allEntries.sort((a, b) => b.total_score - a.total_score);
         return { allEntries: sorted, topUsers: sorted.slice(0, 10) };
       } catch (error) { return { allEntries: [], topUsers: [] }; }
-    }
+    },
+    staleTime: 1000 * 60 * 5,
   });
 
   const topUsers = leaderboardData?.topUsers || [];

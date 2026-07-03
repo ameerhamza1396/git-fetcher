@@ -11,6 +11,9 @@ import { Message, ChatSession, ChatSessionInsert, ChatSessionUpdate } from '@/ty
 import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
 import { aiApiJson } from '@/utils/aiApi';
 
+const isAiPolicyNotice = (text: string) =>
+  /(not available for your current plan|quota|limit|login|required|reached|not enabled|upgrade)/i.test(text);
+
 export const AIStudyChat = () => {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -131,6 +134,11 @@ export const AIStudyChat = () => {
       await saveSession(final);
     } catch (e: any) {
       console.error('Error sending message:', e);
+      setMessages([...newMsgs, {
+        role: 'assistant',
+        content: e.message || 'Failed to send message',
+        timestamp: new Date().toISOString(),
+      }]);
       toast({ title: 'Error', description: e.message || 'Failed to send message', variant: 'destructive' });
     } finally {
       setIsLoading(false);
@@ -198,8 +206,16 @@ export const AIStudyChat = () => {
               messages.map((m, i) => (
                 <div
                   key={i}
-                  className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${m.role === 'user' ? 'justify-end' : isAiPolicyNotice(m.content) ? 'justify-center' : 'justify-start'}`}
                 >
+                  {m.role !== 'user' && isAiPolicyNotice(m.content) ? (
+                    <div className="max-w-md text-center">
+                      <p className="text-xs font-bold leading-relaxed text-gray-500">{m.content}</p>
+                      <a href="/pricing" className="mt-2 inline-flex text-xs font-black uppercase tracking-widest text-blue-600 underline underline-offset-4">
+                        View upgrade options
+                      </a>
+                    </div>
+                  ) : (
                   <div
                     className={`max-w-[80%] p-3 rounded-lg ${
                       m.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-900'
@@ -210,6 +226,7 @@ export const AIStudyChat = () => {
                       {new Date(m.timestamp).toLocaleTimeString()}
                     </p>
                   </div>
+                  )}
                 </div>
               ))
             )}

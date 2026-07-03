@@ -97,7 +97,7 @@ export const CorrectionMCQModal = ({ open, chapter, onOpenChange }: CorrectionMC
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl overflow-hidden rounded-3xl border-border/40 p-0">
-        <DialogHeader className="border-b border-border/40 bg-background px-5 py-4 text-left">
+        <DialogHeader className="border-b border-border/40 bg-background/55 dark:bg-white/[0.035] backdrop-blur-xl px-5 py-4 text-left">
           <DialogTitle className="flex items-center gap-2 text-base font-black">
             <RotateCcw className="h-5 w-5 text-primary" />
             {chapter?.name || 'Correct MCQs'}

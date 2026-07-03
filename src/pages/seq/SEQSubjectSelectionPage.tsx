@@ -16,7 +16,7 @@ import Seo from '@/components/Seo';
 import { CollaborateModal } from '@/components/CollaborateModal';
 
 const SubjectCardSkeleton = () => (
-  <div className="relative overflow-hidden rounded-3xl bg-muted/20 p-6 animate-pulse border border-border/40">
+  <div className="relative overflow-hidden rounded-3xl bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl p-6 animate-pulse border border-border/40">
     <div className="flex items-center gap-4">
       <div className="w-16 h-16 rounded-2xl bg-muted" />
       <div className="flex-1 space-y-2">
@@ -84,8 +84,8 @@ const SEQSubjectSelectionPage = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background p-4 text-center">
-        <Card className="w-full max-w-md bg-card/90 backdrop-blur-sm border-border shadow-lg p-6">
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background/55 dark:bg-white/[0.035] backdrop-blur-xl p-4 text-center">
+        <Card className="w-full max-w-md bg-card/60 dark:bg-white/[0.05] backdrop-blur-sm border-border shadow-lg p-6">
           <CardHeader className="mb-4">
             <Lock className="w-16 h-16 mx-auto text-orange-500 mb-4" />
             <CardTitle className="text-2xl font-bold text-foreground">Access Restricted</CardTitle>
@@ -101,8 +101,7 @@ const SEQSubjectSelectionPage = () => {
     );
   }
 
-  const plan = profile?.plan?.toLowerCase() || 'free';
-  const hasAccess = plan === 'premium';
+  const hasAccess = !!user?.id;
 
   if (!hasAccess) {
     return (
@@ -146,9 +145,9 @@ const SEQSubjectSelectionPage = () => {
   return (
     <MCQPageLayout backTo="/dashboard" showHeader={true} showBackButton={true}>
       <Seo title="SEQ Practice" description="Practice Short Essay Questions for your medical exams with Medmacs App." canonical="https://medmacs.app/seqs" />
-      
+
       <div className="text-center mb-6 sm:mb-8 animate-fade-in">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-foreground uppercase italic mb-3">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-normal leading-[1.08] text-foreground uppercase italic mb-3">
           📝 SEQ <span className="text-orange-500">Practice</span>
         </h1>
         <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] max-w-2xl mx-auto px-4 sm:px-0">
@@ -160,7 +159,7 @@ const SEQSubjectSelectionPage = () => {
         <SEQProgressTracker userId={user?.id} />
       </div>
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="text-center mb-4 px-4"
@@ -168,18 +167,18 @@ const SEQSubjectSelectionPage = () => {
         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-orange-500 mb-3 block">Step 1 of 3</span>
       </motion.div>
 
-      <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md pt-[env(safe-area-inset-top)] -mx-3 sm:mx-0 px-3 sm:px-0">
+      <div className="sticky top-0 z-50 bg-background/45 dark:bg-background/20 backdrop-blur-xl pt-[env(safe-area-inset-top)] -mx-3 sm:mx-0 px-3 sm:px-0">
         <div className="max-w-4xl mx-auto px-4 sm:px-0">
           <div className="pt-4 pb-3">
-            <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
-              Select <span className="text-orange-500">Subject</span>
+            <h2 className="px-1 text-3xl sm:text-5xl font-black tracking-normal text-foreground uppercase italic leading-[1.08] text-center">
+              Select <span className="heading-glyph-safe text-orange-500">Subject&nbsp;</span>
             </h2>
             <p className="text-muted-foreground text-sm font-medium mt-2 max-w-lg mx-auto text-center">
               Choose a subject to begin your SEQ practice. Each subject contains comprehensive chapters and high-yield questions.
             </p>
           </div>
         </div>
-        <div className="h-4 bg-gradient-to-b from-background/80 to-transparent pointer-events-none" />
+        <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
       </div>
 
       <div className="max-w-4xl mx-auto px-4 sm:px-0 pb-32 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -212,9 +211,9 @@ const SEQSubjectSelectionPage = () => {
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setSelectedSubject(subject)}
                 className={`group cursor-pointer relative overflow-hidden rounded-3xl border-2 p-6 transition-all duration-300 ${
-                  isSelected 
-                    ? 'border-orange-500 bg-orange-500/5 shadow-2xl shadow-orange-500/10' 
-                    : 'border-border/40 bg-white/5 dark:bg-zinc-900/50 hover:border-orange-500/30 hover:bg-orange-500/5'
+                  isSelected
+                    ? 'border-orange-500 bg-orange-500/5 shadow-2xl shadow-orange-500/10'
+                    : 'border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl hover:border-orange-500/30 hover:bg-orange-500/5'
                 }`}
               >
                 {isSelected && (
@@ -227,10 +226,10 @@ const SEQSubjectSelectionPage = () => {
                   }`}>
                     {subject.icon || '📝'}
                   </div>
-                  
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className={`text-xl font-black uppercase italic tracking-tight transition-colors ${
+                      <h3 className={`text-xl font-black uppercase italic tracking-normal leading-snug transition-colors ${
                         isSelected ? 'text-orange-500' : 'text-foreground'
                       }`}>
                         {subject.name}

@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Seo from "@/components/Seo";
 import { motion } from "framer-motion";
 import GoogleSignin from "@/components/GoogleSignin";
+import AppTransitionScreen from "@/components/AppTransitionScreen";
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: "", password: "" });
@@ -16,26 +17,39 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  const { signIn, user } = useAuth();
+  const { signIn, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     setMounted(true);
-    if (user) navigate("/dashboard");
-  }, [user, navigate]);
+  }, []);
+
+  useEffect(() => {
+    if (!authLoading && user) navigate("/dashboard", { replace: true });
+  }, [authLoading, user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     const { data, error } = await signIn(formData.email, formData.password);
-    if (data && !error) navigate("/dashboard");
+    if (data && !error) {
+      navigate("/dashboard", { replace: true });
+      return;
+    }
     setIsLoading(false);
   };
 
-  if (!mounted) return null;
+  if (!mounted || authLoading || user) {
+    return <AppTransitionScreen label="Opening" />;
+  }
 
   return (
-    <div className="fixed inset-0 flex flex-col overflow-hidden overscroll-none bg-gradient-to-br from-[#0a2e2e] via-[#0f172a] to-[#020617]">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.28, ease: "easeOut" }}
+      className="fixed inset-0 flex flex-col overflow-hidden overscroll-none bg-gradient-to-br from-[#0a2e2e] via-[#0f172a] to-[#020617]"
+    >
       <Seo
         title="Login"
         description="Log in to your Medmacs App account to access personalized MDCAT preparation tools, MCQs, AI study assistant, and more."
@@ -130,7 +144,7 @@ const Login = () => {
               </div>
 
               <div className="flex items-center justify-end">
-                <Link to="/forgot-password" university-colors className="text-xs text-[#2dd4bf] hover:text-[#2dd4bf]/80 transition-colors font-medium">
+                <Link to="/forgot-password" className="text-xs text-[#2dd4bf] hover:text-[#2dd4bf]/80 transition-colors font-medium">
                   Forgot password?
                 </Link>
               </div>
@@ -163,7 +177,7 @@ const Login = () => {
           </div>
         </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

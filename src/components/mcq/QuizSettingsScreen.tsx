@@ -106,10 +106,10 @@ export const QuizSettingsScreen = ({ subject, chapter, onStartQuiz }: QuizSettin
       >
         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-3 block">Step 3 of 3</span>
       </motion.div>
-      <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md pt-[env(safe-area-inset-top)]">
+      <div className="sticky top-0 z-50 bg-background/45 dark:bg-background/20 backdrop-blur-xl pt-[env(safe-area-inset-top)]">
         <div className="max-w-4xl mx-auto px-4 sm:px-0">
           <div className="pt-4 pb-3">
-            <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
+            <h2 className="px-1 text-3xl sm:text-5xl font-black tracking-normal text-foreground uppercase italic leading-[1.08] text-center">
               Quiz <span className="live-gradient-text">Settings</span>
             </h2>
             <div className="mt-2 flex flex-col items-center gap-1">
@@ -122,7 +122,7 @@ export const QuizSettingsScreen = ({ subject, chapter, onStartQuiz }: QuizSettin
             </div>
           </div>
         </div>
-        <div className="h-4 bg-gradient-to-b from-background/80 to-transparent pointer-events-none" />
+        <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
       </div>
 
       <div className="max-w-4xl mx-auto px-4 sm:px-0">
@@ -140,8 +140,8 @@ export const QuizSettingsScreen = ({ subject, chapter, onStartQuiz }: QuizSettin
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-1">Ready to Start</p>
-            <h3 className="text-xl font-black uppercase italic tracking-tight text-foreground">{subject.name}</h3>
-            <p className="text-muted-foreground text-xs font-medium truncate">
+            <h3 className="text-xl font-black uppercase italic tracking-normal leading-snug text-foreground">{subject.name}</h3>
+            <p className="text-muted-foreground text-xs font-medium leading-snug break-words">
               Chapter {chapter.chapter_number} — {chapter.name}
             </p>
           </div>
@@ -178,7 +178,7 @@ export const QuizSettingsScreen = ({ subject, chapter, onStartQuiz }: QuizSettin
               className={`group cursor-pointer relative overflow-hidden rounded-2xl border-2 p-4 transition-all duration-300 ${
                 isSelected
                   ? 'border-primary bg-primary/5 shadow-xl shadow-primary/10'
-                  : 'border-border/40 bg-white/5 dark:bg-zinc-900/50 hover:border-primary/30 hover:bg-primary/5'
+                  : 'border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl hover:border-primary/30 hover:bg-primary/5'
               }`}
             >
               {/* Selected glow — same as subject cards */}
@@ -200,7 +200,7 @@ export const QuizSettingsScreen = ({ subject, chapter, onStartQuiz }: QuizSettin
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <h3 className={`text-sm font-black uppercase italic tracking-tight transition-colors ${
+                    <h3 className={`text-sm font-black uppercase italic tracking-normal leading-snug transition-colors ${
                       isSelected ? 'text-primary' : 'text-foreground'
                     }`}>
                       {preset.label}

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from 'next-themes';
-import { Moon, Sun, Send, Mic, MessageSquare, Menu, Copy, Clock, PlusCircle, Trash2, AlertTriangle, Crown } from 'lucide-react';
+import { Moon, Sun, Send, Mic, MessageSquare, Menu, Copy, Clock, PlusCircle, Trash2, AlertTriangle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { CardTitle } from '@/components/ui/card';
@@ -39,6 +39,9 @@ interface SavedChat {
 }
 
 import { parseBoldText } from '@/utils/format';
+
+const isAiPolicyNotice = (text: string) =>
+  /(not available for your current plan|quota|limit|login|required|reached|not enabled|upgrade)/i.test(text);
 
 const fallbackSuggestions = [
   'Osteomyelitis',
@@ -128,7 +131,7 @@ const DrSultanChat: React.FC = () => {
     staleTime: 1000 * 60 * 5,
   });
 
-  const canUseChat = profile?.plan?.toLowerCase() === 'premium';
+  const canUseChat = !!user?.id;
   const visibleSuggestions = React.useMemo(() => {
     const source = chatSuggestions.length >= 4 ? chatSuggestions : fallbackSuggestions;
     const start = suggestionTick % source.length;
@@ -235,7 +238,7 @@ const DrSultanChat: React.FC = () => {
     } catch (err: any) {
       setMessages(prev => [...prev, {
         sender: 'ai',
-        text: "⚠️ Connection error. Please try again.",
+        text: err?.message || "Connection error. Please try again.",
         time: ts
       }]);
     } finally {
@@ -407,8 +410,16 @@ const DrSultanChat: React.FC = () => {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     key={i}
-                    className={`flex w-full ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                    className={`flex w-full ${msg.sender === 'user' ? 'justify-end' : isAiPolicyNotice(msg.text) ? 'justify-center' : 'justify-start'}`}
                   >
+                    {msg.sender !== 'user' && isAiPolicyNotice(msg.text) ? (
+                      <div className="max-w-md px-4 py-2 text-center">
+                        <p className="text-xs font-bold leading-relaxed text-muted-foreground">{msg.text}</p>
+                        <Link to="/pricing" className="mt-2 inline-flex text-xs font-black uppercase tracking-widest text-primary underline underline-offset-4">
+                          View upgrade options
+                        </Link>
+                      </div>
+                    ) : (
                     <div className={`relative max-w-[80%] sm:max-w-[70%] p-5 rounded-3xl shadow-lg ${msg.sender === 'user'
                       ? 'bg-primary text-white rounded-tr-none'
                       : 'bg-white dark:bg-zinc-900 text-foreground border border-border/60 rounded-tl-none'
@@ -430,6 +441,7 @@ const DrSultanChat: React.FC = () => {
                         </button>
                       </div>
                     </div>
+                    )}
                   </motion.div>
                 ))}
 
@@ -463,27 +475,6 @@ const DrSultanChat: React.FC = () => {
               <div className="h-16 rounded-3xl bg-secondary/30 animate-pulse flex items-center justify-center">
                 <p className="text-sm text-muted-foreground">Loading...</p>
               </div>
-            ) : !canUseChat ? (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="relative z-20 p-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border-2 border-amber-200 dark:border-amber-900/50 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl shadow-amber-500/5"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center shadow-lg">
-                    <Crown className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-black italic uppercase tracking-tight">Premium Plan Required</h4>
-                    <p className="text-xs text-muted-foreground font-medium">Unlock full access to Dr. Ahroid & other AI features.</p>
-                  </div>
-                </div>
-                <Link to="/pricing" className="w-full sm:w-auto">
-                  <Button className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-white rounded-xl h-10 px-6 font-black uppercase text-xs tracking-[0.2em] shadow-lg shadow-amber-500/20">
-                    Upgrade to Premium
-                  </Button>
-                </Link>
-              </motion.div>
             ) : (
               <form onSubmit={handleSendMessage} className="flex items-center gap-4 relative">
                 <div className="relative flex-1 group">

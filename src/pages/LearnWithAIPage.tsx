@@ -14,7 +14,7 @@ import { MCQPageLayout } from '@/pages/mcq/MCQPageLayout';
 import { fetchChaptersBySubject, fetchMCQsByChapter, fetchSubjects, Chapter, MCQ, Subject } from '@/utils/mcqData';
 import { FlashcardLimitModal } from '@/components/dashboard/personalization/FlashcardLimitModal';
 import { fetchReferenceSnippet } from '@/components/dashboard/personalization/personalizationUtils';
-import { getFlashcardQuota, recordGeneratedFlashcards } from '@/components/profile/AchievementBadges';
+import { recordGeneratedFlashcards } from '@/components/profile/AchievementBadges';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { aiApiJson } from '@/utils/aiApi';
@@ -220,16 +220,8 @@ const LearnWithAIPage = () => {
   const buildBatch = async (nextBatch = false, scope = selectedScope) => {
     if (!scope) return;
     const nextIndex = nextBatch ? batchIndex + 1 : 0;
-    const quota = await getFlashcardQuota(user?.id);
     const requestedCount = 5;
-    const allowedCount = Math.min(requestedCount, quota.remaining);
-
-    if (allowedCount <= 0) {
-      setLimitDetails({ plan: quota.plan, limit: quota.limit });
-      setFlashcardModalOpen(false);
-      setLimitModalOpen(true);
-      return;
-    }
+    const allowedCount = requestedCount;
 
     setCardsLoading(true);
     setActiveCard(0);
@@ -302,8 +294,7 @@ const LearnWithAIPage = () => {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-0 mb-6">
         <div className="rounded-3xl border border-primary/15 bg-primary/5 p-4 text-sm text-muted-foreground">
-          <span className="font-black uppercase text-foreground">{userPlan}</span> flashcard allowance:
-          {' '}{userPlan === 'premium' ? '500/day fair-use protection' : userPlan === 'iconic' ? '10/day' : '2/day'}.
+          Dr Ahroid flashcard access follows your current cloud AI policy.
         </div>
       </div>
 

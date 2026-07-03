@@ -16,7 +16,7 @@ import Seo from '@/components/Seo';
 import { getOfflineChapterSummaries, subscribeOfflineChapterChanges } from '@/utils/offlineChapters';
 
 const SubjectCardSkeleton = () => (
-  <div className="relative overflow-hidden rounded-3xl bg-muted/20 p-6 animate-pulse border border-border/40">
+  <div className="relative overflow-hidden rounded-3xl bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl p-6 animate-pulse border border-border/40">
     <div className="flex items-center gap-4">
       <div className="w-16 h-16 rounded-2xl bg-muted" />
       <div className="flex-1 space-y-2">
@@ -47,54 +47,56 @@ const AnalyticsBubble = ({
   isCompact: boolean;
   index: number;
 }) => {
-  const stepDelay = isCompact ? index * 36 : (3 - index) * 24;
-
   return (
-    <div
-      style={{
-      flexBasis: isCompact ? 'calc((100% - 1.5rem) / 4)' : 'calc((100% - 0.5rem) / 2)',
-      maxWidth: isCompact ? 'calc((100% - 1.5rem) / 4)' : 'calc((100% - 0.5rem) / 2)',
-        transitionDelay: `${stepDelay}ms`,
-        transform: isCompact ? 'translateY(-2px) scale(0.985)' : 'translateY(0) scale(1)',
+    <motion.div
+      layout
+      animate={{
+        y: isCompact ? -2 : 0,
+        scale: isCompact ? 0.96 : 1,
       }}
-      className={`relative shrink-0 transform-gpu overflow-hidden bg-gradient-to-br ${gradient} text-white shadow-xl transition-[flex-basis,max-width,border-radius,padding,transform] duration-[240ms] ease-out will-change-[flex-basis,max-width,transform] ${
-        isCompact ? 'rounded-full p-0.5' : 'rounded-[1.5rem] p-1'
+      transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+      className={`group relative min-w-0 transform-gpu overflow-hidden bg-gradient-to-br ${gradient} text-white shadow-xl shadow-black/10 ring-1 ring-white/10 transition-[border-radius,padding] duration-[240ms] ease-out will-change-transform ${
+        isCompact ? 'rounded-full p-0.5' : 'rounded-2xl p-0.5 sm:p-1'
       }`}
     >
+      <div className="pointer-events-none absolute inset-x-3 top-0 h-1/2 rounded-full bg-white/20 blur-2xl" />
       <div className="absolute inset-0 opacity-10" style={{
         backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)',
         maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
       }} />
       <div
-        style={{ transitionDelay: `${stepDelay}ms` }}
-        className={`relative z-10 border border-white/10 bg-white/10 backdrop-blur-xl transition-[height,padding,border-radius] duration-[240ms] ease-out ${
-          isCompact ? 'flex h-10 items-center justify-center rounded-full px-2 py-0' : 'rounded-[1.3rem] p-3 text-center'
+        className={`relative z-10 border border-white/15 bg-white/[0.14] backdrop-blur-xl transition-[height,padding,border-radius] duration-[240ms] ease-out ${
+          isCompact ? 'flex h-10 items-center justify-center rounded-full px-2 py-0' : 'min-h-[5.9rem] rounded-[1.15rem] px-1.5 py-2.5 text-center sm:min-h-[6.35rem] sm:p-3'
         }`}
       >
-        <div className={`flex ${isCompact ? 'items-center gap-2' : 'flex-col items-center'}`}>
+        <div className={`flex min-w-0 ${isCompact ? 'items-center gap-1.5 sm:gap-2' : 'h-full flex-col items-center justify-center'}`}>
           <span
-            style={{ transitionDelay: `${stepDelay}ms` }}
             className={`relative flex shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/15 transition-all duration-[240ms] ease-out ${
-              isCompact ? 'h-5 w-5 rounded-full' : 'mb-2 h-8 w-8'
+              isCompact ? 'h-5 w-5 rounded-full' : 'mb-2 h-7 w-7 rounded-xl sm:h-8 sm:w-8'
             }`}
           >
             <span className={`absolute inset-0 ${glow} blur-lg opacity-40 rounded-full`} />
-            <Icon className={`relative text-white transition-all duration-[240ms] ease-out ${isCompact ? 'h-2.5 w-2.5' : 'h-4 w-4'}`} />
+            <Icon className={`relative text-white transition-all duration-[240ms] ease-out ${isCompact ? 'h-2.5 w-2.5' : 'h-3.5 w-3.5 sm:h-4 sm:w-4'}`} />
           </span>
-          <p className={`min-w-0 truncate font-black leading-none transition-[font-size] duration-[240ms] ease-out ${isCompact ? 'text-[11px] sm:text-sm' : 'text-xl sm:text-2xl'}`}>
+          <p className={`min-w-0 max-w-full truncate font-black leading-none transition-[font-size] duration-[240ms] ease-out ${isCompact ? 'text-[10px] sm:text-sm' : 'text-[1.05rem] sm:text-xl'}`}>
             {value}
           </p>
         </div>
-        <p
-          style={{ transitionDelay: `${Math.max(stepDelay - 12, 0)}ms` }}
-          className={`overflow-hidden text-[10px] font-bold uppercase tracking-widest text-white/50 transition-[max-height,opacity,margin] duration-[160ms] ease-out ${
-            isCompact ? 'mt-0 max-h-0 opacity-0' : 'mt-1 max-h-4 opacity-100'
+        <motion.p
+          animate={{
+            opacity: isCompact ? 0 : 1,
+            height: isCompact ? 0 : 'auto',
+            marginTop: isCompact ? 0 : 4,
+          }}
+          transition={{ duration: 0.18 }}
+          className={`overflow-hidden text-[8px] font-black uppercase leading-tight tracking-[0.08em] text-white/70 transition-[max-height,opacity,margin] duration-[160ms] ease-out sm:text-[9px] sm:tracking-[0.12em] ${
+            isCompact ? 'mt-0 max-h-0 opacity-0' : 'mt-1 max-h-8 opacity-100'
           }`}
         >
           {label}
-        </p>
+        </motion.p>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
@@ -107,6 +109,8 @@ const MCQAnalyticsPanel = ({
   isCompact: boolean;
   isOffline: boolean;
 }) => {
+  const pulseWords = ['Your', 'MCQ', 'progress,', 'pace,', 'and', 'streak', 'in', 'motion.'];
+
   if (isOffline) {
     return (
       <motion.section
@@ -130,7 +134,7 @@ const MCQAnalyticsPanel = ({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-      className="rounded-[2rem] border border-border/70 bg-card/82 p-5 shadow-sm backdrop-blur-xl"
+      className="rounded-[2rem] border border-border/70 bg-card/55 dark:bg-white/[0.035] p-5 shadow-sm backdrop-blur-xl"
     >
       <div className="overflow-hidden">
         <div className="flex items-start gap-4">
@@ -139,14 +143,43 @@ const MCQAnalyticsPanel = ({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">Practice Pulse</p>
-            <h2 className="mt-2 text-2xl font-black leading-tight tracking-tight">
-              Your MCQ momentum at a glance.
-            </h2>
+            <motion.h2
+              className="mt-2 flex flex-wrap gap-x-1.5 gap-y-0.5 text-2xl font-black leading-tight tracking-normal"
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: {},
+                visible: { transition: { staggerChildren: 0.045 } },
+              }}
+            >
+              {pulseWords.map((word) => (
+                <motion.span
+                  key={word}
+                  variants={{
+                    hidden: { opacity: 0, y: 8, scale: 0.96 },
+                    visible: {
+                      opacity: 1,
+                      y: 0,
+                      scale: 1,
+                      transition: { type: 'spring', stiffness: 520, damping: 18 },
+                    },
+                  }}
+                  className={word === 'motion.' ? 'text-primary' : undefined}
+                >
+                  {word}
+                </motion.span>
+              ))}
+            </motion.h2>
           </div>
         </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-2">
+      <motion.div
+        layout
+        className={`mt-5 grid gap-2 transition-all duration-300 sm:gap-3 ${
+          isCompact ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'
+        }`}
+      >
         <AnalyticsBubble
           value={formatCompactNumber(stats.totalQuestions)}
           label="Practiced"
@@ -183,7 +216,7 @@ const MCQAnalyticsPanel = ({
           isCompact={isCompact}
           index={3}
         />
-      </div>
+      </motion.div>
     </motion.section>
   );
 };
@@ -288,15 +321,18 @@ const MCQSubjectSelectionPage = () => {
       stickyHeadingStartTop.current = stickyHeadingRef.current.offsetTop;
     }
 
+    const headingStickPoint = stickyHeadingStartTop.current;
     const nextIsCompact = analyticsCompactRef.current ? scrollTop > 18 : scrollTop > 72;
-    const nextIsHeadingStuck = scrollTop >= stickyHeadingStartTop.current - 1;
+    const nextIsHeadingStuck = isHeadingStuck
+      ? scrollTop > headingStickPoint - 18
+      : scrollTop >= headingStickPoint + 12;
 
     if (analyticsCompactRef.current !== nextIsCompact) {
       analyticsCompactRef.current = nextIsCompact;
       setIsAnalyticsCompact(nextIsCompact);
     }
     setIsHeadingStuck((current) => (current === nextIsHeadingStuck ? current : nextIsHeadingStuck));
-  }, []);
+  }, [isHeadingStuck]);
 
   const handlePageScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
     latestScrollTopRef.current = event.currentTarget.scrollTop;
@@ -342,8 +378,8 @@ const MCQSubjectSelectionPage = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background p-4 text-center">
-        <Card className="w-full max-w-md bg-card/90 backdrop-blur-sm border-border shadow-lg p-6">
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background/55 dark:bg-white/[0.035] backdrop-blur-xl p-4 text-center">
+        <Card className="w-full max-w-md bg-card/60 dark:bg-white/[0.05] backdrop-blur-sm border-border shadow-lg p-6">
           <CardHeader className="mb-4">
             <Lock className="w-16 h-16 mx-auto text-primary mb-4" />
             <CardTitle className="text-2xl font-bold text-foreground">Access Restricted</CardTitle>
@@ -371,7 +407,7 @@ const MCQSubjectSelectionPage = () => {
       <Seo title="MCQs Practice" description="Practice thousands of MCQs for MDCAT and other medical entrance exams with Medmacs App." canonical="https://medmacs.app/mcqs" />
       
       <div className="text-center mb-6 sm:mb-8 animate-fade-in">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-foreground uppercase italic mb-3">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-normal leading-[1.08] text-foreground uppercase italic mb-3">
           📚 MCQ <span className="text-primary">Practice</span>
         </h1>
         <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] max-w-2xl mx-auto px-4 sm:px-0">
@@ -395,17 +431,17 @@ const MCQSubjectSelectionPage = () => {
         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-3 block">Step 1 of 3</span>
       </motion.div>
 
-      <div ref={stickyHeadingRef} className="sticky top-0 z-50 bg-background/80 backdrop-blur-md pt-[env(safe-area-inset-top)] -mx-3 sm:mx-0 px-3 sm:px-0">
+      <div ref={stickyHeadingRef} className="sticky top-0 z-50 bg-background/45 dark:bg-background/20 backdrop-blur-xl pt-[env(safe-area-inset-top)] -mx-3 sm:mx-0 px-3 sm:px-0">
         <div className="max-w-4xl mx-auto px-4 sm:px-0">
           <motion.div
             animate={{ paddingTop: isHeadingStuck ? 10 : 16, paddingBottom: isHeadingStuck ? 10 : 12 }}
             transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-            className="overflow-hidden"
+            className="overflow-visible"
           >
             <motion.div
-              animate={{ height: isHeadingStuck ? 28 : 56 }}
+              animate={{ height: isHeadingStuck ? 34 : 64 }}
               transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-              className="relative"
+              className="relative overflow-visible"
             >
               <motion.h2
                 animate={{
@@ -414,9 +450,9 @@ const MCQSubjectSelectionPage = () => {
                   scale: isHeadingStuck ? 0.58 : 1
                 }}
                 transition={{ type: 'spring', stiffness: 260, damping: 28 }}
-                className="absolute top-0 origin-left whitespace-nowrap text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none"
+                className="absolute top-0 origin-left whitespace-nowrap pr-3 text-3xl sm:text-5xl font-black tracking-normal text-foreground uppercase italic leading-[1.08]"
               >
-                Select <span className="live-gradient-text">Subject</span>
+                Select <span className="live-gradient-text">Subject&nbsp;</span>
               </motion.h2>
             </motion.div>
             <motion.p
@@ -433,7 +469,7 @@ const MCQSubjectSelectionPage = () => {
             </motion.p>
           </motion.div>
         </div>
-        <div className="h-4 bg-gradient-to-b from-background/80 to-transparent pointer-events-none" />
+        <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
       </div>
 
       <div className="max-w-4xl mx-auto px-4 sm:px-0 pb-32 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -456,9 +492,9 @@ const MCQSubjectSelectionPage = () => {
                 className={`group relative overflow-hidden rounded-3xl border-2 p-6 transition-all duration-300 ${
                   isOfflineUnavailable ? 'cursor-not-allowed opacity-45 grayscale' : 'cursor-pointer'
                 } ${
-                  isSelected 
-                    ? 'border-primary bg-primary/5 shadow-2xl shadow-primary/10' 
-                    : 'border-border/40 bg-white/5 dark:bg-zinc-900/50 hover:border-primary/30 hover:bg-primary/5'
+                  isSelected
+                    ? 'border-primary bg-primary/5 shadow-2xl shadow-primary/10'
+                    : 'border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl hover:border-primary/30 hover:bg-primary/5'
                 }`}
               >
                 {isOfflineUnavailable && (
@@ -480,7 +516,7 @@ const MCQSubjectSelectionPage = () => {
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className={`text-xl font-black uppercase italic tracking-tight transition-colors ${
+                      <h3 className={`text-xl font-black uppercase italic tracking-normal leading-snug transition-colors ${
                         isSelected ? 'text-primary' : 'text-foreground'
                       }`}>
                         {subject.name}

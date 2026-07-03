@@ -7,11 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import {
   BookOpen, Zap, Trophy, Target, Users, Brain, Swords, Flame,
   TrendingUp, Award, Briefcase, BellRing, Bookmark, ScrollText,
-  Home, User, Settings, ChevronRight, ChevronLeft, LogOut, Lock, CreditCard,
+  Home, User, ChevronRight, ChevronLeft, LogOut, Lock, CreditCard,
   Megaphone, BarChart3, Sun, Moon, ArrowRight, Crown, Mail, X,
   Receipt, Shield, FileText, RefreshCw, Sparkles, Stethoscope, PieChart, Info, Star, Loader2, Microscope, FlaskConical, WifiOff,
 } from 'lucide-react';
@@ -20,22 +19,75 @@ import {
 } from '@/components/ui/dialog';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
-import { LeaderboardPreview } from '@/components/dashboard/LeaderboardPreview';
-import { StudyAnalytics } from '@/components/dashboard/StudyAnalytics';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useEffect, useState, useRef } from 'react';
-import AnnouncementToastManager from '@/components/ui/AnnouncementToastManager';
-import AuthErrorDisplay from '@/components/AuthErrorDisplay';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import Seo from '@/components/Seo';
+import AppTransitionScreen from '@/components/AppTransitionScreen';
 
 import VersionGuard from '@/components/VersionControl';
-import ProfileAvatar from '@/components/profile/ProfileAvatar';
-import { AchievementBadges } from '@/components/profile/AchievementBadges';
 import { MCQProgressWidget } from '@/components/dashboard/MCQProgressWidget';
-import { ProgressTracker } from '@/components/mcq/ProgressTracker';
-import { fetchInstitutes, getInstituteByCode, isSpecializedTestInstitute } from '@/utils/institutes';
+import { fetchInstitutes, getInstituteByCode, isSpecializedTestCode, isSpecializedTestInstitute } from '@/utils/institutes';
+import { getProfileCompletion } from '@/utils/profileCompletion';
 import { useCachedImage } from '@/hooks/useCachedImage';
+
+const LazyLeaderboardPreview = lazy(() =>
+  import('@/components/dashboard/LeaderboardPreview').then((module) => ({
+    default: module.LeaderboardPreview,
+  }))
+);
+const LazyStudyAnalytics = lazy(() =>
+  import('@/components/dashboard/StudyAnalytics').then((module) => ({
+    default: module.StudyAnalytics,
+  }))
+);
+const LazyProgressTracker = lazy(() =>
+  import('@/components/mcq/ProgressTracker').then((module) => ({
+    default: module.ProgressTracker,
+  }))
+);
+const LazyAchievementBadges = lazy(() =>
+  import('@/components/profile/AchievementBadges').then((module) => ({
+    default: module.AchievementBadges,
+  }))
+);
+
+const LazyTabFallback = ({ className = 'h-32' }: { className?: string }) => (
+  <div className={`animate-pulse rounded-2xl border border-border/30 bg-muted/30 ${className}`} />
+);
+
+const dashboardGreetingPhrases = [
+  'Ready to learn',
+  'Let us make progress',
+  'Your study desk is ready',
+  'Small steps, strong recall',
+  'Time to sharpen concepts',
+  'Back to the grind',
+  'Let us build momentum',
+  'One focused session at a time',
+  'Fresh questions are waiting',
+  'Your future doctor mode is on',
+  'A little revision goes far',
+  'Keep the streak alive',
+  'Let us train your instincts',
+  'Today is a good day to improve',
+  'Your prep engine is warm',
+  'Focus mode, activated',
+  'Let us turn effort into marks',
+  'Strong basics win exams',
+  'Your next correct answer starts here',
+  'Steady practice, better scores',
+  'Let us clear another topic',
+  'Your revision lane is open',
+  'Clinical thinking starts now',
+  'Make this session count',
+  'Progress is waiting',
+  'Let us beat yesterday',
+  'Confidence grows question by question',
+  'A focused mind learns faster',
+  'Your exam prep continues',
+  'Let us get one percent better',
+];
 
 // Types
 type TermOfDay = {
@@ -81,9 +133,28 @@ const CaseOfDayCard = ({ caseOfDay, onClose, isPremium, onNavigateToChat, onNavi
   const containerRef = useRef<HTMLDivElement>(null);
 
   const sections = [
-    { label: 'Case', icon: '📋', accent: 'bg-blue-500' },
-    { label: 'Answer', icon: '💡', accent: 'bg-amber-500' },
-    { label: 'Learn', icon: '📚', accent: 'bg-purple-500', isLast: true },
+    {
+      label: 'Case',
+      Icon: FileText,
+      accent: 'blue',
+      bar: 'from-sky-500 to-blue-600',
+      chip: 'bg-sky-400/18 text-sky-100 border-sky-200/20',
+    },
+    {
+      label: 'Answer',
+      Icon: Brain,
+      accent: 'amber',
+      bar: 'from-amber-400 to-orange-500',
+      chip: 'bg-amber-300/18 text-amber-100 border-amber-200/20',
+    },
+    {
+      label: 'Learn',
+      Icon: BookOpen,
+      accent: 'violet',
+      bar: 'from-violet-500 to-fuchsia-600',
+      chip: 'bg-violet-300/18 text-violet-100 border-violet-200/20',
+      isLast: true,
+    },
   ];
 
   const handleLearnMore = () => {
@@ -100,15 +171,15 @@ const CaseOfDayCard = ({ caseOfDay, onClose, isPremium, onNavigateToChat, onNavi
     if (index === 2) {
       return (
         <div className="space-y-4">
-          <p className="text-gray-700 dark:text-gray-200 text-[15px] leading-7 tracking-wide whitespace-pre-wrap">
-            {highlightWords(caseOfDay.explanation, 'bg-purple-500')}
+          <p className="text-white/82 text-[15px] leading-7 tracking-wide whitespace-pre-wrap">
+            {highlightWords(caseOfDay.explanation, 'violet')}
           </p>
           <button
             onClick={handleLearnMore}
-            className="w-full bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 shadow-lg"
+            className="w-full rounded-2xl bg-white text-slate-950 font-black py-3.5 px-4 transition-all duration-200 shadow-xl shadow-black/20 active:scale-[0.98]"
           >
             Learn more about this topic
-            <span className="block text-xs font-normal opacity-80">By Dr Ahroid</span>
+            <span className="block text-xs font-semibold opacity-60">By Dr Ahroid</span>
           </button>
         </div>
       );
@@ -121,11 +192,11 @@ const CaseOfDayCard = ({ caseOfDay, onClose, isPremium, onNavigateToChat, onNavi
 
   const highlightWords = (text: string, accent: string) => {
     const accentStyles: Record<string, { text: string; bg: string }> = {
-      'bg-blue-500': { text: 'text-blue-700 dark:text-blue-300', bg: 'bg-blue-200 dark:bg-blue-800' },
-      'bg-amber-500': { text: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-200 dark:bg-amber-800' },
-      'bg-purple-500': { text: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-200 dark:bg-purple-800' },
+      blue: { text: 'text-sky-50', bg: 'bg-sky-300/20 border border-sky-200/25' },
+      amber: { text: 'text-amber-50', bg: 'bg-amber-300/20 border border-amber-200/25' },
+      violet: { text: 'text-violet-50', bg: 'bg-violet-300/20 border border-violet-200/25' },
     };
-    const style = accentStyles[accent] || accentStyles['bg-blue-500'];
+    const style = accentStyles[accent] || accentStyles.blue;
 
     const parts = text.split(/(\*\*[^*]+\*\*)/);
 
@@ -135,7 +206,7 @@ const CaseOfDayCard = ({ caseOfDay, onClose, isPremium, onNavigateToChat, onNavi
         return (
           <span
             key={i}
-            className={`${style.text} ${style.bg} font-extrabold px-1.5 py-0.5 rounded-md underline decoration-2 underline-offset-2`}
+            className={`${style.text} ${style.bg} font-extrabold px-1.5 py-0.5 rounded-lg underline decoration-2 underline-offset-2`}
           >
             {word}
           </span>
@@ -179,43 +250,53 @@ const CaseOfDayCard = ({ caseOfDay, onClose, isPremium, onNavigateToChat, onNavi
   };
 
   const currentSection = sections[currentIndex];
+  const CurrentIcon = currentSection.Icon;
 
   return (
-    <div className="relative overflow-hidden rounded-t-3xl p-6 pb-0">
-      {/* Header */}
-      <div className="text-center mb-4">
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <Stethoscope className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-          <p className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-widest">Case of the Day</p>
+    <div className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-slate-950/82 p-5 pb-0 text-white shadow-2xl shadow-blue-950/40 backdrop-blur-2xl">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(56,189,248,0.24),transparent_32%),radial-gradient(circle_at_88%_20%,rgba(168,85,247,0.20),transparent_30%),linear-gradient(135deg,rgba(15,23,42,0.94),rgba(15,23,42,0.76))]" />
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+
+      <div className="relative z-10 mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-200/20 bg-sky-300/15 backdrop-blur-xl">
+            <Stethoscope className="h-5 w-5 text-sky-100" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-sky-100/70">Case of the Day</p>
+            <h3 className="text-lg font-black leading-tight text-white">{caseOfDay.headline || caseOfDay.case_name}</h3>
+          </div>
         </div>
+        <button
+          onClick={onClose}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white backdrop-blur-xl active:scale-95"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
 
-      {/* Content card */}
-      <div ref={containerRef}>
-        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden relative">
-          {/* Card header with section indicator */}
-          <div className={`${currentSection.accent} p-4`}>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-xl shadow-sm">
-                {currentSection.icon}
-              </div>
-              <div>
-                <p className="text-white/80 text-[10px] font-semibold uppercase tracking-wider">Section</p>
-                <h3 className="text-white text-lg font-bold">{currentSection.label}</h3>
-              </div>
-              <div className="ml-auto flex items-center gap-1.5">
-                {sections.map((s, i) => (
-                  <div
-                    key={i}
-                    className={`h-2 rounded-full transition-all duration-500 ${i === currentIndex ? 'w-6 bg-white' : i < currentIndex ? 'w-2 bg-white/50' : 'w-2 bg-white/30'
-                      }`}
-                  />
-                ))}
-              </div>
-            </div>
+      <div ref={containerRef} className="relative z-10">
+        <div className="mb-4 flex items-center gap-3">
+          <div className={`flex h-10 w-10 items-center justify-center rounded-2xl border ${currentSection.chip} backdrop-blur-xl`}>
+            <CurrentIcon className="h-5 w-5" />
           </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/45">Section</p>
+            <h3 className="text-lg font-black text-white">{currentSection.label}</h3>
+          </div>
+          <div className="ml-auto flex items-center gap-1.5">
+            {sections.map((s, i) => (
+              <div
+                key={s.label}
+                className={`h-2 rounded-full transition-all duration-500 ${
+                  i === currentIndex ? 'w-6 bg-white' : i < currentIndex ? 'w-2 bg-white/50' : 'w-2 bg-white/25'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
 
-          {/* Swipeable content area */}
+        <div className="relative overflow-hidden">
           <motion.div
             key={currentIndex}
             custom={direction}
@@ -232,7 +313,7 @@ const CaseOfDayCard = ({ caseOfDay, onClose, isPremium, onNavigateToChat, onNavi
             style={{ touchAction: 'pan-y' }}
           >
             <div className="h-full overflow-y-auto pr-2 scrollbar-thin">
-              <div className="text-gray-700 dark:text-gray-200 text-[15px] leading-7 tracking-wide">
+              <div className="text-white/82 text-[15px] leading-7 tracking-wide">
                 {getContent(currentIndex)}
               </div>
             </div>
@@ -242,16 +323,16 @@ const CaseOfDayCard = ({ caseOfDay, onClose, isPremium, onNavigateToChat, onNavi
         {/* Navigation hint */}
         <div className="flex justify-center items-center gap-2 mt-4 pb-6">
           {currentIndex > 0 && (
-            <div className="flex items-center gap-1 text-gray-400">
+            <div className="flex items-center gap-1 text-white/45">
               <ChevronLeft className="w-5 h-5" />
               <span className="text-xs">Previous</span>
             </div>
           )}
           {currentIndex > 0 && currentIndex < sections.length - 1 && (
-            <div className="w-px h-4 bg-gray-300 dark:bg-gray-600" />
+            <div className="w-px h-4 bg-white/20" />
           )}
           {currentIndex < sections.length - 1 && (
-            <div className="flex items-center gap-1 text-gray-400">
+            <div className="flex items-center gap-1 text-white/45">
               <span className="text-xs">Next</span>
               <ChevronRight className="w-5 h-5" />
             </div>
@@ -530,6 +611,8 @@ const Dashboard = () => {
   const [showWhatsNew, setShowWhatsNew] = useState(false);
   const [showTermOfDay, setShowTermOfDay] = useState(false);
   const [showCaseOfDay, setShowCaseOfDay] = useState(false);
+  const [dailyInsightIndex, setDailyInsightIndex] = useState(0);
+  const [dailyInsightDirection, setDailyInsightDirection] = useState(0);
   const [showCollaborateModal, setShowCollaborateModal] = useState(false);
   const [showHeaderScore, setShowHeaderScore] = useState(true);
   const [isAccuracyCompact, setIsAccuracyCompact] = useState(false);
@@ -549,13 +632,10 @@ const Dashboard = () => {
 
   type Profile = {
     avatar_url: string;
-    created_at: string;
     full_name: string;
     id: string;
-    medical_school: string;
     updated_at: string;
     username: string;
-    year_of_study: number;
     plan?: string;
     year?: string;
     email?: string;
@@ -578,22 +658,8 @@ const Dashboard = () => {
   };
 
   const requiredProfileFieldsMissing = (profileData: Profile | null, selectedInstitute?: any) => {
-    if (!profileData) return true;
-    const validYears = ["1st", "2nd", "3rd", "4th", "5th"];
-    const selectedSpecializedTest = isSpecializedTestInstitute(selectedInstitute);
-    return (
-      profileData.username === null ||
-      profileData.username === undefined ||
-      String(profileData.username).trim() === '' ||
-      (profileData as any).institute === null ||
-      (profileData as any).institute === undefined ||
-      String((profileData as any).institute).trim() === '' ||
-      (!selectedSpecializedTest && (
-        (profileData as any).year === null ||
-        (profileData as any).year === undefined ||
-        !validYears.includes((profileData as any).year)
-      ))
-    );
+    const institutes = selectedInstitute ? [selectedInstitute] : [];
+    return !getProfileCompletion(profileData, institutes).complete;
   };
 
   const {
@@ -605,7 +671,11 @@ const Dashboard = () => {
     queryKey: ['profile', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, avatar_url, full_name, updated_at, username, plan, year, email, plan_expiry_date, role, institute, daily_mcq_submissions, heard_about_us')
+        .eq('id', user.id)
+        .maybeSingle();
       if (error) throw error;
       setProfileVerifiedFromServer(true);
       if (typeof window !== 'undefined') {
@@ -640,7 +710,7 @@ const Dashboard = () => {
 
       const { data: answers, error: answersError } = await supabase
         .from('user_answers')
-        .select('*')
+        .select('is_correct, created_at')
         .eq('user_id', user.id);
 
       if (answersError) {
@@ -698,15 +768,19 @@ const Dashboard = () => {
         }
       }
 
-      const { data: battles } = await supabase
-        .from('battle_results')
-        .select('*')
-        .eq('user_id', user.id);
+      const [battlesResult, savedResult] = await Promise.all([
+        supabase
+          .from('battle_results')
+          .select('rank')
+          .eq('user_id', user.id),
+        supabase
+          .from('saved_mcqs')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id),
+      ]);
 
-      const { count: savedCount } = await supabase
-        .from('saved_mcqs')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
+      const battles = battlesResult.data;
+      const savedCount = savedResult.count;
 
       const battlesWon = battles?.filter(b => b.rank === 1)?.length || 0;
       const rankPoints = correctAnswers * 10 + currentStreak * 5 + accuracy;
@@ -721,10 +795,15 @@ const Dashboard = () => {
   const { data: announcements, isLoading: announcementsLoading } = useQuery({
     queryKey: ['announcements'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('announcements').select('*').eq('is_published', true).order('created_at', { ascending: false });
+      const { data, error } = await supabase
+        .from('announcements')
+        .select('id, title, content, media_url, created_at')
+        .eq('is_published', true)
+        .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
+    staleTime: 1000 * 60 * 5,
   });
 
   const { data: whatsNewContent, isLoading: whatsNewLoading } = useQuery({
@@ -750,6 +829,34 @@ const Dashboard = () => {
     },
   });
 
+  const { data: dashboardNoticeLine } = useQuery({
+    queryKey: ['dashboard-notice-line'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('setting_value')
+        .eq('setting_name', 'dashboard_notice_line')
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching dashboard notice line:', error);
+        return '';
+      }
+
+      const raw = data?.setting_value;
+      if (!raw) return '';
+
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed === null || parsed?.enabled === false) return '';
+        return String(parsed?.text || parsed?.message || '').trim();
+      } catch {
+        return String(raw).trim();
+      }
+    },
+    staleTime: 1000 * 60 * 2,
+  });
+
   const { data: readAnnouncements } = useQuery({
     queryKey: ['readAnnouncements', user?.id],
     queryFn: async () => {
@@ -759,6 +866,7 @@ const Dashboard = () => {
       return data.map(item => item.announcement_id);
     },
     enabled: !!user?.id,
+    staleTime: 1000 * 60 * 5,
   });
 
   const userYear = (profile as any)?.year || null;
@@ -801,7 +909,7 @@ const Dashboard = () => {
     queryKey: ['instituteData', (profile as any)?.institute],
     queryFn: async () => {
       if (!(profile as any)?.institute) return null;
-      const institutes = await fetchInstitutes();
+      const institutes = await fetchInstitutes({ force: true });
       return getInstituteByCode((profile as any).institute, institutes);
     },
     enabled: !!(profile as any)?.institute
@@ -889,31 +997,37 @@ const Dashboard = () => {
   }, [activeTab, announcements, user]);
 
   useEffect(() => {
-    const handleScroll = (event?: Event) => {
-      const target = event?.target as HTMLElement | Document | null;
-      const targetScrollTop =
-        target && 'scrollTop' in target
-          ? Number(target.scrollTop || 0)
-          : 0;
-      const scrollTop = Math.max(
-        window.scrollY || 0,
-        document.documentElement.scrollTop || 0,
-        document.body.scrollTop || 0,
-        targetScrollTop,
-      );
-      const nextAccuracyCompact = activeTab === 'home' && scrollTop > 72;
-      setIsAccuracyCompact((current) => {
-        if (current === nextAccuracyCompact) return current;
-        if (headerHapticReadyRef.current && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-          navigator.vibrate(6);
-        }
-        headerHapticReadyRef.current = true;
-        return nextAccuracyCompact;
-      });
+    let frameId = 0;
 
-      const quickActionsTop = quickActionsRef.current?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
-      const nextShowStickyQuickActions = activeTab === 'home' && quickActionsTop <= 96;
-      setShowStickyQuickActions((current) => current === nextShowStickyQuickActions ? current : nextShowStickyQuickActions);
+    const handleScroll = (event?: Event) => {
+      if (frameId) return;
+      frameId = window.requestAnimationFrame(() => {
+        frameId = 0;
+        const target = event?.target as HTMLElement | Document | null;
+        const targetScrollTop =
+          target && 'scrollTop' in target
+            ? Number(target.scrollTop || 0)
+            : 0;
+        const scrollTop = Math.max(
+          window.scrollY || 0,
+          document.documentElement.scrollTop || 0,
+          document.body.scrollTop || 0,
+          targetScrollTop,
+        );
+        const nextAccuracyCompact = activeTab === 'home' && scrollTop > 72;
+        setIsAccuracyCompact((current) => {
+          if (current === nextAccuracyCompact) return current;
+          if (headerHapticReadyRef.current && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+            navigator.vibrate(6);
+          }
+          headerHapticReadyRef.current = true;
+          return nextAccuracyCompact;
+        });
+
+        const quickActionsTop = quickActionsRef.current?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
+        const nextShowStickyQuickActions = activeTab === 'home' && quickActionsTop <= 96;
+        setShowStickyQuickActions((current) => current === nextShowStickyQuickActions ? current : nextShowStickyQuickActions);
+      });
     };
 
     handleScroll();
@@ -922,6 +1036,7 @@ const Dashboard = () => {
     window.addEventListener('resize', handleScroll);
 
     return () => {
+      if (frameId) window.cancelAnimationFrame(frameId);
       document.removeEventListener('scroll', handleScroll, { capture: true });
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', handleScroll);
@@ -963,7 +1078,7 @@ const Dashboard = () => {
     }
 
     const isOnline = typeof navigator === 'undefined' || navigator.onLine;
-    if (isOnline && (profile as any)?.institute && !instituteData) {
+    if (isOnline && (profile as any)?.institute && !instituteData && !isSpecializedTestCode((profile as any).institute)) {
       navigate('/setup', { replace: true });
       return;
     }
@@ -976,46 +1091,53 @@ const Dashboard = () => {
     setIsNavigating(false);
   }, [authLoading, waitingForLiveProfileConfirmation, profileFetchFailed, profileVerifiedFromServer, user, profile, instituteData, instituteDataLoading, navigate]);
 
-  const flpAction = { title: 'Full-Length Paper', description: 'Timed mixed exams', icon: ScrollText, link: '/flp', gradient: 'from-fuchsia-600 to-rose-600', iconColor: 'text-fuchsia-100' };
-  const collaborateAction = { title: 'Collaborate', description: 'Why Medmacs needs you', icon: Briefcase, onClick: () => setShowCollaborateModal(true), gradient: 'from-rose-500 to-pink-600', iconColor: 'text-rose-100' };
+  const flpAction = useMemo(() => ({ title: 'Full-Length Paper', description: 'Timed mixed exams', icon: ScrollText, link: '/flp', gradient: 'from-fuchsia-600 to-rose-600', iconColor: 'text-fuchsia-100' }), []);
+  const collaborateAction = useMemo(() => ({ title: 'Collaborate', description: 'Why Medmacs needs you', icon: Briefcase, onClick: () => setShowCollaborateModal(true), gradient: 'from-rose-500 to-pink-600', iconColor: 'text-rose-100' }), []);
 
-  const quickActions = [
+  const quickActions = useMemo(() => [
     { title: 'Practice MCQs', description: 'Test your knowledge', icon: BookOpen, link: '/mcqs', gradient: 'from-blue-500 to-indigo-600', iconColor: 'text-blue-200' },
     { title: 'Saved MCQs', description: 'Review bookmarks', icon: Bookmark, link: '/saved-mcqs', gradient: 'from-teal-500 to-emerald-600', iconColor: 'text-teal-100' },
     { title: 'Battle Arena', description: 'Compete with friends', icon: Swords, link: '/battle', gradient: 'from-orange-500 to-red-500', iconColor: 'text-orange-100' },
     flpAction,
-  ];
+  ], [flpAction]);
 
-  const personalizationActions = [
+  const personalizationActions = useMemo(() => [
     { title: 'Mistake Book', description: 'Review wrong MCQs', icon: Target, link: '/mistake-book', gradient: 'from-rose-500 to-red-600', iconColor: 'text-rose-100' },
     { title: 'Titration', description: 'Repair weakest chapter', icon: FlaskConical, link: '/titration', gradient: 'from-violet-500 to-fuchsia-600', iconColor: 'text-violet-100' },
-  ];
+  ], []);
 
-  const premiumPerks = [
+  const premiumPerks = useMemo(() => [
     { title: 'Ask Dr Ahroid', description: 'Instant AI tutor', icon: Zap, link: '/ai/chatbot', gradient: 'from-amber-400 to-orange-500', iconColor: 'text-yellow-100' },
     { title: 'AI Test Attempt', description: 'Custom tests with AI', icon: Brain, link: '/ai/test-generator', gradient: 'from-cyan-500 to-blue-600', iconColor: 'text-cyan-100' },
     { title: 'AI Flashcards', description: 'AI flashcards by chapter', icon: Sparkles, link: '/learn-with-ai', gradient: 'from-violet-500 to-fuchsia-600', iconColor: 'text-violet-100' },
-  ];
+  ], []);
 
-  const instituteModules = [
+  const instituteModules = useMemo(() => [
     { title: 'Practice SEQs', description: 'Subjective questions', icon: FileText, link: '/seqs', gradient: 'from-orange-500 to-red-600', iconColor: 'text-orange-200', enabled: dashboardComponents.seqs },
     { title: 'Viva & Practicals', description: 'Ace your practicals', icon: Microscope, link: '/practicals', gradient: 'from-fuchsia-600 to-pink-700', iconColor: 'text-fuchsia-100', enabled: dashboardComponents.viva },
-  ].filter(m => m.enabled);
+  ].filter(m => m.enabled), [dashboardComponents.seqs, dashboardComponents.viva]);
 
   const displayName = profile?.full_name || profile?.username || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Medmacs User';
-  const currentHour = new Date().getHours();
-  const greetingMessage =
-    currentHour < 5 ? 'Burning the midnight oil' :
-      currentHour < 12 ? 'Good Morning' :
-        currentHour < 17 ? 'Good Afternoon' :
-          currentHour < 21 ? 'Good Evening' :
-            'Good Night';
+  const greetingMessage = useMemo(() => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const timeGreeting =
+      currentHour < 5 ? 'Late Night Focus' :
+        currentHour < 12 ? 'Good Morning' :
+          currentHour < 17 ? 'Good Afternoon' :
+            currentHour < 21 ? 'Good Evening' :
+              'Good Night';
+    const seedSource = `${user?.id || displayName}-${now.toDateString()}-${currentHour}`;
+    const seed = seedSource.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    const phrase = dashboardGreetingPhrases[seed % dashboardGreetingPhrases.length];
+    return `${timeGreeting}. ${phrase}`;
+  }, [displayName, user?.id]);
   const rawUserPlan = profile?.plan?.toLowerCase() || 'free';
   const userPlanDisplayName = rawUserPlan.charAt(0).toUpperCase() + rawUserPlan.slice(1) + ' Plan';
   const dashboardAnnouncement = dashboardAnnouncements[0] || null;
   const cachedAvatarUrl = useCachedImage(profile?.avatar_url);
 
-  const openExternalUrl = async (url?: string | null) => {
+  const openExternalUrl = useCallback(async (url?: string | null) => {
     if (!url) return;
 
     try {
@@ -1024,23 +1146,15 @@ const Dashboard = () => {
     } catch (error) {
       window.open(url, '_blank', 'noopener,noreferrer');
     }
-  };
+  }, []);
 
   if (isNavigating || authLoading || waitingForLiveProfileConfirmation) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-24 h-24 object-contain animate-pulse" />
-      </div>
-    );
+    return <AppTransitionScreen label="Loading dashboard" />;
   }
 
 
   if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-24 h-24 object-contain animate-pulse" />
-      </div>
-    );
+    return <AppTransitionScreen label="Redirecting" />;
   }
 
 
@@ -1105,7 +1219,9 @@ const Dashboard = () => {
           <div className="animate-in fade-in slide-in-from-left-4 duration-300">
             <h1 className="text-xl font-bold text-foreground mb-1">🏆 Leaderboard</h1>
             <p className="text-xs text-muted-foreground mb-5">See where you rank</p>
-            <LeaderboardPreview />
+            <Suspense fallback={<LazyTabFallback className="h-[520px]" />}>
+              <LazyLeaderboardPreview />
+            </Suspense>
           </div>
         );
 
@@ -1136,8 +1252,10 @@ const Dashboard = () => {
           <div className="animate-in fade-in slide-in-from-right-4 duration-300">
             <h1 className="text-xl font-bold text-foreground mb-1">📊 Analytics</h1>
             <p className="text-xs text-muted-foreground mb-5">Track your progress</p>
-            <ProgressTracker userId={user?.id} />
-            <StudyAnalytics />
+            <Suspense fallback={<LazyTabFallback className="h-[560px]" />}>
+              <LazyProgressTracker userId={user?.id} />
+              <LazyStudyAnalytics />
+            </Suspense>
 
             {/* Deep Analysis CTA */}
             <button
@@ -1182,7 +1300,9 @@ const Dashboard = () => {
                 <Trophy className="w-5 h-5 text-amber-500 fill-amber-500" />
                 <h2 className="text-base font-bold text-foreground">Achievements</h2>
               </div>
-              <AchievementBadges userId={user?.id} />
+              <Suspense fallback={<LazyTabFallback className="h-48" />}>
+                <LazyAchievementBadges userId={user?.id} />
+              </Suspense>
             </div>
 
             <Card className="border border-border/40 shadow-sm bg-card/80">
@@ -1272,10 +1392,18 @@ const Dashboard = () => {
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             {/* Greeting - no avatar here */}
             <div className="mb-5">
-              <h1 className="text-2xl sm:text-3xl font-black text-foreground leading-tight">
-                {greetingMessage}, <span className="text-shimmer">{displayName}</span> ✨
+              <p className="mb-1 text-xs font-black uppercase tracking-widest text-muted-foreground">
+                {greetingMessage}
+              </p>
+              <h1 className="text-3xl sm:text-4xl font-black text-shimmer leading-[1.05] break-words">
+                {displayName}
               </h1>
-              <p className="text-xs text-muted-foreground mt-0.5 font-medium">Ready for your next study move?</p>
+              {dashboardNoticeLine && (
+                <div className="mt-3 rounded-xl border border-amber-200/70 bg-[#fff8db] px-3 py-2 text-xs font-bold leading-relaxed text-amber-900 shadow-sm dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100">
+                  {dashboardNoticeLine}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground mt-1.5 font-medium">Ready for your next study move?</p>
             </div>
 
             {isOfflineMode ? (
@@ -1378,7 +1506,11 @@ const Dashboard = () => {
                 <motion.button
                   animate={{ opacity: termLoading ? 0 : 1, y: termLoading ? 4 : 0 }}
                   transition={{ duration: 0.25 }}
-                  onClick={() => setShowTermOfDay(true)}
+                  onClick={() => {
+                    setDailyInsightIndex(0);
+                    setDailyInsightDirection(0);
+                    setShowTermOfDay(true);
+                  }}
                   className="rounded-2xl border border-border/40 bg-gradient-to-br from-emerald-500/10 to-teal-500/5 backdrop-blur-sm p-4 text-left active:scale-[0.97] transition-all min-h-[120px] w-full"
                   disabled={termLoading || !termOfDay}
                 >
@@ -1507,6 +1639,47 @@ const Dashboard = () => {
     }
   };
 
+  const dailyInsightSlides = [
+    {
+      key: 'term',
+      label: 'Term of the Day',
+      title: termOfDay?.term || 'Term of the Day',
+      body: termOfDay?.definition || 'Loading latest term...',
+      Icon: Sparkles,
+      eyebrowColor: 'text-emerald-100/70',
+      iconShell: 'border-emerald-100/20 bg-emerald-200/15',
+      iconColor: 'text-emerald-100',
+      glow: 'bg-[radial-gradient(circle_at_12%_0%,rgba(16,185,129,0.30),transparent_34%),radial-gradient(circle_at_85%_20%,rgba(34,211,238,0.22),transparent_32%),linear-gradient(135deg,rgba(6,78,59,0.72),rgba(15,23,42,0.84))]',
+    },
+    {
+      key: 'case',
+      label: 'Topic of the Day',
+      title: caseOfDay?.headline || caseOfDay?.case_name || 'Topic of the Day',
+      body: caseOfDay?.details || 'Loading latest topic...',
+      Icon: Stethoscope,
+      eyebrowColor: 'text-sky-100/70',
+      iconShell: 'border-sky-100/20 bg-sky-200/15',
+      iconColor: 'text-sky-100',
+      glow: 'bg-[radial-gradient(circle_at_16%_0%,rgba(56,189,248,0.28),transparent_34%),radial-gradient(circle_at_88%_22%,rgba(168,85,247,0.22),transparent_32%),linear-gradient(135deg,rgba(12,74,110,0.72),rgba(15,23,42,0.84))]',
+    },
+  ];
+  const activeDailyInsight = dailyInsightSlides[dailyInsightIndex] || dailyInsightSlides[0];
+  const ActiveDailyIcon = activeDailyInsight.Icon;
+  const goToDailyInsight = (nextIndex: number) => {
+    const clampedIndex = Math.max(0, Math.min(nextIndex, dailyInsightSlides.length - 1));
+    setDailyInsightDirection(clampedIndex > dailyInsightIndex ? 1 : -1);
+    setDailyInsightIndex(clampedIndex);
+  };
+  const handleDailyInsightDragEnd = (_event: any, info: any) => {
+    const threshold = 70;
+    if ((info.offset.x < -threshold || info.velocity.x < -700) && dailyInsightIndex < dailyInsightSlides.length - 1) {
+      goToDailyInsight(dailyInsightIndex + 1);
+    }
+    if ((info.offset.x > threshold || info.velocity.x > 700) && dailyInsightIndex > 0) {
+      goToDailyInsight(dailyInsightIndex - 1);
+    }
+  };
+
   return (
     <div className="dashboard-modern-font min-h-screen w-full bg-background bg-mesh pb-28 overflow-x-hidden relative">
       {/* Floating gradient orbs */}
@@ -1612,28 +1785,117 @@ const Dashboard = () => {
 
       {/* Term of Day Dialog - vibrant */}
       <Dialog open={showTermOfDay} onOpenChange={setShowTermOfDay}>
-        <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border-0">
+        <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border-0 rounded-[2rem] bg-transparent shadow-2xl [&>button]:hidden">
           <DialogHeader>
             <DialogTitle className="sr-only">Term of the Day</DialogTitle>
             <DialogDescription className="sr-only">{termOfDay?.term}</DialogDescription>
           </DialogHeader>
           {termOfDay && (
-            <div className="relative bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 p-6 text-white">
-              <div className="absolute inset-0 opacity-10" style={{
-                backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`,
-                maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
-              }} />
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/20">
-                    <Sparkles className="w-5 h-5 text-white" />
+            <div className="relative min-h-[430px] overflow-hidden rounded-[2rem] border border-white/15 bg-slate-950/82 p-6 text-white shadow-2xl shadow-emerald-950/40 backdrop-blur-2xl">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={`daily-bg-${activeDailyInsight.key}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.28 }}
+                  className={`absolute inset-0 ${activeDailyInsight.glow}`}
+                />
+              </AnimatePresence>
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/65 to-transparent" />
+
+              <div className="relative z-10 flex h-full min-h-[382px] flex-col">
+                <div className="mb-5 flex items-center justify-between gap-4">
+                  <div className="flex gap-1.5">
+                    {dailyInsightSlides.map((slide, index) => (
+                      <button
+                        key={slide.key}
+                        type="button"
+                        onClick={() => goToDailyInsight(index)}
+                        className={`h-1.5 rounded-full transition-all duration-300 ${
+                          index === dailyInsightIndex ? 'w-9 bg-white' : 'w-3 bg-white/30'
+                        }`}
+                        aria-label={`Show ${slide.label}`}
+                      />
+                    ))}
                   </div>
-                  <div>
-                    <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Term of the Day</p>
-                    <h3 className="text-3xl font-black text-white">{termOfDay.term}</h3>
-                  </div>
+                  <button
+                    onClick={() => setShowTermOfDay(false)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white backdrop-blur-xl active:scale-95"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
-                <p className="text-white/80 text-sm leading-relaxed">{termOfDay.definition}</p>
+
+                <AnimatePresence mode="wait" custom={dailyInsightDirection}>
+                  <motion.div
+                    key={activeDailyInsight.key}
+                    custom={dailyInsightDirection}
+                    variants={{
+                      enter: (direction: number) => ({ x: direction > 0 ? 260 : -260, opacity: 0 }),
+                      center: { x: 0, opacity: 1 },
+                      exit: (direction: number) => ({ x: direction < 0 ? 260 : -260, opacity: 0 }),
+                    }}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{ duration: 0.28, ease: 'easeInOut' }}
+                    drag="x"
+                    dragConstraints={{ left: 0, right: 0 }}
+                    dragElastic={0.22}
+                    onDragEnd={handleDailyInsightDragEnd}
+                    className="flex flex-1 cursor-grab flex-col active:cursor-grabbing"
+                    style={{ touchAction: 'pan-y' }}
+                  >
+                    <div className="mb-6 flex items-center gap-3">
+                      <div className={`flex h-14 w-14 items-center justify-center rounded-3xl border ${activeDailyInsight.iconShell} backdrop-blur-xl`}>
+                        <ActiveDailyIcon className={`h-7 w-7 ${activeDailyInsight.iconColor}`} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`text-[10px] font-black uppercase tracking-[0.24em] ${activeDailyInsight.eyebrowColor}`}>
+                          {activeDailyInsight.label}
+                        </p>
+                        <h3 className="text-3xl font-black leading-tight text-white break-words">
+                          {activeDailyInsight.title}
+                        </h3>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto pr-1">
+                      <p className="text-[15px] leading-7 text-white/82">
+                        {activeDailyInsight.body}
+                      </p>
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
+
+                <div className="mt-6 flex items-center justify-between gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={dailyInsightIndex === 0}
+                    onClick={() => goToDailyInsight(dailyInsightIndex - 1)}
+                    className="h-11 flex-1 rounded-2xl border-white/15 bg-white/8 text-white hover:bg-white/12 disabled:opacity-35"
+                  >
+                    <ChevronLeft className="mr-1 h-4 w-4" />
+                    Previous
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (dailyInsightIndex < dailyInsightSlides.length - 1) {
+                        goToDailyInsight(dailyInsightIndex + 1);
+                      } else if (caseOfDay) {
+                        setShowTermOfDay(false);
+                        setShowCaseOfDay(true);
+                      }
+                    }}
+                    className="h-11 flex-1 rounded-2xl bg-white text-slate-950 font-black hover:bg-white/90"
+                  >
+                    {dailyInsightIndex < dailyInsightSlides.length - 1 ? 'Next' : 'Open Case'}
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           )}
@@ -1724,7 +1986,7 @@ const Dashboard = () => {
       </Dialog>
 
       <Dialog open={showCollaborateModal} onOpenChange={setShowCollaborateModal}>
-        <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border border-white/20 rounded-[2rem] bg-white/10 dark:bg-slate-950/50 backdrop-blur-2xl shadow-2xl [&>button]:hidden">
+        <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border-0 rounded-[2rem] bg-transparent shadow-2xl [&>button]:hidden">
           <DialogHeader>
             <DialogTitle className="sr-only">Why Medmacs</DialogTitle>
             <DialogDescription className="sr-only">
@@ -1732,12 +1994,12 @@ const Dashboard = () => {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="relative overflow-hidden text-white">
-            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/45 via-slate-950/80 to-cyan-500/35" />
-            <div className="absolute inset-0 bg-white/[0.06]" />
+          <div className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-slate-950/82 text-white shadow-2xl shadow-rose-950/35 backdrop-blur-2xl">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_6%,rgba(244,63,94,0.34),transparent_34%),radial-gradient(circle_at_88%_24%,rgba(34,211,238,0.24),transparent_32%),linear-gradient(135deg,rgba(76,5,25,0.72),rgba(15,23,42,0.84))]" />
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-rose-100/70 to-transparent" />
             <button
               onClick={() => setShowCollaborateModal(false)}
-              className="absolute right-4 top-4 z-20 w-9 h-9 rounded-full bg-white/12 border border-white/15 flex items-center justify-center active:scale-95 transition-all"
+              className="absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white backdrop-blur-xl active:scale-95 transition-all"
             >
               <X className="w-4 h-4 text-white" />
             </button>
@@ -1745,7 +2007,7 @@ const Dashboard = () => {
             <div className="relative z-10 px-6 pt-7 pb-6">
               <div className="flex items-end justify-between gap-3 mb-5">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200 mb-2">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-rose-100/70 mb-2">
                     Collaborate
                   </p>
                   <h2 className="text-3xl font-black leading-none tracking-tight">
@@ -1759,7 +2021,7 @@ const Dashboard = () => {
                 />
               </div>
 
-              <div className="rounded-3xl border border-white/15 bg-white/10 backdrop-blur-xl p-4 mb-5 shadow-xl">
+              <div className="rounded-3xl border border-white/12 bg-white/10 backdrop-blur-xl p-4 mb-5 shadow-xl shadow-black/10">
                 <p className="text-sm leading-6 text-white/82">
                   Medmacs is built around students who want better study tools, sharper medical learning, and a community that actually moves fast. Collaborators help shape campaigns, campus presence, content ideas, and the next student-first features inside the app.
                 </p>
@@ -1767,7 +2029,7 @@ const Dashboard = () => {
 
               <button
                 onClick={() => openExternalUrl('https://medmacs.app/collaborate')}
-                className="w-full py-3.5 rounded-2xl bg-white text-slate-950 font-black text-xs uppercase tracking-widest shadow-lg shadow-black/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                className="w-full py-3.5 rounded-2xl bg-white text-slate-950 font-black text-xs uppercase tracking-widest shadow-xl shadow-black/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
               >
                 Visit Collaborate
                 <ArrowRight className="w-4 h-4" />
@@ -1779,7 +2041,7 @@ const Dashboard = () => {
 
       {/* Case of Day Dialog - swipe reveal */}
       <Dialog open={showCaseOfDay} onOpenChange={setShowCaseOfDay}>
-        <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-0 [&>button]:hidden">
+        <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-0 bg-transparent shadow-2xl [&>button]:hidden">
           <DialogHeader>
             <DialogTitle className="sr-only">Case of the Day</DialogTitle>
             <DialogDescription className="sr-only">{caseOfDay?.case_name}</DialogDescription>

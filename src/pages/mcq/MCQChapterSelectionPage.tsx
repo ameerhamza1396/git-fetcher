@@ -69,7 +69,7 @@ const ChapterProgressDonut = ({
 };
 
 const ChapterCardSkeleton = () => (
-  <div className="relative overflow-hidden rounded-2xl bg-muted/20 p-4 animate-pulse border border-border/30">
+  <div className="relative overflow-hidden rounded-2xl bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl p-4 animate-pulse border border-border/30">
     <div className="flex items-center gap-4">
       <div className="w-12 h-12 rounded-xl bg-muted" />
       <div className="flex-1 space-y-2">
@@ -263,17 +263,17 @@ const MCQChapterSelectionPage = () => {
         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-3 block">Step 2 of 3</span>
       </motion.div>
 
-      <div ref={stickyHeadingRef} className="sticky top-0 z-50 bg-background/80 backdrop-blur-md pt-[env(safe-area-inset-top)] -mx-3 sm:mx-0 px-3 sm:px-0">
+      <div ref={stickyHeadingRef} className="sticky top-0 z-50 bg-background/45 dark:bg-background/20 backdrop-blur-xl pt-[env(safe-area-inset-top)] -mx-3 sm:mx-0 px-3 sm:px-0">
         <div className="max-w-4xl mx-auto px-4 sm:px-0">
           <motion.div
             animate={{ paddingTop: isHeadingStuck ? 10 : 16, paddingBottom: isHeadingStuck ? 10 : 12 }}
             transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-            className="overflow-hidden"
+            className="overflow-visible"
           >
             <motion.div
-              animate={{ height: isHeadingStuck ? 28 : 56 }}
+              animate={{ height: isHeadingStuck ? 34 : 64 }}
               transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-              className="relative"
+              className="relative overflow-visible"
             >
               <motion.h2
                 animate={{
@@ -282,9 +282,9 @@ const MCQChapterSelectionPage = () => {
                   scale: isHeadingStuck ? 0.58 : 1
                 }}
                 transition={{ type: 'spring', stiffness: 260, damping: 28 }}
-                className="absolute top-0 origin-left whitespace-nowrap text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none"
+                className="absolute top-0 origin-left whitespace-nowrap pr-3 text-3xl sm:text-5xl font-black tracking-normal text-foreground uppercase italic leading-[1.08]"
               >
-                Select <span className="live-gradient-text">Chapter</span>
+                Select <span className="live-gradient-text">Chapter&nbsp;</span>
               </motion.h2>
             </motion.div>
             <motion.div
@@ -308,7 +308,7 @@ const MCQChapterSelectionPage = () => {
             </motion.div>
           </motion.div>
         </div>
-        <div className="h-4 bg-gradient-to-b from-background/80 to-transparent pointer-events-none" />
+        <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
       </div>
 
       <div className="max-w-4xl mx-auto px-4 sm:px-0 pb-32 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -332,7 +332,7 @@ const MCQChapterSelectionPage = () => {
             const isDisabled = isComingSoon || isOfflineUnavailable;
             const attemptedCount = attemptedByChapter[ch.id] || 0;
             const totalCount = ch.mcq_count || 0;
-            
+
             return (
               <motion.div
                 key={ch.id}
@@ -346,9 +346,9 @@ const MCQChapterSelectionPage = () => {
                 className={`group relative overflow-hidden rounded-2xl border-2 p-4 transition-all duration-300 ${
                   isDisabled ? 'opacity-40 cursor-not-allowed grayscale' : 'cursor-pointer'
                 } ${
-                  isSelected 
-                    ? 'border-primary bg-primary/5 shadow-xl shadow-primary/10' 
-                    : 'border-border/40 bg-white/5 dark:bg-zinc-900/50 hover:border-primary/30 hover:bg-primary/5'
+                  isSelected
+                    ? 'border-primary bg-primary/5 shadow-xl shadow-primary/10'
+                    : 'border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl hover:border-primary/30 hover:bg-primary/5'
                 }`}
               >
                 {isComingSoon && (
@@ -382,9 +382,9 @@ const MCQChapterSelectionPage = () => {
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="min-w-0 flex-1 pr-1">
-                    <h3 className={`text-sm font-black uppercase italic tracking-tight transition-colors ${
+                    <h3 className={`text-sm font-black uppercase italic tracking-normal leading-snug transition-colors ${
                       isSelected ? 'text-primary' : 'text-foreground'
                     }`}>
                       Chapter {ch.chapter_number}

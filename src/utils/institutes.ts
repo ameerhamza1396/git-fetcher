@@ -28,9 +28,17 @@ export interface Institute {
 let cachedInstitutes: Institute[] | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const SPECIALIZED_TEST_CODES = new Set([
+  'jinnah_house_job_test',
+  'jpmc_house_job_test',
+  'nle',
+  'fcps_part_1',
+  'fcps_part_2',
+]);
 
-export async function fetchInstitutes(): Promise<Institute[]> {
-  if (cachedInstitutes && Date.now() - cacheTimestamp < CACHE_TTL) {
+export async function fetchInstitutes(options?: { force?: boolean } | boolean): Promise<Institute[]> {
+  const force = typeof options === 'boolean' ? options : !!options?.force;
+  if (!force && cachedInstitutes && Date.now() - cacheTimestamp < CACHE_TTL) {
     return cachedInstitutes;
   }
   const { data, error } = await supabase
@@ -67,4 +75,8 @@ export function getInstituteCategory(institute?: Pick<Institute, 'category'> | n
 
 export function isSpecializedTestInstitute(institute?: Pick<Institute, 'category'> | null): boolean {
   return getInstituteCategory(institute) === 'specialized_test';
+}
+
+export function isSpecializedTestCode(code?: string | null): boolean {
+  return !!code && SPECIALIZED_TEST_CODES.has(String(code).trim().toLowerCase());
 }

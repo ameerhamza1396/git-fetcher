@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, X, Loader2, Lock, WifiOff } from 'lucide-react';
+import { Send, X, Loader2, WifiOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { aiApiJson, aiApiOrigin } from '@/utils/aiApi';
 
@@ -13,6 +13,9 @@ interface Message {
 }
 
 import { parseBoldText } from '@/utils/format';
+
+const isAiPolicyNotice = (text: string) =>
+  /(not available for your current plan|quota|limit|login|required|reached|not enabled|upgrade)/i.test(text);
 
 interface AIChatbotProps {
   isOpen: boolean;
@@ -35,7 +38,7 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
   explanationContext,
   currentAnswer,
   correctAnswer,
-  userPlan,
+  userPlan: _userPlan,
   isHidden = false,
   onOpen,
   onQuestionHelp,
@@ -46,14 +49,12 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const hasPremiumAccess = userPlan?.toLowerCase() === 'premium';
-
   const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); };
   useEffect(() => { scrollToBottom(); }, [messages]);
 
 
   const sendMessage = async (message: string) => {
-    if (!hasPremiumAccess || !message.trim() || isLoading) return;
+    if (!message.trim() || isLoading) return;
     if (!isOnline) {
       setMessages(prev => [...prev, {
         role: 'assistant',
@@ -74,14 +75,14 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
       const data = await aiApiJson<{ answer?: string }>('ai/study-chat', { question: composedPrompt });
       const answer = data.answer || 'Sorry, I could not generate a response.';
       setMessages(prev => [...prev, { role: 'assistant', content: answer, timestamp: new Date().toISOString() }]);
-    } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: `Sorry, there was an error connecting to the AI service. Please check if the server at ${aiApiOrigin} is running and try again.`, timestamp: new Date().toISOString() }]);
+    } catch (error: any) {
+      setMessages(prev => [...prev, { role: 'assistant', content: error?.message || `Sorry, there was an error connecting to the AI service. Please check if the server at ${aiApiOrigin} is running and try again.`, timestamp: new Date().toISOString() }]);
     } finally { setIsLoading(false); }
   };
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); sendMessage(input); };
   const handleQuestionHelp = () => {
-    if (!hasPremiumAccess || !questionContext) return;
+    if (!questionContext) return;
     if (!isOnline) {
       setMessages(prev => [...prev, {
         role: 'assistant',
@@ -151,19 +152,18 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
               </div>
             </div>
 
-            {hasPremiumAccess ? (
-              <>
-                {/* Messages */}
-                <ScrollArea className="flex-1 px-4 py-4">
-                  {!isOnline ? (
-                    <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                      <div className="w-16 h-16 rounded-full bg-amber-500/10 backdrop-blur-lg flex items-center justify-center mb-4">
-                        <WifiOff className="w-8 h-8 text-amber-600 dark:text-amber-300" />
-                      </div>
-                      <p className="text-sm font-bold text-foreground">This feature is not available offline.</p>
-                      <p className="text-xs text-muted-foreground mt-1">Connect to the internet and try again.</p>
+            <>
+              {/* Messages */}
+              <ScrollArea className="flex-1 px-4 py-4">
+                {!isOnline ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                    <div className="w-16 h-16 rounded-full bg-amber-500/10 backdrop-blur-lg flex items-center justify-center mb-4">
+                      <WifiOff className="w-8 h-8 text-amber-600 dark:text-amber-300" />
                     </div>
-                  ) : messages.length === 0 ? (
+                    <p className="text-sm font-bold text-foreground">This feature is not available offline.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Connect to the internet and try again.</p>
+                  </div>
+                ) : messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center py-12">
                       <div className="w-16 h-16 rounded-full bg-primary/10 backdrop-blur-lg flex items-center justify-center mb-4 overflow-hidden">
                         <img src="/mascots/Mascot12.png" alt="Dr. Ahroid" className="w-full h-full object-contain opacity-80" />
@@ -174,7 +174,15 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
                   ) : (
                     <div className="space-y-3 w-full">
                       {messages.map((message, index) => (
-                        <div key={index} className={`flex w-full ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div key={index} className={`flex w-full ${message.role === 'user' ? 'justify-end' : isAiPolicyNotice(message.content) ? 'justify-center' : 'justify-start'}`}>
+                          {message.role !== 'user' && isAiPolicyNotice(message.content) ? (
+                            <div className="max-w-[88%] text-center">
+                              <p className="text-xs font-bold leading-relaxed text-muted-foreground">{message.content}</p>
+                              <a href="/pricing" className="mt-2 inline-flex text-xs font-black uppercase tracking-widest text-primary underline underline-offset-4">
+                                View upgrade options
+                              </a>
+                            </div>
+                          ) : (
                           <div className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm backdrop-blur-lg ${message.role === 'user'
                             ? 'bg-primary text-white dark:bg-slate-700 dark:text-white rounded-br-md'
                             : 'bg-muted/60 text-foreground rounded-bl-md'
@@ -184,6 +192,7 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
                               {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </p>
                           </div>
+                          )}
                         </div>
                       ))}
                       {isLoading && (
@@ -200,45 +209,33 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
                       <div ref={messagesEndRef} />
                     </div>
                   )}
-                </ScrollArea>
+              </ScrollArea>
 
-                {/* Help button */}
-                {questionContext && (
-                  <div className="px-3 py-2 border-t border-border/30 flex-shrink-0">
-                    <Button variant="outline" size="sm" onClick={handleQuestionHelp} disabled={!isOnline} className="w-full text-xs rounded-xl h-9 bg-background/40 backdrop-blur-lg border-border/30">
-                      Help with current question
-                    </Button>
-                  </div>
-                )}
+              {/* Help button */}
+              {questionContext && (
+                <div className="px-3 py-2 border-t border-border/30 flex-shrink-0">
+                  <Button variant="outline" size="sm" onClick={handleQuestionHelp} disabled={!isOnline} className="w-full text-xs rounded-xl h-9 bg-background/40 backdrop-blur-lg border-border/30">
+                    Help with current question
+                  </Button>
+                </div>
+              )}
 
-                {/* Input */}
-                <div className="px-3 py-3 border-t border-border/30 flex-shrink-0 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:pb-3">
-                  <form onSubmit={handleSubmit} className="flex space-x-2">
-                    <Input
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      placeholder={isOnline ? 'Type your question...' : 'Connect to internet to use AI chat'}
-                      disabled={isLoading || !isOnline}
-                      className="flex-1 rounded-xl h-10 text-sm bg-muted/40 backdrop-blur-lg border-border/30"
-                    />
-                    <Button type="submit" disabled={isLoading || !isOnline || !input.trim()} size="sm" className="bg-primary/80 backdrop-blur-lg hover:bg-primary/90 rounded-xl h-10 w-10 p-0">
-                      {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    </Button>
-                  </form>
-                </div>
-              </>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-                <div className="w-16 h-16 rounded-full bg-primary/10 backdrop-blur-lg flex items-center justify-center mb-4">
-                  <Lock className="w-8 h-8 text-primary opacity-60" />
-                </div>
-                <h3 className="text-lg font-bold text-foreground mb-2">Premium Feature</h3>
-                <p className="text-sm text-muted-foreground mb-6">Unlock Dr. Ahroid AI Chatbot with a Premium plan.</p>
-                <Button asChild className="bg-primary/80 backdrop-blur-lg hover:bg-primary/90 text-primary-foreground font-bold rounded-xl px-6">
-                  <a href="/pricing">Upgrade to Premium</a>
-                </Button>
+              {/* Input */}
+              <div className="px-3 py-3 border-t border-border/30 flex-shrink-0 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:pb-3">
+                <form onSubmit={handleSubmit} className="flex space-x-2">
+                  <Input
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder={isOnline ? 'Type your question...' : 'Connect to internet to use AI chat'}
+                    disabled={isLoading || !isOnline}
+                    className="flex-1 rounded-xl h-10 text-sm bg-muted/40 backdrop-blur-lg border-border/30"
+                  />
+                  <Button type="submit" disabled={isLoading || !isOnline || !input.trim()} size="sm" className="bg-primary/80 backdrop-blur-lg hover:bg-primary/90 rounded-xl h-10 w-10 p-0">
+                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  </Button>
+                </form>
               </div>
-            )}
+            </>
           </motion.div>
         )}
       </AnimatePresence>

@@ -48,7 +48,6 @@ export const MistakeBook = ({ subjects, isPremium }: MistakeBookProps) => {
   };
 
   const loadAiExplanation = async (attempt: WrongAttempt) => {
-    if (!isPremium) return;
     setAiExplainTarget(attempt);
     setAiExplanation('');
     setAiLoading(true);
@@ -194,11 +193,11 @@ export const MistakeBook = ({ subjects, isPremium }: MistakeBookProps) => {
                     <Button
                       size="sm"
                       className="rounded-xl"
-                      variant={isPremium ? 'default' : 'secondary'}
-                      disabled={!isPremium}
+                      variant="default"
+                      disabled={aiLoading}
                       onClick={() => loadAiExplanation(activeAttempt)}
                     >
-                      {isPremium ? <Sparkles className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />}
+                      <Sparkles className="mr-2 h-4 w-4" />
                       AI Explain
                     </Button>
                     <Button size="sm" variant="outline" className="rounded-xl" onClick={() => startCorrectionSession()}>

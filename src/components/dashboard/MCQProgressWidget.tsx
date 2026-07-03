@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Clock, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { MCQProgressSkeleton } from '../skeletons/MCQProgressSkeleton';
 
 // Defines the shape of the saved session per Subject/Chapter in localStorage
@@ -56,7 +56,7 @@ const GET_COMPLETED_COUNT = async (userId: string, chapterId: string): Promise<n
   }
 };
 
-const DonutChart3D = ({ percentage, colorClass, gradientId }: { percentage: number, colorClass: string, gradientId: string }) => {
+const DonutChart3D = memo(({ percentage, colorClass, gradientId }: { percentage: number, colorClass: string, gradientId: string }) => {
   const radius = 35;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (percentage / 100) * circumference;
@@ -110,7 +110,9 @@ const DonutChart3D = ({ percentage, colorClass, gradientId }: { percentage: numb
       </div>
     </div>
   );
-};
+});
+
+DonutChart3D.displayName = 'DonutChart3D';
 
 export const MCQProgressWidget = () => {
   const navigate = useNavigate();
@@ -138,45 +140,58 @@ export const MCQProgressWidget = () => {
     queryFn: async () => {
       if (sessions.length === 0) return [];
       
-      const chapterIds = sessions.map(s => s.chapterId);
-      const subjectIds = sessions.map(s => s.subjectId);
+      const chapterIds = [...new Set(sessions.map(s => s.chapterId))];
+      const subjectIds = [...new Set(sessions.map(s => s.subjectId))];
 
       // Fetch chapter details for names and counts
-      const { data: chapters, error: chError } = await supabase
-        .from('chapters')
-        .select('id, name, subject_id, mcqs(count)')
-        .in('id', chapterIds);
+      const [chaptersResult, subjectsResult, mcqsResult] = await Promise.all([
+        supabase
+          .from('chapters')
+          .select('id, name, subject_id, mcqs(count)')
+          .in('id', chapterIds),
+        supabase
+          .from('subjects')
+          .select('id, name, color')
+          .in('id', subjectIds),
+        supabase
+          .from('mcqs')
+          .select('id, chapter_id')
+          .in('chapter_id', chapterIds),
+      ]);
 
-      // Fetch subject details for names
-      const { data: subjects, error: subError } = await supabase
-        .from('subjects')
-        .select('id, name, color')
-        .in('id', subjectIds);
-
-      // Fetch answered MCQs for the user
-      const { data: answeredMCQs } = await supabase
-        .from('user_answers')
-        .select('mcq_id')
-        .eq('user_id', userData?.id);
-
-      // Create a set of answered MCQ IDs
-      const answeredSet = new Set(answeredMCQs?.map(a => a.mcq_id) || []);
-
-      // Fetch all MCQs for the chapters
-      const { data: allMCQs } = await supabase
-        .from('mcqs')
-        .select('id, chapter_id')
-        .in('chapter_id', chapterIds);
+      const { data: chapters, error: chError } = chaptersResult;
+      const { data: subjects, error: subError } = subjectsResult;
+      const allMCQs = mcqsResult.data || [];
 
       if (chError || subError) return [];
 
+      const mcqIds = allMCQs.map(m => m.id);
+      const { data: answeredMCQs } = mcqIds.length
+        ? await supabase
+          .from('user_answers')
+          .select('mcq_id')
+          .eq('user_id', userData?.id)
+          .in('mcq_id', mcqIds)
+        : { data: [] };
+
+      const answeredSet = new Set(answeredMCQs?.map(a => a.mcq_id) || []);
+      const chaptersById = new Map(chapters?.map(chapter => [chapter.id, chapter]) || []);
+      const subjectsById = new Map(subjects?.map(subject => [subject.id, subject]) || []);
+      const mcqsByChapter = new Map<string, typeof allMCQs>();
+
+      allMCQs.forEach((mcq) => {
+        const existing = mcqsByChapter.get(mcq.chapter_id) || [];
+        existing.push(mcq);
+        mcqsByChapter.set(mcq.chapter_id, existing);
+      });
+
       return sessions.map(session => {
-        const chapter = chapters?.find(c => c.id === session.chapterId);
-        const subject = subjects?.find(s => s.id === session.subjectId);
+        const chapter = chaptersById.get(session.chapterId);
+        const subject = subjectsById.get(session.subjectId);
         const totalMCQs = chapter?.mcqs?.[0]?.count || 1;
 
         // Count completed MCQs for this chapter
-        const chapterMCQs = allMCQs?.filter(m => m.chapter_id === session.chapterId) || [];
+        const chapterMCQs = mcqsByChapter.get(session.chapterId) || [];
         const completedMCQs = chapterMCQs.filter(m => answeredSet.has(m.id)).length;
 
         // Find first unattempted MCQ index
@@ -203,8 +218,17 @@ export const MCQProgressWidget = () => {
         };
       }).filter(s => s.completedMCQs > 0 && s.completedMCQs < s.totalMCQs); // Only show incomplete ones with at least 1 attempted
     },
-    enabled: sessions.length > 0 && !!userData?.id
+    enabled: sessions.length > 0 && !!userData?.id,
+    staleTime: 1000 * 60 * 5,
   });
+
+  const gradients = useMemo(() => [
+    { text: 'text-rose-500 stroke-rose-500', bg: 'from-rose-500/10 to-pink-500/5', icon: 'text-rose-500' },
+    { text: 'text-blue-500 stroke-blue-500', bg: 'from-blue-500/10 to-indigo-500/5', icon: 'text-blue-500' },
+    { text: 'text-emerald-500 stroke-emerald-500', bg: 'from-emerald-500/10 to-teal-500/5', icon: 'text-emerald-500' },
+    { text: 'text-amber-500 stroke-amber-500', bg: 'from-amber-500/10 to-orange-500/5', icon: 'text-amber-500' },
+    { text: 'text-violet-500 stroke-violet-500', bg: 'from-violet-500/10 to-purple-500/5', icon: 'text-violet-500' },
+  ], []);
 
   if (isLoading) return <MCQProgressSkeleton />;
   if (!chaptersData || chaptersData.length === 0) return null;
@@ -217,14 +241,6 @@ export const MCQProgressWidget = () => {
       } 
     });
   };
-
-  const gradients = [
-    { text: 'text-rose-500 stroke-rose-500', bg: 'from-rose-500/10 to-pink-500/5', icon: 'text-rose-500' },
-    { text: 'text-blue-500 stroke-blue-500', bg: 'from-blue-500/10 to-indigo-500/5', icon: 'text-blue-500' },
-    { text: 'text-emerald-500 stroke-emerald-500', bg: 'from-emerald-500/10 to-teal-500/5', icon: 'text-emerald-500' },
-    { text: 'text-amber-500 stroke-amber-500', bg: 'from-amber-500/10 to-orange-500/5', icon: 'text-amber-500' },
-    { text: 'text-violet-500 stroke-violet-500', bg: 'from-violet-500/10 to-purple-500/5', icon: 'text-violet-500' },
-  ];
 
   return (
     <div className="mb-6">

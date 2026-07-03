@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { BookOpen, ChevronLeft, ChevronRight, FlaskConical, Loader2, RotateCcw, Sparkles, Wand2 } from 'lucide-react';
-import { getFlashcardQuota, recordGeneratedFlashcards } from '@/components/profile/AchievementBadges';
+import { recordGeneratedFlashcards } from '@/components/profile/AchievementBadges';
 import { useAuth } from '@/hooks/useAuth';
 import { CorrectionMCQModal } from './CorrectionMCQModal';
 import { FlashcardLimitModal } from './FlashcardLimitModal';
@@ -18,7 +18,7 @@ type TitrationProps = {
 };
 
 const FlashcardSkeleton = () => (
-  <div className="space-y-3 rounded-3xl border border-border/40 bg-background p-4">
+  <div className="space-y-3 rounded-3xl border border-border/40 bg-background/55 dark:bg-white/[0.035] backdrop-blur-xl p-4">
     <div className="flex items-center justify-between">
       <div className="h-5 w-16 animate-pulse rounded-full bg-muted" />
       <div className="h-3 w-24 animate-pulse rounded-full bg-muted" />
@@ -49,16 +49,8 @@ export const Titration = ({ weakestChapter }: TitrationProps) => {
   const loadFlashcards = async (nextBatch = false) => {
     if (!weakestChapter) return;
     const nextIndex = nextBatch ? batchIndex + 1 : batchIndex;
-    const quota = await getFlashcardQuota(user?.id);
     const requestedCount = 5;
-    const allowedCount = Math.min(requestedCount, quota.remaining);
-
-    if (allowedCount <= 0) {
-      setLimitDetails({ plan: quota.plan, limit: quota.limit });
-      setFlashcardModalOpen(false);
-      setLimitModalOpen(true);
-      return;
-    }
+    const allowedCount = requestedCount;
 
     setCardsLoading(true);
     setActiveCard(0);
@@ -90,7 +82,7 @@ export const Titration = ({ weakestChapter }: TitrationProps) => {
 
   return (
     <>
-      <Card className="overflow-hidden border-border/40 bg-card/80 shadow-sm">
+      <Card className="overflow-hidden border-border/40 bg-card/55 dark:bg-white/[0.035] shadow-sm">
         <CardHeader className="bg-gradient-to-br from-rose-500/10 via-amber-500/10 to-cyan-500/10 p-4">
           <div className="flex items-start gap-3">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -135,7 +127,7 @@ export const Titration = ({ weakestChapter }: TitrationProps) => {
 
       <Dialog open={flashcardModalOpen} onOpenChange={setFlashcardModalOpen}>
         <DialogContent className="max-w-2xl overflow-hidden rounded-3xl border-border/40 p-0">
-          <DialogHeader className="border-b border-border/40 bg-background px-5 py-4 text-left">
+          <DialogHeader className="border-b border-border/40 bg-background/55 dark:bg-white/[0.035] backdrop-blur-xl px-5 py-4 text-left">
             <DialogTitle className="flex items-center gap-2 text-base font-black">
               <BookOpen className="h-5 w-5 text-primary" />
               {weakestChapter?.name}
@@ -150,7 +142,7 @@ export const Titration = ({ weakestChapter }: TitrationProps) => {
               <FlashcardSkeleton />
             ) : currentCard ? (
               <div className="space-y-3">
-                <div className="rounded-3xl border border-border/40 bg-background p-4 shadow-sm">
+                <div className="rounded-3xl border border-border/40 bg-background/55 dark:bg-white/[0.035] backdrop-blur-xl p-4 shadow-sm">
                   <div className="mb-3 flex items-center justify-between">
                     <Badge variant="secondary">{activeCard + 1}/{flashcards.length}</Badge>
                     <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">

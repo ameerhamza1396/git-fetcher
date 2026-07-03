@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Mail, ShieldCheck } from 'lucide-react';
 
 import Seo from '@/components/Seo'; // Import the Seo component
 
@@ -78,77 +78,102 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
+    <div className="fixed inset-0 flex flex-col overflow-hidden overscroll-none bg-gradient-to-br from-[#0a2e2e] via-[#0f172a] to-[#020617]">
       <Seo
         title="Forgot Password"
         description="Reset your password for Medmacs App. Enter your email to receive instructions on how to regain access to your account."
         canonical="https://medmacs.app/forgot-password"
       />
 
-            
-      <div className="w-full max-w-md space-y-6 animate-fade-in">
-        <div className="text-center">
-          <Link to="/" className="inline-flex items-center text-purple-600 hover:text-purple-700 mb-6">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Forgot Password?</h1>
-          <p className="text-gray-600 dark:text-gray-300">Enter your email to receive a password reset link.</p>
-        </div>
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#2dd4bf]/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-1/2 -right-32 w-80 h-80 bg-[#0ea5e9]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute -bottom-24 left-1/3 w-72 h-72 bg-[#67e8f9]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.5) 20px, rgba(255,255,255,0.5) 21px)`
+        }} />
+      </div>
 
-        <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-purple-200 dark:border-purple-800">
-          <CardHeader>
-            <CardTitle>Reset Your Password</CardTitle>
-            <CardDescription>
+      <div className="pt-[env(safe-area-inset-top)]" />
+
+      <div className="relative z-10 flex items-center justify-between px-5 py-4">
+        <Link to="/login" className="flex items-center space-x-2 text-white/70 hover:text-white transition-colors">
+          <ArrowLeft className="w-5 h-5" />
+          <span className="text-sm font-medium">Back</span>
+        </Link>
+        <div className="flex items-center space-x-2">
+          <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-7 h-7" />
+          <span className="text-white font-bold text-lg tracking-tight">Medmacs</span>
+        </div>
+      </div>
+
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-5 pb-[env(safe-area-inset-bottom)]">
+        <div className="w-full max-w-md animate-fade-in">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md rounded-full px-4 py-1.5 mb-4 border border-white/10">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#2dd4bf]" />
+              <span className="text-[#2dd4bf] text-xs font-semibold uppercase tracking-widest">Account recovery</span>
+            </div>
+            <h1 className="text-white text-3xl font-black tracking-tight">Forgot Password?</h1>
+            <p className="text-white/50 text-sm mt-2">Enter your email to receive a password reset link.</p>
+          </div>
+
+          <Card className="bg-white/[0.07] backdrop-blur-2xl rounded-3xl border border-white/10 shadow-2xl text-white">
+            <CardHeader>
+              <CardTitle className="text-white">Reset Your Password</CardTitle>
+              <CardDescription className="text-white/50">
               {emailSent ? (
-                <p className="text-green-600 dark:text-green-400">
+                <p className="text-[#67e8f9]">
                   If an account exists with that email, a password reset link has been sent to your inbox.
                 </p>
               ) : (
                 <p>Don't worry, it happens! Just enter your email below.</p>
               )}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={email}
-                  onChange={handleEmailChange}
-                  placeholder="your@example.com"
-                  className={validationError ? "border-red-500" : ""}
-                  required
-                />
-                {validationError && (
-                  <p className="text-red-500 text-sm">{validationError}</p>
-                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="email" className="text-white/80 text-xs font-semibold uppercase tracking-wider">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-white/30" />
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      value={email}
+                      onChange={handleEmailChange}
+                      placeholder="your@example.com"
+                      className={`pl-10 bg-white/[0.08] border-white/10 text-white placeholder:text-white/25 focus:border-[#2dd4bf]/50 focus:ring-[#2dd4bf]/20 h-12 rounded-xl ${validationError ? "border-red-400" : ""}`}
+                      required
+                    />
+                  </div>
+                  {validationError && (
+                    <p className="text-red-300 text-xs font-medium">{validationError}</p>
+                  )}
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] hover:from-[#2dd4bf]/90 hover:to-[#0ea5e9]/90 text-white rounded-xl h-12 font-bold text-sm tracking-wide shadow-lg shadow-[#0ea5e9]/20"
+                  disabled={loading || !!validationError || !email}
+                >
+                  {loading ? 'Sending Link...' : 'Send Reset Link'}
+                </Button>
+              </form>
+
+              <div className="text-center mt-5">
+                <p className="text-white/40 text-sm">
+                  Remember your password?{' '}
+                  <Link to="/login" className="text-[#2dd4bf] hover:text-[#2dd4bf]/80 font-medium">
+                    Sign in
+                  </Link>
+                </p>
               </div>
-
-              <Button
-                type="submit"
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                disabled={loading || !!validationError || !email}
-              >
-                {loading ? 'Sending Link...' : 'Send Reset Link'}
-              </Button>
-            </form>
-
-            <div className="text-center mt-4">
-              <p className="text-gray-600 dark:text-gray-300">
-                Remember your password?{' '}
-                <Link to="/login" className="text-purple-600 hover:text-purple-700 font-medium">
-                  Sign in
-                </Link>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      
+            </CardContent>
+          </Card>
+        </div>
+      </main>
     </div>
   );
 };

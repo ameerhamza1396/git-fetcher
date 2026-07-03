@@ -7,6 +7,7 @@ import {
   Trophy, Swords, Bot, Sparkles, HelpCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import AppTransitionScreen from "@/components/AppTransitionScreen";
 
 const STEPS = [
   {
@@ -73,7 +74,7 @@ export default function Welcome() {
       if (!hasSeenWizard) {
         setShowWizard(true);
       } else if (userExists) {
-        navigate("/dashboard");
+        navigate("/dashboard", { replace: true });
       }
       setLoading(false);
     }
@@ -91,7 +92,7 @@ export default function Welcome() {
 
   const completeSetup = () => {
     localStorage.setItem("hasSeenWizard", "true");
-    if (isLoggedIn) navigate("/dashboard");
+    if (isLoggedIn) navigate("/dashboard", { replace: true });
     else setShowWizard(false);
   };
 
@@ -100,7 +101,7 @@ export default function Welcome() {
     setShowWizard(true);
   };
 
-  if (loading) return null;
+  if (loading) return <AppTransitionScreen label="Preparing" />;
 
   return (
     <AnimatePresence mode="wait">

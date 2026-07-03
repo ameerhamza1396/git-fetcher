@@ -30,11 +30,11 @@ const GoogleSignin: React.FC<GoogleSigninProps> = ({
                 if (result.idToken) {
                     const { error } = await signInWithGoogleSupabase(result.idToken);
                     if (error) throw error;
-                    navigate("/dashboard");
+                    navigate("/dashboard", { replace: true });
                 }
             } else {
                 await signInWithGoogle();
-                navigate("/dashboard");
+                navigate("/dashboard", { replace: true });
             }
         } catch (err: any) {
             if (!err.message?.includes("12501")) {

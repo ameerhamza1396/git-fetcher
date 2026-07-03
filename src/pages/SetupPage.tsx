@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ChevronRight, ChevronLeft, Sparkles, User, Building2, GraduationCap, CheckCircle2, Loader2, Gift, HeartHandshake, Moon, Sun, Search, SlidersHorizontal, X
+  ChevronRight, ChevronLeft, Sparkles, User, Building2, GraduationCap, CheckCircle2, Loader2, Gift, HeartHandshake, Moon, Sun, Search, SlidersHorizontal, X, Megaphone, Share2, Bot, Users, CalendarDays, BadgePercent, MessageCircle
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Capacitor } from '@capacitor/core';
@@ -14,33 +14,44 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { fetchInstitutes, getInstituteByCode, isSpecializedTestInstitute, type Institute } from '@/utils/institutes';
+import { fetchInstitutes, getInstituteByCode, isSpecializedTestCode, isSpecializedTestInstitute, type Institute } from '@/utils/institutes';
+import { getProfileCompletion, VALID_PROFILE_YEARS } from '@/utils/profileCompletion';
 import { generateUniqueReferralCode, resolveReferralCode } from '@/utils/referral';
 import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
 
-const VALID_YEARS = ['1st', '2nd', '3rd', '4th', '5th'];
+const VALID_YEARS = VALID_PROFILE_YEARS;
 type SetupSelectionCategory = 'institute' | 'specialized_test';
 type SetupThemeChoice = 'light' | 'dark';
 type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
-type OwnershipFilter = 'all' | 'public' | 'private';
+type HeardAboutUsOption = {
+  value: string;
+  label: string;
+  icon: string | null;
+};
+
+const heardAboutUsIconMap = {
+  share: Share2,
+  badge_percent: BadgePercent,
+  bot: Bot,
+  users: Users,
+  calendar_days: CalendarDays,
+  megaphone: Megaphone,
+  message_circle: MessageCircle,
+};
+
+const fallbackHeardAboutUsOptions: HeardAboutUsOption[] = [
+  { value: 'social_media', label: 'Social Media', icon: 'share' },
+  { value: 'ads', label: 'Ads', icon: 'badge_percent' },
+  { value: 'ai_chatbot', label: 'AI Chatbot', icon: 'bot' },
+  { value: 'recommended_by_someone', label: 'Recommended by Someone', icon: 'users' },
+  { value: 'public_event', label: 'Public Event', icon: 'calendar_days' },
+  { value: 'marketing_posters', label: 'Marketing Posters', icon: 'megaphone' },
+  { value: 'friends_group', label: 'Friends Group', icon: 'message_circle' },
+];
 
 const getInstituteProvince = (inst: Institute) => {
   const value = (inst.province || inst.region || '').trim();
   return value || 'Other';
-};
-
-const getInstituteOwnership = (inst: Institute): 'public' | 'private' | 'unknown' => {
-  if (typeof inst.is_public === 'boolean') return inst.is_public ? 'public' : 'private';
-  const value = String(inst.ownership || inst.sector || inst.institute_type || inst.type || '').toLowerCase();
-  if (value.includes('private')) return 'private';
-  if (value.includes('public') || value.includes('government') || value.includes('govt')) return 'public';
-  return 'unknown';
-};
-
-const formatOwnership = (ownership: ReturnType<typeof getInstituteOwnership>) => {
-  if (ownership === 'public') return 'Public';
-  if (ownership === 'private') return 'Private';
-  return 'Unspecified';
 };
 
 const SetupWizard = () => {
@@ -62,12 +73,15 @@ const SetupWizard = () => {
   const [setupLoadError, setSetupLoadError] = useState('');
   const [referredByName, setReferredByName] = useState<string | null>(null);
   const [referralStepCode, setReferralStepCode] = useState('');
+  const [heardAboutUs, setHeardAboutUs] = useState('');
+  const [heardAboutUsOptions, setHeardAboutUsOptions] = useState<HeardAboutUsOption[]>(fallbackHeardAboutUsOptions);
   const [setupTheme, setSetupTheme] = useState<SetupThemeChoice>('dark');
   const [studySearchExpanded, setStudySearchExpanded] = useState(false);
   const [studyFiltersExpanded, setStudyFiltersExpanded] = useState(false);
   const [studySearch, setStudySearch] = useState('');
   const [provinceFilter, setProvinceFilter] = useState('all');
-  const [ownershipFilter, setOwnershipFilter] = useState<OwnershipFilter>('all');
+  const setupLoadUserIdRef = useRef<string | null>(null);
+  const setupLoadToastShownRef = useRef(false);
   const studyOverlayRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -147,9 +161,13 @@ const SetupWizard = () => {
 
     if (existing) {
       if (!existing.referral_code) {
-        const code = await generateUniqueReferralCode();
-        await supabase.from('profiles').update({ referral_code: code }).eq('id', user.id);
-        existing.referral_code = code;
+        try {
+          const code = await generateUniqueReferralCode();
+          const { error: referralUpdateError } = await supabase.from('profiles').update({ referral_code: code }).eq('id', user.id);
+          if (!referralUpdateError) existing.referral_code = code;
+        } catch (error) {
+          console.warn('Failed to backfill referral code during setup load', error);
+        }
       }
       return existing;
     }
@@ -202,16 +220,34 @@ const SetupWizard = () => {
     const hasUsername = !!profile?.username;
     const hasInstitute = !!profile?.institute;
     const hasValidYear = !!profile?.year && VALID_YEARS.includes(profile.year);
-    const selectedInstitute = hasInstitute ? getInstituteByCode(profile.institute, instituteRows) : null;
-    const selectedSpecializedTest = isSpecializedTestInstitute(selectedInstitute);
 
     // Brand-new users should see the welcome step first.
     if (!hasUsername && !hasInstitute && !hasValidYear) return 0;
-    if (!hasUsername) return 1;
-    if (!hasInstitute) return 2;
-    if (selectedSpecializedTest) return 4;
-    if (!hasValidYear) return 3;
-    return 5;
+    const completion = getProfileCompletion(profile, instituteRows);
+    if (completion.complete) return 6;
+    if (completion.reason === 'missing_username') return 1;
+    if (completion.reason === 'missing_institute' || completion.reason === 'unknown_institute') return 2;
+    if (completion.reason === 'missing_year') return 3;
+    return 0;
+  }, []);
+
+  const loadHeardAboutUsOptions = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('heard_about_us_options' as any)
+      .select('value, label, icon')
+      .eq('enabled', true)
+      .order('order_index', { ascending: true });
+
+    if (error || !data?.length) {
+      if (error) console.warn('Failed to load heard_about_us_options; using fallback', error);
+      return fallbackHeardAboutUsOptions;
+    }
+
+    return data.map((option: any) => ({
+      value: String(option.value),
+      label: String(option.label),
+      icon: option.icon ? String(option.icon) : null,
+    })) as HeardAboutUsOption[];
   }, []);
 
   const loadSetupProfile = useCallback(async () => {
@@ -219,18 +255,25 @@ const SetupWizard = () => {
     setSetupLoadError('');
 
     try {
-      const [profile, insts] = await Promise.all([
+      const [profile, insts, heardOptions] = await Promise.all([
         ensureProfile(),
-        fetchInstitutes(),
+        fetchInstitutes({ force: true }),
+        loadHeardAboutUsOptions(),
       ]);
       setInstitutes(insts);
+      setHeardAboutUsOptions(heardOptions);
       setExistingProfile(profile);
 
       setUsername(profile?.username || '');
       setInstitute((profile as any)?.institute || '');
       setYear((profile as any)?.year || '');
+      setHeardAboutUs((profile as any)?.heard_about_us || '');
       const selectedInstitute = getInstituteByCode((profile as any)?.institute || '', insts);
-      setSelectionCategory(isSpecializedTestInstitute(selectedInstitute) ? 'specialized_test' : 'institute');
+      setSelectionCategory(
+        isSpecializedTestInstitute(selectedInstitute) || isSpecializedTestCode((profile as any)?.institute)
+          ? 'specialized_test'
+          : 'institute'
+      );
 
       if (profile?.referred_by) {
         const { data: referrer } = await supabase.from('profiles').select('full_name, username').eq('id', profile.referred_by).maybeSingle();
@@ -238,7 +281,7 @@ const SetupWizard = () => {
       }
 
       const initialStep = getInitialStep(profile, insts);
-      if (initialStep === 5) { navigate('/dashboard', { replace: true }); return; }
+      if (initialStep === 6) { navigate('/dashboard', { replace: true }); return; }
       setCurrentStep(initialStep);
     } catch (error) {
       console.error('Failed to initialize setup profile:', error);
@@ -247,17 +290,23 @@ const SetupWizard = () => {
           ? 'We could not load your profile from the server. Please try again.'
           : 'You appear to be offline, so setup fields cannot be verified right now.'
       );
-      toast.error('Failed to load setup. Please try again.');
+      if (!setupLoadToastShownRef.current) {
+        setupLoadToastShownRef.current = true;
+        toast.error('Failed to load setup. Please try again.', { id: 'setup-load-failed' });
+      }
     } finally {
       setLoading(false);
     }
-  }, [ensureProfile, getInitialStep, navigate]);
+  }, [ensureProfile, getInitialStep, loadHeardAboutUsOptions, navigate]);
 
   useEffect(() => {
     if (authLoading) return;
     if (!user) { navigate('/login'); return; }
+    if (setupLoadUserIdRef.current === user.id) return;
+    setupLoadUserIdRef.current = user.id;
+    setupLoadToastShownRef.current = false;
     loadSetupProfile();
-  }, [user, authLoading, navigate, loadSetupProfile]);
+  }, [user?.id, authLoading, navigate, loadSetupProfile]);
 
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'there';
 
@@ -357,7 +406,10 @@ const SetupWizard = () => {
         return;
       }
       const selectedInstitute = getInstituteByCode(institute, institutes);
-      const selectedSpecializedTest = isSpecializedTestInstitute(selectedInstitute);
+      const selectedSpecializedTest =
+        selectionCategory === 'specialized_test' ||
+        isSpecializedTestInstitute(selectedInstitute) ||
+        isSpecializedTestCode(institute);
       const profilePatch: any = {
         id: user!.id,
         institute,
@@ -402,13 +454,28 @@ const SetupWizard = () => {
       setCurrentStep(5);
       return;
     }
-    if (currentStep === 5) { navigate('/dashboard'); }
+    if (currentStep === 5) {
+      if (heardAboutUs) {
+        setSaving(true);
+        const { error } = await supabase
+          .from('profiles')
+          .update({ heard_about_us: heardAboutUs, updated_at: new Date().toISOString() } as any)
+          .eq('id', user!.id);
+        setSaving(false);
+        if (error) {
+          console.warn('Failed to save heard_about_us during setup', error);
+        }
+      }
+      setCurrentStep(6);
+      return;
+    }
+    if (currentStep === 6) { navigate('/dashboard'); }
   };
 
   const handleBack = () => {
     if (currentStep === 4) {
       const selectedInstitute = getInstituteByCode(institute, institutes);
-      if (isSpecializedTestInstitute(selectedInstitute)) {
+      if (isSpecializedTestInstitute(selectedInstitute) || isSpecializedTestCode(institute)) {
         setCurrentStep(2);
         return;
       }
@@ -422,6 +489,7 @@ const SetupWizard = () => {
     { title: 'Study Path', icon: Building2 },
     { title: 'Year', icon: GraduationCap },
     { title: 'Referral', icon: Gift },
+    { title: 'Source', icon: Megaphone },
     { title: 'All Set', icon: CheckCircle2 },
   ];
 
@@ -482,13 +550,10 @@ const SetupWizard = () => {
       )
     ).sort((a, b) => a.localeCompare(b));
     const filteredInstitutes = categoryInstitutes.filter(inst => {
-      const matchesProvince = selectionCategory !== 'institute' || provinceFilter === 'all' || getInstituteProvince(inst) === provinceFilter;
-      const ownership = getInstituteOwnership(inst);
-      const matchesOwnership = selectionCategory !== 'institute' || ownershipFilter === 'all' || ownership === ownershipFilter;
-      return matchesProvince && matchesOwnership;
+      return selectionCategory !== 'institute' || provinceFilter === 'all' || getInstituteProvince(inst) === provinceFilter;
     });
     const searchResults = searchTerm ? filteredInstitutes.filter(inst => {
-      const searchable = `${inst.name} ${inst.short_name} ${getInstituteProvince(inst)} ${formatOwnership(getInstituteOwnership(inst))}`.toLowerCase();
+      const searchable = `${inst.name} ${inst.short_name} ${getInstituteProvince(inst)}`.toLowerCase();
       return searchable.includes(searchTerm);
     }) : [];
     const groupedInstitutes = filteredInstitutes.reduce<Record<string, Institute[]>>((groups, inst) => {
@@ -504,10 +569,9 @@ const SetupWizard = () => {
     });
     const studyOverlayOpen = studySearchExpanded || studyFiltersExpanded;
     const renderStudyPathRow = (inst: Institute, compact = false) => {
-      const ownership = getInstituteOwnership(inst);
       const selected = institute === inst.code;
       const metadata = selectionCategory === 'institute'
-        ? [inst.short_name, formatOwnership(ownership)].filter(Boolean).join(' · ')
+        ? inst.short_name
         : 'Specialized test';
 
       return (
@@ -560,7 +624,10 @@ const SetupWizard = () => {
       setStudyFiltersExpanded(false);
       setStudySearchExpanded(false);
       const selectedInstitute = getInstituteByCode(institute, institutes);
-      const selectedCategory = isSpecializedTestInstitute(selectedInstitute) ? 'specialized_test' : 'institute';
+      const selectedCategory =
+        isSpecializedTestInstitute(selectedInstitute) || isSpecializedTestCode(institute)
+          ? 'specialized_test'
+          : 'institute';
       if (selectedInstitute && selectedCategory !== nextCategory) {
         setInstitute('');
       }
@@ -719,7 +786,7 @@ const SetupWizard = () => {
                     setStudyFiltersExpanded((value) => !value);
                   }}
                   className={`flex h-11 w-11 items-center justify-center rounded-2xl border transition-all ${
-                    studyFiltersExpanded || provinceFilter !== 'all' || ownershipFilter !== 'all'
+                    studyFiltersExpanded || provinceFilter !== 'all'
                       ? 'border-cyan-300 bg-cyan-400/15 text-cyan-300'
                       : 'border-white/10 bg-white/10 text-white/70 hover:text-white'
                   }`}
@@ -737,7 +804,7 @@ const SetupWizard = () => {
                       }`}
                     >
                       <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-white/50">Province</p>
-                      <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+                      <div className="flex gap-2 overflow-x-auto pb-1">
                         {['all', ...availableProvinces].map((province) => (
                           <button
                             key={province}
@@ -750,23 +817,6 @@ const SetupWizard = () => {
                             }`}
                           >
                             {province === 'all' ? 'All' : province}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-white/50">Ownership</p>
-                      <div className="grid grid-cols-3 gap-2">
-                        {(['all', 'public', 'private'] as OwnershipFilter[]).map((ownership) => (
-                          <button
-                            key={ownership}
-                            type="button"
-                            onClick={() => setOwnershipFilter(ownership)}
-                            className={`rounded-xl px-3 py-2 text-xs font-black capitalize transition-all ${
-                              ownershipFilter === ownership
-                                ? 'bg-cyan-500 text-white'
-                                : 'bg-white/10 text-white/60 hover:bg-white/15 hover:text-white'
-                            }`}
-                          >
-                            {ownership}
                           </button>
                         ))}
                       </div>
@@ -886,6 +936,45 @@ const SetupWizard = () => {
 
       case 5:
         return (
+          <div className="text-center max-w-lg mx-auto">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
+              <div className="w-20 h-20 rounded-3xl bg-white/15 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20">
+                <Megaphone className="w-10 h-10 text-white" />
+              </div>
+            </motion.div>
+            <h2 className="text-3xl font-black text-white mb-2">Where did you hear about us?</h2>
+            <p className="text-white/60 text-sm mb-6">This helps us understand what is working. You can skip it.</p>
+            <div className="grid grid-cols-2 gap-3">
+              {heardAboutUsOptions.map((option) => {
+                const Icon = heardAboutUsIconMap[(option.icon || 'megaphone') as keyof typeof heardAboutUsIconMap] || Megaphone;
+                const selected = heardAboutUs === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setHeardAboutUs(selected ? '' : option.value)}
+                    className={`min-h-24 rounded-2xl border-2 p-3 text-left transition-all ${
+                      selected
+                        ? 'border-cyan-300 bg-cyan-400/15 shadow-xl shadow-cyan-500/20'
+                        : 'border-white/10 bg-white/5 hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/15">
+                        <Icon className="h-5 w-5 text-white" />
+                      </span>
+                      {selected && <CheckCircle2 className="h-5 w-5 text-cyan-300" />}
+                    </div>
+                    <p className="text-sm font-black leading-tight text-white">{option.label}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+
+      case 6:
+        return (
           <div className="text-center">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.2 }}>
               <img src="/mascots/Mascot14.png" alt="All Set" className="w-48 h-auto mx-auto mb-6 drop-shadow-2xl" />
@@ -895,6 +984,23 @@ const SetupWizard = () => {
             </motion.div>
             <h2 className="text-3xl md:text-4xl font-black text-white mb-3">You're All Set!</h2>
             <p className="text-white/70 text-lg">Your profile is complete. Let's start learning!</p>
+            <Button
+              onClick={handleNext}
+              disabled={saving}
+              className={`mt-8 h-14 w-full max-w-md rounded-2xl font-black shadow-2xl transition-all active:scale-95 ${
+                setupIsDark
+                  ? 'bg-white text-black hover:bg-white/90'
+                  : 'bg-gradient-to-r from-cyan-600 to-teal-500 text-white hover:from-cyan-500 hover:to-teal-400 shadow-cyan-700/20'
+              }`}
+            >
+              {saving ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  Go to Dashboard <Sparkles className={`h-5 w-5 ${setupIsDark ? 'fill-black' : 'fill-white'}`} />
+                </span>
+              )}
+            </Button>
           </div>
         );
     }
@@ -907,6 +1013,7 @@ const SetupWizard = () => {
     if (currentStep === 3) return !!year;
     if (currentStep === 4) return true;
     if (currentStep === 5) return true;
+    if (currentStep === 6) return true;
     return false;
   };
 
@@ -989,9 +1096,10 @@ const SetupWizard = () => {
         </AnimatePresence>
       </div>
 
+      {currentStep !== 6 && (
       <div className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+24px)] left-6 right-6 z-50">
         <div className={`flex items-center gap-3 ${currentStep > 0 ? 'justify-between' : 'justify-center'}`}>
-          {currentStep > 0 && currentStep < 5 && (
+          {currentStep > 0 && currentStep < 6 && (
             <Button
               onClick={handleBack}
               variant="outline"
@@ -1012,12 +1120,12 @@ const SetupWizard = () => {
                 ? 'bg-white text-black hover:bg-white/90'
                 : 'bg-gradient-to-r from-cyan-600 to-teal-500 text-white hover:from-cyan-500 hover:to-teal-400 shadow-cyan-700/20'
             } ${
-              currentStep > 0 && currentStep < 5 ? 'flex-1' : 'w-full max-w-md'
+              currentStep > 0 && currentStep < 6 ? 'flex-1' : 'w-full max-w-md'
             }`}
           >
             {saving ? (
               <Loader2 className="w-5 h-5 animate-spin" />
-            ) : currentStep === 5 ? (
+            ) : currentStep === 6 ? (
               <span className="flex items-center gap-2">Go to Dashboard <Sparkles className={`h-5 w-5 ${setupIsDark ? 'fill-black' : 'fill-white'}`} /></span>
             ) : currentStep === 0 ? (
               <span className="flex items-center gap-2">Let's Go <ChevronRight className="h-5 w-5" /></span>
@@ -1027,6 +1135,7 @@ const SetupWizard = () => {
           </Button>
         </div>
       </div>
+      )}
     </div>
   );
 };

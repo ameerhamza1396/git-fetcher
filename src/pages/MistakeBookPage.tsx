@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Crown, Sparkles, Target } from 'lucide-react';
+import { Sparkles, Target } from 'lucide-react';
 import Seo from '@/components/Seo';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,7 +26,7 @@ const MistakeBookPage = () => {
     enabled: !!user?.id,
   });
 
-  const isPremium = ['premium', 'iconic'].includes(String(profile?.plan || 'free').toLowerCase());
+  const isPremium = true;
   const chapterCount = groupedSubjects.reduce((total, subject) => total + subject.chapters.length, 0);
 
   return (
@@ -59,8 +59,8 @@ const MistakeBookPage = () => {
             </div>
           </div>
           <div className="mt-3 flex items-center gap-2 rounded-2xl bg-background/70 px-3 py-2 text-xs text-muted-foreground ring-1 ring-border/40">
-            {isPremium ? <Sparkles className="h-4 w-4 text-primary" /> : <Crown className="h-4 w-4 text-amber-500" />}
-            <span>{isPremium ? 'AI Explain is active for your plan.' : 'AI Explain is locked until premium.'}</span>
+            <Sparkles className="h-4 w-4 text-primary" />
+            <span>AI Explain follows your cloud AI policy.</span>
           </div>
         </div>
       </div>

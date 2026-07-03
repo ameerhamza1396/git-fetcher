@@ -3,8 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Gift } from 'lucide-react';
+import { ArrowLeft, Gift, Sparkles } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -65,53 +64,65 @@ const RedeemCode = () => {
     };
 
     return (
-        <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950">
+        <div className="min-h-screen w-full bg-gradient-to-br from-[#0a2e2e] via-[#0f172a] to-[#020617] text-white relative overflow-x-hidden">
             <Seo title="Redeem Code" />
 
-            <dialog ref={successModalRef} className="rounded-[2rem] p-8 w-80 bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-2xl border-0">
-                <h3 className="text-xl font-black uppercase">Congratulations 🎉</h3>
+            <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+                <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#2dd4bf]/20 rounded-full blur-3xl animate-pulse" />
+                <div className="absolute top-1/2 -right-32 w-80 h-80 bg-[#0ea5e9]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+                <div className="absolute -bottom-24 left-1/3 w-72 h-72 bg-[#67e8f9]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+                <div className="absolute inset-0 opacity-[0.03]" style={{
+                    backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.5) 20px, rgba(255,255,255,0.5) 21px)`
+                }} />
+            </div>
+
+            <dialog ref={successModalRef} className="rounded-[2rem] p-8 w-80 bg-gradient-to-br from-[#2dd4bf] to-[#0ea5e9] text-white shadow-2xl border-0 backdrop:bg-slate-950/70">
+                <h3 className="text-xl font-black uppercase">Congratulations</h3>
                 <p className="mt-3 text-sm text-white/80">
                     Your <b className="text-white">{activatedPlan}</b> plan is activated for <b className="text-white">{days}</b> days!
                 </p>
                 <div className="mt-5">
-                    <Button onClick={() => successModalRef.current.close()} className="w-full bg-white text-emerald-700 font-black uppercase tracking-widest rounded-xl h-11">OK</Button>
+                    <Button onClick={() => successModalRef.current.close()} className="w-full bg-white text-[#0f766e] hover:bg-white/90 font-black uppercase tracking-widest rounded-xl h-11">OK</Button>
                 </div>
             </dialog>
 
             <div
                 ref={headerRef}
-                className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
+                className={`fixed top-0 left-0 right-0 z-50 bg-[#07171f]/75 backdrop-blur-2xl border-b border-white/10 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
             >
-                <div className="container mx-auto px-4 py-4 flex justify-between items-center max-w-7xl">
+                <div className="container mx-auto px-5 h-14 flex justify-between items-center max-w-7xl">
                     <Link to="/dashboard">
-                        <Button variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110">
+                        <Button variant="ghost" size="sm" className="w-9 h-9 p-0 text-white/70 hover:text-white hover:bg-white/10">
                             <ArrowLeft className="h-5 w-5" />
                         </Button>
                     </Link>
                     <div className="flex items-center gap-2">
-                        <Gift className="w-5 h-5 text-purple-500" />
-                        <span className="text-lg font-black">Redeem Code</span>
+                        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-7 h-7" />
+                        <span className="text-lg font-black text-white">Redeem Code</span>
                     </div>
                     <div className="w-9" />
                 </div>
             </div>
 
-            <main className="container mx-auto px-4 py-8 max-w-md mt-[var(--header-height)]">
+            <main className="relative z-10 container mx-auto px-5 py-8 max-w-md mt-[var(--header-height)]">
                 <div className="text-center mb-8">
-                    <div className="relative inline-block mb-4">
-                        <div className="absolute inset-0 bg-purple-400 blur-2xl opacity-30 rounded-full" />
-                        <div className="relative bg-gradient-to-br from-purple-600 to-violet-700 p-5 rounded-3xl shadow-2xl">
+                    <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md rounded-full px-4 py-1.5 mb-4 border border-white/10">
+                        <Sparkles className="w-3.5 h-3.5 text-[#2dd4bf]" />
+                        <span className="text-[#2dd4bf] text-xs font-semibold uppercase tracking-widest">Premium gift</span>
+                    </div>
+                    <div className="relative inline-flex mb-5">
+                        <div className="absolute inset-0 bg-[#2dd4bf] blur-2xl opacity-30 rounded-full" />
+                        <div className="relative bg-gradient-to-br from-[#2dd4bf] to-[#0ea5e9] p-5 rounded-3xl shadow-2xl shadow-[#0ea5e9]/20">
                             <Gift className="w-10 h-10 text-white" />
                         </div>
                     </div>
-                    <h1 className="text-2xl font-black text-foreground uppercase tracking-tight italic">
-                        Redeem Your <span className="text-purple-600">Gift Code</span>
+                    <h1 className="text-3xl font-black text-white tracking-tight">
+                        Redeem Your Gift Code
                     </h1>
-                    <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] mt-2">Enter your code to unlock premium access</p>
+                    <p className="text-white/50 text-sm mt-2">Enter your code to unlock premium access.</p>
                 </div>
 
-                {/* Redeem card - pricing style */}
-                <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-purple-600 via-violet-600 to-indigo-700 text-white shadow-2xl p-1">
+                <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#2dd4bf] via-[#0ea5e9] to-[#155e75] text-white shadow-2xl shadow-[#0ea5e9]/20 p-1">
                     <div className="absolute inset-0 opacity-10" style={{
                         backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`,
                         maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
@@ -128,7 +139,7 @@ const RedeemCode = () => {
                         </div>
                         {errorMsg && <p className="text-red-300 text-sm text-center font-medium">{errorMsg}</p>}
                         <Button onClick={handleRedeem} disabled={loading}
-                            className="w-full bg-white text-purple-700 hover:scale-105 transition-all rounded-xl h-12 uppercase font-black text-xs tracking-widest shadow-2xl">
+                            className="w-full bg-white text-[#0f766e] hover:bg-white/90 hover:scale-[1.02] transition-all rounded-xl h-12 uppercase font-black text-xs tracking-widest shadow-2xl">
                             {loading ? "Processing..." : "Redeem Code"}
                         </Button>
                     </div>

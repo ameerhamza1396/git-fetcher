@@ -624,6 +624,9 @@ body,
 }
 
 .live-gradient-text {
+  display: inline-block;
+  margin-inline: -0.06em;
+  padding-inline: 0.06em;
   background: linear-gradient(
     90deg,
     hsl(var(--primary)),
@@ -637,6 +640,12 @@ body,
   -webkit-text-fill-color: transparent;
   background-clip: text;
   animation: text-gradient-flow 4s ease-in-out infinite;
+}
+
+.heading-glyph-safe {
+  display: inline-block;
+  margin-inline: -0.08em;
+  padding-inline: 0.08em;
 }
 
 @keyframes text-gradient-flow-fast {

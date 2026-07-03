@@ -3,10 +3,8 @@ import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Moon, Sun, ArrowLeft, CheckCircle2, Crown, Zap, Star, Shield } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Crown, Zap, Star, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useTheme } from 'next-themes';
-import { ProfileDropdown } from '@/components/ProfileDropdown';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -43,39 +41,38 @@ interface GroupedPlan {
 
 const planStyles: { [key: string]: { gradient: string; accent: string; icon: any; glow: string; ring: string } } = {
     free: {
-        gradient: 'from-slate-500 via-slate-600 to-slate-700',
-        accent: 'bg-slate-300',
-        icon: <Shield className="w-8 h-8 text-slate-200" />,
-        glow: 'bg-slate-400',
-        ring: 'ring-slate-400/40',
+        gradient: 'from-slate-700 via-slate-800 to-slate-950',
+        accent: 'bg-slate-200',
+        icon: <Shield className="w-8 h-8 text-slate-100" />,
+        glow: 'bg-slate-300',
+        ring: 'ring-slate-300/30',
     },
     premium: {
-        gradient: 'from-blue-600 via-indigo-600 to-violet-700',
-        accent: 'bg-yellow-400',
-        icon: <Star className="w-8 h-8 text-yellow-300" />,
-        glow: 'bg-yellow-400',
-        ring: 'ring-blue-500/40',
+        gradient: 'from-[#2dd4bf] via-[#0ea5e9] to-[#155e75]',
+        accent: 'bg-[#67e8f9]',
+        icon: <Star className="w-8 h-8 text-[#cffafe]" />,
+        glow: 'bg-[#2dd4bf]',
+        ring: 'ring-[#2dd4bf]/35',
     },
     iconic: {
-        gradient: 'from-rose-600 via-red-600 to-orange-700',
-        accent: 'bg-amber-400',
-        icon: <Crown className="w-8 h-8 text-amber-300" />,
+        gradient: 'from-[#0f766e] via-[#0e7490] to-[#1e3a8a]',
+        accent: 'bg-amber-300',
+        icon: <Crown className="w-8 h-8 text-amber-200" />,
         glow: 'bg-amber-400',
-        ring: 'ring-rose-500/40',
+        ring: 'ring-amber-300/35',
     },
     pro: {
-        gradient: 'from-emerald-600 via-teal-600 to-cyan-700',
-        accent: 'bg-emerald-300',
-        icon: <Zap className="w-8 h-8 text-emerald-200" />,
-        glow: 'bg-emerald-400',
-        ring: 'ring-emerald-500/40',
+        gradient: 'from-emerald-500 via-teal-600 to-cyan-700',
+        accent: 'bg-emerald-200',
+        icon: <Zap className="w-8 h-8 text-emerald-100" />,
+        glow: 'bg-emerald-300',
+        ring: 'ring-emerald-300/35',
     },
 };
 
 const Pricing = () => {
     const { user, isLoading: isAuthLoading } = useAuth();
     const [isMonthly, setIsMonthly] = useState(true);
-    const [currency, setCurrency] = useState<'PKR' | 'USD'>('PKR');
     const [activePlanId, setActivePlanId] = useState<string>('free');
     const [headerVisible, setHeaderVisible] = useState(true);
     const lastScrollY = useRef(0);
@@ -192,19 +189,16 @@ const Pricing = () => {
         return <PageSkeleton />;
     }
 
-    const activeStyle = planStyles[activePlanId] || planStyles.free;
     const ActiveFallingIcon = activePlanId === 'premium' ? Star
         : activePlanId === 'iconic' ? Crown
             : activePlanId === 'pro' ? Zap
                 : Shield;
 
     return (
-        <div className="min-h-screen w-full bg-[#FAFAFA] dark:bg-[#020617] relative overflow-x-hidden selection:bg-blue-500/30">
+        <div className="min-h-screen w-full bg-gradient-to-br from-[#0a2e2e] via-[#0f172a] to-[#020617] relative overflow-x-hidden selection:bg-[#2dd4bf]/30 text-white">
             <Seo title="Pricing Plans" />
 
-            {/* Premium Animated Background Layer */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-                {/* Floating Mesh Objects */}
                 <motion.div 
                     animate={{ 
                         x: [0, 100, 0], 
@@ -212,7 +206,7 @@ const Pricing = () => {
                         rotate: [0, 120, 0]
                     }}
                     transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-                    className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] rounded-full bg-blue-500/10 blur-[120px] dark:bg-blue-900/10"
+                    className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] rounded-full bg-[#2dd4bf]/15 blur-[120px]"
                 />
                 <motion.div 
                     animate={{ 
@@ -221,15 +215,13 @@ const Pricing = () => {
                         rotate: [0, -90, 0]
                     }}
                     transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-                    className="absolute bottom-[10%] -right-[10%] w-[60%] h-[60%] rounded-full bg-purple-500/10 blur-[120px] dark:bg-purple-900/10"
+                    className="absolute bottom-[10%] -right-[10%] w-[60%] h-[60%] rounded-full bg-[#0ea5e9]/15 blur-[120px]"
                 />
 
-                {/* Ambient Dynamic Glow */}
-                <div className={`absolute inset-0 transition-all duration-1000 opacity-20 dark:opacity-10`} 
-                     style={{ background: `radial-gradient(circle at 50% 50%, ${activeStyle.glow.replace('bg-', '')}, transparent 70%)` }} 
-                />
+                <div className="absolute inset-0 opacity-[0.03]" style={{
+                    backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.5) 20px, rgba(255,255,255,0.5) 21px)`
+                }} />
                 
-                {/* Falling Icons */}
                 {Array.from({ length: 8 }).map((_, i) => (
                     <motion.div
                         key={`icon-${i}`}
@@ -250,53 +242,67 @@ const Pricing = () => {
                             ease: 'linear',
                             delay: Math.random() * -25
                         }}
-                        className="absolute text-slate-400/20 dark:text-white/5"
+                        className="absolute text-white/10"
                     >
                         <ActiveFallingIcon size={Math.random() * 32 + 16} />
                     </motion.div>
                 ))}
             </div>
 
-            <main className="relative z-10 container mx-auto px-4 lg:px-8 py-10 max-w-2xl pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-                {/* Hero Title */}
+            <div
+                className={`fixed top-0 left-0 right-0 z-50 bg-[#07171f]/75 backdrop-blur-2xl border-b border-white/10 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
+            >
+                <div className="container mx-auto px-5 h-14 flex justify-between items-center max-w-2xl">
+                    <Link to="/dashboard">
+                        <Button variant="ghost" size="sm" className="w-9 h-9 p-0 text-white/70 hover:text-white hover:bg-white/10">
+                            <ArrowLeft className="h-5 w-5" />
+                        </Button>
+                    </Link>
+                    <div className="flex items-center gap-2">
+                        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-7 h-7" />
+                        <span className="text-lg font-black text-white">Pricing</span>
+                    </div>
+                    <div className="w-9" />
+                </div>
+            </div>
+
+            <main className="relative z-10 container mx-auto px-5 lg:px-8 py-10 max-w-2xl mt-[var(--header-height)] pb-[env(safe-area-inset-bottom)]">
                 <motion.div
-                    className="text-center mb-12"
+                    className="text-center mb-10"
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                 >
-                    <div className="inline-block px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 mb-6">
-                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600 dark:text-blue-400">Premium Access</span>
+                    <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-white/10 border border-white/10 backdrop-blur-md mb-5">
+                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#2dd4bf]">Medmacs Plans</span>
                     </div>
-                    <h1 className="text-4xl md:text-6xl font-black tracking-tight text-slate-900 dark:text-white mb-4 italic uppercase leading-[0.9]">
-                        Choose Your <br/><span className="text-blue-600 dark:text-blue-400">Path</span>
+                    <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white mb-4 leading-[0.95]">
+                        Choose Your <br/><span className="text-[#2dd4bf]">Plan</span>
                     </h1>
-                    <p className="text-slate-500 dark:text-slate-400 font-bold max-w-xl mx-auto mb-10 uppercase text-[10px] tracking-[0.2em] opacity-80">
-                        High-performance plans for <br/>future medical professionals
+                    <p className="text-white/50 font-medium max-w-xl mx-auto mb-8 text-sm">
+                        High-performance tools for future medical professionals.
                     </p>
 
-                    {/* Monthly / Yearly Toggle - Premium Glass Style */}
-                    <div className="inline-flex items-center p-1.5 bg-white/40 dark:bg-slate-900/40 backdrop-blur-2xl rounded-3xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.05)]">
+                    <div className="inline-flex items-center p-1.5 bg-white/10 backdrop-blur-2xl rounded-2xl border border-white/10 shadow-2xl shadow-black/10">
                         <button
                             onClick={() => setIsMonthly(true)}
-                            className={`px-10 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all duration-500 ${isMonthly ? 'bg-white dark:bg-slate-800 shadow-xl text-blue-600 scale-105' : 'text-slate-500 hover:text-slate-700'}`}
+                            className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 ${isMonthly ? 'bg-white text-[#0f766e] shadow-xl scale-105' : 'text-white/50 hover:text-white'}`}
                         >
                             Monthly
                         </button>
                         <button
                             onClick={() => setIsMonthly(false)}
-                            className={`px-10 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all duration-500 ${!isMonthly ? 'bg-white dark:bg-slate-800 shadow-xl text-blue-600 scale-105' : 'text-slate-500 hover:text-slate-700'}`}
+                            className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 ${!isMonthly ? 'bg-white text-[#0f766e] shadow-xl scale-105' : 'text-white/50 hover:text-white'}`}
                         >
                             Yearly
                         </button>
                     </div>
                 </motion.div>
 
-                {/* Vertically stacked plan cards */}
                 <div className="flex flex-col gap-6">
                     {plans.map((plan, index) => {
                         const style = planStyles[plan.id] || planStyles.free;
-                        const currentPlanDetails = isMonthly ? plan.monthly[currency] : plan.yearly[currency];
+                        const currentPlanDetails = isMonthly ? plan.monthly.PKR : plan.yearly.PKR;
                         const displayPrice = plan.id === 'free' ? '0' : currentPlanDetails.price;
                         const originalPrice = plan.id === 'free' ? null : currentPlanDetails.originalPrice;
                         const isUserOnPaidPlan = currentUserPlan !== 'free';
@@ -356,11 +362,11 @@ const Pricing = () => {
                                         <div className="text-right shrink-0">
                                             {originalPrice && (
                                                 <span className="text-xs opacity-60 line-through font-bold block mb-0.5">
-                                                    {currency === 'PKR' ? 'Rs.' : '$'}{originalPrice}
+                                                    Rs.{originalPrice}
                                                 </span>
                                             )}
                                             <div className="flex items-baseline gap-0.5 justify-end">
-                                                <span className="text-base font-bold opacity-80">{currency === 'PKR' ? 'Rs.' : '$'}</span>
+                                                <span className="text-base font-bold opacity-80">Rs.</span>
                                                 <span className="text-4xl font-black tracking-tight">{displayPrice}</span>
                                             </div>
                                             <span className="text-[10px] opacity-60 font-bold uppercase tracking-widest">/{isMonthly ? 'mo' : 'yr'}</span>
@@ -382,11 +388,11 @@ const Pricing = () => {
                                     {/* CTA */}
                                     <div className="p-4 pt-5">
                                         {currentUserPlan === plan.id ? (
-                                            <Button disabled className="w-full bg-white/10 border border-white/20 text-white rounded-2xl h-13 uppercase font-bold text-xs tracking-widest">
+                                            <Button disabled className="w-full bg-white/10 border border-white/20 text-white rounded-2xl h-14 uppercase font-bold text-xs tracking-widest">
                                                 Active Plan ✓
                                             </Button>
                                         ) : isFreePlanAndPaidUser ? (
-                                            <Button disabled className="w-full bg-white/5 border border-white/10 text-white/40 rounded-2xl h-13 uppercase font-bold text-xs tracking-widest">
+                                            <Button disabled className="w-full bg-white/5 border border-white/10 text-white/40 rounded-2xl h-14 uppercase font-bold text-xs tracking-widest">
                                                 You are on a paid plan
                                             </Button>
                                         ) : (
@@ -398,7 +404,7 @@ const Pricing = () => {
                                                     price: displayPrice,
                                                     duration: isMonthly ? 'Monthly' : 'Yearly',
                                                     validity: isMonthly ? 'monthly' : 'yearly',
-                                                    currency,
+                                                    currency: 'PKR',
                                                     planId: plan.id
                                                 }}
                                             >
@@ -414,9 +420,17 @@ const Pricing = () => {
                     })}
                 </div>
 
-                <p className="text-center text-[10px] text-slate-400 dark:text-slate-600 mt-14 pb-12 uppercase tracking-[0.4em] font-black opacity-50">
-                    All prices in {currency} · Secure checkout · Cancel anytime
-                </p>
+                <div className="mt-14 space-y-4 pb-12 text-center">
+                    <p className="text-[10px] text-white/35 uppercase tracking-[0.4em] font-black">
+                        All prices in PKR · Secure checkout · Cancel anytime
+                    </p>
+                    <p className="mx-auto max-w-md text-xs font-semibold leading-relaxed text-white/45">
+                        International payments are not yet supported. For further details contact us at{' '}
+                        <a href="mailto:billing@medmacs.app" className="text-[#2dd4bf] underline underline-offset-4">
+                            billing@medmacs.app
+                        </a>
+                    </p>
+                </div>
             </main>
         </div>
     );

@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Crown, ArrowLeft, ArrowRight, X, Sparkles, CheckCircle, XCircle, PanelLeft } from 'lucide-react';
+import { ArrowLeft, ArrowRight, X, Sparkles, CheckCircle, XCircle, PanelLeft } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardContent, CardFooter, CardTitle } from '@/components/ui/card';
@@ -49,9 +49,8 @@ const AITestGenerator: React.FC = () => {
         enabled: !!user?.id, retry: false
     });
 
-    const plan = profile?.plan?.toLowerCase() || 'free';
     const userYear = profile?.year || '1st';
-    const hasAccess = plan === 'premium';
+    const hasAccess = !!user?.id;
 
     const [currentStep, setCurrentStep] = useState(1);
     const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
@@ -313,24 +312,6 @@ const AITestGenerator: React.FC = () => {
 
             <main className="flex-grow flex flex-col items-center px-4 pb-[env(safe-area-inset-bottom)] overflow-y-auto w-full relative z-10">
                 <div className="w-full max-w-2xl">
-                    {/* No Access */}
-                    {!hasAccess && (
-                        <div className="text-center py-16 space-y-6">
-                            <div className="relative inline-block">
-                                <div className="absolute inset-0 bg-blue-400 blur-2xl opacity-20 rounded-full" />
-                                <div className="relative bg-gradient-to-br from-amber-500 to-yellow-500 p-5 rounded-3xl shadow-xl">
-                                    <Crown className="w-10 h-10 text-white" />
-                                </div>
-                            </div>
-                            <h2 className="text-xl font-black uppercase tracking-tight text-foreground">Upgrade Required</h2>
-                            <p className="text-sm text-muted-foreground">Upgrade to <span className="font-bold text-primary">Premium</span> to access AI Test Generator.</p>
-                            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                                <Link to="/pricing"><Button className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-2xl h-11 px-8 font-black uppercase text-xs tracking-widest">Upgrade Plan</Button></Link>
-                                <Link to="/dashboard"><Button variant="outline" className="rounded-2xl h-11 px-8 font-black uppercase text-xs tracking-widest">Dashboard</Button></Link>
-                            </div>
-                        </div>
-                    )}
-
                     {/* Step 1: Subject Selection */}
                     {hasAccess && questions.length === 0 && currentStep === 1 && (
                         <div>
