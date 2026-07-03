@@ -9,8 +9,7 @@ import { Loader2, Send, MessageSquare, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Message, ChatSession, ChatSessionInsert, ChatSessionUpdate } from '@/types/ai';
 import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
-import { aiApiUrl } from '@/utils/aiApi';
-import { logAiUsageEvent } from '@/utils/aiUsageEvents';
+import { aiApiJson } from '@/utils/aiApi';
 
 export const AIStudyChat = () => {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
@@ -120,30 +119,16 @@ export const AIStudyChat = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(aiApiUrl('ai/study-chat'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          // adjust these keys if your backend expects different names
-          topic: currentSession.session_name,  
-          question: userMsg.content
-        }),
+      const data = await aiApiJson<{ answer?: string }>('ai/study-chat', {
+        topic: currentSession.session_name,
+        question: userMsg.content,
       });
-      if (!response.ok) throw new Error('AI backend error');
 
-      const { answer } = await response.json();
+      const { answer } = data;
       const aiMsg: Message = { role: 'assistant', content: answer, timestamp: new Date().toISOString() };
       const final = [...newMsgs, aiMsg];
       setMessages(final);
       await saveSession(final);
-      await logAiUsageEvent({
-        source: 'ai_study_chat',
-        metadata: {
-          sessionId: currentSession.id,
-          promptLength: userMsg.content.length,
-          responseLength: String(answer || '').length,
-        },
-      });
     } catch (e: any) {
       console.error('Error sending message:', e);
       toast({ title: 'Error', description: e.message || 'Failed to send message', variant: 'destructive' });

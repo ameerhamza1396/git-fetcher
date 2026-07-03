@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { fetchReferenceChunks } from './reference-utils';
 
-const GROQ_MODEL = process.env.GROQ_VERIFICATION_MODEL || 'llama-3.3-70b-versatile';
+const GROQ_MODEL = process.env.GROQ_VERIFICATION_MODEL || 'openai/gpt-oss-120b';
 
 const extractOutputText = (data: any) => data?.choices?.[0]?.message?.content || '';
 

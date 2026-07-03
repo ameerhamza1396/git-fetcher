@@ -1,4 +1,5 @@
 import { Flashcard, WrongAttempt } from './types';
+import { aiApiJson } from '@/utils/aiApi';
 
 const normalizeOptions = (options: any): string[] => {
   if (Array.isArray(options)) return options.map(option => String(option));
@@ -51,13 +52,7 @@ export const buildFallbackCards = (attempts: WrongAttempt[], batchIndex: number,
 
 export const fetchReferenceSnippet = async (question: string) => {
   try {
-    const response = await fetch('https://ai.medmacs.app/api/reference', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: question, top_k: 2 }),
-    });
-    if (!response.ok) return '';
-    const data = await response.json();
+    const data = await aiApiJson<{ results?: any[] }>('reference', { query: question, top_k: 2 });
     return (data.results || [])
       .map((ref: any) => `${ref.book || 'Reference'} p.${ref.page || '-'}: ${ref.content || ''}`)
       .join('\n');
@@ -71,21 +66,14 @@ export const refineFlashcardsWithAI = async (attempts: WrongAttempt[], batchInde
   const cardSource = selected.length ? selected : attempts.slice(0, batchSize);
   const references = await Promise.all(cardSource.map(attempt => fetchReferenceSnippet(attempt.mcq.question)));
 
-  const response = await fetch('https://ai.medmacs.app/api/ai/titration-flashcards', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      items: cardSource.map((attempt, index) => ({
-        question: attempt.mcq.question,
-        correctAnswer: attempt.mcq.correctAnswer,
-        explanation: attempt.mcq.explanation || '',
-        reference: references[index] || '',
-      })),
-    }),
+  const data = await aiApiJson<{ cards?: any[] }>('ai/titration-flashcards', {
+    items: cardSource.map((attempt, index) => ({
+      question: attempt.mcq.question,
+      correctAnswer: attempt.mcq.correctAnswer,
+      explanation: attempt.mcq.explanation || '',
+      reference: references[index] || '',
+    })),
   });
-  if (!response.ok) throw new Error('AI flashcard generation failed');
-
-  const data = await response.json();
   const cards = Array.isArray(data.cards) ? data.cards : [];
 
   return cards

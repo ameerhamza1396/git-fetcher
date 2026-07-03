@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { aiApiJson } from '@/utils/aiApi';
 import { fetchCloudContent } from '@/utils/cloudContent';
 import {
   getOfflineChapterById,
@@ -264,21 +265,11 @@ export const evaluateSEQAnswer = async (
   bookReferences: string
 ): Promise<SEQEvaluationResult> => {
   try {
-    const response = await fetch('https://ai.medmacs.app/api/seq_ai', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userAnswer,
-        question,
-        bookReferences
-      }),
+    const data = await aiApiJson<Partial<SEQEvaluationResult>>('seq_ai', {
+      userAnswer,
+      question,
+      bookReferences
     });
-
-    if (!response.ok) {
-      throw new Error('Evaluation failed');
-    }
-
-    const data = await response.json();
     return {
       is_correct: data.is_correct ?? false,
       satisfaction_index: data.satisfaction_index ?? 0,

@@ -13,8 +13,7 @@ import { ProfileDropdown } from '@/components/ProfileDropdown';
 import Seo from '@/components/Seo';
 import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
 import { motion, AnimatePresence } from 'framer-motion';
-import { aiApiUrl } from '@/utils/aiApi';
-import { logAiUsageEvent } from '@/utils/aiUsageEvents';
+import { aiApiJson } from '@/utils/aiApi';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -216,14 +215,9 @@ const DrSultanChat: React.FC = () => {
     const questionWithContext = context ? `${context}\n\nUser: ${trimmedInput}` : trimmedInput;
 
     try {
-      const res = await fetch(aiApiUrl('ai/study-chat'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: questionWithContext })
+      const payload = await aiApiJson<{ answer?: string | Record<string, unknown> }>('ai/study-chat', {
+        question: questionWithContext,
       });
-
-      if (!res.ok) throw new Error("Server error");
-      const payload = await res.json();
 
       const aiResponseText = typeof payload.answer === 'object'
         ? JSON.stringify(payload.answer, null, 2)
@@ -238,13 +232,6 @@ const DrSultanChat: React.FC = () => {
       const finalMessages = [...messagesWithUser, aiMsg];
       setMessages(finalMessages);
       await syncChatToDb(finalMessages, currentSessionId);
-      await logAiUsageEvent({
-        source: 'ai_chatbot_page',
-        metadata: {
-          promptLength: trimmedInput.length,
-          responseLength: aiResponseText.length,
-        },
-      });
     } catch (err: any) {
       setMessages(prev => [...prev, {
         sender: 'ai',

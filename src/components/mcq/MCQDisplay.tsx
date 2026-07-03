@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useReferenceSearch } from '@/hooks/useReferenceSearch';
-import { aiApiUrl } from '@/utils/aiApi';
+import { aiApiJson } from '@/utils/aiApi';
 import { fetchChapterById, fetchMCQsByChapter, fetchSubjectById, Chapter, MCQ, Subject } from '@/utils/mcqData';
 import { supabase } from '@/integrations/supabase/client';
 import { AIChatbot } from './AIChatbot';
@@ -1258,19 +1258,12 @@ export const MCQDisplay = ({
         return;
       }
 
-      const response = await fetch(aiApiUrl('reference-verify'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: currentMCQ.question,
-          correctAnswer: currentMCQ.correct_answer,
-          options: currentMCQ.shuffledOptions || currentMCQ.options || [],
-          explanation: currentMCQ.explanation || '',
-        }),
+      const parsed = await aiApiJson<any>('reference-verify', {
+        question: currentMCQ.question,
+        correctAnswer: currentMCQ.correct_answer,
+        options: currentMCQ.shuffledOptions || currentMCQ.options || [],
+        explanation: currentMCQ.explanation || '',
       });
-
-      if (!response.ok) throw new Error('AI confirmation failed');
-      const parsed = await response.json();
       const explicitNoInternalReferences =
         parsed?.verdict === 'no_references' ||
         ['none', 'external', 'llm_knowledge'].includes(String(parsed?.sourceBasis || '').toLowerCase());
@@ -1348,17 +1341,10 @@ export const MCQDisplay = ({
 
     setIsSummarizingReferences(true);
     try {
-      const response = await fetch(aiApiUrl('reference-summary'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: currentMCQ.question,
-          top_k: 5,
-        }),
+      const data = await aiApiJson<any>('reference-summary', {
+        question: currentMCQ.question,
+        top_k: 5,
       });
-
-      if (!response.ok) throw new Error('AI summary failed');
-      const data = await response.json();
 
       if (data.status === 'no_references' || !data.summary) {
         setReferenceSummary({

@@ -16,6 +16,7 @@ import { AIProgressTracker } from '@/components/ai/AIProgressTracker';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { motion, AnimatePresence } from 'framer-motion';
+import { aiApiJson } from '@/utils/aiApi';
 
 interface Question {
     question: string;
@@ -150,18 +151,12 @@ const AITestGenerator: React.FC = () => {
 
     const fetchBatch = async (batchSize: number, batchNumber: number, totalBatches: number) => {
         const apiTopic = topicMapping(selectedChapters[0]);
-        const res = await fetch(`https://ai.medmacs.app/api/ai/generate-test`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                topic: apiTopic,
-                difficulty: 'medium',
-                count: batchNumber === totalBatches ? (totalQ % 10 === 0 ? 10 : totalQ % 10) : batchSize,
-                prompt: `Strictly adhere to the syllabus for ${userYear} year and module: ${apiTopic}. Batch ${batchNumber} of ${totalBatches}. ${customPrompt}`
-            })
+        const data = await aiApiJson<{ questions: Question[] }>('ai/generate-test', {
+            topic: apiTopic,
+            difficulty: 'medium',
+            count: batchNumber === totalBatches ? (totalQ % 10 === 0 ? 10 : totalQ % 10) : batchSize,
+            prompt: `Strictly adhere to the syllabus for ${userYear} year and module: ${apiTopic}. Batch ${batchNumber} of ${totalBatches}. ${customPrompt}`
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || `Status ${res.status}`);
         return data.questions;
     };
 
@@ -341,7 +336,7 @@ const AITestGenerator: React.FC = () => {
                         <div>
                             {/* Main Title Section */}
                             <div className="text-center mb-6 sm:mb-8 animate-fade-in px-4">
-                                <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-foreground uppercase italic mb-3 mt-[env(safe-area-inset-top)]">
+                                <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-normal leading-[1.08] text-foreground uppercase italic mb-3 mt-[env(safe-area-inset-top)]">
                                     🧠 AI <span className="text-amber-500">Test</span> Generator
                                 </h1>
                                 <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] max-w-2xl mx-auto">
@@ -362,24 +357,24 @@ const AITestGenerator: React.FC = () => {
                                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-3 block">Step 1 of 3</span>
                             </motion.div>
 
-                            <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md pt-[env(safe-area-inset-top)] -mx-4 sm:mx-0 px-4 sm:px-0">
+                            <div className="sticky top-0 z-50 bg-background/45 dark:bg-background/20 backdrop-blur-xl pt-[env(safe-area-inset-top)] -mx-4 sm:mx-0 px-4 sm:px-0">
                                 <div className="max-w-4xl mx-auto">
                                     <div className="pb-3">
-                                        <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
-                                            Select <span className="text-amber-500">Subject</span>
+                                        <h2 className="px-1 text-3xl sm:text-5xl font-black tracking-normal text-foreground uppercase italic leading-[1.08] text-center">
+                                            Select <span className="heading-glyph-safe text-amber-500">Subject&nbsp;</span>
                                         </h2>
                                         <p className="text-muted-foreground text-sm font-medium mt-2 max-w-lg mx-auto text-center">
                                             Choose a subject to generate your AI-powered test
                                         </p>
                                     </div>
                                 </div>
-                                <div className="h-4 bg-gradient-to-b from-background/80 to-transparent pointer-events-none" />
+                                <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
                             </div>
 
                             <div className="max-w-4xl mx-auto px-4 sm:px-0 pb-32 grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {loadingSubjects ? (
                                     Array.from({ length: 4 }).map((_, i) => (
-                                        <div key={i} className="relative overflow-hidden rounded-3xl bg-muted/20 p-6 animate-pulse border border-border/40">
+                                        <div key={i} className="relative overflow-hidden rounded-3xl bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl p-6 animate-pulse border border-border/40">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-16 h-16 rounded-2xl bg-muted" />
                                                 <div className="flex-1 space-y-2">
@@ -403,7 +398,7 @@ const AITestGenerator: React.FC = () => {
                                                 onClick={() => handleChapterToggle(subject.subject_code)}
                                                 className={`group cursor-pointer relative overflow-hidden rounded-3xl border-2 p-6 transition-all duration-300 ${isSelected
                                                     ? 'border-amber-500 bg-amber-500/5 shadow-2xl shadow-amber-500/10'
-                                                    : 'border-border/40 bg-white/5 dark:bg-zinc-900/50 hover:border-amber-500/30 hover:bg-amber-500/5'
+                                                    : 'border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl hover:border-amber-500/30 hover:bg-amber-500/5'
                                                     }`}
                                             >
                                                 {isSelected && (
@@ -418,7 +413,7 @@ const AITestGenerator: React.FC = () => {
 
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2 mb-1">
-                                                            <h3 className={`text-xl font-black uppercase italic tracking-tight transition-colors ${isSelected ? 'text-amber-500' : 'text-foreground'
+                                                            <h3 className={`text-xl font-black uppercase italic tracking-normal leading-snug transition-colors ${isSelected ? 'text-amber-500' : 'text-foreground'
                                                                 }`}>
                                                                 {subject.subject_name}
                                                             </h3>
@@ -486,10 +481,10 @@ const AITestGenerator: React.FC = () => {
                                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-3 block">Step 2 of 3</span>
                             </motion.div>
 
-                            <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md pt-[env(safe-area-inset-top)] -mx-4 sm:mx-0 px-4 sm:px-0">
+                            <div className="sticky top-0 z-50 bg-background/45 dark:bg-background/20 backdrop-blur-xl pt-[env(safe-area-inset-top)] -mx-4 sm:mx-0 px-4 sm:px-0">
                                 <div className="max-w-4xl mx-auto">
                                     <div className="pb-3">
-                                        <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
+                                        <h2 className="px-1 text-3xl sm:text-5xl font-black tracking-normal text-foreground uppercase italic leading-[1.08] text-center">
                                             Select <span className="text-amber-500">Questions</span>
                                         </h2>
                                         <div className="mt-2 flex flex-col items-center gap-1">
@@ -500,7 +495,7 @@ const AITestGenerator: React.FC = () => {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="h-4 bg-gradient-to-b from-background/80 to-transparent pointer-events-none" />
+                                <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
                             </div>
 
                             <div className="max-w-4xl mx-auto px-4 sm:px-0">
@@ -518,8 +513,8 @@ const AITestGenerator: React.FC = () => {
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-1">Ready to Start</p>
-                                            <h3 className="text-xl font-black uppercase italic tracking-tight text-foreground">{topicMapping(selectedChapters[0])}</h3>
-                                            <p className="text-muted-foreground text-xs font-medium truncate">
+                                            <h3 className="text-xl font-black uppercase italic tracking-normal leading-snug text-foreground">{topicMapping(selectedChapters[0])}</h3>
+                                            <p className="text-muted-foreground text-xs font-medium leading-snug break-words">
                                                 AI Generated Test
                                             </p>
                                         </div>
@@ -550,7 +545,7 @@ const AITestGenerator: React.FC = () => {
                                                 onClick={() => setTotalQ(item.num)}
                                                 className={`group cursor-pointer relative overflow-hidden rounded-2xl border-2 p-4 transition-all duration-300 ${isSelected
                                                     ? 'border-amber-500 bg-amber-500/5 shadow-xl shadow-amber-500/10'
-                                                    : 'border-border/40 bg-white/5 dark:bg-zinc-900/50 hover:border-amber-500/30 hover:bg-amber-500/5'
+                                                    : 'border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl hover:border-amber-500/30 hover:bg-amber-500/5'
                                                     }`}
                                             >
                                                 {isSelected && (
@@ -565,7 +560,7 @@ const AITestGenerator: React.FC = () => {
 
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2 mb-0.5">
-                                                            <h3 className={`text-sm font-black uppercase italic tracking-tight transition-colors ${isSelected ? 'text-amber-500' : 'text-foreground'
+                                                            <h3 className={`text-sm font-black uppercase italic tracking-normal leading-snug transition-colors ${isSelected ? 'text-amber-500' : 'text-foreground'
                                                                 }`}>
                                                                 {item.label}
                                                             </h3>
@@ -630,10 +625,10 @@ const AITestGenerator: React.FC = () => {
                                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-3 block">Step 3 of 3</span>
                             </motion.div>
 
-                            <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md pt-[env(safe-area-inset-top)] -mx-4 sm:mx-0 px-4 sm:px-0">
+                            <div className="sticky top-0 z-50 bg-background/45 dark:bg-background/20 backdrop-blur-xl pt-[env(safe-area-inset-top)] -mx-4 sm:mx-0 px-4 sm:px-0">
                                 <div className="max-w-4xl mx-auto">
                                     <div className="pb-3">
-                                        <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
+                                        <h2 className="px-1 text-3xl sm:text-5xl font-black tracking-normal text-foreground uppercase italic leading-[1.08] text-center">
                                             Custom <span className="text-amber-500">Prompt</span>
                                         </h2>
                                         <p className="text-muted-foreground text-sm font-medium mt-2 max-w-lg mx-auto text-center">
@@ -641,7 +636,7 @@ const AITestGenerator: React.FC = () => {
                                         </p>
                                     </div>
                                 </div>
-                                <div className="h-4 bg-gradient-to-b from-background/80 to-transparent pointer-events-none" />
+                                <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
                             </div>
 
                             {/* Subject Preview Card */}
@@ -658,8 +653,8 @@ const AITestGenerator: React.FC = () => {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-1">Generating Test</p>
-                                        <h3 className="text-xl font-black uppercase italic tracking-tight text-foreground">{topicMapping(selectedChapters[0])}</h3>
-                                        <p className="text-muted-foreground text-xs font-medium truncate">
+                                        <h3 className="text-xl font-black uppercase italic tracking-normal leading-snug text-foreground">{topicMapping(selectedChapters[0])}</h3>
+                                        <p className="text-muted-foreground text-xs font-medium leading-snug break-words">
                                             {totalQ} AI Generated Questions
                                         </p>
                                     </div>
@@ -971,10 +966,10 @@ const AITestGenerator: React.FC = () => {
                                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500 mb-3 block">Test Completed</span>
                             </motion.div>
 
-                            <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md pt-[env(safe-area-inset-top)] -mx-4 sm:mx-0 px-4 sm:px-0">
+                            <div className="sticky top-0 z-50 bg-background/45 dark:bg-background/20 backdrop-blur-xl pt-[env(safe-area-inset-top)] -mx-4 sm:mx-0 px-4 sm:px-0">
                                 <div className="max-w-4xl mx-auto">
                                     <div className="pb-3">
-                                        <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none text-center">
+                                        <h2 className="px-1 text-3xl sm:text-5xl font-black tracking-normal text-foreground uppercase italic leading-[1.08] text-center">
                                             Your <span className="text-amber-500">Result</span>
                                         </h2>
                                         <p className="text-muted-foreground text-sm font-medium mt-2 max-w-lg mx-auto text-center">
@@ -982,7 +977,7 @@ const AITestGenerator: React.FC = () => {
                                         </p>
                                     </div>
                                 </div>
-                                <div className="h-4 bg-gradient-to-b from-background/80 to-transparent pointer-events-none" />
+                                <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
                             </div>
 
                             <div className="max-w-4xl mx-auto px-4 sm:px-0">

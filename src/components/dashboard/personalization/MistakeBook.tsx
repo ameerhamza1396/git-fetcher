@@ -10,6 +10,7 @@ import { CorrectionMCQModal } from './CorrectionMCQModal';
 import { fetchReferenceSnippet } from './personalizationUtils';
 import { MistakeChapter, MistakeSubject, WrongAttempt } from './types';
 import { parseBoldText } from '@/utils/format';
+import { aiApiJson } from '@/utils/aiApi';
 
 type MistakeBookProps = {
   subjects: MistakeSubject[];
@@ -27,6 +28,7 @@ export const MistakeBook = ({ subjects, isPremium }: MistakeBookProps) => {
   const [aiLoading, setAiLoading] = useState(false);
 
   const activeAttempt = activeChapter?.attempts[activeIndex];
+  let chapterAnimationIndex = 0;
 
   const openChapter = (chapter: MistakeChapter) => {
     setActiveChapter(chapter);
@@ -52,19 +54,13 @@ export const MistakeBook = ({ subjects, isPremium }: MistakeBookProps) => {
     setAiLoading(true);
     try {
       const reference = await fetchReferenceSnippet(attempt.mcq.question);
-      const response = await fetch('https://ai.medmacs.app/api/ai/mistake-explain', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: attempt.mcq.question,
-          selectedAnswer: attempt.selectedAnswer,
-          correctAnswer: attempt.mcq.correctAnswer,
-          explanation: attempt.mcq.explanation || '',
-          reference,
-        }),
+      const data = await aiApiJson<{ explanation?: string }>('ai/mistake-explain', {
+        question: attempt.mcq.question,
+        selectedAnswer: attempt.selectedAnswer,
+        correctAnswer: attempt.mcq.correctAnswer,
+        explanation: attempt.mcq.explanation || '',
+        reference,
       });
-      if (!response.ok) throw new Error('AI explanation failed');
-      const data = await response.json();
       setAiExplanation(data.explanation || 'Explanation generated, but no text was returned.');
     } catch {
       setAiExplanation(attempt.mcq.explanation || `Correct answer: ${attempt.mcq.correctAnswer}`);
@@ -75,42 +71,64 @@ export const MistakeBook = ({ subjects, isPremium }: MistakeBookProps) => {
 
   return (
     <>
-      <div className="max-w-4xl mx-auto px-4 sm:px-0 pb-20 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {subjects.flatMap(subject => subject.chapters.map((chapter, index) => (
-          <motion.button
-            key={chapter.id}
-            type="button"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.03 }}
-            whileHover={{ scale: 1.02, x: 5 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => openChapter({ ...chapter, subjectName: subject.name })}
-            className="group relative overflow-hidden rounded-2xl border-2 border-border/40 bg-white/5 p-4 text-left transition-all duration-300 hover:border-primary/30 hover:bg-primary/5 dark:bg-zinc-900/50"
-          >
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 transition-all group-hover:bg-primary group-hover:text-white">
-                <Target className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Chapter {chapter.number} - {subject.name}</p>
-                <h3 className="truncate text-base font-black uppercase italic tracking-tight text-foreground">
-                  {chapter.name}
+      <div className="max-w-4xl mx-auto px-4 sm:px-0 pb-20 space-y-7">
+        {subjects.map(subject => (
+          <section key={subject.id} className="space-y-3">
+            <div className="flex items-end justify-between gap-4 border-b border-border/40 pb-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary">Subject Segment</p>
+                <h3 className="mt-1 text-xl font-black uppercase italic leading-tight tracking-normal text-foreground">
+                  {subject.name}
                 </h3>
-                <p className="truncate text-xs font-medium text-muted-foreground">{chapter.attempts.length} marked MCQs</p>
               </div>
               <div className="shrink-0 text-right">
-                <Badge className="border-0 bg-rose-500/10 text-rose-600 dark:text-rose-300">{chapter.attempts.length}</Badge>
-                <p className="mt-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">MCQs</p>
+                <Badge className="border-0 bg-primary/10 text-primary">{subject.chapters.length} chapters</Badge>
+                <p className="mt-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{subject.total} MCQs</p>
               </div>
             </div>
-          </motion.button>
-        )))}
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {subject.chapters.map(chapter => {
+                const animationIndex = chapterAnimationIndex++;
+                return (
+                  <motion.button
+                    key={chapter.id}
+                    type="button"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: animationIndex * 0.03 }}
+                    whileHover={{ scale: 1.02, x: 5 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => openChapter({ ...chapter, subjectName: subject.name })}
+                    className="group relative overflow-hidden rounded-2xl border-2 border-border/40 bg-white/5 p-4 text-left backdrop-blur-xl transition-all duration-300 hover:border-primary/30 hover:bg-primary/5 dark:bg-white/[0.035]"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 transition-all group-hover:bg-primary group-hover:text-white">
+                        <Target className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Chapter {chapter.number}</p>
+                        <h3 className="text-base font-black uppercase italic leading-snug tracking-normal text-foreground">
+                          {chapter.name}
+                        </h3>
+                        <p className="text-xs font-medium leading-snug text-muted-foreground">{chapter.attempts.length} marked MCQs</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <Badge className="border-0 bg-rose-500/10 text-rose-600 dark:text-rose-300">{chapter.attempts.length}</Badge>
+                        <p className="mt-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">MCQs</p>
+                      </div>
+                    </div>
+                  </motion.button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </div>
 
       <Dialog open={!!activeChapter} onOpenChange={(open) => !open && setActiveChapter(null)}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden rounded-3xl border-border/40 p-0 flex flex-col">
-          <DialogHeader className="shrink-0 border-b border-border/40 bg-background px-5 py-4 text-left">
+          <DialogHeader className="shrink-0 border-b border-border/40 bg-background/55 dark:bg-white/[0.035] backdrop-blur-xl px-5 py-4 text-left">
             <DialogTitle className="flex items-center gap-2 text-base font-black">
               <BookOpen className="h-5 w-5 text-primary" />
               {activeChapter?.name}

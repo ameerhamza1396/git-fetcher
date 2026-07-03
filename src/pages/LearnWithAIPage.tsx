@@ -17,7 +17,7 @@ import { fetchReferenceSnippet } from '@/components/dashboard/personalization/pe
 import { getFlashcardQuota, recordGeneratedFlashcards } from '@/components/profile/AchievementBadges';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { logAiUsageEvent } from '@/utils/aiUsageEvents';
+import { aiApiJson } from '@/utils/aiApi';
 
 type Flashcard = {
   front: string;
@@ -30,7 +30,7 @@ type LearningScope =
   | { type: 'subject'; subject: Subject; chapters: Chapter[] };
 
 const SubjectCardSkeleton = () => (
-  <div className="relative overflow-hidden rounded-3xl bg-muted/20 p-6 animate-pulse border border-border/40">
+  <div className="relative overflow-hidden rounded-3xl bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl p-6 animate-pulse border border-border/40">
     <div className="flex items-center gap-4">
       <div className="w-16 h-16 rounded-2xl bg-muted" />
       <div className="flex-1 space-y-2">
@@ -42,7 +42,7 @@ const SubjectCardSkeleton = () => (
 );
 
 const ChapterCardSkeleton = () => (
-  <div className="relative overflow-hidden rounded-2xl bg-muted/20 p-4 animate-pulse border border-border/30">
+  <div className="relative overflow-hidden rounded-2xl bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl p-4 animate-pulse border border-border/30">
     <div className="flex items-center gap-4">
       <div className="w-12 h-12 rounded-xl bg-muted" />
       <div className="flex-1 space-y-2">
@@ -54,7 +54,7 @@ const ChapterCardSkeleton = () => (
 );
 
 const FlashcardSkeleton = () => (
-  <div className="space-y-3 rounded-3xl border border-border/40 bg-background p-4">
+  <div className="space-y-3 rounded-3xl border border-border/40 bg-background/55 dark:bg-white/[0.035] backdrop-blur-xl p-4">
     <div className="flex items-center justify-between">
       <div className="h-5 w-16 animate-pulse rounded-full bg-muted" />
       <div className="h-3 w-24 animate-pulse rounded-full bg-muted" />
@@ -101,14 +101,7 @@ Explanation: ${mcq.explanation || 'None'}
 Reference: ${references[index] || 'No reference retrieved'}
 `).join('\n')}`;
 
-  const response = await fetch('https://ai.medmacs.app/api/ai/study-chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question: prompt }),
-  });
-  if (!response.ok) throw new Error('AI flashcard generation failed');
-
-  const data = await response.json();
+  const data = await aiApiJson<{ answer?: string }>('ai/study-chat', { question: prompt });
   const answer = data.answer || '';
   const jsonMatch = answer.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('AI response was not JSON');
@@ -123,17 +116,6 @@ Reference: ${references[index] || 'No reference retrieved'}
       back: String(card.back),
       source: card.source ? String(card.source) : `AI card ${start + index + 1}`,
     }));
-
-  await logAiUsageEvent({
-    source: 'learn_with_ai_flashcards',
-    metadata: {
-      scopeLabel,
-      batchIndex,
-      promptLength: prompt.length,
-      responseLength: answer.length,
-      cards: normalizedCards.length,
-    },
-  });
 
   return normalizedCards;
 };
@@ -288,8 +270,8 @@ const LearnWithAIPage = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background p-4 text-center">
-        <Card className="w-full max-w-md bg-card/90 backdrop-blur-sm border-border shadow-lg p-6">
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background/55 dark:bg-white/[0.035] backdrop-blur-xl p-4 text-center">
+        <Card className="w-full max-w-md bg-card/60 dark:bg-white/[0.05] backdrop-blur-sm border-border shadow-lg p-6">
           <CardHeader className="mb-4">
             <Lock className="w-16 h-16 mx-auto text-primary mb-4" />
             <CardTitle className="text-2xl font-bold text-foreground">Access Restricted</CardTitle>
@@ -310,7 +292,7 @@ const LearnWithAIPage = () => {
       <Seo title="Learn with Dr Ahroid" description="Generate AI flashcards from any subject or chapter on Medmacs App." canonical="https://medmacs.app/learn-with-ai" />
 
       <div className="text-center mb-6 sm:mb-8 animate-fade-in">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-foreground uppercase italic mb-3">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-normal leading-[1.08] text-foreground uppercase italic mb-3">
           Learn with <span className="text-primary">Dr Ahroid</span>
         </h1>
         <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] max-w-2xl mx-auto px-4 sm:px-0">
@@ -331,17 +313,17 @@ const LearnWithAIPage = () => {
         </span>
       </motion.div>
 
-      <div ref={stickyHeadingRef} className="sticky top-0 z-50 bg-background/80 backdrop-blur-md pt-[env(safe-area-inset-top)] -mx-3 sm:mx-0 px-3 sm:px-0">
+      <div ref={stickyHeadingRef} className="sticky top-0 z-50 bg-background/45 dark:bg-background/20 backdrop-blur-xl pt-[env(safe-area-inset-top)] -mx-3 sm:mx-0 px-3 sm:px-0">
         <div className="max-w-4xl mx-auto px-4 sm:px-0">
           <motion.div
             animate={{ paddingTop: isHeadingStuck ? 10 : 16, paddingBottom: isHeadingStuck ? 10 : 12 }}
             transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-            className="overflow-hidden"
+            className="overflow-visible"
           >
             <motion.div
-              animate={{ height: isHeadingStuck ? 28 : 56 }}
+              animate={{ height: isHeadingStuck ? 34 : 64 }}
               transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-              className="relative"
+              className="relative overflow-visible"
             >
               <motion.h2
                 animate={{
@@ -350,9 +332,9 @@ const LearnWithAIPage = () => {
                   scale: isHeadingStuck ? 0.58 : 1
                 }}
                 transition={{ type: 'spring', stiffness: 260, damping: 28 }}
-                className="absolute top-0 origin-left whitespace-nowrap text-3xl sm:text-5xl font-black tracking-tight text-foreground uppercase italic leading-none"
+                className="absolute top-0 origin-left whitespace-nowrap pr-3 text-3xl sm:text-5xl font-black tracking-normal text-foreground uppercase italic leading-[1.08]"
               >
-                Select <span className="live-gradient-text">{selectedSubject ? 'Chapter' : 'Subject'}</span>
+                Select <span className="live-gradient-text">{selectedSubject ? 'Chapter\u00A0' : 'Subject\u00A0'}</span>
               </motion.h2>
             </motion.div>
             <motion.p
@@ -369,7 +351,7 @@ const LearnWithAIPage = () => {
             </motion.p>
           </motion.div>
         </div>
-        <div className="h-4 bg-gradient-to-b from-background/80 to-transparent pointer-events-none" />
+        <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
       </div>
 
       {!selectedSubject ? (
@@ -391,7 +373,7 @@ const LearnWithAIPage = () => {
                   className={`group cursor-pointer relative overflow-hidden rounded-3xl border-2 p-6 transition-all duration-300 ${
                     isSelected
                       ? 'border-primary bg-primary/5 shadow-2xl shadow-primary/10'
-                      : 'border-border/40 bg-white/5 dark:bg-zinc-900/50 hover:border-primary/30 hover:bg-primary/5'
+                      : 'border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl hover:border-primary/30 hover:bg-primary/5'
                   }`}
                 >
                   <div className="flex items-center gap-5 relative z-10">
@@ -401,7 +383,7 @@ const LearnWithAIPage = () => {
                       {subject.icon || <Brain className="w-7 h-7" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-xl font-black uppercase italic tracking-tight text-foreground">{subject.name}</h3>
+                      <h3 className="text-xl font-black uppercase italic tracking-normal leading-snug text-foreground">{subject.name}</h3>
                       <p className="text-muted-foreground text-xs font-medium leading-relaxed line-clamp-2">
                         {subject.description || `Generate focused flashcards from ${subject.name}.`}
                       </p>
@@ -432,8 +414,8 @@ const LearnWithAIPage = () => {
                 <Sparkles className="w-5 h-5" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-black uppercase italic tracking-tight text-primary">Whole Subject</h3>
-                <p className="text-muted-foreground text-xs font-medium truncate">{selectedSubject.name} - all available chapters</p>
+                <h3 className="text-sm font-black uppercase italic tracking-normal leading-snug text-primary">Whole Subject</h3>
+                <p className="text-muted-foreground text-xs font-medium leading-snug break-words">{selectedSubject.name} - all available chapters</p>
               </div>
               <Badge className="border-0 bg-primary/10 text-primary">{chapters.length}</Badge>
             </div>
@@ -456,15 +438,15 @@ const LearnWithAIPage = () => {
                 disabled={isComingSoon}
                 className={`group relative overflow-hidden rounded-2xl border-2 p-4 text-left transition-all duration-300 ${
                   isComingSoon ? 'opacity-50 cursor-not-allowed grayscale' : 'cursor-pointer'
-                } border-border/40 bg-white/5 dark:bg-zinc-900/50 hover:border-primary/30 hover:bg-primary/5`}
+                } border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl hover:border-primary/30 hover:bg-primary/5`}
               >
                 <div className="flex items-center gap-4 relative z-10">
                   <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-muted/50 text-foreground/70">
                     <BookOpen className="w-5 h-5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-black uppercase italic tracking-tight text-foreground">{chapter.name}</h3>
-                    <p className="text-muted-foreground text-xs font-medium truncate">Chapter {chapter.chapter_number} - {chapter.mcq_count || 0} MCQs</p>
+                    <h3 className="text-sm font-black uppercase italic tracking-normal leading-snug text-foreground">{chapter.name}</h3>
+                    <p className="text-muted-foreground text-xs font-medium leading-snug break-words">Chapter {chapter.chapter_number} - {chapter.mcq_count || 0} MCQs</p>
                   </div>
                   <ArrowRight className="w-4 h-4 text-muted-foreground" />
                 </div>
@@ -498,7 +480,7 @@ const LearnWithAIPage = () => {
 
       <Dialog open={flashcardModalOpen} onOpenChange={setFlashcardModalOpen}>
         <DialogContent className="max-w-2xl overflow-hidden rounded-3xl border-border/40 p-0">
-          <DialogHeader className="border-b border-border/40 bg-background px-5 py-4 text-left">
+          <DialogHeader className="border-b border-border/40 bg-background/55 dark:bg-white/[0.035] backdrop-blur-xl px-5 py-4 text-left">
             <DialogTitle className="flex items-center gap-2 text-base font-black">
               <Sparkles className="h-5 w-5 text-primary" />
               {getScopeLabel()}
@@ -513,7 +495,7 @@ const LearnWithAIPage = () => {
               <FlashcardSkeleton />
             ) : currentCard ? (
               <div className="space-y-3">
-                <div className="rounded-3xl border border-border/40 bg-background p-4 shadow-sm">
+                <div className="rounded-3xl border border-border/40 bg-background/55 dark:bg-white/[0.035] backdrop-blur-xl p-4 shadow-sm">
                   <div className="mb-3 flex items-center justify-between">
                     <Badge variant="secondary">{activeCard + 1}/{flashcards.length}</Badge>
                     <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">

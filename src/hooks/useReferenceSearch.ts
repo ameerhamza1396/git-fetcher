@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { ReferenceResponse } from "../types/reference";
-import { aiApiUrl } from "@/utils/aiApi";
+import { aiApiJson } from "@/utils/aiApi";
 
 export function useReferenceSearch() {
     const [loading, setLoading] = useState(false);
@@ -12,25 +12,7 @@ export function useReferenceSearch() {
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch(aiApiUrl('reference'), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query, top_k: topK }),
-            });
-
-            if (!res.ok) {
-                let errorMsg = "Failed to fetch references";
-                try {
-                    const errText = await res.text();
-                    const errData = JSON.parse(errText);
-                    errorMsg = errData.error || errorMsg;
-                } catch (e) {
-                    errorMsg = `Server error: ${res.status}`;
-                }
-                throw new Error(errorMsg);
-            }
-
-            const result: ReferenceResponse = await res.json();
+            const result = await aiApiJson<ReferenceResponse>('reference', { query, top_k: topK });
             setData(result);
             return result;
         } catch (err: any) {

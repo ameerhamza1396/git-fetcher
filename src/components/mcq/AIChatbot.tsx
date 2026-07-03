@@ -4,8 +4,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, X, Loader2, Lock, WifiOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { aiApiUrl, aiApiOrigin } from '@/utils/aiApi';
-import { logAiUsageEvent } from '@/utils/aiUsageEvents';
+import { aiApiJson, aiApiOrigin } from '@/utils/aiApi';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -72,22 +71,9 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
       if (questionContext) {
         composedPrompt = `MCQ Question: ${questionContext}\nCorrect Answer: ${correctAnswer}\nUser Selected: ${currentAnswer || 'None'}\nExplanation Provided: ${explanationContext}\n\nUser Query: ${message.trim()}`;
       }
-      const response = await fetch(aiApiUrl('ai/study-chat'), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: composedPrompt }),
-      });
-      if (!response.ok) { const errorText = await response.text(); throw new Error(`Server responded with ${response.status}: ${errorText}`); }
-      const data = await response.json();
+      const data = await aiApiJson<{ answer?: string }>('ai/study-chat', { question: composedPrompt });
       const answer = data.answer || 'Sorry, I could not generate a response.';
       setMessages(prev => [...prev, { role: 'assistant', content: answer, timestamp: new Date().toISOString() }]);
-      await logAiUsageEvent({
-        source: 'mcq_chatbot',
-        metadata: {
-          hasQuestionContext: Boolean(questionContext),
-          promptLength: message.trim().length,
-          responseLength: String(answer).length,
-        },
-      });
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: `Sorry, there was an error connecting to the AI service. Please check if the server at ${aiApiOrigin} is running and try again.`, timestamp: new Date().toISOString() }]);
     } finally { setIsLoading(false); }
