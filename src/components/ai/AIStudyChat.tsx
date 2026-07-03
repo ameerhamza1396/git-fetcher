@@ -10,6 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Message, ChatSession, ChatSessionInsert, ChatSessionUpdate } from '@/types/ai';
 import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
 import { aiApiJson } from '@/utils/aiApi';
+import { renderAiMessageText } from '@/utils/format';
+import { InstagramCreatorCta, shouldShowCreatorInstagramCta } from '@/components/ai/InstagramCreatorCta';
 
 const isAiPolicyNotice = (text: string) =>
   /(not available for your current plan|quota|limit|login|required|reached|not enabled|upgrade)/i.test(text);
@@ -221,7 +223,10 @@ export const AIStudyChat = () => {
                       m.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-900'
                     }`}
                   >
-                    <p className="whitespace-pre-wrap">{m.content}</p>
+                    <div className="whitespace-pre-wrap">{m.role === 'user' ? m.content : renderAiMessageText(m.content)}</div>
+                    {m.role !== 'user' && shouldShowCreatorInstagramCta(m.content) && (
+                      <InstagramCreatorCta />
+                    )}
                     <p className={`text-xs mt-1 ${m.role === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
                       {new Date(m.timestamp).toLocaleTimeString()}
                     </p>

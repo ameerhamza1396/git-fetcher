@@ -1,13 +1,110 @@
 import { ReactNode } from "react";
 
+const normalizeAiMarkdown = (text: string) => {
+  const normalizedHeadingText = text
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/^\s{0,3}#{1,6}\s+(.+)$/gm, '**$1**')
+    .replace(/^\s{0,3}>{1,}\s?/gm, '')
+    .replace(/```[\s\S]*?```/g, (block) => block.replace(/```[a-z]*|```/gi, '').trim())
+    .replace(/^\s*Component:\s*Details\s*$/gim, '')
+    .replace(/(^|\n)\s*([A-Z][A-Za-z /‑–-]{2,48}):\*\*\s*/g, '$1**$2:** ')
+    .replace(/(^|\n)\s*([A-Z][A-Za-z /‑–-]{2,48}):\s*/g, '$1**$2:** ')
+    .replace(/(^|\n)(\s*\d+[.)]\s+)([^*\n:]{2,72})\*\*\s*[–-]\s*/g, '$1$2**$3:** ')
+    .replace(/(^|\n)(\s*\d+[.)]\s+)([^:\n]{2,48})\s+[–-]\s+/g, '$1$2**$3:** ')
+    .replace(/\s*[•●]\s*/g, '\n- ')
+    .replace(/\s+([1-9]\d?[.)]\s+)/g, '\n$1')
+    .replace(/\*\*\s*:/g, ':**');
+
+  return normalizedHeadingText
+    .split('\n')
+    .map((line) => {
+      const trimmed = line.trim();
+      if (/^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(trimmed)) return '';
+      if (trimmed.includes('|')) {
+        const cells = trimmed
+          .replace(/^\|/, '')
+          .replace(/\|$/, '')
+          .split('|')
+          .map((cell) => cell.trim())
+          .filter(Boolean);
+        if (cells.length >= 2) {
+          return `- **${cells[0]}:** ${cells.slice(1).join(' - ')}`;
+        }
+      }
+      return line;
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};
+
 export const parseBoldText = (text: string): ReactNode[] => {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  const parts = normalizeAiMarkdown(text).split(/(\*\*[^*]+\*\*)/g);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return <strong key={i} className="font-bold">{part.slice(2, -2)}</strong>;
     }
-    return part;
+    return part.replace(/\*([^*\n]+)\*/g, '$1').replace(/_([^_\n]+)_/g, '$1');
   });
+};
+
+export const renderAiMessageText = (text: string): ReactNode => {
+  const normalized = normalizeAiMarkdown(text);
+  const lines = normalized.split('\n');
+  const elements: ReactNode[] = [];
+  let listItems: string[] = [];
+  let paragraphLines: string[] = [];
+  let key = 0;
+
+  const flushParagraph = () => {
+    if (!paragraphLines.length) return;
+    elements.push(
+      <p key={key++} className="mb-2 last:mb-0">
+        {parseBoldText(paragraphLines.join(' '))}
+      </p>
+    );
+    paragraphLines = [];
+  };
+
+  const flushList = () => {
+    if (!listItems.length) return;
+    elements.push(
+      <ul key={key++} className="mb-2 list-disc space-y-1 pl-4 last:mb-0">
+        {listItems.map((item, index) => (
+          <li key={`${key}-${index}`}>{parseBoldText(item)}</li>
+        ))}
+      </ul>
+    );
+    listItems = [];
+  };
+
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    const bulletMatch = trimmed.match(/^[-*]\s+(.+)$/);
+    const numberedMatch = trimmed.match(/^\d+[.)]\s+(.+)$/);
+
+    if (!trimmed) {
+      flushParagraph();
+      flushList();
+      return;
+    }
+
+    if (bulletMatch || numberedMatch) {
+      flushParagraph();
+      listItems.push((bulletMatch?.[1] || numberedMatch?.[1] || '').trim());
+      return;
+    }
+
+    flushList();
+    paragraphLines.push(trimmed);
+  });
+
+  flushParagraph();
+  flushList();
+
+  return <>{elements}</>;
 };
 
 const renderInline = (text: string): ReactNode[] => {

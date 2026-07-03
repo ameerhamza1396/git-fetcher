@@ -38,7 +38,8 @@ interface SavedChat {
   session_name?: string;
 }
 
-import { parseBoldText } from '@/utils/format';
+import { renderAiMessageText } from '@/utils/format';
+import { InstagramCreatorCta, shouldShowCreatorInstagramCta } from '@/components/ai/InstagramCreatorCta';
 
 const isAiPolicyNotice = (text: string) =>
   /(not available for your current plan|quota|limit|login|required|reached|not enabled|upgrade)/i.test(text);
@@ -424,7 +425,10 @@ const DrSultanChat: React.FC = () => {
                       ? 'bg-primary text-white rounded-tr-none'
                       : 'bg-white dark:bg-zinc-900 text-foreground border border-border/60 rounded-tl-none'
                       }`}>
-                      <p className="text-[15px] leading-relaxed font-medium whitespace-pre-wrap">{parseBoldText(msg.text)}</p>
+                      <div className="text-[15px] leading-relaxed font-medium whitespace-pre-wrap">{renderAiMessageText(msg.text)}</div>
+                      {msg.sender === 'ai' && shouldShowCreatorInstagramCta(msg.text) && (
+                        <InstagramCreatorCta />
+                      )}
 
                       <div className={`mt-3 pt-3 flex items-center justify-between border-t ${msg.sender === 'user' ? 'border-white/10 opacity-60' : 'border-border/30 opacity-40'
                         }`}>

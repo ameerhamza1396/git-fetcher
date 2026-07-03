@@ -12,7 +12,8 @@ interface Message {
   timestamp: string;
 }
 
-import { parseBoldText } from '@/utils/format';
+import { renderAiMessageText } from '@/utils/format';
+import { InstagramCreatorCta, shouldShowCreatorInstagramCta } from '@/components/ai/InstagramCreatorCta';
 
 const isAiPolicyNotice = (text: string) =>
   /(not available for your current plan|quota|limit|login|required|reached|not enabled|upgrade)/i.test(text);
@@ -187,7 +188,10 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
                             ? 'bg-primary text-white dark:bg-slate-700 dark:text-white rounded-br-md'
                             : 'bg-muted/60 text-foreground rounded-bl-md'
                             }`}>
-                            <p className="whitespace-pre-wrap break-words leading-relaxed">{parseBoldText(message.content)}</p>
+                            <div className="whitespace-pre-wrap break-words leading-relaxed">{renderAiMessageText(message.content)}</div>
+                            {message.role === 'assistant' && shouldShowCreatorInstagramCta(message.content) && (
+                              <InstagramCreatorCta />
+                            )}
                             <p className={`text-[10px] mt-1 ${message.role === 'user' ? 'text-white/70' : 'text-muted-foreground'}`}>
                               {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </p>
