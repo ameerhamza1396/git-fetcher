@@ -694,7 +694,7 @@ const ReferenceModal = ({
                         <div className="min-w-[150px]">
                           <div className="mb-1 flex items-center justify-between gap-3">
                             <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                              Context Match
+                              AI Confidence
                             </span>
                             <span className="text-[10px] font-black text-primary">
                               {contextScore === null ? 'N/A' : `${contextScore}%`}
@@ -718,26 +718,25 @@ const ReferenceModal = ({
                   );
                 })}
 
-                <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-4 text-xs font-medium leading-relaxed text-muted-foreground dark:border-slate-800 dark:bg-slate-900/40">
-                  <p className="font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">DCMA Disclaimer</p>
-                  <p className="mt-2">
-                    References are provided for educational verification and study support. If you believe any referenced
-                    material infringes your rights, please review our{' '}
-                    <a href="/dcma" className="font-bold text-slate-600 underline underline-offset-4 hover:text-primary dark:text-slate-300">
-                      DCMA Page
-                    </a>{' '}
-                    or contact{' '}
-                    <a href="mailto:legal@medmacs.app" className="font-bold text-slate-600 underline underline-offset-4 hover:text-primary dark:text-slate-300">
-                      legal@medmacs.app
-                    </a>
-                    .
-                  </p>
-                </div>
               </div>
             )}
           </motion.div>
 
           <div className="border-t border-slate-200 px-5 py-4 dark:border-slate-800">
+            <div className="mb-3 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 text-[11px] font-medium leading-relaxed text-muted-foreground dark:border-slate-800 dark:bg-slate-900/40">
+              <p>
+                <span className="font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">DCMA Disclaimer: </span>
+                References are provided for educational verification and study support. If you believe any referenced
+                material infringes your rights, review our{' '}
+                <a href="/dcma" className="font-bold text-slate-600 underline underline-offset-4 hover:text-primary dark:text-slate-300">
+                  DCMA Page
+                </a>{' '}
+                or contact{' '}
+                <a href="mailto:legal@medmacs.app" className="font-bold text-slate-600 underline underline-offset-4 hover:text-primary dark:text-slate-300">
+                  legal@medmacs.app
+                </a>.
+              </p>
+            </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button
                 variant="outline"
@@ -1408,10 +1407,13 @@ export const MCQDisplay = ({
         correctAnswer: currentMCQ.correct_answer,
         explanation: currentMCQ.explanation || '',
       });
+      const optionList = currentMCQ.shuffledOptions || currentMCQ.options || [];
       const nextExplanations = Array.isArray(data.optionExplanations)
-        ? data.optionExplanations.reduce((acc, item) => {
-          if (item?.option && item?.explanation) {
-            acc[item.option] = {
+        ? data.optionExplanations.reduce((acc, item, fallbackIndex) => {
+          const optionIndex = Number.isInteger(item?.optionIndex) ? item.optionIndex : fallbackIndex;
+          const optionKey = optionList[optionIndex] || item?.option;
+          if (optionKey && item?.explanation) {
+            acc[optionKey] = {
               verdict: item.verdict === 'correct' ? 'correct' : 'wrong',
               explanation: String(item.explanation),
             };

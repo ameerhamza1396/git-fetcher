@@ -59,10 +59,11 @@ Private reference context:
 ${referenceText}
 
 Return only JSON in this exact shape:
-{"optionExplanations":[{"option":"exact option text","verdict":"correct|wrong","explanation":"1 concise original sentence explaining support or contradiction."}],"citationIndexes":[0,2]}
+{"optionExplanations":[{"optionIndex":0,"option":"exact option text","verdict":"correct|wrong","explanation":"1 concise original sentence explaining support or contradiction."}],"citationIndexes":[0,2]}
 
 Rules:
 - Include every option in the same order.
+- optionIndex must be the zero-based index from the Options list.
 - Do not quote the private snippets.
 - Do not rewrite the snippets sentence-by-sentence.
 - Do not mention hidden chunks or internal context.
@@ -125,9 +126,10 @@ Rules:
     if (optionExplainMode) {
       const optionExplanations = Array.isArray(parsed?.optionExplanations)
         ? parsed.optionExplanations
-          .filter((item: any) => item?.option && item?.explanation)
+          .filter((item: any) => item?.explanation && (item?.option || Number.isInteger(item?.optionIndex)))
           .map((item: any) => ({
-            option: String(item.option),
+            option: item.option ? String(item.option) : '',
+            optionIndex: Number.isInteger(item.optionIndex) ? item.optionIndex : null,
             verdict: item.verdict === 'correct' ? 'correct' : 'wrong',
             explanation: String(item.explanation),
           }))
