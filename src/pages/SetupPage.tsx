@@ -458,7 +458,6 @@ const SetupWizard = () => {
         return;
       }
       const profilePatch: any = {
-        id: user!.id,
         institute,
         updated_at: new Date().toISOString(),
       };
@@ -467,7 +466,9 @@ const SetupWizard = () => {
         if (studyPathChangeMode) profilePatch.study_path_changed_at = new Date().toISOString();
       }
       setSaving(true);
-      const { error } = await supabase.from('profiles').upsert(profilePatch, { onConflict: 'id' });
+      const { error } = studyPathChangeMode
+        ? await supabase.from('profiles').update(profilePatch).eq('id', user!.id)
+        : await supabase.from('profiles').upsert({ id: user!.id, ...profilePatch }, { onConflict: 'id' });
       setSaving(false);
       if (error) {
         toast.error(selectedSpecializedTest ? 'Failed to save specialized test' : 'Failed to save institute');
@@ -491,15 +492,21 @@ const SetupWizard = () => {
       }
       if (!year) { toast.error('Please select your year'); return; }
       setSaving(true);
-      const { error } = await supabase.from('profiles').upsert({
-        id: user!.id,
+      const profilePatch: any = {
         ...(studyPathChangeMode ? { institute } : {}),
         year,
         updated_at: new Date().toISOString(),
         ...(studyPathChangeMode ? { study_path_changed_at: new Date().toISOString() } : {}),
-      } as any, { onConflict: 'id' });
+      };
+      const { error } = studyPathChangeMode
+        ? await supabase.from('profiles').update(profilePatch).eq('id', user!.id)
+        : await supabase.from('profiles').upsert({ id: user!.id, ...profilePatch }, { onConflict: 'id' });
       setSaving(false);
-      if (error) { toast.error('Failed to save year'); return; }
+      if (error) {
+        console.error('Failed to save year', error);
+        toast.error(error.message || 'Failed to save year');
+        return;
+      }
       if (studyPathChangeMode) {
         sessionStorage.removeItem('medmacs_setup_change_verified');
         toast.success('Institute updated.');
