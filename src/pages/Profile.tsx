@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,11 +43,15 @@ const itemVariants = {
 
 const Profile = () => {
     const queryClient = useQueryClient();
+    const navigate = useNavigate();
     const { user, isLoading: authLoading } = useAuth();
 
     const [editableProfile, setEditableProfile] = useState({ full_name: '', username: '', year: '' });
     const [loadingUpdateProfile, setLoadingUpdateProfile] = useState(false);
     const [showStatsModal, setShowStatsModal] = useState(false);
+    const [showStudyPathModal, setShowStudyPathModal] = useState(false);
+    const [studyPathPassword, setStudyPathPassword] = useState('');
+    const [verifyingStudyPathPassword, setVerifyingStudyPathPassword] = useState(false);
     const [institutes, setInstitutes] = useState<Institute[]>([]);
     const [copiedReferral, setCopiedReferral] = useState(false);
     const validYears = ["1st", "2nd", "3rd", "4th", "5th"];
@@ -134,6 +138,36 @@ const Profile = () => {
         setCopiedReferral(true);
         toast.success('Referral code copied!');
         setTimeout(() => setCopiedReferral(false), 2500);
+    };
+
+    const verifyStudyPathChange = async (event) => {
+        event.preventDefault();
+        if (!user?.email || !studyPathPassword) {
+            toast.error('Please enter your password.');
+            return;
+        }
+
+        setVerifyingStudyPathPassword(true);
+        try {
+            const { error } = await supabase.auth.signInWithPassword({
+                email: user.email,
+                password: studyPathPassword,
+            });
+            if (error) {
+                toast.error('Password verification failed.');
+                return;
+            }
+
+            sessionStorage.setItem('medmacs_setup_change_verified', JSON.stringify({
+                userId: user.id,
+                verifiedAt: Date.now(),
+            }));
+            setShowStudyPathModal(false);
+            setStudyPathPassword('');
+            navigate('/setup');
+        } finally {
+            setVerifyingStudyPathPassword(false);
+        }
     };
 
     if (authLoading || profileLoading) {
@@ -318,10 +352,14 @@ const Profile = () => {
                                             <Label htmlFor="institute" className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
                                                 <Building2 className="mr-1 inline h-3 w-3" /> {selectedSpecializedTest ? 'Specialized Test' : 'Institute'}
                                             </Label>
-                                            <Input id="institute" value={userInstituteName} disabled
-                                                onClick={() => toast.info(`${selectedSpecializedTest ? 'Specialized test' : 'Institute'} can only be set once. To request a change, please contact us at hi@medmacs.app.`)}
-                                                className="mt-1.5 h-11 rounded-xl border-border/40 bg-muted/30 text-muted-foreground cursor-not-allowed" />
-                                            <p className="mt-1 text-[10px] text-muted-foreground/60">Contact hi@medmacs.app to change</p>
+                                            <div className="mt-1.5 flex gap-2">
+                                                <Input id="institute" value={userInstituteName} disabled
+                                                    className="h-11 rounded-xl border-border/40 bg-muted/30 text-muted-foreground cursor-not-allowed" />
+                                                <Button type="button" variant="outline" className="h-11 rounded-xl font-bold" onClick={() => setShowStudyPathModal(true)}>
+                                                    Change
+                                                </Button>
+                                            </div>
+                                            <p className="mt-1 text-[10px] text-muted-foreground/60">Password verification is required before changing this.</p>
                                         </div>
                                         <div>
                                             <Label htmlFor="full_name" className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
@@ -442,6 +480,31 @@ const Profile = () => {
                         ))}
                     </div>
                     <AchievementBadges userId={user?.id} compact />
+                </DialogContent>
+            </Dialog>
+            <Dialog open={showStudyPathModal} onOpenChange={setShowStudyPathModal}>
+                <DialogContent className="sm:max-w-[430px] rounded-[2rem]">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-black">Verify Password</DialogTitle>
+                        <DialogDescription>Confirm your password to change your institute or specialized test.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={verifyStudyPathChange} className="space-y-4">
+                        <div>
+                            <Label htmlFor="study-path-password">Password</Label>
+                            <Input
+                                id="study-path-password"
+                                type="password"
+                                value={studyPathPassword}
+                                onChange={(event) => setStudyPathPassword(event.target.value)}
+                                placeholder="Enter your password"
+                                className="mt-1.5 h-11 rounded-xl"
+                            />
+                        </div>
+                        <Button type="submit" disabled={verifyingStudyPathPassword} className="w-full rounded-xl font-bold">
+                            {verifyingStudyPathPassword ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Shield className="mr-2 h-4 w-4" />}
+                            Continue to Setup
+                        </Button>
+                    </form>
                 </DialogContent>
             </Dialog>
         </div>

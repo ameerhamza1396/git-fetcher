@@ -865,8 +865,10 @@ export const MCQDisplay = ({
   const [confirmedReferenceIndexes, setConfirmedReferenceIndexes] = useState<number[] | null>(null);
   const [referenceVerification, setReferenceVerification] = useState<any>(null);
   const [referenceSummary, setReferenceSummary] = useState<any>(null);
+  const [optionExplanations, setOptionExplanations] = useState<Record<string, { verdict: string; explanation: string }>>({});
   const [referenceActionError, setReferenceActionError] = useState('');
   const [isSummarizingReferences, setIsSummarizingReferences] = useState(false);
+  const [isExplainingOptions, setIsExplainingOptions] = useState(false);
   const [summaryGenerationCounts, setSummaryGenerationCounts] = useState<Record<string, number>>({});
   const [isConfirmingReferences, setIsConfirmingReferences] = useState(false);
   const [downloadSubject, setDownloadSubject] = useState<Subject | null>(null);
@@ -1193,6 +1195,7 @@ export const MCQDisplay = ({
       setConfirmedReferenceIndexes(null);
       setReferenceVerification(null);
       setReferenceSummary(null);
+      setOptionExplanations({});
       setReferenceActionError('');
       setReferenceData(null);
       setOfflineReferenceMessage('Connect to the internet and try again.');
@@ -1203,6 +1206,7 @@ export const MCQDisplay = ({
     setConfirmedReferenceIndexes(null);
     setReferenceVerification(null);
     setReferenceSummary(null);
+    setOptionExplanations({});
     setReferenceActionError('');
     setOfflineReferenceMessage('');
     setIsReferenceModalOpen(true);
@@ -1380,6 +1384,64 @@ export const MCQDisplay = ({
   };
 
   const handleSummaryUpgradePrompt = () => handleSummarizeReferences();
+
+  const handleExplainOptions = async () => {
+    if (!currentMCQ || isExplainingOptions || !showExplanation) return;
+    if (!isOnline) {
+      showOfflineFeatureToast('AI option explanations');
+      return;
+    }
+    const summaryCount = summaryGenerationCounts[currentMCQ.id] || 0;
+    if (summaryCount >= 3) {
+      toast({ title: "AI explain limit reached", description: "This uses the same quota as Reference Summary." });
+      return;
+    }
+
+    setIsExplainingOptions(true);
+    setReferenceActionError('');
+    try {
+      const data = await aiApiJson<any>('reference-summary', {
+        question: currentMCQ.question,
+        top_k: 5,
+        mode: 'option_explanations',
+        options: currentMCQ.shuffledOptions || currentMCQ.options || [],
+        correctAnswer: currentMCQ.correct_answer,
+        explanation: currentMCQ.explanation || '',
+      });
+      const nextExplanations = Array.isArray(data.optionExplanations)
+        ? data.optionExplanations.reduce((acc, item) => {
+          if (item?.option && item?.explanation) {
+            acc[item.option] = {
+              verdict: item.verdict === 'correct' ? 'correct' : 'wrong',
+              explanation: String(item.explanation),
+            };
+          }
+          return acc;
+        }, {})
+        : {};
+
+      if (!Object.keys(nextExplanations).length) {
+        toast({ title: "AI explain unavailable", description: "Dr Ahroid could not explain these options right now." });
+        return;
+      }
+
+      setOptionExplanations(nextExplanations);
+      setSummaryGenerationCounts(prev => ({ ...prev, [currentMCQ.id]: (prev[currentMCQ.id] || 0) + 1 }));
+    } catch (error) {
+      console.error('Option explanations failed:', error);
+      toast({
+        title: "AI explain unavailable",
+        description: isAiPolicyNotice(error?.message || '') ? error.message : "Dr Ahroid could not explain these options right now.",
+      });
+    } finally {
+      setIsExplainingOptions(false);
+    }
+  };
+
+  useEffect(() => {
+    setOptionExplanations({});
+    setIsExplainingOptions(false);
+  }, [currentQuestionIndex]);
 
   useEffect(() => {
     if (profile && !profileLoading) {
@@ -1798,30 +1860,45 @@ export const MCQDisplay = ({
                   return 'bg-background border-slate-200 dark:border-slate-700 text-foreground hover:border-primary/30 hover:bg-slate-50 dark:hover:bg-slate-800/50';
                 };
 
+                const optionAiExplanation = optionExplanations[option];
+
                 return (
-                  <motion.button
+                  <motion.div
                     key={index}
-                    onClick={() => handleAnswerSelect(option)}
-                    disabled={showExplanation}
                     initial={{ opacity: 0, y: 20, scale: 0.97 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={{ delay: index * 0.08, duration: 0.3, ease: "easeOut" }}
-                    whileHover={!showExplanation ? { scale: 1.02 } : {}}
-                    whileTap={!showExplanation ? { scale: 0.98 } : {}}
-                    className={`w-full p-3 sm:p-4 rounded-xl text-left border transition-all duration-200 flex items-center gap-3 ${getThemeClasses()}`}
                   >
-                    <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 ${state === 'default' ? 'bg-slate-100 dark:bg-slate-800 text-slate-500' :
-                      state === 'correct' ? 'bg-emerald-500 text-white' :
-                        state === 'incorrect' ? 'bg-red-500 text-white' :
-                          'bg-primary text-white'
+                    <motion.button
+                      onClick={() => handleAnswerSelect(option)}
+                      disabled={showExplanation}
+                      whileHover={!showExplanation ? { scale: 1.02 } : {}}
+                      whileTap={!showExplanation ? { scale: 0.98 } : {}}
+                      className={`w-full p-3 sm:p-4 rounded-xl text-left border transition-all duration-200 flex items-center gap-3 ${getThemeClasses()}`}
+                    >
+                      <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 ${state === 'default' ? 'bg-slate-100 dark:bg-slate-800 text-slate-500' :
+                        state === 'correct' ? 'bg-emerald-500 text-white' :
+                          state === 'incorrect' ? 'bg-red-500 text-white' :
+                            'bg-primary text-white'
+                        }`}>
+                        {String.fromCharCode(65 + index)}
+                      </span>
+                      <span className="flex-1 text-sm sm:text-base font-medium leading-snug">{option}</span>
+                      {showExplanation && (isCorrect || isSelected) && (
+                        isCorrect ? <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" /> : <XCircle className="w-5 h-5 text-red-500 shrink-0" />
+                      )}
+                    </motion.button>
+                    {showExplanation && optionAiExplanation?.explanation && (
+                      <div className={`mx-2 mt-2 rounded-xl border p-3 text-xs font-medium leading-relaxed ${
+                        optionAiExplanation.verdict === 'correct'
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200'
+                          : 'border-red-200 bg-red-50 text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200'
                       }`}>
-                      {String.fromCharCode(65 + index)}
-                    </span>
-                    <span className="flex-1 text-sm sm:text-base font-medium leading-snug">{option}</span>
-                    {showExplanation && (isCorrect || isSelected) && (
-                      isCorrect ? <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" /> : <XCircle className="w-5 h-5 text-red-500 shrink-0" />
+                        <span className="font-black">{optionAiExplanation.verdict === 'correct' ? 'Supported: ' : 'Why wrong: '}</span>
+                        {optionAiExplanation.explanation}
+                      </div>
                     )}
-                  </motion.button>
+                  </motion.div>
                 );
               })}
             </div>
@@ -1843,7 +1920,7 @@ export const MCQDisplay = ({
                 <p className="text-sm text-muted-foreground leading-relaxed">{currentMCQ?.explanation || "No explanation provided."}</p>
 
                 {/* Reference Button */}
-                <div className="mt-4">
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <Button
                     onClick={handleSearchReference}
                     variant="outline"
@@ -1856,6 +1933,19 @@ export const MCQDisplay = ({
                       <CheckCircle className="w-4 h-4 mr-2" />
                     )}
                     {isConfirmingReferences ? 'Verifying Question' : 'Find Reference'}
+                  </Button>
+                  <Button
+                    onClick={handleExplainOptions}
+                    variant="outline"
+                    className="w-full h-10 rounded-lg text-sm font-medium"
+                    disabled={isExplainingOptions || (currentMCQ ? (summaryGenerationCounts[currentMCQ.id] || 0) >= 3 : false)}
+                  >
+                    {isExplainingOptions ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 mr-2" />
+                    )}
+                    {isExplainingOptions ? 'Explaining...' : 'AI Explain'}
                   </Button>
                 </div>
               </motion.div>

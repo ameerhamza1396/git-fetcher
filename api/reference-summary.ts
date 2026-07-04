@@ -19,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const groqApiKey = process.env.GROQ_API_KEY;
     if (!groqApiKey) return res.status(500).json({ error: 'GROQ_API_KEY is not configured' });
 
-    const { question, top_k = 5 } = req.body || {};
+    const { question, top_k = 5, mode = 'summary', options = [], correctAnswer = '', explanation = '' } = req.body || {};
     if (!question?.trim()) return res.status(400).json({ error: 'question is required' });
 
     const referenceData = await fetchReferenceChunks(question, top_k);
@@ -37,7 +37,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .map((ref: any, index: number) => `${index}: ${ref.book || 'Reference'}, page ${ref.page || '-'}\n${ref.content || ''}`)
       .join('\n\n');
 
-    const prompt = `You are Dr Ahroid, an MBBS tutor.
+    const optionExplainMode = mode === 'option_explanations';
+    const optionList = Array.isArray(options) ? options : [];
+    const prompt = optionExplainMode ? `You are Dr Ahroid, an MBBS tutor.
+
+Explain why each MCQ option is correct or wrong using the internal reference snippets as private context.
+
+Question:
+${question}
+
+Options:
+${optionList.map((option: string, index: number) => `${String.fromCharCode(65 + index)}. ${option}`).join('\n')}
+
+Marked correct answer:
+${correctAnswer}
+
+Existing explanation:
+${explanation || 'None provided'}
+
+Private reference context:
+${referenceText}
+
+Return only JSON in this exact shape:
+{"optionExplanations":[{"option":"exact option text","verdict":"correct|wrong","explanation":"1 concise original sentence explaining support or contradiction."}],"citationIndexes":[0,2]}
+
+Rules:
+- Include every option in the same order.
+- Do not quote the private snippets.
+- Do not rewrite the snippets sentence-by-sentence.
+- Do not mention hidden chunks or internal context.
+- Keep explanations concise, educational, and focused on why the marked answer is supported and the other options are wrong.
+- citationIndexes should include only the private references that materially support the explanations.`
+      : `You are Dr Ahroid, an MBBS tutor.
 
 Create a short original teaching summary that answers the student's question using the internal reference snippets as private context.
 
@@ -90,6 +121,24 @@ Rules:
       : [];
     const citations = (citationIndexes.length ? citationIndexes : references.map((_, index) => index).slice(0, 3))
       .map((index: number) => publicReferenceChunk(references[index]));
+
+    if (optionExplainMode) {
+      const optionExplanations = Array.isArray(parsed?.optionExplanations)
+        ? parsed.optionExplanations
+          .filter((item: any) => item?.option && item?.explanation)
+          .map((item: any) => ({
+            option: String(item.option),
+            verdict: item.verdict === 'correct' ? 'correct' : 'wrong',
+            explanation: String(item.explanation),
+          }))
+        : [];
+
+      return res.status(200).json({
+        optionExplanations,
+        citations,
+        status: 'explained',
+      });
+    }
 
     return res.status(200).json({
       summary: parsed?.summary || '',

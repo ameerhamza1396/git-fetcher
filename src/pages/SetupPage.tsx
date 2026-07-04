@@ -80,6 +80,7 @@ const SetupWizard = () => {
   const [studyFiltersExpanded, setStudyFiltersExpanded] = useState(false);
   const [studySearch, setStudySearch] = useState('');
   const [provinceFilter, setProvinceFilter] = useState('all');
+  const [studyPathChangeMode, setStudyPathChangeMode] = useState(false);
   const setupLoadUserIdRef = useRef<string | null>(null);
   const setupLoadToastShownRef = useRef(false);
   const studyOverlayRef = useRef<HTMLDivElement | null>(null);
@@ -108,6 +109,20 @@ const SetupWizard = () => {
     setSetupTheme(theme);
     setTheme(theme);
   };
+
+  const readStudyPathChangeVerification = useCallback(() => {
+    if (typeof window === 'undefined' || !user?.id) return false;
+    try {
+      const raw = sessionStorage.getItem('medmacs_setup_change_verified');
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      const verifiedAt = Number(parsed?.verifiedAt || 0);
+      const stillFresh = Date.now() - verifiedAt < 10 * 60 * 1000;
+      return parsed?.userId === user.id && stillFresh;
+    } catch {
+      return false;
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
@@ -280,7 +295,9 @@ const SetupWizard = () => {
         if (referrer) setReferredByName(referrer.full_name || referrer.username || 'a friend');
       }
 
-      const initialStep = getInitialStep(profile, insts);
+      const changeMode = readStudyPathChangeVerification();
+      setStudyPathChangeMode(changeMode);
+      const initialStep = changeMode ? 2 : getInitialStep(profile, insts);
       if (initialStep === 6) { navigate('/dashboard', { replace: true }); return; }
       setCurrentStep(initialStep);
     } catch (error) {
@@ -297,7 +314,7 @@ const SetupWizard = () => {
     } finally {
       setLoading(false);
     }
-  }, [ensureProfile, getInitialStep, loadHeardAboutUsOptions, navigate]);
+  }, [ensureProfile, getInitialStep, loadHeardAboutUsOptions, navigate, readStudyPathChangeVerification]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -423,6 +440,12 @@ const SetupWizard = () => {
         toast.error(selectedSpecializedTest ? 'Failed to save specialized test' : 'Failed to save institute');
         return;
       }
+      if (studyPathChangeMode && selectedSpecializedTest) {
+        sessionStorage.removeItem('medmacs_setup_change_verified');
+        toast.success('Specialized test updated.');
+        navigate('/dashboard', { replace: true });
+        return;
+      }
       setCurrentStep(selectedSpecializedTest ? 4 : 3);
       return;
     }
@@ -436,6 +459,12 @@ const SetupWizard = () => {
       } as any, { onConflict: 'id' });
       setSaving(false);
       if (error) { toast.error('Failed to save year'); return; }
+      if (studyPathChangeMode) {
+        sessionStorage.removeItem('medmacs_setup_change_verified');
+        toast.success('Institute updated.');
+        navigate('/dashboard', { replace: true });
+        return;
+      }
       setCurrentStep(4);
       return;
     }
