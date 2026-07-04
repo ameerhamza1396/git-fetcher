@@ -124,6 +124,20 @@ const SetupWizard = () => {
     }
   }, [user?.id]);
 
+  const getNextStudyPathChangeAt = (profile: any = existingProfile) => {
+    const changedAt = profile?.study_path_changed_at ? new Date(profile.study_path_changed_at) : null;
+    if (!changedAt || Number.isNaN(changedAt.getTime())) return null;
+    return new Date(changedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+  };
+
+  const canChangeStudyPathNow = (profile: any = existingProfile) => {
+    const nextChangeAt = getNextStudyPathChangeAt(profile);
+    return !nextChangeAt || nextChangeAt.getTime() <= Date.now();
+  };
+
+  const formatStudyPathChangeDate = (date: Date | null) =>
+    date?.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) || '';
+
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
 
@@ -297,6 +311,12 @@ const SetupWizard = () => {
 
       const changeMode = readStudyPathChangeVerification();
       setStudyPathChangeMode(changeMode);
+      if (changeMode && !canChangeStudyPathNow(profile)) {
+        sessionStorage.removeItem('medmacs_setup_change_verified');
+        toast.error(`You can change institute or specialized test once per week. Try again after ${formatStudyPathChangeDate(getNextStudyPathChangeAt(profile))}.`);
+        navigate('/dashboard', { replace: true });
+        return;
+      }
       const initialStep = changeMode ? 2 : getInitialStep(profile, insts);
       if (initialStep === 6) { navigate('/dashboard', { replace: true }); return; }
       setCurrentStep(initialStep);
@@ -418,6 +438,12 @@ const SetupWizard = () => {
       return;
     }
     if (currentStep === 2) {
+      if (studyPathChangeMode && !canChangeStudyPathNow()) {
+        sessionStorage.removeItem('medmacs_setup_change_verified');
+        toast.error(`You can change institute or specialized test once per week. Try again after ${formatStudyPathChangeDate(getNextStudyPathChangeAt())}.`);
+        navigate('/dashboard', { replace: true });
+        return;
+      }
       if (!institute) {
         toast.error(selectionCategory === 'specialized_test' ? 'Please select a specialized test' : 'Please select an institute');
         return;
@@ -427,12 +453,19 @@ const SetupWizard = () => {
         selectionCategory === 'specialized_test' ||
         isSpecializedTestInstitute(selectedInstitute) ||
         isSpecializedTestCode(institute);
+      if (studyPathChangeMode && !selectedSpecializedTest) {
+        setCurrentStep(3);
+        return;
+      }
       const profilePatch: any = {
         id: user!.id,
         institute,
         updated_at: new Date().toISOString(),
       };
-      if (selectedSpecializedTest) profilePatch.year = null;
+      if (selectedSpecializedTest) {
+        profilePatch.year = null;
+        if (studyPathChangeMode) profilePatch.study_path_changed_at = new Date().toISOString();
+      }
       setSaving(true);
       const { error } = await supabase.from('profiles').upsert(profilePatch, { onConflict: 'id' });
       setSaving(false);
@@ -450,12 +483,20 @@ const SetupWizard = () => {
       return;
     }
     if (currentStep === 3) {
+      if (studyPathChangeMode && !canChangeStudyPathNow()) {
+        sessionStorage.removeItem('medmacs_setup_change_verified');
+        toast.error(`You can change institute or specialized test once per week. Try again after ${formatStudyPathChangeDate(getNextStudyPathChangeAt())}.`);
+        navigate('/dashboard', { replace: true });
+        return;
+      }
       if (!year) { toast.error('Please select your year'); return; }
       setSaving(true);
       const { error } = await supabase.from('profiles').upsert({
         id: user!.id,
+        ...(studyPathChangeMode ? { institute } : {}),
         year,
         updated_at: new Date().toISOString(),
+        ...(studyPathChangeMode ? { study_path_changed_at: new Date().toISOString() } : {}),
       } as any, { onConflict: 'id' });
       setSaving(false);
       if (error) { toast.error('Failed to save year'); return; }
@@ -865,6 +906,11 @@ const SetupWizard = () => {
                   ? "We'll tailor content for your selected exam."
                   : "We'll tailor content for your college."}
               </p>
+              {studyPathChangeMode && (
+                <p className="mt-3 rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-xs font-bold text-cyan-100">
+                  You can change institute or specialized test once per week. This weekly cooldown starts after you save this change.
+                </p>
+              )}
               </div>
             </div>
             <div className={`transition-all duration-300 ${studyOverlayOpen ? 'pointer-events-none blur-[2px] opacity-55' : ''}`}>

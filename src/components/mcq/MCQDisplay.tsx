@@ -1900,6 +1900,16 @@ export const MCQDisplay = ({
                         {optionAiExplanation.explanation}
                       </div>
                     )}
+                    {showExplanation && isExplainingOptions && !optionAiExplanation?.explanation && (
+                      <div className="mx-2 mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/50">
+                        <div className="mb-2 flex items-center gap-2">
+                          <Skeleton className="h-3 w-16 rounded-full" />
+                          <Skeleton className="h-3 w-20 rounded-full" />
+                        </div>
+                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="mt-2 h-3 w-8/12" />
+                      </div>
+                    )}
                   </motion.div>
                 );
               })}

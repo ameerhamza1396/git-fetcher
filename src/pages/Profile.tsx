@@ -50,8 +50,10 @@ const Profile = () => {
     const [loadingUpdateProfile, setLoadingUpdateProfile] = useState(false);
     const [showStatsModal, setShowStatsModal] = useState(false);
     const [showStudyPathModal, setShowStudyPathModal] = useState(false);
-    const [studyPathPassword, setStudyPathPassword] = useState('');
-    const [verifyingStudyPathPassword, setVerifyingStudyPathPassword] = useState(false);
+    const [studyPathOtp, setStudyPathOtp] = useState('');
+    const [studyPathOtpSent, setStudyPathOtpSent] = useState(false);
+    const [sendingStudyPathOtp, setSendingStudyPathOtp] = useState(false);
+    const [verifyingStudyPathOtp, setVerifyingStudyPathOtp] = useState(false);
     const [institutes, setInstitutes] = useState<Institute[]>([]);
     const [copiedReferral, setCopiedReferral] = useState(false);
     const validYears = ["1st", "2nd", "3rd", "4th", "5th"];
@@ -68,7 +70,7 @@ const Profile = () => {
         queryKey: ['profile', user?.id],
         queryFn: async () => {
             if (!user?.id) return null;
-            const { data, error } = await supabase.from('profiles').select('id, full_name, username, email, avatar_url, plan, plan_expiry_date, role, year, institute, badges, referral_code').eq('id', user.id).maybeSingle();
+            const { data, error } = await supabase.from('profiles').select('id, full_name, username, email, avatar_url, plan, plan_expiry_date, role, year, institute, badges, referral_code, study_path_changed_at').eq('id', user.id).maybeSingle();
             if (error && error.code !== 'PGRST116') throw new Error(error.message);
             return data;
         },
@@ -102,6 +104,14 @@ const Profile = () => {
     const userInstituteName = getInstituteDisplayName(userInstituteCode, institutes);
     const selectedInstitute = getInstituteByCode(userInstituteCode, institutes);
     const selectedSpecializedTest = isSpecializedTestInstitute(selectedInstitute);
+    const studyPathChangedAt = (profileData as any)?.study_path_changed_at ? new Date((profileData as any).study_path_changed_at) : null;
+    const nextStudyPathChangeAt = studyPathChangedAt ? new Date(studyPathChangedAt.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
+    const canChangeStudyPath = !nextStudyPathChangeAt || nextStudyPathChangeAt.getTime() <= Date.now();
+    const nextStudyPathChangeLabel = nextStudyPathChangeAt?.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+    });
     const { data: achievementData } = useAchievementData(user?.id);
     const achievementStats = achievementData?.stats || {
         lifetimeMcqs: 0, flpCompletions: 0, aiChatSessions: 0, points: 0, accuracy: 0,
@@ -140,21 +150,53 @@ const Profile = () => {
         setTimeout(() => setCopiedReferral(false), 2500);
     };
 
-    const verifyStudyPathChange = async (event) => {
-        event.preventDefault();
-        if (!user?.email || !studyPathPassword) {
-            toast.error('Please enter your password.');
+    const sendStudyPathOtp = async () => {
+        if (!user?.email) {
+            toast.error('No email is attached to this account.');
+            return;
+        }
+        if (!canChangeStudyPath) {
+            toast.error(`You can change this once per week. Try again after ${nextStudyPathChangeLabel}.`);
             return;
         }
 
-        setVerifyingStudyPathPassword(true);
+        setSendingStudyPathOtp(true);
         try {
-            const { error } = await supabase.auth.signInWithPassword({
+            const { error } = await supabase.auth.signInWithOtp({
                 email: user.email,
-                password: studyPathPassword,
+                options: { shouldCreateUser: false },
             });
             if (error) {
-                toast.error('Password verification failed.');
+                toast.error(error.message || 'Could not send the email code.');
+                return;
+            }
+            setStudyPathOtpSent(true);
+            toast.success('Verification code sent to your email.');
+        } finally {
+            setSendingStudyPathOtp(false);
+        }
+    };
+
+    const verifyStudyPathChange = async (event) => {
+        event.preventDefault();
+        if (!user?.email || studyPathOtp.trim().length < 6) {
+            toast.error('Please enter the 6-digit email code.');
+            return;
+        }
+        if (!canChangeStudyPath) {
+            toast.error(`You can change this once per week. Try again after ${nextStudyPathChangeLabel}.`);
+            return;
+        }
+
+        setVerifyingStudyPathOtp(true);
+        try {
+            const { error } = await supabase.auth.verifyOtp({
+                email: user.email,
+                token: studyPathOtp.trim(),
+                type: 'email',
+            });
+            if (error) {
+                toast.error(error.message || 'Email code verification failed.');
                 return;
             }
 
@@ -163,10 +205,11 @@ const Profile = () => {
                 verifiedAt: Date.now(),
             }));
             setShowStudyPathModal(false);
-            setStudyPathPassword('');
+            setStudyPathOtp('');
+            setStudyPathOtpSent(false);
             navigate('/setup');
         } finally {
-            setVerifyingStudyPathPassword(false);
+            setVerifyingStudyPathOtp(false);
         }
     };
 
@@ -359,7 +402,10 @@ const Profile = () => {
                                                     Change
                                                 </Button>
                                             </div>
-                                            <p className="mt-1 text-[10px] text-muted-foreground/60">Password verification is required before changing this.</p>
+                                            <p className="mt-1 text-[10px] text-muted-foreground/60">
+                                                You can change this once per week. Email OTP verification is required.
+                                                {!canChangeStudyPath && nextStudyPathChangeLabel ? ` Next change available after ${nextStudyPathChangeLabel}.` : ''}
+                                            </p>
                                         </div>
                                         <div>
                                             <Label htmlFor="full_name" className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
@@ -485,26 +531,53 @@ const Profile = () => {
             <Dialog open={showStudyPathModal} onOpenChange={setShowStudyPathModal}>
                 <DialogContent className="sm:max-w-[430px] rounded-[2rem]">
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-black">Verify Password</DialogTitle>
-                        <DialogDescription>Confirm your password to change your institute or specialized test.</DialogDescription>
+                        <DialogTitle className="text-xl font-black">Verify Email</DialogTitle>
+                        <DialogDescription>
+                            Institute or specialized test can be changed once per week. We will send a 6-digit code to {userEmail}.
+                        </DialogDescription>
                     </DialogHeader>
-                    <form onSubmit={verifyStudyPathChange} className="space-y-4">
-                        <div>
-                            <Label htmlFor="study-path-password">Password</Label>
-                            <Input
-                                id="study-path-password"
-                                type="password"
-                                value={studyPathPassword}
-                                onChange={(event) => setStudyPathPassword(event.target.value)}
-                                placeholder="Enter your password"
-                                className="mt-1.5 h-11 rounded-xl"
-                            />
+                    {!canChangeStudyPath && nextStudyPathChangeLabel ? (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                            Your study path was changed recently. You can change it again after {nextStudyPathChangeLabel}.
                         </div>
-                        <Button type="submit" disabled={verifyingStudyPathPassword} className="w-full rounded-xl font-bold">
-                            {verifyingStudyPathPassword ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Shield className="mr-2 h-4 w-4" />}
-                            Continue to Setup
-                        </Button>
-                    </form>
+                    ) : (
+                        <form onSubmit={verifyStudyPathChange} className="space-y-4">
+                            <div className="rounded-2xl border border-border/50 bg-muted/30 p-3 text-xs font-medium text-muted-foreground">
+                                This change is allowed once per week. After you save the new institute or test, the next change unlocks 7 days later.
+                            </div>
+                            {!studyPathOtpSent ? (
+                                <Button type="button" onClick={sendStudyPathOtp} disabled={sendingStudyPathOtp} className="w-full rounded-xl font-bold">
+                                    {sendingStudyPathOtp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                                    Send Email Code
+                                </Button>
+                            ) : (
+                                <>
+                                    <div>
+                                        <Label htmlFor="study-path-otp">Email code</Label>
+                                        <Input
+                                            id="study-path-otp"
+                                            inputMode="numeric"
+                                            maxLength={6}
+                                            value={studyPathOtp}
+                                            onChange={(event) => setStudyPathOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                                            placeholder="Enter 6-digit code"
+                                            className="mt-1.5 h-11 rounded-xl text-center text-lg font-black tracking-[0.35em]"
+                                        />
+                                    </div>
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                        <Button type="button" variant="outline" onClick={sendStudyPathOtp} disabled={sendingStudyPathOtp} className="rounded-xl font-bold">
+                                            {sendingStudyPathOtp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                                            Resend
+                                        </Button>
+                                        <Button type="submit" disabled={verifyingStudyPathOtp || studyPathOtp.length < 6} className="rounded-xl font-bold">
+                                            {verifyingStudyPathOtp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Shield className="mr-2 h-4 w-4" />}
+                                            Continue
+                                        </Button>
+                                    </div>
+                                </>
+                            )}
+                        </form>
+                    )}
                 </DialogContent>
             </Dialog>
         </div>
