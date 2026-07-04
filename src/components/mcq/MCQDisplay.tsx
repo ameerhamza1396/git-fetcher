@@ -869,6 +869,7 @@ export const MCQDisplay = ({
   const [isSummarizingReferences, setIsSummarizingReferences] = useState(false);
   const [isExplainingOptions, setIsExplainingOptions] = useState(false);
   const [summaryGenerationCounts, setSummaryGenerationCounts] = useState<Record<string, number>>({});
+  const [explainGenerationCounts, setExplainGenerationCounts] = useState<Record<string, number>>({});
   const [isConfirmingReferences, setIsConfirmingReferences] = useState(false);
   const [downloadSubject, setDownloadSubject] = useState<Subject | null>(null);
   const [downloadChapter, setDownloadChapter] = useState<Chapter | null>(null);
@@ -1390,19 +1391,18 @@ export const MCQDisplay = ({
       showOfflineFeatureToast('AI option explanations');
       return;
     }
-    const summaryCount = summaryGenerationCounts[currentMCQ.id] || 0;
-    if (summaryCount >= 3) {
-      toast({ title: "AI explain limit reached", description: "This uses the same quota as Reference Summary." });
+    const explainCount = explainGenerationCounts[currentMCQ.id] || 0;
+    if (explainCount >= 3) {
+      toast({ title: "AI explain limit reached", description: "Try again on another question." });
       return;
     }
 
     setIsExplainingOptions(true);
     setReferenceActionError('');
     try {
-      const data = await aiApiJson<any>('reference-summary', {
+      const data = await aiApiJson<any>('reference-explain', {
         question: currentMCQ.question,
         top_k: 5,
-        mode: 'option_explanations',
         options: currentMCQ.shuffledOptions || currentMCQ.options || [],
         correctAnswer: currentMCQ.correct_answer,
         explanation: currentMCQ.explanation || '',
@@ -1428,7 +1428,7 @@ export const MCQDisplay = ({
       }
 
       setOptionExplanations(nextExplanations);
-      setSummaryGenerationCounts(prev => ({ ...prev, [currentMCQ.id]: (prev[currentMCQ.id] || 0) + 1 }));
+      setExplainGenerationCounts(prev => ({ ...prev, [currentMCQ.id]: (prev[currentMCQ.id] || 0) + 1 }));
     } catch (error) {
       console.error('Option explanations failed:', error);
       toast({
@@ -1950,7 +1950,7 @@ export const MCQDisplay = ({
                     onClick={handleExplainOptions}
                     variant="outline"
                     className="w-full h-10 rounded-lg text-sm font-medium"
-                    disabled={isExplainingOptions || (currentMCQ ? (summaryGenerationCounts[currentMCQ.id] || 0) >= 3 : false)}
+                    disabled={isExplainingOptions || (currentMCQ ? (explainGenerationCounts[currentMCQ.id] || 0) >= 3 : false)}
                   >
                     {isExplainingOptions ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
