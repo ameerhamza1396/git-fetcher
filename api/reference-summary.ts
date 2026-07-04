@@ -5,11 +5,60 @@ const GROQ_MODEL = process.env.GROQ_SUMMARY_MODEL || process.env.GROQ_VERIFICATI
 
 const extractOutputText = (data: any) => data?.choices?.[0]?.message?.content || '';
 
-const parseSummary = (text: string) => {
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('Summary response was not JSON');
-  return JSON.parse(jsonMatch[0]);
+const extractJsonObject = (text: string) => {
+  const cleaned = String(text || '')
+    .trim()
+    .replace(/^```(?:json)?/i, '')
+    .replace(/```$/i, '')
+    .trim();
+
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < cleaned.length; index += 1) {
+    const char = cleaned[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+
+    if (char === '"') inString = true;
+    if (char === '{') {
+      if (depth === 0) start = index;
+      depth += 1;
+    } else if (char === '}' && depth > 0) {
+      depth -= 1;
+      if (depth === 0 && start >= 0) return cleaned.slice(start, index + 1);
+    }
+  }
+
+  return '';
 };
+
+const parseSummary = (text: string) => {
+  const jsonText = extractJsonObject(text);
+  if (!jsonText) return null;
+  try {
+    return JSON.parse(jsonText);
+  } catch {
+    const repaired = jsonText
+      .replace(/,\s*([}\]])/g, '$1')
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'");
+    return JSON.parse(repaired);
+  }
+};
+
+const fallbackPlainSummary = (text: string) =>
+  String(text || '')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 700);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -104,8 +153,8 @@ Rules:
           },
           { role: 'user', content: prompt },
         ],
-        temperature: 0.3,
-        max_tokens: 500,
+        temperature: 0.1,
+        max_tokens: 700,
         response_format: { type: 'json_object' },
       }),
     });
@@ -143,7 +192,7 @@ Rules:
     }
 
     return res.status(200).json({
-      summary: parsed?.summary || '',
+      summary: parsed?.summary || fallbackPlainSummary(extractOutputText(data)) || 'Dr Ahroid could not format a focused summary right now.',
       citations,
       status: 'summarized',
     });
