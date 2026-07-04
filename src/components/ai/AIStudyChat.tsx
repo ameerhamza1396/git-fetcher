@@ -12,9 +12,7 @@ import { notifyAchievementProgress } from '@/components/profile/AchievementBadge
 import { aiApiJson } from '@/utils/aiApi';
 import { renderAiMessageText } from '@/utils/format';
 import { InstagramCreatorCta, shouldShowCreatorInstagramCta } from '@/components/ai/InstagramCreatorCta';
-
-const isAiPolicyNotice = (text: string) =>
-  /(not available for your current plan|quota|limit|login|required|reached|not enabled|upgrade)/i.test(text);
+import { isAiPolicyNotice } from '@/utils/aiPolicyNotice';
 
 export const AIStudyChat = () => {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);

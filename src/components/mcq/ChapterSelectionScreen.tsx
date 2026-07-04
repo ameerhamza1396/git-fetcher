@@ -80,7 +80,9 @@ export const ChapterSelectionScreen = ({
             <div className="mt-2 flex flex-col items-center gap-1">
                <p className="text-muted-foreground text-sm font-bold uppercase tracking-widest">{subject.name}</p>
                <p className="text-muted-foreground/60 text-[10px] font-medium uppercase tracking-[0.2em]">
-                 {userProfile?.plan === 'free'
+                 {subject.free_unlimited_access
+                   ? 'Free · No limits'
+                   : userProfile?.plan === 'free'
                    ? 'Free daily limits apply'
                    : 'Unlimited Premium Access'}
                </p>
@@ -97,6 +99,7 @@ export const ChapterSelectionScreen = ({
           allChapters.map((ch, idx) => {
             const isComingSoon = (ch.mcq_count || 0) === 0;
             const isSelected = selectedChapter?.id === ch.id;
+            const isFreeUnlimited = subject.free_unlimited_access === true;
             
             return (
               <motion.div
@@ -137,6 +140,11 @@ export const ChapterSelectionScreen = ({
                     <p className="text-muted-foreground text-xs font-medium leading-snug break-words">
                       {ch.name}
                     </p>
+                    {isFreeUnlimited && (
+                      <p className="mt-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300">
+                        Free · No limits
+                      </p>
+                    )}
                   </div>
 
                   {!isComingSoon && (

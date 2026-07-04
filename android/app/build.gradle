@@ -10,8 +10,8 @@ android {
         applicationId "com.hmacs.medmacs"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 15
-        versionName "7.5.8"
+        versionCode 16
+        versionName "7.5.9"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         aaptOptions {

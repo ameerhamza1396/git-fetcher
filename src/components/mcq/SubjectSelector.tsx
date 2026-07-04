@@ -57,7 +57,9 @@ export const SubjectSelector = ({ selectedSubject, onSubjectSelect }: SubjectSel
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {subjects.map((subject, index) => (
+      {subjects.map((subject, index) => {
+        const isFreeUnlimited = subject.free_unlimited_access === true;
+        return (
         <motion.div
           key={subject.id}
           initial={{ opacity: 0, y: 20 }}
@@ -90,6 +92,11 @@ export const SubjectSelector = ({ selectedSubject, onSubjectSelect }: SubjectSel
               <CardDescription className="text-gray-600 dark:text-gray-400">
                 {subject.description}
               </CardDescription>
+              {isFreeUnlimited && (
+                <div className="mt-3 inline-flex rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300">
+                  Free · No limits
+                </div>
+              )}
             </CardHeader>
             <CardContent className="text-center">
               <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
@@ -99,7 +106,8 @@ export const SubjectSelector = ({ selectedSubject, onSubjectSelect }: SubjectSel
             </CardContent>
           </Card>
         </motion.div>
-      ))}
+        );
+      })}
     </div>
   );
 };

@@ -14,6 +14,7 @@ import Seo from '@/components/Seo';
 import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
 import { motion, AnimatePresence } from 'framer-motion';
 import { aiApiJson } from '@/utils/aiApi';
+import { isAiPolicyNotice } from '@/utils/aiPolicyNotice';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,9 +41,6 @@ interface SavedChat {
 
 import { renderAiMessageText } from '@/utils/format';
 import { InstagramCreatorCta, shouldShowCreatorInstagramCta } from '@/components/ai/InstagramCreatorCta';
-
-const isAiPolicyNotice = (text: string) =>
-  /(not available for your current plan|quota|limit|login|required|reached|not enabled|upgrade)/i.test(text);
 
 const fallbackSuggestions = [
   'Osteomyelitis',

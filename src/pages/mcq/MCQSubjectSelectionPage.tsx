@@ -479,6 +479,7 @@ const MCQSubjectSelectionPage = () => {
           subjects.map((subject, index) => {
             const isSelected = selectedSubject?.id === subject.id;
             const isOfflineUnavailable = isOfflineMode && !offlineSubjectIds.has(subject.id);
+            const isFreeUnlimited = subject.free_unlimited_access === true;
             return (
               <motion.div
                 key={subject.id}
@@ -528,6 +529,11 @@ const MCQSubjectSelectionPage = () => {
                     <p className="text-muted-foreground text-xs font-medium leading-relaxed line-clamp-2">
                       {subject.description || `Master ${subject.name} with our structured question bank and detailed explanations.`}
                     </p>
+                    {isFreeUnlimited && (
+                      <div className="mt-3 inline-flex rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300">
+                        Free · No limits
+                      </div>
+                    )}
                   </div>
 
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${

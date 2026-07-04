@@ -301,6 +301,8 @@ const MCQChapterSelectionPage = () => {
               <p className="text-muted-foreground/60 text-[10px] font-medium uppercase tracking-[0.2em]">
                 {isOfflineMode
                   ? 'Offline mode - downloaded MCQs only'
+                  : subject?.free_unlimited_access
+                  ? 'Free · No limits'
                   : profile?.plan === 'free'
                   ? 'Free daily limits apply'
                   : 'Unlimited Premium Access'}
@@ -332,6 +334,7 @@ const MCQChapterSelectionPage = () => {
             const isDisabled = isComingSoon || isOfflineUnavailable;
             const attemptedCount = attemptedByChapter[ch.id] || 0;
             const totalCount = ch.mcq_count || 0;
+            const isFreeUnlimited = subject?.free_unlimited_access === true;
 
             return (
               <motion.div
@@ -399,6 +402,11 @@ const MCQChapterSelectionPage = () => {
                         ? '--/-- questions'
                         : `${Math.min(attemptedCount, totalCount)}/${totalCount} questions`}
                     </p>
+                    {isFreeUnlimited && (
+                      <p className="mt-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300">
+                        Free · No limits
+                      </p>
+                    )}
                   </div>
 
                   {!isDisabled && (

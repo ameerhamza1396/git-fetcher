@@ -5,6 +5,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, X, Loader2, WifiOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { aiApiJson, aiApiOrigin } from '@/utils/aiApi';
+import { isAiPolicyNotice } from '@/utils/aiPolicyNotice';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -14,9 +15,6 @@ interface Message {
 
 import { renderAiMessageText } from '@/utils/format';
 import { InstagramCreatorCta, shouldShowCreatorInstagramCta } from '@/components/ai/InstagramCreatorCta';
-
-const isAiPolicyNotice = (text: string) =>
-  /(not available for your current plan|quota|limit|login|required|reached|not enabled|upgrade)/i.test(text);
 
 interface AIChatbotProps {
   isOpen: boolean;

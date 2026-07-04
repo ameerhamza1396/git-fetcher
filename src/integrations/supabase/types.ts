@@ -880,6 +880,7 @@ export type Database = {
           color: string | null
           created_at: string
           description: string | null
+          free_unlimited_access: boolean
           icon: string | null
           id: string
           name: string
@@ -888,6 +889,7 @@ export type Database = {
           color?: string | null
           created_at?: string
           description?: string | null
+          free_unlimited_access?: boolean
           icon?: string | null
           id?: string
           name: string
@@ -896,6 +898,7 @@ export type Database = {
           color?: string | null
           created_at?: string
           description?: string | null
+          free_unlimited_access?: boolean
           icon?: string | null
           id?: string
           name?: string

@@ -620,6 +620,7 @@ const Dashboard = () => {
   const quickActionsRef = useRef<HTMLDivElement>(null);
   const headerHapticReadyRef = useRef(false);
   const [selectedDashboardAnnouncement, setSelectedDashboardAnnouncement] = useState<DashboardAnnouncement | null>(null);
+  const dashboardModalOpen = showWhatsNew || showTermOfDay || showCaseOfDay || showCollaborateModal || !!selectedDashboardAnnouncement;
   const [appVersion, setAppVersion] = useState<string>('Loading...');
   const [reviewCompleted, setReviewCompleted] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -1025,7 +1026,7 @@ const Dashboard = () => {
         });
 
         const quickActionsTop = quickActionsRef.current?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
-        const nextShowStickyQuickActions = activeTab === 'home' && quickActionsTop <= 96;
+        const nextShowStickyQuickActions = activeTab === 'home' && quickActionsTop <= 96 && !dashboardModalOpen;
         setShowStickyQuickActions((current) => current === nextShowStickyQuickActions ? current : nextShowStickyQuickActions);
       });
     };
@@ -1041,7 +1042,7 @@ const Dashboard = () => {
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', handleScroll);
     };
-  }, [activeTab]);
+  }, [activeTab, dashboardModalOpen]);
 
   useEffect(() => {
     if (authLoading || waitingForLiveProfileConfirmation) { setIsNavigating(true); return; }
@@ -1134,6 +1135,81 @@ const Dashboard = () => {
   }, [displayName, user?.id]);
   const rawUserPlan = profile?.plan?.toLowerCase() || 'free';
   const userPlanDisplayName = rawUserPlan.charAt(0).toUpperCase() + rawUserPlan.slice(1) + ' Plan';
+  const { data: aiUsageSummary, isLoading: aiUsageSummaryLoading } = useQuery({
+    queryKey: ['dashboard-ai-usage-summary', user?.id, rawUserPlan],
+    queryFn: async () => {
+      if (!user?.id) return { kind: 'disabled', label: 'AI off by policy' };
+
+      const now = Date.now();
+      const dayStartIso = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+      const monthStartIso = new Date(now - 31 * 24 * 60 * 60 * 1000).toISOString();
+
+      const [policyResult, overrideResult, usageResult] = await Promise.all([
+        (supabase.from('ai_feature_policies') as any)
+          .select('feature, enabled, daily_requests, weekly_requests, monthly_requests')
+          .eq('plan', rawUserPlan),
+        (supabase.from('ai_user_overrides') as any)
+          .select('feature, enabled, daily_requests, weekly_requests, monthly_requests, expires_at')
+          .eq('user_id', user.id),
+        (supabase.from('ai_usage_events') as any)
+          .select('feature, status, created_at')
+          .eq('user_id', user.id)
+          .in('status', ['success', 'fallback'])
+          .gte('created_at', monthStartIso),
+      ]);
+
+      if (policyResult.error) {
+        console.warn('Unable to load AI feature policies for dashboard', policyResult.error);
+        return { kind: 'unknown', label: 'AI usage unavailable' };
+      }
+
+      const policyMap = new Map<string, any>();
+      (policyResult.data || []).forEach((policy: any) => policyMap.set(policy.feature, policy));
+
+      const activeOverrides = (overrideResult.data || []).filter((override: any) =>
+        !override.expires_at || new Date(override.expires_at).getTime() > now
+      );
+      activeOverrides.forEach((override: any) => {
+        const base = policyMap.get(override.feature) || { feature: override.feature, enabled: false };
+        policyMap.set(override.feature, {
+          ...base,
+          enabled: override.enabled ?? base.enabled,
+          daily_requests: override.daily_requests ?? base.daily_requests,
+          weekly_requests: override.weekly_requests ?? base.weekly_requests,
+          monthly_requests: override.monthly_requests ?? base.monthly_requests,
+        });
+      });
+
+      const effectivePolicies = Array.from(policyMap.values()).filter((policy: any) => policy.enabled);
+      if (!effectivePolicies.length) return { kind: 'disabled', label: 'AI off by policy' };
+
+      const dailyFeatures = effectivePolicies.filter((policy: any) => Number.isFinite(Number(policy.daily_requests)));
+      const monthlyFeatures = effectivePolicies.filter((policy: any) => Number.isFinite(Number(policy.monthly_requests)));
+      const hasUnlimitedFeature = effectivePolicies.some((policy: any) =>
+        policy.daily_requests == null && policy.weekly_requests == null && policy.monthly_requests == null
+      );
+
+      const usageRows = usageResult.data || [];
+      const countUsage = (feature: string, sinceIso: string) =>
+        usageRows.filter((event: any) => event.feature === feature && event.created_at >= sinceIso).length;
+
+      const dailyAllowed = dailyFeatures.reduce((sum: number, policy: any) => sum + Number(policy.daily_requests || 0), 0);
+      const dailyUsed = dailyFeatures.reduce((sum: number, policy: any) => sum + countUsage(policy.feature, dayStartIso), 0);
+      const monthlyAllowed = monthlyFeatures.reduce((sum: number, policy: any) => sum + Number(policy.monthly_requests || 0), 0);
+      const monthlyUsed = monthlyFeatures.reduce((sum: number, policy: any) => sum + countUsage(policy.feature, monthStartIso), 0);
+
+      const parts: string[] = [];
+      if (dailyAllowed > 0) parts.push(`${Math.max(dailyAllowed - dailyUsed, 0)}/${dailyAllowed} today`);
+      if (monthlyAllowed > 0) parts.push(`${Math.max(monthlyAllowed - monthlyUsed, 0)}/${monthlyAllowed} month`);
+
+      if (!parts.length && hasUnlimitedFeature) return { kind: 'unlimited', label: 'AI usage: Unlimited' };
+      if (!parts.length) return { kind: 'disabled', label: 'AI off by policy' };
+
+      return { kind: 'limited', label: `AI left: ${parts.join(' · ')}` };
+    },
+    enabled: !!user?.id && !isOfflineMode,
+    staleTime: 60 * 1000,
+  });
   const dashboardAnnouncement = dashboardAnnouncements[0] || null;
   const cachedAvatarUrl = useCachedImage(profile?.avatar_url);
 
@@ -1288,10 +1364,15 @@ const Dashboard = () => {
                 )}
               </div>
               <div className="min-w-0">
-                <h2 className="text-lg font-bold text-foreground truncate">{displayName}</h2>
-                <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-                <Badge className="mt-1.5 text-[10px] bg-primary/15 text-primary border-0 font-semibold">{userPlanDisplayName}</Badge>
-              </div>
+	                <h2 className="text-lg font-bold text-foreground truncate">{displayName}</h2>
+	                <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+	                <Badge className="mt-1.5 text-[10px] bg-primary/15 text-primary border-0 font-semibold">{userPlanDisplayName}</Badge>
+	                {!isOfflineMode && (
+	                  <p className="mt-1 text-[10px] font-bold text-muted-foreground">
+	                    {aiUsageSummaryLoading ? 'Checking AI usage...' : aiUsageSummary?.label}
+	                  </p>
+	                )}
+	              </div>
             </div>
 
             {/* Achievements Section */}
@@ -1468,7 +1549,7 @@ const Dashboard = () => {
             {/* Plan Status & Term of Day - side by side */}
             <div className="grid grid-cols-2 gap-3 mb-6">
               {/* Plan Pie Chart */}
-              <div className="rounded-2xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 flex flex-col items-center justify-center">
+              <div className="rounded-2xl border border-border/40 bg-card/80 backdrop-blur-sm p-3 flex min-h-[120px] flex-col items-center justify-center overflow-hidden">
                 {isOfflineMode ? (
                   <div className="flex h-full flex-col items-center justify-center text-center">
                     <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/15">
@@ -1479,7 +1560,7 @@ const Dashboard = () => {
                   </div>
                 ) : rawUserPlan === 'free' ? (
                   <>
-                    <div className="relative w-20 h-20 mb-2">
+	                    <div className="relative w-16 h-16 mb-1.5">
                       <svg viewBox="0 0 36 36" className="w-full h-full">
                         <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="hsl(var(--muted))" strokeWidth="3" />
                         <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="hsl(var(--primary))" strokeWidth="3" strokeDasharray={`${Math.min(((profile?.daily_mcq_submissions || 0) / 50) * 100, 100)}, 100`} strokeLinecap="round" />
@@ -1488,18 +1569,22 @@ const Dashboard = () => {
                         <span className="text-sm font-black text-foreground">{Math.min(profile?.daily_mcq_submissions || 0, 50)}/50</span>
                       </div>
                     </div>
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider text-center">Daily Limit</p>
-                    <p className="text-[9px] text-muted-foreground text-center mt-0.5">Free Plan</p>
-                  </>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-center">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-2 ${rawUserPlan === 'iconic' ? 'bg-gradient-to-br from-rose-500 to-orange-500' : 'bg-gradient-to-br from-blue-500 to-violet-600'}`}>
-                      {rawUserPlan === 'iconic' ? <Crown className="w-6 h-6 text-white" /> : <Star className="w-6 h-6 text-white" />}
-                    </div>
-                    <p className="text-xs font-black text-foreground uppercase">{rawUserPlan === 'iconic' ? 'Iconic' : 'Premium'}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Unlimited access</p>
-                  </div>
-                )}
+		                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider text-center leading-none">Free Plan</p>
+		                    <p className="mt-1 max-w-[8.5rem] truncate text-center text-[9px] font-bold leading-none text-muted-foreground">
+		                      {aiUsageSummaryLoading ? 'Checking AI...' : aiUsageSummary?.label}
+		                    </p>
+	                  </>
+	                ) : (
+	                  <div className="flex flex-col items-center justify-center h-full text-center">
+	                    <div className={`w-11 h-11 rounded-2xl flex items-center justify-center mb-1.5 ${rawUserPlan === 'iconic' ? 'bg-gradient-to-br from-rose-500 to-orange-500' : 'bg-gradient-to-br from-blue-500 to-violet-600'}`}>
+	                      {rawUserPlan === 'iconic' ? <Crown className="w-5 h-5 text-white" /> : <Star className="w-5 h-5 text-white" />}
+		                    </div>
+		                    <p className="text-xs font-black text-foreground uppercase leading-none">{rawUserPlan === 'iconic' ? 'Iconic' : 'Premium'}</p>
+		                    <p className="mt-1 max-w-[8.5rem] truncate text-center text-[9px] font-bold leading-none text-muted-foreground">
+		                      {aiUsageSummaryLoading ? 'Checking AI...' : aiUsageSummary?.label}
+		                    </p>
+	                  </div>
+	                )}
               </div>
 
               <div className="relative min-h-[120px]">
@@ -1651,17 +1736,6 @@ const Dashboard = () => {
       iconColor: 'text-emerald-100',
       glow: 'bg-[radial-gradient(circle_at_12%_0%,rgba(16,185,129,0.30),transparent_34%),radial-gradient(circle_at_85%_20%,rgba(34,211,238,0.22),transparent_32%),linear-gradient(135deg,rgba(6,78,59,0.72),rgba(15,23,42,0.84))]',
     },
-    {
-      key: 'case',
-      label: 'Topic of the Day',
-      title: caseOfDay?.headline || caseOfDay?.case_name || 'Topic of the Day',
-      body: caseOfDay?.details || 'Loading latest topic...',
-      Icon: Stethoscope,
-      eyebrowColor: 'text-sky-100/70',
-      iconShell: 'border-sky-100/20 bg-sky-200/15',
-      iconColor: 'text-sky-100',
-      glow: 'bg-[radial-gradient(circle_at_16%_0%,rgba(56,189,248,0.28),transparent_34%),radial-gradient(circle_at_88%_22%,rgba(168,85,247,0.22),transparent_32%),linear-gradient(135deg,rgba(12,74,110,0.72),rgba(15,23,42,0.84))]',
-    },
   ];
   const activeDailyInsight = dailyInsightSlides[dailyInsightIndex] || dailyInsightSlides[0];
   const ActiveDailyIcon = activeDailyInsight.Icon;
@@ -1670,16 +1744,6 @@ const Dashboard = () => {
     setDailyInsightDirection(clampedIndex > dailyInsightIndex ? 1 : -1);
     setDailyInsightIndex(clampedIndex);
   };
-  const handleDailyInsightDragEnd = (_event: any, info: any) => {
-    const threshold = 70;
-    if ((info.offset.x < -threshold || info.velocity.x < -700) && dailyInsightIndex < dailyInsightSlides.length - 1) {
-      goToDailyInsight(dailyInsightIndex + 1);
-    }
-    if ((info.offset.x > threshold || info.velocity.x > 700) && dailyInsightIndex > 0) {
-      goToDailyInsight(dailyInsightIndex - 1);
-    }
-  };
-
   return (
     <div className="dashboard-modern-font min-h-screen w-full bg-background bg-mesh pb-28 overflow-x-hidden relative">
       {/* Floating gradient orbs */}
@@ -1746,7 +1810,7 @@ const Dashboard = () => {
       </div>
 
       <AnimatePresence>
-        {showStickyQuickActions && (
+        {showStickyQuickActions && !dashboardModalOpen && (
           <StickyQuickActions actions={quickActions} offlineMode={isOfflineMode} />
         )}
       </AnimatePresence>
@@ -1840,13 +1904,8 @@ const Dashboard = () => {
                     animate="center"
                     exit="exit"
                     transition={{ duration: 0.28, ease: 'easeInOut' }}
-                    drag="x"
-                    dragConstraints={{ left: 0, right: 0 }}
-                    dragElastic={0.22}
-                    onDragEnd={handleDailyInsightDragEnd}
-                    className="flex flex-1 cursor-grab flex-col active:cursor-grabbing"
-                    style={{ touchAction: 'pan-y' }}
-                  >
+	                    className="flex flex-1 flex-col"
+	                  >
                     <div className="mb-6 flex items-center gap-3">
                       <div className={`flex h-14 w-14 items-center justify-center rounded-3xl border ${activeDailyInsight.iconShell} backdrop-blur-xl`}>
                         <ActiveDailyIcon className={`h-7 w-7 ${activeDailyInsight.iconColor}`} />
@@ -1869,32 +1928,16 @@ const Dashboard = () => {
                   </motion.div>
                 </AnimatePresence>
 
-                <div className="mt-6 flex items-center justify-between gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={dailyInsightIndex === 0}
-                    onClick={() => goToDailyInsight(dailyInsightIndex - 1)}
-                    className="h-11 flex-1 rounded-2xl border-white/15 bg-white/8 text-white hover:bg-white/12 disabled:opacity-35"
-                  >
-                    <ChevronLeft className="mr-1 h-4 w-4" />
-                    Previous
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      if (dailyInsightIndex < dailyInsightSlides.length - 1) {
-                        goToDailyInsight(dailyInsightIndex + 1);
-                      } else if (caseOfDay) {
-                        setShowTermOfDay(false);
-                        setShowCaseOfDay(true);
-                      }
-                    }}
-                    className="h-11 flex-1 rounded-2xl bg-white text-slate-950 font-black hover:bg-white/90"
-                  >
-                    {dailyInsightIndex < dailyInsightSlides.length - 1 ? 'Next' : 'Open Case'}
-                    <ChevronRight className="ml-1 h-4 w-4" />
-                  </Button>
+	                <div className="mt-6">
+	                  <Button
+	                    type="button"
+	                    onClick={() => {
+		                      setShowTermOfDay(false);
+		                    }}
+		                    className="h-11 w-full rounded-2xl bg-white text-slate-950 font-black hover:bg-white/90"
+		                  >
+		                    Done
+		                  </Button>
                 </div>
               </div>
             </div>

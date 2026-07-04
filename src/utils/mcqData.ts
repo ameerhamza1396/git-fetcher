@@ -17,6 +17,7 @@ export interface Subject {
   color: string;
   year: string;
   institutes?: string[];
+  free_unlimited_access?: boolean;
 }
 
 export interface Chapter {
@@ -79,21 +80,57 @@ const mergeById = <T extends { id: string }>(primary: T[], fallback: T[]) => {
   return Array.from(merged.values());
 };
 
+const fetchSubjectFreeUnlimitedFlags = async (subjectIds: string[]) => {
+  const uniqueIds = Array.from(new Set(subjectIds.filter(Boolean)));
+  if (uniqueIds.length === 0) return new Map<string, boolean>();
+
+  try {
+    const { data, error } = await supabase
+      .from('subjects')
+      .select('id, free_unlimited_access')
+      .in('id', uniqueIds);
+
+    if (error || !data) return new Map<string, boolean>();
+    return new Map(data.map(subject => [subject.id, subject.free_unlimited_access === true]));
+  } catch {
+    return new Map<string, boolean>();
+  }
+};
+
+const applySubjectFreeUnlimitedFlags = async (subjects: Subject[]) => {
+  const flags = await fetchSubjectFreeUnlimitedFlags(subjects.map(subject => subject.id));
+  if (flags.size === 0) return subjects;
+
+  return subjects.map(subject => ({
+    ...subject,
+    free_unlimited_access: flags.get(subject.id) ?? subject.free_unlimited_access,
+  }));
+};
+
 export const fetchSubjects = async (): Promise<Subject[]> => {
   const [cloudSubjects, offlineSubjects] = await Promise.all([
     fetchCloudContent<Subject[]>('mcq-subjects'),
     getOfflineSubjects(),
   ]);
 
-  return mergeById(cloudSubjects ?? [], offlineSubjects as Subject[]);
+  return applySubjectFreeUnlimitedFlags(mergeById(cloudSubjects ?? [], offlineSubjects as Subject[]));
 };
 
 export const fetchSubjectById = async (subjectId: string): Promise<Subject | null> => {
+  const withFreeUnlimitedFlag = async (subject: Subject | null) => {
+    if (!subject) return null;
+    const flags = await fetchSubjectFreeUnlimitedFlags([subject.id]);
+    return {
+      ...subject,
+      free_unlimited_access: flags.get(subject.id) ?? subject.free_unlimited_access,
+    };
+  };
+
   const subject = await fetchCloudContent<Subject>('mcq-subject', { subjectId });
-  if (subject) return subject;
+  if (subject) return withFreeUnlimitedFlag(subject);
 
   const offlineSubject = await getOfflineSubjectById(subjectId);
-  if (offlineSubject) return offlineSubject as Subject;
+  if (offlineSubject) return withFreeUnlimitedFlag(offlineSubject as Subject);
 
   const subjects = await fetchSubjects();
   return subjects.find(item => item.id === subjectId) ?? null;

@@ -9,6 +9,8 @@ const normalizeAiMarkdown = (text: string) => {
     .replace(/^\s{0,3}>{1,}\s?/gm, '')
     .replace(/```[\s\S]*?```/g, (block) => block.replace(/```[a-z]*|```/gi, '').trim())
     .replace(/^\s*Component:\s*Details\s*$/gim, '')
+    .replace(/\s+-\s+(?=\*\*[^*]+\*\*)/g, '\n\n')
+    .replace(/\s+-\s+(?=[A-Z][^.\n]{3,90}\s+[–-]\s+)/g, '\n- ')
     .replace(/(^|\n)\s*([A-Z][A-Za-z /‑–-]{2,48}):\*\*\s*/g, '$1**$2:** ')
     .replace(/(^|\n)\s*([A-Z][A-Za-z /‑–-]{2,48}):\s*/g, '$1**$2:** ')
     .replace(/(^|\n)(\s*\d+[.)]\s+)([^*\n:]{2,72})\*\*\s*[–-]\s*/g, '$1$2**$3:** ')

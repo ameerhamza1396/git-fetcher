@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useReferenceSearch } from '@/hooks/useReferenceSearch';
 import { aiApiJson } from '@/utils/aiApi';
+import { isAiPolicyNotice } from '@/utils/aiPolicyNotice';
 import { fetchChapterById, fetchMCQsByChapter, fetchSubjectById, Chapter, MCQ, Subject } from '@/utils/mcqData';
 import { supabase } from '@/integrations/supabase/client';
 import { AIChatbot } from './AIChatbot';
@@ -65,9 +66,6 @@ const LAST_ATTEMPTED_MCQ_KEY = 'lastAttemptedMCQIndex';
 const LAST_ATTEMPTED_SUBJECT_KEY = 'lastAttemptedMCQSubject';
 const LAST_ATTEMPTED_CHAPTER_KEY = 'lastAttemptedMCQChapter';
 const SAVED_SESSIONS_LIST_KEY = 'mcq_saved_sessions';
-const isAiPolicyNotice = (text = '') =>
-  /(not available for your current plan|quota|limit|login|required|reached|not enabled|upgrade)/i.test(text);
-
 export interface SavedMCQSession {
   subjectId: string;
   chapterId: string;
@@ -890,6 +888,7 @@ export const MCQDisplay = ({
   const userPlanForChatbot = profile?.plan?.toLowerCase() || 'free';
   const isPremium = true;
   const canUseAiSummary = true;
+  const isSubjectFreeUnlimited = downloadSubject?.free_unlimited_access === true;
 
   const isNewDayPKT = (lastResetDateStr: string | null): boolean => {
     if (!lastResetDateStr) return true;
@@ -1012,7 +1011,14 @@ export const MCQDisplay = ({
     try {
       setHasAttemptedAny(true);
 
-      if (userPlanForChatbot === 'free') {
+      let subjectIsFreeUnlimited = isSubjectFreeUnlimited;
+      if (userPlanForChatbot === 'free' && !downloadSubject) {
+        const subjectData = await fetchSubjectById(subject);
+        setDownloadSubject(subjectData);
+        subjectIsFreeUnlimited = subjectData?.free_unlimited_access === true;
+      }
+
+      if (userPlanForChatbot === 'free' && !subjectIsFreeUnlimited) {
         const isNewDay = isNewDayPKT(lastSubmissionResetDate);
         let currentSubmissions = dailySubmissionsCount;
         let currentResetDate = lastSubmissionResetDate;
