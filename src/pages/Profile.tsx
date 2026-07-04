@@ -177,6 +177,16 @@ const Profile = () => {
         }
     };
 
+    const openStudyPathChangeModal = () => {
+        if (!canChangeStudyPath) {
+            toast.error(`You can request another institute or specialized test change after ${nextStudyPathChangeLabel}.`);
+            return;
+        }
+        setStudyPathOtp('');
+        setStudyPathOtpSent(false);
+        setShowStudyPathModal(true);
+    };
+
     const verifyStudyPathChange = async (event) => {
         event.preventDefault();
         if (!user?.email || studyPathOtp.trim().length < 6) {
@@ -398,8 +408,14 @@ const Profile = () => {
                                             <div className="mt-1.5 flex gap-2">
                                                 <Input id="institute" value={userInstituteName} disabled
                                                     className="h-11 rounded-xl border-border/40 bg-muted/30 text-muted-foreground cursor-not-allowed" />
-                                                <Button type="button" variant="outline" className="h-11 rounded-xl font-bold" onClick={() => setShowStudyPathModal(true)}>
-                                                    Change
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="h-11 rounded-xl font-bold"
+                                                    onClick={openStudyPathChangeModal}
+                                                    disabled={!canChangeStudyPath}
+                                                >
+                                                    {canChangeStudyPath ? 'Change' : 'Locked'}
                                                 </Button>
                                             </div>
                                             <p className="mt-1 text-[10px] text-muted-foreground/60">
