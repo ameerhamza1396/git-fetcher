@@ -1145,6 +1145,7 @@ const Dashboard = () => {
       : 'once a week';
   const [analyticsPlan, setAnalyticsPlan] = useState<any>(null);
   const [analyticsPlanLoading, setAnalyticsPlanLoading] = useState(false);
+  const analyticsPlanCacheKey = user?.id ? `medmacs_analytics_ai_plan_${user.id}` : null;
   const { data: aiUsageSummary, isLoading: aiUsageSummaryLoading } = useQuery({
     queryKey: ['dashboard-ai-usage-summary', user?.id, rawUserPlan],
     queryFn: async () => {
@@ -1222,15 +1223,40 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
-    if (!user?.id) return;
-    const cached = localStorage.getItem(`medmacs_analytics_ai_plan_${user.id}`);
+    if (!analyticsPlanCacheKey) return;
+    const cached = localStorage.getItem(analyticsPlanCacheKey);
     if (!cached) return;
     try {
       setAnalyticsPlan(JSON.parse(cached));
     } catch {
-      localStorage.removeItem(`medmacs_analytics_ai_plan_${user.id}`);
+      localStorage.removeItem(analyticsPlanCacheKey);
     }
-  }, [user?.id]);
+  }, [analyticsPlanCacheKey]);
+
+  const { data: syncedAnalyticsPlan } = useQuery({
+    queryKey: ['analytics-ai-plan', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await (supabase.from('user_analytics_ai_plans') as any)
+        .select('plan_payload, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.plan_payload ? { ...data.plan_payload, generatedAt: data.created_at } : null;
+    },
+    enabled: !!user?.id && !isOfflineMode,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  useEffect(() => {
+    if (!syncedAnalyticsPlan) return;
+    setAnalyticsPlan(syncedAnalyticsPlan);
+    if (analyticsPlanCacheKey) {
+      localStorage.setItem(analyticsPlanCacheKey, JSON.stringify(syncedAnalyticsPlan));
+    }
+  }, [analyticsPlanCacheKey, syncedAnalyticsPlan]);
 
   const buildAnalyticsPayload = useCallback(async () => {
     if (!user?.id) return null;
@@ -1336,8 +1362,20 @@ const Dashboard = () => {
       const plan = await aiApiJson<any>('analytics-plan', { analytics });
       const nextPlan = { ...plan, generatedAt: new Date().toISOString() };
       setAnalyticsPlan(nextPlan);
-      localStorage.setItem(`medmacs_analytics_ai_plan_${user.id}`, JSON.stringify(nextPlan));
+      if (analyticsPlanCacheKey) {
+        localStorage.setItem(analyticsPlanCacheKey, JSON.stringify(nextPlan));
+      }
+      const { error: savePlanError } = await (supabase.from('user_analytics_ai_plans') as any)
+        .insert({
+          user_id: user.id,
+          plan_payload: nextPlan,
+          analytics_snapshot: analytics,
+        });
+      if (savePlanError) {
+        console.warn('Analytics AI plan cloud save failed:', savePlanError);
+      }
       queryClient.invalidateQueries({ queryKey: ['dashboard-ai-usage-summary', user.id, rawUserPlan] });
+      queryClient.invalidateQueries({ queryKey: ['analytics-ai-plan', user.id] });
       toast({ title: 'AI analysis ready', description: 'Dr Ahroid updated your study strategy.' });
     } catch (error: any) {
       toast({
@@ -1348,7 +1386,7 @@ const Dashboard = () => {
     } finally {
       setAnalyticsPlanLoading(false);
     }
-  }, [analyticsPlanLoading, buildAnalyticsPayload, isOfflineMode, queryClient, rawUserPlan, toast, user?.id]);
+  }, [analyticsPlanCacheKey, analyticsPlanLoading, buildAnalyticsPayload, isOfflineMode, queryClient, rawUserPlan, toast, user?.id]);
   const dashboardAnnouncement = dashboardAnnouncements[0] || null;
   const cachedAvatarUrl = useCachedImage(profile?.avatar_url);
 
