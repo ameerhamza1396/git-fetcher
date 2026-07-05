@@ -649,7 +649,7 @@ const ReferenceModal = ({
                   </div>
                 )}
                 <Button type="button" variant="outline" size="sm" onClick={onLearnMore} className="mt-3 h-8 rounded-xl text-xs font-bold">
-                  <MessageCircle className="mr-2 h-3.5 w-3.5" /> Learn more
+                  <MessageCircle className="mr-2 h-3.5 w-3.5" /> Learn more with Dr Ahroid
                 </Button>
               </motion.div>
             ) : null}
