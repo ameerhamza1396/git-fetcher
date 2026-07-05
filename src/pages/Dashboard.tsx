@@ -1138,6 +1138,11 @@ const Dashboard = () => {
   }, [displayName, user?.id]);
   const rawUserPlan = profile?.plan?.toLowerCase() || 'free';
   const userPlanDisplayName = rawUserPlan.charAt(0).toUpperCase() + rawUserPlan.slice(1) + ' Plan';
+  const analyticsPlanCadence = rawUserPlan === 'premium'
+    ? 'every day'
+    : rawUserPlan === 'iconic'
+      ? 'every 3 days'
+      : 'once a week';
   const [analyticsPlan, setAnalyticsPlan] = useState<any>(null);
   const [analyticsPlanLoading, setAnalyticsPlanLoading] = useState(false);
   const { data: aiUsageSummary, isLoading: aiUsageSummaryLoading } = useQuery({
@@ -1510,7 +1515,7 @@ const Dashboard = () => {
                   </div>
                 ) : (
                   <p className="text-xs font-medium leading-relaxed text-muted-foreground">
-                    Free users can request once per week, Iconic every 3 days, and Premium every day. Admin25 controls these limits.
+                    Ask Dr Ahroid for a personalized study plan from your analytics. Your plan can request this {analyticsPlanCadence}.
                   </p>
                 )}
               </div>
