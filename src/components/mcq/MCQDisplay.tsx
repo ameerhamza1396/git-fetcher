@@ -1979,7 +1979,7 @@ export const MCQDisplay = ({
                       )}
                     </motion.button>
                     {showExplanation && optionAiExplanation?.explanation && (
-                      <div className={`mx-2 mt-2 rounded-xl border p-3 text-xs font-medium leading-relaxed ${
+                      <div className={`mx-2 mb-2 mt-2 rounded-xl border p-3 text-xs font-medium leading-relaxed ${
                         optionAiExplanation.verdict === 'correct'
                           ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200'
                           : 'border-red-200 bg-red-50 text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200'
@@ -1989,7 +1989,7 @@ export const MCQDisplay = ({
                       </div>
                     )}
                     {showExplanation && isExplainingOptions && !optionAiExplanation?.explanation && (
-                      <div className="mx-2 mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/50">
+                      <div className="mx-2 mb-2 mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/50">
                         <div className="mb-2 flex items-center gap-2">
                           <Skeleton className="h-3 w-16 rounded-full" />
                           <Skeleton className="h-3 w-20 rounded-full" />
