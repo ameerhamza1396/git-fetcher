@@ -19,7 +19,7 @@ import ProfileAvatar from '@/components/profile/ProfileAvatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { fetchInstitutes, getInstituteByCode, getInstituteDisplayName, isSpecializedTestInstitute, type Institute } from '@/utils/institutes';
 import PageSkeleton from '@/components/skeletons/PageSkeleton';
-import { AchievementBadges, useAchievementData } from '@/components/profile/AchievementBadges';
+import { useAchievementData } from '@/components/profile/AchievementBadges';
 import { motion } from 'framer-motion';
 
 const planStyles = {
@@ -329,10 +329,6 @@ const Profile = () => {
                             </div>
                         </motion.div>
 
-                        <motion.div variants={itemVariants}>
-                            <AchievementBadges userId={user?.id} />
-                        </motion.div>
-
                         {/* Referral code card */}
                         {profileData?.referral_code && (
                             <motion.div variants={itemVariants}>
@@ -541,7 +537,6 @@ const Profile = () => {
                             </div>
                         ))}
                     </div>
-                    <AchievementBadges userId={user?.id} compact />
                 </DialogContent>
             </Dialog>
             <Dialog open={showStudyPathModal} onOpenChange={setShowStudyPathModal}>

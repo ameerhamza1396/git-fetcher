@@ -7,7 +7,8 @@ import {
   Clock, CheckCircle, XCircle, Timer, Bot, MessageSquare, X, Bookmark,
   BookmarkCheck, Crown, LogOut, AlertTriangle, MoreVertical, Flag, BotOff,
   Moon, Sun, Zap, Sparkles, BookOpen, ChevronLeft, Loader2, Star, Award,
-  TrendingUp, Brain, Target, Shield, ShieldAlert, Trash2, PanelBottom, Lock, RotateCcw, WifiOff
+  TrendingUp, Brain, Target, Shield, ShieldAlert, Trash2, PanelBottom, Lock, RotateCcw, WifiOff,
+  ThumbsUp, ThumbsDown, MessageCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
@@ -481,6 +482,7 @@ const ReferenceModal = ({
   summary,
   isSummarizing,
   onSummarize,
+  onLearnMore,
   onSummaryUpgrade,
   summaryCount,
   summaryLimitReached,
@@ -634,6 +636,21 @@ const ReferenceModal = ({
               >
                 <div className="font-black text-primary">AI Summary</div>
                 <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{summary.summary}</p>
+                {Array.isArray(summary.citations) && summary.citations.length > 0 && (
+                  <div className="mt-3 flex max-w-full flex-nowrap gap-2 overflow-x-auto pb-1">
+                    {summary.citations.map((citation, index) => (
+                      <span
+                        key={`${citation.book || citation.title || 'Citation'}-${citation.page || index}-${index}`}
+                        className="shrink-0 whitespace-nowrap rounded-full border border-primary/20 bg-background/70 px-2 py-1 text-[10px] font-bold text-primary"
+                      >
+                        {citation.book || citation.title || 'Reference'}{citation.page ? ` p. ${citation.page}` : ''}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <Button type="button" variant="outline" size="sm" onClick={onLearnMore} className="mt-3 h-8 rounded-xl text-xs font-bold">
+                  <MessageCircle className="mr-2 h-3.5 w-3.5" /> Learn more
+                </Button>
               </motion.div>
             ) : null}
             </AnimatePresence>
@@ -660,7 +677,7 @@ const ReferenceModal = ({
               </div>
             )}
 
-            {!offlineMessage && !isConfirming && !isLoading && visibleReferences.length > 0 && (
+            {!offlineMessage && !isConfirming && !isLoading && !summary && visibleReferences.length > 0 && (
               <div className="mt-4 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
@@ -865,6 +882,9 @@ export const MCQDisplay = ({
   const [referenceVerification, setReferenceVerification] = useState<any>(null);
   const [referenceSummary, setReferenceSummary] = useState<any>(null);
   const [optionExplanations, setOptionExplanations] = useState<Record<string, { verdict: string; explanation: string }>>({});
+  const [questionFeedback, setQuestionFeedback] = useState<Record<string, 'up' | 'down'>>({});
+  const [savingQuestionFeedback, setSavingQuestionFeedback] = useState(false);
+  const [chatPrefillPrompt, setChatPrefillPrompt] = useState('');
   const [referenceActionError, setReferenceActionError] = useState('');
   const [isSummarizingReferences, setIsSummarizingReferences] = useState(false);
   const [isExplainingOptions, setIsExplainingOptions] = useState(false);
@@ -992,6 +1012,44 @@ export const MCQDisplay = ({
 
     if (error) {
       console.warn('Reference verification cache write failed:', error);
+    }
+  };
+
+  const loadQuestionFeedback = async () => {
+    if (!user || !currentMCQ?.id) return;
+    const { data, error } = await (supabase.from('question_feedbacks') as any)
+      .select('feedback')
+      .eq('user_id', user.id)
+      .eq('mcq_id', currentMCQ.id)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('Question feedback load failed:', error);
+      return;
+    }
+
+    if (data?.feedback === 'up' || data?.feedback === 'down') {
+      setQuestionFeedback(prev => ({ ...prev, [currentMCQ.id]: data.feedback }));
+    }
+  };
+
+  const saveQuestionFeedback = async (feedback: 'up' | 'down') => {
+    if (!user || !currentMCQ?.id || savingQuestionFeedback) return;
+    setSavingQuestionFeedback(true);
+    setQuestionFeedback(prev => ({ ...prev, [currentMCQ.id]: feedback }));
+    try {
+      const { error } = await (supabase.from('question_feedbacks') as any).upsert({
+        user_id: user.id,
+        mcq_id: currentMCQ.id,
+        feedback,
+      }, { onConflict: 'user_id,mcq_id' });
+      if (error) throw error;
+      toast({ title: 'Feedback saved', description: 'Thanks for helping improve this question.' });
+    } catch (error) {
+      console.error('Question feedback save failed:', error);
+      toast({ title: 'Feedback not saved', description: 'Please try again.', variant: 'destructive' });
+    } finally {
+      setSavingQuestionFeedback(false);
     }
   };
 
@@ -1385,6 +1443,18 @@ export const MCQDisplay = ({
 
   const handleSummaryUpgradePrompt = () => handleSummarizeReferences();
 
+  const handleSummaryLearnMore = () => {
+    if (!currentMCQ || !referenceSummary?.summary) return;
+    const citationText = Array.isArray(referenceSummary.citations) && referenceSummary.citations.length > 0
+      ? referenceSummary.citations
+        .map(citation => `${citation.book || citation.title || 'Reference'}${citation.page ? ` p. ${citation.page}` : ''}`)
+        .join(', ')
+      : 'No listed citations';
+    setChatPrefillPrompt(`Help me learn more about this MCQ using the AI summary and references.\n\nQuestion: ${currentMCQ.question}\nCorrect answer: ${currentMCQ.correct_answer}\nExplanation: ${currentMCQ.explanation || 'No explanation provided.'}\nAI Summary: ${referenceSummary.summary}\nCitations: ${citationText}\n\nExplain the concept in a high-yield way and add any exam-relevant points.`);
+    setIsReferenceModalOpen(false);
+    setIsChatbotOpen(true);
+  };
+
   const handleExplainOptions = async () => {
     if (!currentMCQ || isExplainingOptions || !showExplanation) return;
     if (!isOnline) {
@@ -1444,6 +1514,15 @@ export const MCQDisplay = ({
     setOptionExplanations({});
     setIsExplainingOptions(false);
   }, [currentQuestionIndex]);
+
+  useEffect(() => {
+    if (showExplanation) {
+      loadQuestionFeedback();
+      readCachedVerification().then(cached => {
+        if (cached) setReferenceVerification(cached);
+      });
+    }
+  }, [showExplanation, currentMCQ?.id]);
 
   useEffect(() => {
     if (profile && !profileLoading) {
@@ -1779,6 +1858,15 @@ export const MCQDisplay = ({
     );
   }
 
+  const verifiedAgainstBooks = isInternalVerification(referenceVerification?.sourceBasis) && Array.isArray(referenceVerification?.citations)
+    ? Array.from(new Set(
+      referenceVerification.citations
+        .map(citation => String(citation?.book || citation?.title || '').trim())
+        .filter(book => book && !isGenericReferenceBook(book))
+    ))
+    : [];
+  const currentQuestionFeedback = currentMCQ ? questionFeedback[currentMCQ.id] : undefined;
+
   return (
     <div className="fixed inset-0 z-[100] bg-background flex flex-col">
       {/* Header */}
@@ -1930,6 +2018,39 @@ export const MCQDisplay = ({
                   <span className="text-sm font-semibold text-primary">Explanation</span>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">{currentMCQ?.explanation || "No explanation provided."}</p>
+                {verifiedAgainstBooks.length > 0 && (
+                  <div className="mt-3 flex max-w-full flex-nowrap gap-2 overflow-x-auto pb-1">
+                    <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
+                      Verified against: {verifiedAgainstBooks.join(', ')}
+                    </span>
+                  </div>
+                )}
+
+                <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-background/70 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+                  <span className="text-xs font-bold text-muted-foreground">Was this question helpful?</span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant={currentQuestionFeedback === 'up' ? 'default' : 'outline'}
+                      size="sm"
+                      disabled={savingQuestionFeedback}
+                      onClick={() => saveQuestionFeedback('up')}
+                      className="h-8 rounded-xl px-3"
+                    >
+                      <ThumbsUp className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={currentQuestionFeedback === 'down' ? 'destructive' : 'outline'}
+                      size="sm"
+                      disabled={savingQuestionFeedback}
+                      onClick={() => saveQuestionFeedback('down')}
+                      className="h-8 rounded-xl px-3"
+                    >
+                      <ThumbsDown className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
 
                 {/* Reference Button */}
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -2064,6 +2185,7 @@ export const MCQDisplay = ({
         summary={referenceSummary}
         isSummarizing={isSummarizingReferences}
         onSummarize={handleSummarizeReferences}
+        onLearnMore={handleSummaryLearnMore}
         onSummaryUpgrade={handleSummaryUpgradePrompt}
         summaryCount={currentMCQ ? (summaryGenerationCounts[currentMCQ.id] || 0) : 0}
         summaryLimitReached={currentMCQ ? (summaryGenerationCounts[currentMCQ.id] || 0) >= 3 : false}
@@ -2090,6 +2212,7 @@ export const MCQDisplay = ({
           isOnline={isOnline}
           onOpen={() => setIsChatbotOpen(true)}
           onQuestionHelp={() => setUsedAiHelpByQuestion(prev => ({ ...prev, [currentMCQ.id]: true }))}
+          prefillPrompt={chatPrefillPrompt}
         />
       )}
 

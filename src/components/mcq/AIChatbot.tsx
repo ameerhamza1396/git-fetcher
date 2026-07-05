@@ -28,6 +28,7 @@ interface AIChatbotProps {
   onOpen: () => void;
   onQuestionHelp?: () => void;
   isOnline?: boolean;
+  prefillPrompt?: string;
 }
 
 export const AIChatbot: React.FC<AIChatbotProps> = ({
@@ -41,7 +42,8 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
   isHidden = false,
   onOpen,
   onQuestionHelp,
-  isOnline = true
+  isOnline = true,
+  prefillPrompt = ''
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -50,6 +52,10 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
 
   const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); };
   useEffect(() => { scrollToBottom(); }, [messages]);
+
+  useEffect(() => {
+    if (isOpen && prefillPrompt) setInput(prefillPrompt);
+  }, [isOpen, prefillPrompt]);
 
 
   const sendMessage = async (message: string) => {
