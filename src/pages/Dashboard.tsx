@@ -31,6 +31,7 @@ import { fetchInstitutes, getInstituteByCode, isSpecializedTestCode, isSpecializ
 import { getProfileCompletion } from '@/utils/profileCompletion';
 import { useCachedImage } from '@/hooks/useCachedImage';
 import { aiApiJson } from '@/utils/aiApi';
+import { useToast } from '@/hooks/use-toast';
 
 const LazyLeaderboardPreview = lazy(() =>
   import('@/components/dashboard/LeaderboardPreview').then((module) => ({
@@ -603,6 +604,7 @@ const DashboardAnnouncementCard = ({
 
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const queryClient = useQueryClient();
