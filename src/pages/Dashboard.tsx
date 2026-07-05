@@ -30,6 +30,7 @@ import { MCQProgressWidget } from '@/components/dashboard/MCQProgressWidget';
 import { fetchInstitutes, getInstituteByCode, isSpecializedTestCode, isSpecializedTestInstitute } from '@/utils/institutes';
 import { getProfileCompletion } from '@/utils/profileCompletion';
 import { useCachedImage } from '@/hooks/useCachedImage';
+import { aiApiJson } from '@/utils/aiApi';
 
 const LazyLeaderboardPreview = lazy(() =>
   import('@/components/dashboard/LeaderboardPreview').then((module) => ({
@@ -1135,6 +1136,8 @@ const Dashboard = () => {
   }, [displayName, user?.id]);
   const rawUserPlan = profile?.plan?.toLowerCase() || 'free';
   const userPlanDisplayName = rawUserPlan.charAt(0).toUpperCase() + rawUserPlan.slice(1) + ' Plan';
+  const [analyticsPlan, setAnalyticsPlan] = useState<any>(null);
+  const [analyticsPlanLoading, setAnalyticsPlanLoading] = useState(false);
   const { data: aiUsageSummary, isLoading: aiUsageSummaryLoading } = useQuery({
     queryKey: ['dashboard-ai-usage-summary', user?.id, rawUserPlan],
     queryFn: async () => {
@@ -1210,6 +1213,135 @@ const Dashboard = () => {
     enabled: !!user?.id && !isOfflineMode,
     staleTime: 60 * 1000,
   });
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const cached = localStorage.getItem(`medmacs_analytics_ai_plan_${user.id}`);
+    if (!cached) return;
+    try {
+      setAnalyticsPlan(JSON.parse(cached));
+    } catch {
+      localStorage.removeItem(`medmacs_analytics_ai_plan_${user.id}`);
+    }
+  }, [user?.id]);
+
+  const buildAnalyticsPayload = useCallback(async () => {
+    if (!user?.id) return null;
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const [answersResult, savedResult, testsResult, battlesResult] = await Promise.all([
+      supabase
+        .from('user_answers')
+        .select('is_correct, time_taken, created_at, mcqs(id, chapter_id, chapters(id, name, subjects(id, name, year)))')
+        .eq('user_id', user.id)
+        .gte('created_at', thirtyDaysAgo),
+      supabase
+        .from('saved_mcqs')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id),
+      supabase
+        .from('ai_generated_tests')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id),
+      supabase
+        .from('battle_results')
+        .select('rank')
+        .eq('user_id', user.id),
+    ]);
+
+    if (answersResult.error) throw answersResult.error;
+
+    const userYear = (profile as any)?.year || null;
+    const subjectMap = new Map<string, any>();
+    const answers = answersResult.data || [];
+    answers.forEach((answer: any) => {
+      const subject = answer.mcqs?.chapters?.subjects;
+      const subjectName = subject?.name || 'Unknown Subject';
+      if (userYear && subject?.year && subject.year !== userYear) return;
+      const row = subjectMap.get(subjectName) || {
+        subject: subjectName,
+        total: 0,
+        correct: 0,
+        wrong: 0,
+        avgTime: 0,
+        totalTime: 0,
+        recentTotal: 0,
+        recentCorrect: 0,
+      };
+      row.total += 1;
+      row.correct += answer.is_correct ? 1 : 0;
+      row.wrong += answer.is_correct ? 0 : 1;
+      row.totalTime += Number(answer.time_taken || 0);
+      if (answer.created_at >= sevenDaysAgo) {
+        row.recentTotal += 1;
+        row.recentCorrect += answer.is_correct ? 1 : 0;
+      }
+      subjectMap.set(subjectName, row);
+    });
+
+    const subjects = Array.from(subjectMap.values())
+      .map(row => ({
+        subject: row.subject,
+        total: row.total,
+        correct: row.correct,
+        wrong: row.wrong,
+        accuracy: row.total ? Math.round((row.correct / row.total) * 100) : 0,
+        avgTime: row.total ? Math.round(row.totalTime / row.total) : 0,
+        recentTotal: row.recentTotal,
+        recentAccuracy: row.recentTotal ? Math.round((row.recentCorrect / row.recentTotal) * 100) : null,
+      }))
+      .sort((a, b) => b.wrong - a.wrong)
+      .slice(0, 10);
+
+    const total = subjects.reduce((sum, subject) => sum + subject.total, 0);
+    const correct = subjects.reduce((sum, subject) => sum + subject.correct, 0);
+
+    return {
+      generatedAt: new Date().toISOString(),
+      plan: rawUserPlan,
+      year: userYear,
+      institute: (profile as any)?.institute || null,
+      windowDays: 30,
+      totals: {
+        questions: total,
+        accuracy: total ? Math.round((correct / total) * 100) : 0,
+        savedMcqs: savedResult.count || 0,
+        aiTests: testsResult.count || 0,
+        battlesPlayed: battlesResult.data?.length || 0,
+        battlesWon: (battlesResult.data || []).filter((battle: any) => battle.rank === 1).length,
+      },
+      subjects,
+    };
+  }, [profile, rawUserPlan, user?.id]);
+
+  const requestAnalyticsPlan = useCallback(async () => {
+    if (!user?.id || analyticsPlanLoading) return;
+    if (isOfflineMode) {
+      toast({ title: 'AI analysis unavailable offline', description: 'Connect to the internet and try again.', variant: 'destructive' });
+      return;
+    }
+
+    setAnalyticsPlanLoading(true);
+    try {
+      const analytics = await buildAnalyticsPayload();
+      if (!analytics) return;
+      const plan = await aiApiJson<any>('analytics-plan', { analytics });
+      const nextPlan = { ...plan, generatedAt: new Date().toISOString() };
+      setAnalyticsPlan(nextPlan);
+      localStorage.setItem(`medmacs_analytics_ai_plan_${user.id}`, JSON.stringify(nextPlan));
+      queryClient.invalidateQueries({ queryKey: ['dashboard-ai-usage-summary', user.id, rawUserPlan] });
+      toast({ title: 'AI analysis ready', description: 'Dr Ahroid updated your study strategy.' });
+    } catch (error: any) {
+      toast({
+        title: 'AI analysis unavailable',
+        description: error?.message || 'Dr Ahroid could not analyze your stats right now.',
+        variant: 'destructive',
+      });
+    } finally {
+      setAnalyticsPlanLoading(false);
+    }
+  }, [analyticsPlanLoading, buildAnalyticsPayload, isOfflineMode, queryClient, rawUserPlan, toast, user?.id]);
   const dashboardAnnouncement = dashboardAnnouncements[0] || null;
   const cachedAvatarUrl = useCachedImage(profile?.avatar_url);
 
@@ -1327,28 +1459,83 @@ const Dashboard = () => {
         return (
           <div className="animate-in fade-in slide-in-from-right-4 duration-300">
             <h1 className="text-xl font-bold text-foreground mb-1">📊 Analytics</h1>
-            <p className="text-xs text-muted-foreground mb-5">Track your progress</p>
+            <p className="text-xs text-muted-foreground mb-4">Track your progress</p>
+
+            <div className="mb-4 rounded-3xl border border-primary/20 bg-primary/5 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary">Request AI Analysis</p>
+                  <h2 className="mt-1 text-base font-black text-foreground">Dr Ahroid study plan</h2>
+                  <p className="mt-1 text-xs font-medium leading-relaxed text-muted-foreground">
+                    Analytic data will be sent to AI and Dr Ahroid will plan which subject needs attention and what strategy to follow.
+                  </p>
+                </div>
+                <Button
+                  onClick={requestAnalyticsPlan}
+                  disabled={analyticsPlanLoading}
+                  className="h-10 shrink-0 rounded-2xl px-3 text-xs font-black"
+                >
+                  {analyticsPlanLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                  Analyze
+                </Button>
+              </div>
+
+              <div className="mt-3 rounded-2xl border border-border/50 bg-background/70 p-3">
+                {analyticsPlan ? (
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-black text-foreground">{analyticsPlan.headline}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        Focus: <span className="font-bold text-primary">{analyticsPlan.focusSubject}</span>
+                        {analyticsPlan.focusReason ? ` - ${analyticsPlan.focusReason}` : ''}
+                      </p>
+                    </div>
+                    {Array.isArray(analyticsPlan.strategy) && analyticsPlan.strategy.length > 0 && (
+                      <div className="space-y-1.5">
+                        {analyticsPlan.strategy.slice(0, 4).map((step: string, index: number) => (
+                          <div key={`${step}-${index}`} className="flex gap-2 text-xs leading-relaxed text-muted-foreground">
+                            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[9px] font-black text-primary">{index + 1}</span>
+                            <span>{step}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {analyticsPlan.nextSession && (
+                      <p className="rounded-xl bg-primary/10 px-3 py-2 text-xs font-bold leading-relaxed text-primary">
+                        Next session: {analyticsPlan.nextSession}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs font-medium leading-relaxed text-muted-foreground">
+                    Free users can request once per week, Iconic every 3 days, and Premium every day. Admin25 controls these limits.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={() => navigate('/detailed-analytics')}
+              className="mb-5 w-full rounded-2xl border border-border/50 bg-card/90 p-4 text-left shadow-sm transition-all active:scale-[0.98]"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <PieChart className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-foreground">Deep Analysis</p>
+                    <p className="text-[11px] text-muted-foreground">Subject & topic-wise breakdown</p>
+                  </div>
+                </div>
+                <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+              </div>
+            </button>
+
             <Suspense fallback={<LazyTabFallback className="h-[560px]" />}>
               <LazyProgressTracker userId={user?.id} />
               <LazyStudyAnalytics />
             </Suspense>
-
-            {/* Deep Analysis CTA */}
-            <button
-              onClick={() => navigate('/detailed-analytics')}
-              className="w-full mt-6 p-4 rounded-2xl bg-gradient-to-r from-primary to-primary/80 text-primary-foreground flex items-center justify-between shadow-lg active:scale-[0.98] transition-all"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                  <PieChart className="w-5 h-5" />
-                </div>
-                <div className="text-left">
-                  <p className="text-sm font-bold">Deep Analysis</p>
-                  <p className="text-[11px] text-primary-foreground/70">Subject & topic-wise breakdown</p>
-                </div>
-              </div>
-              <ChevronRight className="w-5 h-5" />
-            </button>
           </div>
         );
 
