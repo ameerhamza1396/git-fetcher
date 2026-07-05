@@ -1472,7 +1472,7 @@ export const MCQDisplay = ({
     try {
       const data = await aiApiJson<any>('reference-explain', {
         question: currentMCQ.question,
-        top_k: 5,
+        top_k: 3,
         options: currentMCQ.shuffledOptions || currentMCQ.options || [],
         correctAnswer: currentMCQ.correct_answer,
         explanation: currentMCQ.explanation || '',
