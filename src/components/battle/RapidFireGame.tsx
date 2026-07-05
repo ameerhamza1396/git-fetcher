@@ -358,15 +358,34 @@ export const RapidFireGame = ({ roomData, userId, onGameComplete }: RapidFireGam
 
   const completeRoom = async () => {
     const topPlayer = playerRows[0];
-    await supabase
+    const completedAt = new Date().toISOString();
+    const { error } = await supabase
       .from('battle_rooms')
       .update({
         status: 'completed',
         winner_user_id: topPlayer?.userId || null,
         winner_team: null,
-        ended_at: new Date().toISOString(),
+        ended_at: completedAt,
       })
       .eq('id', room.id);
+
+    if (error) {
+      console.error('RapidFireGame: Failed to complete room.', error);
+      toast({
+        title: "Result Stuck",
+        description: error.message || "Could not open the Rapid Fire result page.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    setRoom(current => ({
+      ...current,
+      status: 'completed',
+      winner_user_id: topPlayer?.userId || null,
+      winner_team: null,
+    }));
+    return true;
   };
 
   const advanceQuestion = async () => {
