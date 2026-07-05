@@ -1226,13 +1226,11 @@ const Dashboard = () => {
     queryFn: async () => {
       if (!user?.id) return null;
       const { data, error } = await (supabase.from('user_analytics_ai_plans') as any)
-        .select('plan_payload, created_at')
+        .select('plan_payload, updated_at, created_at')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
         .maybeSingle();
       if (error) throw error;
-      return data?.plan_payload ? { ...data.plan_payload, generatedAt: data.created_at } : null;
+      return data?.plan_payload ? { ...data.plan_payload, generatedAt: data.updated_at || data.created_at } : null;
     },
     enabled: !!user?.id && !isOfflineMode,
     staleTime: 1000 * 60 * 5,
@@ -1346,16 +1344,23 @@ const Dashboard = () => {
       if (!analytics) return;
       const plan = await aiApiJson<any>('analytics-plan', { analytics });
       const nextPlan = { ...plan, generatedAt: new Date().toISOString() };
-      setAnalyticsPlan(nextPlan);
       const { error: savePlanError } = await (supabase.from('user_analytics_ai_plans') as any)
-        .insert({
+        .upsert({
           user_id: user.id,
           plan_payload: nextPlan,
           analytics_snapshot: analytics,
-        });
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
       if (savePlanError) {
         console.warn('Analytics AI plan cloud save failed:', savePlanError);
+        toast({
+          title: 'AI plan not synced',
+          description: savePlanError.message || 'The plan was generated but could not be saved to cloud.',
+          variant: 'destructive',
+        });
+        return;
       }
+      setAnalyticsPlan(nextPlan);
       queryClient.invalidateQueries({ queryKey: ['dashboard-ai-usage-summary', user.id, rawUserPlan] });
       queryClient.invalidateQueries({ queryKey: ['analytics-ai-plan', user.id] });
       toast({ title: 'AI analysis ready', description: 'Dr Ahroid updated your study strategy.' });
