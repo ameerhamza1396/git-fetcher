@@ -1145,7 +1145,6 @@ const Dashboard = () => {
       : 'once a week';
   const [analyticsPlan, setAnalyticsPlan] = useState<any>(null);
   const [analyticsPlanLoading, setAnalyticsPlanLoading] = useState(false);
-  const analyticsPlanCacheKey = user?.id ? `medmacs_analytics_ai_plan_${user.id}` : null;
   const { data: aiUsageSummary, isLoading: aiUsageSummaryLoading } = useQuery({
     queryKey: ['dashboard-ai-usage-summary', user?.id, rawUserPlan],
     queryFn: async () => {
@@ -1222,17 +1221,6 @@ const Dashboard = () => {
     staleTime: 60 * 1000,
   });
 
-  useEffect(() => {
-    if (!analyticsPlanCacheKey) return;
-    const cached = localStorage.getItem(analyticsPlanCacheKey);
-    if (!cached) return;
-    try {
-      setAnalyticsPlan(JSON.parse(cached));
-    } catch {
-      localStorage.removeItem(analyticsPlanCacheKey);
-    }
-  }, [analyticsPlanCacheKey]);
-
   const { data: syncedAnalyticsPlan } = useQuery({
     queryKey: ['analytics-ai-plan', user?.id],
     queryFn: async () => {
@@ -1253,10 +1241,7 @@ const Dashboard = () => {
   useEffect(() => {
     if (!syncedAnalyticsPlan) return;
     setAnalyticsPlan(syncedAnalyticsPlan);
-    if (analyticsPlanCacheKey) {
-      localStorage.setItem(analyticsPlanCacheKey, JSON.stringify(syncedAnalyticsPlan));
-    }
-  }, [analyticsPlanCacheKey, syncedAnalyticsPlan]);
+  }, [syncedAnalyticsPlan]);
 
   const buildAnalyticsPayload = useCallback(async () => {
     if (!user?.id) return null;
@@ -1362,9 +1347,6 @@ const Dashboard = () => {
       const plan = await aiApiJson<any>('analytics-plan', { analytics });
       const nextPlan = { ...plan, generatedAt: new Date().toISOString() };
       setAnalyticsPlan(nextPlan);
-      if (analyticsPlanCacheKey) {
-        localStorage.setItem(analyticsPlanCacheKey, JSON.stringify(nextPlan));
-      }
       const { error: savePlanError } = await (supabase.from('user_analytics_ai_plans') as any)
         .insert({
           user_id: user.id,
@@ -1386,7 +1368,7 @@ const Dashboard = () => {
     } finally {
       setAnalyticsPlanLoading(false);
     }
-  }, [analyticsPlanCacheKey, analyticsPlanLoading, buildAnalyticsPayload, isOfflineMode, queryClient, rawUserPlan, toast, user?.id]);
+  }, [analyticsPlanLoading, buildAnalyticsPayload, isOfflineMode, queryClient, rawUserPlan, toast, user?.id]);
   const dashboardAnnouncement = dashboardAnnouncements[0] || null;
   const cachedAvatarUrl = useCachedImage(profile?.avatar_url);
 
