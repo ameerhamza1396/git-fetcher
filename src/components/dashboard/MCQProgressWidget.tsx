@@ -5,6 +5,7 @@ import { Clock, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { memo, useEffect, useMemo, useState } from 'react';
 import { MCQProgressSkeleton } from '../skeletons/MCQProgressSkeleton';
+import { isSubjectVisibleForInstitute } from '@/utils/subjectVisibility';
 
 // Defines the shape of the saved session per Subject/Chapter in localStorage
 export interface SavedMCQSession {
@@ -124,6 +125,19 @@ export const MCQProgressWidget = () => {
       return data.user;
     }
   });
+  const { data: profileData, isLoading: profileLoading } = useQuery({
+    queryKey: ['mcq-progress-profile', userData?.id],
+    queryFn: async () => {
+      if (!userData?.id) return null;
+      const { data } = await supabase
+        .from('profiles')
+        .select('institute, year')
+        .eq('id', userData.id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!userData?.id,
+  });
 
   useEffect(() => {
     if (userData?.id) {
@@ -136,10 +150,12 @@ export const MCQProgressWidget = () => {
   }, [userData?.id]);
 
   const { data: chaptersData, isLoading } = useQuery({
-    queryKey: ['mcq-progress-chapters', sessions.map(s => s.chapterId), userData?.id],
+    queryKey: ['mcq-progress-chapters', sessions.map(s => s.chapterId), userData?.id, profileData?.institute, profileData?.year],
     queryFn: async () => {
       if (sessions.length === 0) return [];
-      
+      const userInstitute = String(profileData?.institute || '').trim();
+      const userYear = String(profileData?.year || '').trim();
+
       const chapterIds = [...new Set(sessions.map(s => s.chapterId))];
       const subjectIds = [...new Set(sessions.map(s => s.subjectId))];
 
@@ -151,7 +167,7 @@ export const MCQProgressWidget = () => {
           .in('id', chapterIds),
         supabase
           .from('subjects')
-          .select('id, name, color')
+          .select('id, name, color, year, institutes')
           .in('id', subjectIds),
         supabase
           .from('mcqs')
@@ -188,10 +204,14 @@ export const MCQProgressWidget = () => {
       return sessions.map(session => {
         const chapter = chaptersById.get(session.chapterId);
         const subject = subjectsById.get(session.subjectId);
-        const totalMCQs = chapter?.mcqs?.[0]?.count || 1;
+        const subjectYear = String((subject as any)?.year || '').trim();
+        const visibleForInstitute = isSubjectVisibleForInstitute(subject as any, userInstitute);
+        const visibleForYear = !userYear || !subjectYear || subjectYear === userYear;
+        if (!chapter || !subject || !visibleForInstitute || !visibleForYear) return null;
 
         // Count completed MCQs for this chapter
         const chapterMCQs = mcqsByChapter.get(session.chapterId) || [];
+        const totalMCQs = chapterMCQs.length || chapter?.mcqs?.[0]?.count || 1;
         const completedMCQs = chapterMCQs.filter(m => answeredSet.has(m.id)).length;
 
         // Find first unattempted MCQ index
@@ -216,9 +236,10 @@ export const MCQProgressWidget = () => {
           resumeIndex,
           percentage
         };
-      }).filter(s => s.completedMCQs > 0 && s.completedMCQs < s.totalMCQs); // Only show incomplete ones with at least 1 attempted
+      }).filter((s): s is NonNullable<typeof s> => Boolean(s))
+        .filter(s => s.completedMCQs > 0 && s.completedMCQs < s.totalMCQs); // Only show incomplete ones with at least 1 attempted
     },
-    enabled: sessions.length > 0 && !!userData?.id,
+    enabled: sessions.length > 0 && !!userData?.id && !profileLoading,
     staleTime: 1000 * 60 * 5,
   });
 

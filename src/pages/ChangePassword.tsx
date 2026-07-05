@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, Lock, Mail, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, Lock, Mail, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import Seo from '@/components/Seo';
@@ -22,6 +22,19 @@ const ChangePassword = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [email, setEmail] = useState(user?.email || '');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const passwordChecks = [
+    { label: '6+ characters', valid: newPassword.length >= 6 },
+    { label: 'Uppercase letter', valid: /[A-Z]/.test(newPassword) },
+    { label: 'Lowercase letter', valid: /[a-z]/.test(newPassword) },
+    { label: 'Number', valid: /\d/.test(newPassword) },
+  ];
+  const matched = newPassword.length > 0 && confirmPassword.length > 0 && newPassword === confirmPassword;
+  const strengthCount = passwordChecks.filter(check => check.valid).length;
+  const strengthLabel = strengthCount >= 4 ? 'Strong' : strengthCount >= 3 ? 'Good' : strengthCount >= 2 ? 'Fair' : 'Weak';
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,6 +168,27 @@ const ChangePassword = () => {
           <p className="mt-3 text-sm font-medium leading-relaxed text-muted-foreground">Update your sign-in password or send a reset link to your email.</p>
         </div>
 
+        <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl border border-border/70 bg-muted/40 p-1">
+          <Button
+            type="button"
+            variant={!showForgotPassword ? 'default' : 'ghost'}
+            onClick={() => setShowForgotPassword(false)}
+            className="h-11 rounded-xl text-xs font-black"
+          >
+            <KeyRound className="mr-2 h-4 w-4" />
+            Update
+          </Button>
+          <Button
+            type="button"
+            variant={showForgotPassword ? 'default' : 'ghost'}
+            onClick={() => setShowForgotPassword(true)}
+            className="h-11 rounded-xl text-xs font-black"
+          >
+            <Mail className="mr-2 h-4 w-4" />
+            Reset Email
+          </Button>
+        </div>
+
         <Card className="overflow-hidden rounded-3xl border-border/70 bg-card/95 shadow-xl shadow-primary/5">
           <CardHeader className="border-b border-border/60 bg-muted/30">
             <CardTitle className="flex items-center gap-2 text-lg font-black text-foreground">
@@ -168,9 +202,13 @@ const ChangePassword = () => {
               }
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-5">
             {showForgotPassword ? (
               <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4">
+                  <p className="text-sm font-black text-foreground">Password reset link</p>
+                  <p className="mt-1 text-xs font-medium leading-relaxed text-muted-foreground">We will send a secure reset email. Use this if you signed in with Google or forgot your current password.</p>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="reset-email" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Email Address</Label>
                   <Input
@@ -203,42 +241,98 @@ const ChangePassword = () => {
               <form onSubmit={handleChangePassword} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="current-password" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Current Password</Label>
-                  <Input
-                    id="current-password"
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Enter current password"
-                    required
-                    className="h-12 rounded-2xl border-border/70 bg-background font-medium"
-                  />
+                  <div className="relative">
+                    <Input
+                      id="current-password"
+                      type={showCurrentPassword ? 'text' : 'password'}
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="Enter current password"
+                      required
+                      className="h-12 rounded-2xl border-border/70 bg-background pr-12 font-medium"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowCurrentPassword(value => !value)}
+                      className="absolute right-1 top-1 h-10 w-10 rounded-xl p-0 text-muted-foreground"
+                    >
+                      {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="new-password" className="text-xs font-black uppercase tracking-widest text-muted-foreground">New Password</Label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password"
-                    required
-                    className="h-12 rounded-2xl border-border/70 bg-background font-medium"
-                  />
-                  <p className="text-xs font-medium text-muted-foreground">Must be at least 6 characters.</p>
+                  <div className="relative">
+                    <Input
+                      id="new-password"
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter new password"
+                      required
+                      className="h-12 rounded-2xl border-border/70 bg-background pr-12 font-medium"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowNewPassword(value => !value)}
+                      className="absolute right-1 top-1 h-10 w-10 rounded-xl p-0 text-muted-foreground"
+                    >
+                      {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <div className="rounded-2xl border border-border/60 bg-muted/30 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Strength</span>
+                      <span className="text-xs font-black text-primary">{strengthLabel}</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-1">
+                      {passwordChecks.map((check, index) => (
+                        <div key={check.label} className={`h-1.5 rounded-full ${index < strengthCount ? 'bg-primary' : 'bg-muted-foreground/20'}`} />
+                      ))}
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {passwordChecks.map(check => (
+                        <span key={check.label} className={`flex items-center gap-1 text-[10px] font-bold ${check.valid ? 'text-emerald-600 dark:text-emerald-300' : 'text-muted-foreground'}`}>
+                          <CheckCircle2 className="h-3 w-3" />
+                          {check.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="confirm-password" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Confirm New Password</Label>
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm new password"
-                    required
-                    className="h-12 rounded-2xl border-border/70 bg-background font-medium"
-                  />
+                  <div className="relative">
+                    <Input
+                      id="confirm-password"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm new password"
+                      required
+                      className="h-12 rounded-2xl border-border/70 bg-background pr-12 font-medium"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowConfirmPassword(value => !value)}
+                      className="absolute right-1 top-1 h-10 w-10 rounded-xl p-0 text-muted-foreground"
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  {confirmPassword && (
+                    <p className={`text-xs font-bold ${matched ? 'text-emerald-600 dark:text-emerald-300' : 'text-destructive'}`}>
+                      {matched ? 'Passwords match.' : 'Passwords do not match yet.'}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
