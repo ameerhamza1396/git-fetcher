@@ -49,6 +49,10 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollAreaRef = useRef<HTMLDivElement>(null);
+  const pullStartYRef = useRef<number | null>(null);
+  const pullStartedAtTopRef = useRef(false);
+  const pullDeltaYRef = useRef(0);
 
   const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); };
   useEffect(() => { scrollToBottom(); }, [messages]);
@@ -86,6 +90,37 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
   };
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); sendMessage(input); };
+  const getMessagesViewport = () => (
+    messagesScrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement | null
+  );
+
+  const handleMessagesTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    const viewport = getMessagesViewport();
+    pullStartYRef.current = event.touches[0]?.clientY ?? null;
+    pullDeltaYRef.current = 0;
+    pullStartedAtTopRef.current = Boolean(viewport && viewport.scrollTop <= 0);
+  };
+
+  const handleMessagesTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (pullStartYRef.current === null || !pullStartedAtTopRef.current) return;
+    const viewport = getMessagesViewport();
+    if (!viewport || viewport.scrollTop > 0) {
+      pullStartedAtTopRef.current = false;
+      return;
+    }
+
+    pullDeltaYRef.current = (event.touches[0]?.clientY ?? pullStartYRef.current) - pullStartYRef.current;
+  };
+
+  const handleMessagesTouchEnd = () => {
+    if (pullStartedAtTopRef.current && pullDeltaYRef.current > 90) {
+      onClose();
+    }
+    pullStartYRef.current = null;
+    pullStartedAtTopRef.current = false;
+    pullDeltaYRef.current = 0;
+  };
+
   const handleQuestionHelp = () => {
     if (!questionContext) return;
     if (!isOnline) {
@@ -159,7 +194,14 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
 
             <>
               {/* Messages */}
-              <ScrollArea className="flex-1 px-4 py-4">
+              <ScrollArea
+                ref={messagesScrollAreaRef}
+                className="flex-1 overscroll-contain px-4 py-4"
+                onTouchStart={handleMessagesTouchStart}
+                onTouchMove={handleMessagesTouchMove}
+                onTouchEnd={handleMessagesTouchEnd}
+                onTouchCancel={handleMessagesTouchEnd}
+              >
                 {!isOnline ? (
                   <div className="flex flex-col items-center justify-center h-full text-center py-12">
                     <div className="w-16 h-16 rounded-full bg-amber-500/10 backdrop-blur-lg flex items-center justify-center mb-4">
