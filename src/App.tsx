@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ConsentProvider } from '@/components/consent/ConsentProvider';
 import { ThemeProvider, useTheme } from 'next-themes';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as SonnerToaster } from '@/components/ui/sonner';
@@ -161,7 +162,7 @@ function App() {
         <OtaUpdateScreen />
         <OtaDiagnosticsPanel />
 
-        <Router>
+        <ConsentProvider><Router>
           {/* Crucial: The bg-background class here ensures the div 
               behind the status bar is dark as soon as the app loads.
           */}
@@ -238,7 +239,7 @@ function App() {
               <Toaster />
               <SonnerToaster position="bottom-center" />
             </div>
-        </Router>
+        </Router></ConsentProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

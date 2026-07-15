@@ -18,7 +18,8 @@ import {
     Gift,
     LogOut,
     Mail,
-    Megaphone // Added Megaphone icon for News and Announcements
+    Megaphone,
+    ShieldCheck
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useQuery } from '@tanstack/react-query';
@@ -96,6 +97,10 @@ export const ProfileDropdown = () => {
                         <User className="mr-2 h-4 w-4" />
                         <span>Profile Settings</span>
                     </Link>
+                </DropdownMenuItem>
+
+                <DropdownMenuItem onSelect={() => window.dispatchEvent(new Event('open-privacy-preferences'))}>
+                    <ShieldCheck className="mr-2 h-4 w-4" /><span>Privacy Preferences</span>
                 </DropdownMenuItem>
 
                 <DropdownMenuItem asChild>

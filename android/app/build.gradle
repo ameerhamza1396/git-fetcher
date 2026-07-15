@@ -10,8 +10,8 @@ android {
         applicationId "com.hmacs.medmacs"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 16
-        versionName "7.5.9"
+        versionCode 19
+        versionName "7.5.12`"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         aaptOptions {
@@ -51,6 +51,9 @@ dependencies {
     implementation 'com.google.firebase:firebase-messaging' // Required for Push
     implementation 'com.google.firebase:firebase-analytics'
     implementation 'com.google.android.gms:play-services-auth:21.2.0'
+
+    // Meta App Events (analytics only; enabled after marketing consent).
+    implementation 'com.facebook.android:facebook-core:18.2.3'
 
     // Lottie
     implementation "com.airbnb.android:lottie:6.4.0"

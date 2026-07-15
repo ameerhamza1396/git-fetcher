@@ -28,3 +28,4 @@ dist-ssr
 *.mjs
 !scripts/create-ota-release.mjs
 nul
+CODEX_MEMORY.md

@@ -31,6 +31,7 @@ public class MainActivity extends BridgeActivity {
 
         // Only keep your custom plugins here
         registerPlugin(GoogleNativeAuthPlugin.class);
+        registerPlugin(MetaAppEventsPlugin.class);
         super.onCreate(savedInstanceState);
 
         showSplashOverlay();

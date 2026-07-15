@@ -108,11 +108,9 @@ const Checkout = () => {
         };
     }, [user, modalState]);
 
-    if (!location.state) return <Navigate to="/pricing" replace />;
-
-    const { planName = 'Premium', price: basePriceStr, duration = 'Monthly', currency = 'PKR', validity = 'monthly' } = location.state;
+    const { planName = 'Premium', price: basePriceStr, duration = 'Monthly', currency = 'PKR', validity = 'monthly' } = location.state || {};
     const basePrice = basePriceStr ? parseFloat(basePriceStr) : 0;
-    const validityDisplay = validity.toLowerCase() === 'yearly' ? 'Validity: 365 Days' : 'Validity: 30 Days';
+    const validityDisplay = validity?.toLowerCase() === 'yearly' ? 'Validity: 365 Days' : 'Validity: 30 Days';
     const priceAfterPromo = discountedPrice !== null ? discountedPrice : basePrice;
     const grandTotal = priceAfterPromo;
     const isPayFastDisabled = grandTotal < 20;
@@ -120,6 +118,8 @@ const Checkout = () => {
     useEffect(() => {
         if (isPayFastDisabled && paymentMethod === 'payfast') setPaymentMethod('easypaisa');
     }, [isPayFastDisabled, paymentMethod]);
+
+    if (!location.state) return <Navigate to="/pricing" replace />;
 
     const handleApplyPromoCode = async () => {
         setPromoCodeError(null);
@@ -185,27 +185,37 @@ const Checkout = () => {
                 TOKEN: data.ACCESS_TOKEN, PROCCODE: "00", TXNAMT: finalAmount,
                 CUSTOMER_MOBILE_NO: mobileNumber || "03000000000",
                 CUSTOMER_EMAIL_ADDRESS: user?.email || "",
-                SUCCESS_URL: `${callbackBase}/payment-success?plan=${planName}&validity=${validity}&basket_id=${basketId}`,
+                SUCCESS_URL: `${callbackBase}/payment-success?plan=${encodeURIComponent(planName)}&validity=${validity}&basket_id=${basketId}`,
                 FAILURE_URL: `${callbackBase}/payment-failure`,
-                CHECKOUT_URL: `https://medmacs.app/api/payment-`,
+                CHECKOUT_URL: `https://medmacs.app/api/payment-webhook`,
                 BASKET_ID: basketId, ORDER_DATE: new Date().toISOString().slice(0, 10),
                 SIGNATURE: "PAYMENT_REQ", VERSION: "V1.2",
                 TXNDESC: `Upgrade to ${planName} (${duration})`, CURRENCY_CODE: "PKR",
                 P1: user?.id || "", P2: planName, P3: duration
             };
 
-            const form = document.createElement("form");
-            form.method = "POST";
-            form.action = "https://ipg1.apps.net.pk/Ecommerce/api/Transaction/PostTransaction";
-            Object.entries(fields).forEach(([key, value]) => {
-                const input = document.createElement("input");
-                input.type = "hidden"; input.name = key; input.value = value as string;
-                form.appendChild(input);
-            });
-            document.body.appendChild(form);
-            form.submit();
-
-            setIsLoading(false);
+            if (Capacitor.isNativePlatform()) {
+                const params = new URLSearchParams();
+                Object.entries(fields).forEach(([key, value]) => {
+                    params.append(key, value as string);
+                });
+                const redirectUrl = `https://medmacs.app/payfast-redirect.html?${params.toString()}`;
+                const { Browser } = await import('@capacitor/browser');
+                await Browser.open({ url: redirectUrl });
+                setIsLoading(false);
+            } else {
+                const form = document.createElement("form");
+                form.method = "POST";
+                form.action = "https://ipg1.apps.net.pk/Ecommerce/api/Transaction/PostTransaction";
+                Object.entries(fields).forEach(([key, value]) => {
+                    const input = document.createElement("input");
+                    input.type = "hidden"; input.name = key; input.value = value as string;
+                    form.appendChild(input);
+                });
+                document.body.appendChild(form);
+                form.submit();
+                setIsLoading(false);
+            }
         } catch (err) { setError(err.message || "An error occurred."); setIsLoading(false); }
     };
 
@@ -213,7 +223,11 @@ const Checkout = () => {
         if (isLoading || isRedirecting) return;
         if (!user) { setError("Please sign in to continue."); return; }
         if (!agreedToTerms) { setError("You must agree to the Terms, Privacy, and Refund policies to continue."); return; }
-        paymentMethod === 'easypaisa' ? handleEasypaisaPayment() : handlePayFastPayment();
+        if (paymentMethod === 'easypaisa') {
+            handleEasypaisaPayment();
+        } else {
+            handlePayFastPayment();
+        }
     };
 
     return (

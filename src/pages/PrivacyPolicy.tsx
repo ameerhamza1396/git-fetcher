@@ -363,6 +363,10 @@ Your Personal Data, We cannot guarantee its absolute security.
 
 ---
 
+## Analytics, Campaign Measurement, and Consent
+
+Optional analytics and non-personalized campaign measurement are disabled by default. You may separately allow analytics and marketing measurement. When signed in, Your choice is stored with Your account so it can apply across Your devices; a local copy is retained for offline enforcement. We may use consented Google and Meta measurement tools to understand campaign performance, but advertising personalization remains disabled. You can change or withdraw Your choice at any time from **Privacy Preferences** in Your account menu. We retain the consent version, choice, source, and timestamps as an audit record.
+
 ## Children's Privacy
 
 Our Service does not address anyone under the age of 13. We do not knowingly
