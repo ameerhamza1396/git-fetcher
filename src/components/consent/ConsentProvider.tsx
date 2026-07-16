@@ -189,7 +189,7 @@ export function ConsentProvider({ children }: { children: React.ReactNode }) {
 
   return <ConsentContext.Provider value={value}>{children}
     <Dialog open={open} onOpenChange={() => { if (preferences.explicit) setOpen(false); }}>
-      <DialogContent className="max-w-md rounded-3xl">
+      <DialogContent className="max-h-[88dvh] w-[calc(100vw-2rem)] max-w-[26rem] overflow-y-auto rounded-3xl p-5 sm:w-[calc(100vw-3rem)] sm:p-6">
         <DialogHeader><div className="mb-2 flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary"><ShieldCheck /></div>
           <DialogTitle>Privacy preferences</DialogTitle><DialogDescription>Choose whether optional measurement may help us understand and improve our campaigns. Advertising personalization stays disabled.</DialogDescription></DialogHeader>
         <div className="space-y-3 py-2">

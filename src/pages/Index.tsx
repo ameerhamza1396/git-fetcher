@@ -51,8 +51,8 @@ function StepVisual({ kind, mascot }: { kind: string; mascot: string }) {
   if (kind === "library") return <>
     <img src={mascot} alt="Dr Ahroid welcoming you" className="absolute bottom-8 left-1/2 h-[88%] -translate-x-1/2 object-contain drop-shadow-[0_24px_30px_rgba(0,0,0,.55)]" />
     <div className="absolute inset-x-4 bottom-1 grid grid-cols-2 gap-2 rounded-2xl border border-teal-400/35 bg-[#031b1d]/90 p-3 shadow-2xl backdrop-blur-xl">
-      <div className="flex items-center gap-2"><BookOpen className="h-7 w-7 text-teal-300"/><div><b className="block text-sm text-white">50,000+</b><span className="text-[10px] text-slate-400">Verified MCQs</span></div></div>
-      <div className="flex items-center gap-2"><GraduationCap className="h-7 w-7 text-cyan-300"/><div><b className="block text-sm text-white">All years</b><span className="text-[10px] text-slate-400">Major exams</span></div></div>
+      <div className="flex min-w-0 items-center gap-2"><BookOpen className="h-7 w-7 shrink-0 text-teal-300"/><div className="min-w-0 leading-none"><b className="block text-xs leading-4 text-white">50,000+</b><span className="block text-[10px] leading-4 text-slate-400">Verified MCQs</span></div></div>
+      <div className="flex min-w-0 items-center gap-2"><GraduationCap className="h-7 w-7 shrink-0 text-cyan-300"/><div className="min-w-0 leading-none"><b className="block text-xs leading-4 text-white">All Institutes</b><span className="block text-[10px] leading-4 text-slate-400">All Exams</span></div></div>
     </div>
   </>;
 
@@ -81,7 +81,11 @@ function StepVisual({ kind, mascot }: { kind: string; mascot: string }) {
     <div className="absolute left-2 top-1 w-[67%] space-y-1.5">
       {[[Swords,"Battle Mode","1v1, 2v2 & FFA"],[FileCheck2,"AI Tests","Made for your weak areas"],[BarChart3,"Deep Analytics","Find gaps faster"],[Crown,"Leaderboards","Climb and compete"]].map(([Icon,title,sub]: any) => <div key={title} className="flex items-center gap-2 rounded-xl border border-teal-400/15 bg-teal-400/10 px-3 py-2 backdrop-blur"><Icon className="h-5 w-5 text-teal-300"/><div><b className="block text-[10px] text-white">{title}</b><span className="block text-[8px] text-slate-400">{sub}</span></div></div>)}
     </div>
-    <div className="absolute bottom-3 left-2 grid h-24 w-24 place-items-center rounded-2xl border border-teal-400/25 bg-[#062426]/90"><div className="grid h-16 w-16 place-items-center rounded-full border-[7px] border-teal-400 text-lg font-black text-white">82%</div></div>
+    <div className="absolute bottom-3 left-2 grid h-24 w-24 place-items-center rounded-2xl border border-teal-400/25 bg-[#062426]/90">
+      <div className="grid h-16 w-16 place-items-center rounded-full p-[7px]" style={{ background: "conic-gradient(#2dd4bf 0 82%, rgba(45,212,191,.16) 82% 100%)" }}>
+        <div className="grid h-full w-full place-items-center rounded-full bg-[#062426] text-lg font-black text-white">82%</div>
+      </div>
+    </div>
     <img src={mascot} alt="Dr Ahroid showing your progress" className="absolute -bottom-8 -right-10 h-[80%] object-contain drop-shadow-[0_24px_30px_rgba(0,0,0,.55)]" />
   </>;
 
@@ -160,7 +164,7 @@ export default function Welcome() {
 
           <main className="relative z-10 mx-auto flex h-full w-full max-w-md flex-col px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-[max(18px,env(safe-area-inset-top))]">
             <header className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5"><img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs" className="h-9 w-9 object-contain"/><span className="text-xl font-black tracking-tight">medmacs</span></div>
+              <div className="flex items-center gap-2.5"><img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs" className="h-9 w-9 object-contain"/><span className="text-xl font-black tracking-tight">Medmacs.App</span></div>
               <button onClick={completeSetup} className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.16em] text-slate-400 transition hover:text-white">Skip</button>
             </header>
 
