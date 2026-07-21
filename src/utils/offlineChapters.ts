@@ -20,6 +20,7 @@ type OfflineChapter = {
   chapter_number: number;
   subject_id: string;
   mcq_count?: number;
+  content_type?: 'question_bank' | 'past_paper' | null;
 };
 
 type OfflineMCQ = {

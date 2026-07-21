@@ -7,6 +7,7 @@ import { ArrowRight, Sun, Moon } from "lucide-react";
 import { FaFacebookF, FaInstagram, FaLinkedinIn, FaWhatsapp } from "react-icons/fa";
 import { useTheme } from "next-themes";
 import { supabase } from "@/integrations/supabase/client";
+import { CONTACT_DETAILS } from "@/constants/contact";
 
 type PricingPlan = {
     id: string;
@@ -75,7 +76,7 @@ const IndexHeader: React.FC = () => {
                                 <ul className="space-y-4 text-base">
                                     <li>
                                         <a
-                                            href="https://facebook.com/medisticsapp"
+                                            href={CONTACT_DETAILS.facebookUrl}
                                             target="_blank"
                                             rel="noreferrer"
                                             className="flex items-center space-x-3 hover:text-[#1877F2]"
@@ -85,7 +86,7 @@ const IndexHeader: React.FC = () => {
                                     </li>
                                     <li>
                                         <a
-                                            href="https://instagram.com/medistics.app"
+                                            href={CONTACT_DETAILS.instagramUrl}
                                             target="_blank"
                                             rel="noreferrer"
                                             className="flex items-center space-x-3 hover:text-[#E1306C]"
@@ -95,7 +96,7 @@ const IndexHeader: React.FC = () => {
                                     </li>
                                     <li>
                                         <a
-                                            href="https://linkedin.com/in/medisticsapp"
+                                            href={CONTACT_DETAILS.linkedinUrl}
                                             target="_blank"
                                             rel="noreferrer"
                                             className="flex items-center space-x-3 hover:text-[#0077B5]"
@@ -106,20 +107,20 @@ const IndexHeader: React.FC = () => {
                                     <li className="border-t border-current/30"></li>
                                     <li>
                                         <a
-                                            href="https://wa.me/03392456162"
+                                            href={CONTACT_DETAILS.whatsappUrl}
                                             target="_blank"
                                             rel="noreferrer"
                                             className="flex items-center space-x-3 hover:text-[#25D366]"
                                         >
-                                            <FaWhatsapp className="w-5 h-5" /> <span>WhatsApp: 0339-2456162</span>
+                                            <FaWhatsapp className="w-5 h-5" /> <span>WhatsApp: {CONTACT_DETAILS.whatsappDisplay}</span>
                                         </a>
                                     </li>
                                     <li>
                                         <a
-                                            href="mailto:contact@medmacs.app"
+                                            href={`mailto:${CONTACT_DETAILS.email}`}
                                             className="flex items-center space-x-3 hover:opacity-80"
                                         >
-                                            <span>📧 contact@medmacs.app</span>
+                                            <span>📧 {CONTACT_DETAILS.email}</span>
                                         </a>
                                     </li>
                                 </ul>

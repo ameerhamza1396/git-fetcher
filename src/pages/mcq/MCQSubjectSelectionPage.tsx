@@ -1,12 +1,12 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, type UIEvent } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Clock, Flame, Target, TrendingUp, WifiOff } from 'lucide-react';
-import { fetchSubjects, Subject } from '@/utils/mcqData';
+import { ArrowRight, Clock, Flame, RefreshCw, Target, TrendingUp, WifiOff } from 'lucide-react';
+import { fetchSubjects, readCachedSubjects, Subject } from '@/utils/mcqData';
 import { useAuth } from '@/hooks/useAuth';
 import { MCQPageLayout } from './MCQPageLayout';
-import PageSkeleton from '@/components/skeletons/PageSkeleton';
+import AppTransitionScreen from '@/components/AppTransitionScreen';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Link } from 'react-router-dom';
 import { Lock } from 'lucide-react';
@@ -14,6 +14,13 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import Seo from '@/components/Seo';
 import { getOfflineChapterSummaries, subscribeOfflineChapterChanges } from '@/utils/offlineChapters';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 
 const SubjectCardSkeleton = () => (
   <div className="relative overflow-hidden rounded-3xl bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl p-6 animate-pulse border border-border/40">
@@ -223,11 +230,7 @@ const MCQAnalyticsPanel = ({
 
 const MCQSubjectSelectionPage = () => {
   const pageScrollRef = useRef<HTMLDivElement>(null);
-  const stickyHeadingRef = useRef<HTMLDivElement>(null);
-  const stickyHeadingStartTop = useRef<number | null>(null);
-  const latestScrollTopRef = useRef(0);
-  const scrollFrameRef = useRef<number | null>(null);
-  const analyticsCompactRef = useRef(false);
+  const subjectRequestRef = useRef(0);
 
   useLayoutEffect(() => {
     requestAnimationFrame(() => {
@@ -238,13 +241,13 @@ const MCQSubjectSelectionPage = () => {
     });
   }, []);
 
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [subjects, setSubjects] = useState<Subject[]>(readCachedSubjects);
+  const [loading, setLoading] = useState(() => readCachedSubjects().length === 0);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [isOfflineMode, setIsOfflineMode] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
   const [offlineSubjectIds, setOfflineSubjectIds] = useState<Set<string>>(new Set());
-  const [isHeadingStuck, setIsHeadingStuck] = useState(false);
-  const [isAnalyticsCompact, setIsAnalyticsCompact] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [entryTransitionComplete, setEntryTransitionComplete] = useState(false);
   const [userStats, setUserStats] = useState({
     totalQuestions: 0, correctAnswers: 0, accuracy: 0, averageTime: 0, bestStreak: 0
   });
@@ -253,7 +256,7 @@ const MCQSubjectSelectionPage = () => {
   const navigate = useNavigate();
 
   const { data: profile, isLoading: profileLoading } = useQuery({
-    queryKey: ['profile', user?.id],
+    queryKey: ['mcq-profile-plan', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
       const { data, error } = await supabase
@@ -265,10 +268,17 @@ const MCQSubjectSelectionPage = () => {
   });
 
   const loadSubjects = useCallback(async () => {
+    const requestId = ++subjectRequestRef.current;
     setLoading(true);
-    const data = await fetchSubjects();
-    setSubjects(data);
-    setLoading(false);
+    try {
+      const data = await fetchSubjects();
+      if (requestId !== subjectRequestRef.current) return;
+      setSubjects(current => data.length > 0 ? data : current);
+    } catch (error) {
+      console.error('Unable to load MCQ subjects:', error);
+    } finally {
+      if (requestId === subjectRequestRef.current) setLoading(false);
+    }
   }, []);
 
   const loadUserStats = useCallback(async () => {
@@ -281,6 +291,11 @@ const MCQSubjectSelectionPage = () => {
   const loadOfflineAvailability = useCallback(async () => {
     const summaries = await getOfflineChapterSummaries();
     setOfflineSubjectIds(new Set(summaries.map(summary => summary.subjectId)));
+  }, []);
+
+  useEffect(() => {
+    const transitionTimer = window.setTimeout(() => setEntryTransitionComplete(true), 220);
+    return () => window.clearTimeout(transitionTimer);
   }, []);
 
   useEffect(() => {
@@ -315,52 +330,22 @@ const MCQSubjectSelectionPage = () => {
     loadSubjects();
   }, [loadSubjects]);
 
-  const updateScrollState = useCallback((scrollTop: number) => {
-    if (!stickyHeadingRef.current) return;
-    if (stickyHeadingStartTop.current === null) {
-      stickyHeadingStartTop.current = stickyHeadingRef.current.offsetTop;
-    }
-
-    const headingStickPoint = stickyHeadingStartTop.current;
-    const nextIsCompact = analyticsCompactRef.current ? scrollTop > 18 : scrollTop > 72;
-    const nextIsHeadingStuck = isHeadingStuck
-      ? scrollTop > headingStickPoint - 18
-      : scrollTop >= headingStickPoint + 12;
-
-    if (analyticsCompactRef.current !== nextIsCompact) {
-      analyticsCompactRef.current = nextIsCompact;
-      setIsAnalyticsCompact(nextIsCompact);
-    }
-    setIsHeadingStuck((current) => (current === nextIsHeadingStuck ? current : nextIsHeadingStuck));
-  }, [isHeadingStuck]);
-
-  const handlePageScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
-    latestScrollTopRef.current = event.currentTarget.scrollTop;
-    if (scrollFrameRef.current !== null) return;
-
-    scrollFrameRef.current = requestAnimationFrame(() => {
-      scrollFrameRef.current = null;
-      updateScrollState(latestScrollTopRef.current);
-    });
-  }, [updateScrollState]);
-
   useEffect(() => {
-    const handleResize = () => {
-      stickyHeadingStartTop.current = null;
-      updateScrollState(pageScrollRef.current?.scrollTop || 0);
-    };
+    const channel = supabase
+      .channel('mcq-subject-access-flags')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'subjects' },
+        () => {
+          void loadSubjects();
+        },
+      )
+      .subscribe();
 
-    const frame = requestAnimationFrame(() => updateScrollState(pageScrollRef.current?.scrollTop || 0));
-    window.addEventListener('resize', handleResize);
     return () => {
-      cancelAnimationFrame(frame);
-      if (scrollFrameRef.current !== null) {
-        cancelAnimationFrame(scrollFrameRef.current);
-        scrollFrameRef.current = null;
-      }
-      window.removeEventListener('resize', handleResize);
+      void supabase.removeChannel(channel);
     };
-  }, [updateScrollState]);
+  }, [loadSubjects]);
 
   useEffect(() => {
     if (user?.id && !authLoading && !profileLoading) loadUserStats();
@@ -372,8 +357,8 @@ const MCQSubjectSelectionPage = () => {
     }
   };
 
-  if (authLoading || profileLoading) {
-    return <PageSkeleton />;
+  if (!entryTransitionComplete || authLoading || profileLoading) {
+    return <AppTransitionScreen label="Preparing MCQs" />;
   }
 
   if (!user) {
@@ -402,7 +387,6 @@ const MCQSubjectSelectionPage = () => {
       showBackButton={true}
       scrollable
       scrollRef={pageScrollRef}
-      onScroll={handlePageScroll}
     >
       <Seo title="MCQs Practice" description="Practice thousands of MCQs for MDCAT and other medical entrance exams with Medmacs App." canonical="https://medmacs.app/mcqs" />
       
@@ -416,12 +400,49 @@ const MCQSubjectSelectionPage = () => {
       </div>
 
       <div className="mx-auto mb-6 max-w-4xl px-4 sm:mb-8 sm:px-0">
-        <MCQAnalyticsPanel
-          stats={userStats}
-          isCompact={isAnalyticsCompact}
-          isOffline={isOfflineMode}
-        />
+        <button
+          type="button"
+          onClick={() => setAnalyticsOpen(true)}
+          className="group flex w-full items-center gap-4 rounded-3xl border border-border/70 bg-card/55 p-4 text-left shadow-sm backdrop-blur-xl transition-colors hover:border-primary/35 hover:bg-primary/[0.04] dark:bg-white/[0.035]"
+          aria-label="Open MCQ practice analytics"
+        >
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <Target className="h-6 w-6" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+              Practice Pulse
+            </span>
+            <span className="mt-1 block text-sm font-black text-foreground">
+              View your MCQ analytics
+            </span>
+          </span>
+          <span className="rounded-full bg-primary/10 px-3 py-1.5 text-xs font-black text-primary">
+            {formatCompactNumber(userStats.totalQuestions)}
+          </span>
+          <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+        </button>
       </div>
+
+      <Sheet open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
+        <SheetContent
+          side="bottom"
+          className="no-scrollbar max-h-[88dvh] overflow-y-auto rounded-t-[2rem] border-x border-t border-border/70 bg-background/95 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 shadow-2xl backdrop-blur-2xl sm:px-6"
+        >
+          <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-muted-foreground/25" />
+          <SheetHeader className="sr-only">
+            <SheetTitle>MCQ practice analytics</SheetTitle>
+            <SheetDescription>Your practice totals, accuracy, streak and average answer time.</SheetDescription>
+          </SheetHeader>
+          <div className="mx-auto w-full max-w-4xl">
+            <MCQAnalyticsPanel
+              stats={userStats}
+              isCompact={false}
+              isOffline={isOfflineMode}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
@@ -431,43 +452,16 @@ const MCQSubjectSelectionPage = () => {
         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-3 block">Step 1 of 3</span>
       </motion.div>
 
-      <div ref={stickyHeadingRef} className="sticky top-0 z-50 bg-background/45 dark:bg-background/20 backdrop-blur-xl pt-[env(safe-area-inset-top)] -mx-3 sm:mx-0 px-3 sm:px-0">
+      <div className="sticky top-0 z-50 -mx-3 bg-gradient-to-b from-background via-background to-background/95 px-3 pt-[env(safe-area-inset-top)] sm:mx-0 sm:px-0">
         <div className="max-w-4xl mx-auto px-4 sm:px-0">
-          <motion.div
-            animate={{ paddingTop: isHeadingStuck ? 10 : 16, paddingBottom: isHeadingStuck ? 10 : 12 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-            className="overflow-visible"
-          >
-            <motion.div
-              animate={{ height: isHeadingStuck ? 34 : 64 }}
-              transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-              className="relative overflow-visible"
-            >
-              <motion.h2
-                animate={{
-                  left: isHeadingStuck ? '0%' : '50%',
-                  x: isHeadingStuck ? '0%' : '-50%',
-                  scale: isHeadingStuck ? 0.58 : 1
-                }}
-                transition={{ type: 'spring', stiffness: 260, damping: 28 }}
-                className="absolute top-0 origin-left whitespace-nowrap pr-3 text-3xl sm:text-5xl font-black tracking-normal text-foreground uppercase italic leading-[1.08]"
-              >
+          <div className="py-3 text-center">
+              <h2 className="text-2xl font-black uppercase italic leading-tight text-foreground sm:text-3xl">
                 Select <span className="live-gradient-text">Subject&nbsp;</span>
-              </motion.h2>
-            </motion.div>
-            <motion.p
-              animate={{
-                opacity: isHeadingStuck ? 0 : 1,
-                y: isHeadingStuck ? -8 : 0,
-                height: isHeadingStuck ? 0 : 'auto',
-                marginTop: isHeadingStuck ? 0 : 8
-              }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden text-muted-foreground text-sm font-medium max-w-lg mx-auto text-center"
-            >
+              </h2>
+            <p className="mx-auto mt-1 max-w-lg text-center text-xs font-medium text-muted-foreground">
               Choose a subject to begin your practice. Each subject contains comprehensive chapters and high-yield MCQs.
-            </motion.p>
-          </motion.div>
+            </p>
+          </div>
         </div>
         <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
       </div>
@@ -475,19 +469,14 @@ const MCQSubjectSelectionPage = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-0 pb-32 grid grid-cols-1 md:grid-cols-2 gap-4">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => <SubjectCardSkeleton key={i} />)
-        ) : (
-          subjects.map((subject, index) => {
+        ) : subjects.length > 0 ? (
+          subjects.map((subject) => {
             const isSelected = selectedSubject?.id === subject.id;
             const isOfflineUnavailable = isOfflineMode && !offlineSubjectIds.has(subject.id);
             const isFreeUnlimited = subject.free_unlimited_access === true;
             return (
-              <motion.div
+              <div
                 key={subject.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.05 }}
-                whileHover={isOfflineUnavailable ? {} : { scale: 1.02, y: -4 }}
-                whileTap={isOfflineUnavailable ? {} : { scale: 0.98 }}
                 onClick={() => !isOfflineUnavailable && setSelectedSubject(subject)}
                 aria-disabled={isOfflineUnavailable}
                 className={`group relative overflow-hidden rounded-3xl border-2 p-6 transition-all duration-300 ${
@@ -542,20 +531,32 @@ const MCQSubjectSelectionPage = () => {
                     <ArrowRight className="w-4 h-4" />
                   </div>
                 </div>
-              </motion.div>
+              </div>
             );
           })
+        ) : (
+          <div className="col-span-full rounded-3xl border border-amber-500/20 bg-amber-500/10 p-8 text-center">
+            <WifiOff className="mx-auto h-9 w-9 text-amber-600 dark:text-amber-300" />
+            <h3 className="mt-4 text-sm font-black uppercase tracking-wider text-foreground">
+              Subjects could not be loaded
+            </h3>
+            <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-muted-foreground">
+              Check your connection and try again. If the issue continues, contact{' '}
+              <a className="font-semibold underline underline-offset-2" href="mailto:hi@medmacs.app">
+                hi@medmacs.app
+              </a>
+              .
+            </p>
+            <Button type="button" className="mt-5 rounded-xl" onClick={loadSubjects}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Try again
+            </Button>
+          </div>
         )}
       </div>
 
-      <AnimatePresence>
-        {selectedSubject && (
-          <motion.div
-            initial={{ opacity: 0, y: 100 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 100 }}
-            className="fixed bottom-0 left-0 right-0 p-6 pb-[env(safe-area-inset-bottom)] z-50 flex justify-center pointer-events-none"
-          >
+      {selectedSubject && (
+          <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex justify-center p-6 pb-[env(safe-area-inset-bottom)]">
             <div className="w-full max-w-md pointer-events-auto">
               <Button
                 onClick={handleContinue}
@@ -563,17 +564,13 @@ const MCQSubjectSelectionPage = () => {
                 size="lg"
               >
                 Continue to Chapters
-                <motion.div
-                  animate={{ x: [0, 5, 0] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                >
+                <span>
                   <ArrowRight className="w-5 h-5 ml-2" />
-                </motion.div>
+                </span>
               </Button>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+      )}
 
       <div className="text-center pt-20 pb-10 opacity-40">
         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">© 2026 Medmacs App • All rights reserved</p>

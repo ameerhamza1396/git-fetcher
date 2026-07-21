@@ -141,7 +141,7 @@ If you have any questions about these Terms and Conditions, you can contact us:
 * By email: [hi@medmacs.app](mailto:hi@medmacs.app)
 
 * By visiting this page on our website:
-    [instagram.com/Medmacs.app](https://instagram.com/Medmacs.app)
+    [instagram.com/medmacs.app](https://instagram.com/medmacs.app)
 `;
 
   return (

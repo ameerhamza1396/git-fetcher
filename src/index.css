@@ -171,6 +171,25 @@ body,
   body {
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+
+  /* Native-app behavior: UI copy is not selectable, while fields and
+     intentionally copyable codes keep normal text selection. */
+  body,
+  body * {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  input,
+  textarea,
+  [contenteditable="true"],
+  .select-text,
+  .select-all {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    -webkit-touch-callout: default;
+  }
 }
 
 @layer utilities {
@@ -874,10 +893,23 @@ body,
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+  width: 0;
+  height: 0;
 }
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+.mcq-document-scroll-lock {
+  -ms-overflow-style: none;
+  scrollbar-width: none !important;
+}
+
+.mcq-document-scroll-lock::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .dashboard-modern-font {

@@ -1,5 +1,4 @@
-// @ts-nocheck
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { CONTACT_DETAILS } from '@/constants/contact';
 import {
     Mail, Phone, Instagram, Facebook, Linkedin, User, MessageSquare,
     Loader2, CheckCircle, Send, ArrowLeft
@@ -18,20 +18,27 @@ import { fetchInstitutes, getInstituteByCode, getInstituteDisplayName, isSpecial
 import Seo from '@/components/Seo';
 
 const ContactUsPage = () => {
+    type ContactFormData = {
+        fullName: string;
+        email: string;
+        message: string;
+    };
+    type ContactFormErrors = Partial<Record<keyof ContactFormData, string>>;
+
     const { user } = useAuth();
-    const headerRef = useRef<HTMLElement>(null);
+    const headerRef = useRef<HTMLDivElement>(null);
     const lastScrollY = useRef(0);
     const [headerVisible, setHeaderVisible] = useState(true);
 
     const [searchParams] = useSearchParams();
     const isCampusCollaboration = searchParams.get('subject') === 'campus-collaboration';
     const [formData, setFormData] = useState({ fullName: '', email: '', message: '' });
-    const [formErrors, setFormErrors] = useState({});
+    const [formErrors, setFormErrors] = useState<ContactFormErrors>({});
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
     const { data: institutes } = useQuery({
         queryKey: ['institutesForContact'],
-        queryFn: fetchInstitutes,
+        queryFn: () => fetchInstitutes(),
         staleTime: 5 * 60 * 1000,
     });
 
@@ -85,7 +92,7 @@ const ContactUsPage = () => {
         }
     }, [user, profile, institutes, isCampusCollaboration, campusCollaborationMessage]);
 
-    const handleInputChange = (e) => {
+    const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         setFormData(prev => ({ ...prev, [id]: value }));
         setFormErrors(prev => ({ ...prev, [id]: undefined }));
@@ -93,7 +100,7 @@ const ContactUsPage = () => {
     };
 
     const validateForm = () => {
-        const errors = {};
+        const errors: ContactFormErrors = {};
         if (!formData.fullName.trim()) errors.fullName = 'Full Name is required.';
         if (!formData.email.trim()) errors.email = 'Email is required.';
         else if (!/\S+@\S+\.\S+/.test(formData.email)) errors.email = 'Email address is invalid.';
@@ -103,7 +110,7 @@ const ContactUsPage = () => {
         return Object.keys(errors).length === 0;
     };
 
-    const submitMessageMutation = useMutation({
+    const submitMessageMutation = useMutation<unknown, Error, ContactFormData>({
         mutationFn: async (messageData) => {
             const { data, error } = await supabase.from('contact_messages').insert([{
                 full_name: messageData.fullName, email: messageData.email,
@@ -124,7 +131,7 @@ const ContactUsPage = () => {
         },
     });
 
-    const handleSubmit = (e) => {
+    const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setShowSuccessMessage(false);
         if (validateForm()) submitMessageMutation.mutate(formData);
@@ -132,11 +139,11 @@ const ContactUsPage = () => {
     };
 
     const contactLinks = [
-        { icon: Mail, label: 'Email', value: 'hi@medmacs.app', href: 'mailto:hi@medmacs.app', gradient: 'from-blue-600 via-indigo-600 to-violet-700' },
-        { icon: Phone, label: 'WhatsApp', value: '03242456162', href: 'tel:+923242456162', gradient: 'from-emerald-600 via-teal-600 to-cyan-700' },
-        { icon: Instagram, label: 'Instagram', value: '@medmacs.app', href: 'https://www.instagram.com/medmacs.app', gradient: 'from-rose-600 via-pink-600 to-fuchsia-700' },
-        { icon: Facebook, label: 'Facebook', value: 'medmacsapp', href: 'https://www.facebook.com/medmacsapp', gradient: 'from-blue-700 via-blue-600 to-indigo-700' },
-        { icon: Linkedin, label: 'LinkedIn', value: 'dr-ameerhamza', href: 'https://www.linkedin.com/in/dr-ameerhamza/', gradient: 'from-sky-600 via-blue-600 to-indigo-700' },
+        { icon: Mail, label: 'Email', value: CONTACT_DETAILS.email, href: `mailto:${CONTACT_DETAILS.email}`, gradient: 'from-blue-600 via-indigo-600 to-violet-700' },
+        { icon: Phone, label: 'WhatsApp', value: CONTACT_DETAILS.whatsappDisplay, href: CONTACT_DETAILS.whatsappUrl, gradient: 'from-emerald-600 via-teal-600 to-cyan-700' },
+        { icon: Instagram, label: 'Instagram', value: `@${CONTACT_DETAILS.instagramHandle}`, href: CONTACT_DETAILS.instagramUrl, gradient: 'from-rose-600 via-pink-600 to-fuchsia-700' },
+        { icon: Facebook, label: 'Facebook', value: CONTACT_DETAILS.facebookHandle, href: CONTACT_DETAILS.facebookUrl, gradient: 'from-blue-700 via-blue-600 to-indigo-700' },
+        { icon: Linkedin, label: 'LinkedIn', value: CONTACT_DETAILS.linkedinHandle, href: CONTACT_DETAILS.linkedinUrl, gradient: 'from-sky-600 via-blue-600 to-indigo-700' },
     ];
 
     return (
@@ -148,11 +155,11 @@ const ContactUsPage = () => {
                 className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
             >
                 <div className="container mx-auto px-4 py-4 flex justify-between items-center max-w-7xl">
-                    <Link to="/dashboard">
-                        <Button variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110">
+                    <Button asChild variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110">
+                        <Link to="/dashboard" aria-label="Back to dashboard">
                             <ArrowLeft className="h-5 w-5" />
-                        </Button>
-                    </Link>
+                        </Link>
+                    </Button>
                     <div className="flex items-center gap-2">
                         <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-7 h-7" />
                         <span className="text-lg font-black">Contact Us</span>

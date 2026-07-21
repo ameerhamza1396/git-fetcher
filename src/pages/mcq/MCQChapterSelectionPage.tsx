@@ -1,16 +1,16 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, BookOpen, CheckCircle2, WifiOff } from 'lucide-react';
+import { ArrowRight, BookOpen, CheckCircle2, FileClock, WifiOff } from 'lucide-react';
 import { fetchChaptersBySubject, fetchSubjectById, Subject, Chapter } from '@/utils/mcqData';
 import { MCQPageLayout } from './MCQPageLayout';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { CollaborateModal } from '@/components/CollaborateModal';
 import { ChapterDownloadButton } from '@/components/mcq/ChapterDownloadButton';
-import { useOfflineChapterStatus } from '@/hooks/useOfflineChapterStatus';
 import { getOfflineChapterSummaries, subscribeOfflineChapterChanges } from '@/utils/offlineChapters';
+import { useAuth } from '@/hooks/useAuth';
 
 const ChapterProgressDonut = ({
   attempted,
@@ -80,18 +80,11 @@ const ChapterCardSkeleton = () => (
   </div>
 );
 
-const OfflineChapterNote = ({ chapterId }: { chapterId: string }) => {
-  const { status } = useOfflineChapterStatus(chapterId);
+type ChapterTab = 'question_bank' | 'past_paper';
 
-  if (status !== 'downloaded') return null;
-
-  return (
-    <div className="mt-3 flex w-full items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-      <CheckCircle2 className="h-3 w-3" />
-      This chapter is available for offline use
-    </div>
-  );
-};
+const getChapterContentType = (chapter: Chapter): ChapterTab => (
+  chapter.content_type === 'past_paper' ? 'past_paper' : 'question_bank'
+);
 
 const MCQChapterSelectionPage = () => {
   useLayoutEffect(() => {
@@ -104,37 +97,52 @@ const MCQChapterSelectionPage = () => {
 
   const { subjectId } = useParams<{ subjectId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [allChapters, setAllChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
   const [showCollaborateModal, setShowCollaborateModal] = useState(false);
   const [subject, setSubject] = useState<Subject | null>(null);
-  const [isHeadingStuck, setIsHeadingStuck] = useState(false);
   const [isOfflineMode, setIsOfflineMode] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
   const [offlineChapterIds, setOfflineChapterIds] = useState<Set<string>>(new Set());
-  const stickyHeadingRef = useRef<HTMLDivElement>(null);
-  const stickyHeadingStartTop = useRef<number | null>(null);
+  const [activeTab, setActiveTab] = useState<ChapterTab>('question_bank');
+
+  const chaptersByType = useMemo(() => ({
+    question_bank: allChapters.filter(chapter => getChapterContentType(chapter) === 'question_bank'),
+    past_paper: allChapters.filter(chapter => getChapterContentType(chapter) === 'past_paper'),
+  }), [allChapters]);
+  const visibleChapters = chaptersByType[activeTab];
 
   const { data: profile, isLoading: profileLoading } = useQuery({
-    queryKey: ['profile', 'chapter-select'],
+    queryKey: ['mcq-profile-plan', user?.id],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
       const { data } = await supabase.from('profiles').select('plan').eq('id', user.id).maybeSingle();
       return data;
     },
-    enabled: true
+    enabled: Boolean(user?.id)
   });
 
   const { data: attemptedByChapter = {}, isLoading: progressLoading } = useQuery({
-    queryKey: ['mcq-chapter-progress', allChapters.map(ch => ch.id).join(',')],
+    queryKey: ['mcq-chapter-progress', user?.id, allChapters.map(ch => ch.id).join(',')],
     queryFn: async () => {
-      if (allChapters.length === 0) return {};
+      if (allChapters.length === 0 || !user?.id) return {};
 
       const chapterIds = allChapters.map(ch => ch.id);
       const chapterIdSet = new Set(chapterIds);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) return {};
+
+      const { data: compactProgress, error: compactProgressError } = await supabase
+        .rpc('get_mcq_chapter_progress', { p_chapter_ids: chapterIds });
+      if (!compactProgressError && compactProgress) {
+        const progressRows = compactProgress as Array<{
+          chapter_id: string;
+          attempted_count: number;
+        }>;
+        return progressRows.reduce<Record<string, number>>((acc, row) => {
+          acc[row.chapter_id] = Number(row.attempted_count || 0);
+          return acc;
+        }, {});
+      }
 
       const { data: answerRows, error } = await supabase
         .from('user_answers')
@@ -143,16 +151,20 @@ const MCQChapterSelectionPage = () => {
 
       if (error || !answerRows) return {};
 
-      const attemptedMcqIds = new Set(answerRows.map(answer => answer.mcq_id).filter(Boolean));
-      return answerRows.reduce<Record<string, number>>((acc, answer: any) => {
+      const typedAnswerRows = answerRows as Array<{
+        mcq_id: string | null;
+        mcqs: Array<{ chapter_id: string | null }> | null;
+      }>;
+      const attemptedMcqIds = new Set(typedAnswerRows.map(answer => answer.mcq_id).filter(Boolean));
+      return typedAnswerRows.reduce<Record<string, number>>((acc, answer) => {
         if (!answer.mcq_id || !attemptedMcqIds.delete(answer.mcq_id)) return acc;
-        const chapterId = answer.mcqs?.chapter_id;
+        const chapterId = answer.mcqs?.[0]?.chapter_id;
         if (!chapterId || !chapterIdSet.has(chapterId)) return acc;
         acc[chapterId] = (acc[chapterId] || 0) + 1;
         return acc;
       }, {});
     },
-    enabled: allChapters.length > 0 && !isOfflineMode
+    enabled: Boolean(user?.id) && allChapters.length > 0 && !isOfflineMode
   });
 
   const loadData = useCallback(async () => {
@@ -212,28 +224,17 @@ const MCQChapterSelectionPage = () => {
     }
   }, [isOfflineMode, offlineChapterIds, selectedChapter]);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      if (!stickyHeadingRef.current) return;
-      if (stickyHeadingStartTop.current === null) {
-        stickyHeadingStartTop.current = stickyHeadingRef.current.offsetTop;
-      }
-      setIsHeadingStuck(window.scrollY >= stickyHeadingStartTop.current - 1);
-    };
-
-    handleScroll();
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('resize', handleScroll);
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('resize', handleScroll);
-    };
-  }, []);
-
   const handleContinue = () => {
     if (selectedChapter && subjectId && (!isOfflineMode || offlineChapterIds.has(selectedChapter.id))) {
-      navigate(`/mcqs/settings/${subjectId}/${selectedChapter.id}`);
+      navigate(`/mcqs/settings/${subjectId}/${selectedChapter.id}`, {
+        state: { subject, chapter: selectedChapter },
+      });
     }
+  };
+
+  const selectTab = (tab: ChapterTab) => {
+    setActiveTab(tab);
+    setSelectedChapter(null);
   };
 
   if (!subject && !loading) {
@@ -263,40 +264,13 @@ const MCQChapterSelectionPage = () => {
         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-3 block">Step 2 of 3</span>
       </motion.div>
 
-      <div ref={stickyHeadingRef} className="sticky top-0 z-50 bg-background/45 dark:bg-background/20 backdrop-blur-xl pt-[env(safe-area-inset-top)] -mx-3 sm:mx-0 px-3 sm:px-0">
+      <div className="sticky top-0 z-50 -mx-3 bg-gradient-to-b from-background via-background to-background/95 px-3 pt-[env(safe-area-inset-top)] sm:mx-0 sm:px-0">
         <div className="max-w-4xl mx-auto px-4 sm:px-0">
-          <motion.div
-            animate={{ paddingTop: isHeadingStuck ? 10 : 16, paddingBottom: isHeadingStuck ? 10 : 12 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-            className="overflow-visible"
-          >
-            <motion.div
-              animate={{ height: isHeadingStuck ? 34 : 64 }}
-              transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-              className="relative overflow-visible"
-            >
-              <motion.h2
-                animate={{
-                  left: isHeadingStuck ? '0%' : '50%',
-                  x: isHeadingStuck ? '0%' : '-50%',
-                  scale: isHeadingStuck ? 0.58 : 1
-                }}
-                transition={{ type: 'spring', stiffness: 260, damping: 28 }}
-                className="absolute top-0 origin-left whitespace-nowrap pr-3 text-3xl sm:text-5xl font-black tracking-normal text-foreground uppercase italic leading-[1.08]"
-              >
+          <div className="py-3 text-center">
+              <h2 className="text-2xl font-black uppercase italic leading-tight text-foreground sm:text-3xl">
                 Select <span className="live-gradient-text">Chapter&nbsp;</span>
-              </motion.h2>
-            </motion.div>
-            <motion.div
-              animate={{
-                opacity: isHeadingStuck ? 0 : 1,
-                y: isHeadingStuck ? -8 : 0,
-                height: isHeadingStuck ? 0 : 'auto',
-                marginTop: isHeadingStuck ? 0 : 8
-              }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden flex flex-col items-center gap-1"
-            >
+              </h2>
+            <div className="mt-1 flex flex-col items-center gap-1">
               <p className="text-muted-foreground text-sm font-bold uppercase tracking-widest">{subject?.name}</p>
               <p className="text-muted-foreground/60 text-[10px] font-medium uppercase tracking-[0.2em]">
                 {isOfflineMode
@@ -307,8 +281,38 @@ const MCQChapterSelectionPage = () => {
                   ? 'Free daily limits apply'
                   : 'Unlimited Premium Access'}
               </p>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
+          <nav className="no-scrollbar flex w-full gap-2 overflow-x-auto pb-3" aria-label="Chapter content type">
+            <button
+              type="button"
+              onClick={() => selectTab('question_bank')}
+              aria-pressed={activeTab === 'question_bank'}
+              className={`flex min-w-[170px] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-4 py-3 text-xs font-black uppercase tracking-wider transition-all ${
+                activeTab === 'question_bank'
+                  ? 'border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                  : 'border-border/50 bg-muted/30 text-muted-foreground hover:border-primary/40 hover:text-foreground'
+              }`}
+            >
+              <BookOpen className="h-4 w-4" />
+              Question Bank
+              <span className="rounded-full bg-background/15 px-2 py-0.5 text-[9px]">{chaptersByType.question_bank.length}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => selectTab('past_paper')}
+              aria-pressed={activeTab === 'past_paper'}
+              className={`flex min-w-[150px] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-4 py-3 text-xs font-black uppercase tracking-wider transition-all ${
+                activeTab === 'past_paper'
+                  ? 'border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                  : 'border-border/50 bg-muted/30 text-muted-foreground hover:border-primary/40 hover:text-foreground'
+              }`}
+            >
+              <FileClock className="h-4 w-4" />
+              Past Papers
+              <span className="rounded-full bg-background/15 px-2 py-0.5 text-[9px]">{chaptersByType.past_paper.length}</span>
+            </button>
+          </nav>
         </div>
         <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
       </div>
@@ -326,8 +330,32 @@ const MCQChapterSelectionPage = () => {
             </div>
             <CollaborateModal open={showCollaborateModal} onOpenChange={setShowCollaborateModal} />
           </div>
+        ) : visibleChapters.length === 0 && activeTab === 'past_paper' ? (
+          <div className="col-span-full py-10 text-center sm:py-16">
+            <div className="mx-auto max-w-lg rounded-3xl border border-primary/15 bg-primary/5 px-6 py-10 shadow-xl shadow-primary/5">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <FileClock className="h-7 w-7" />
+              </div>
+              <h3 className="mt-5 text-xl font-black uppercase italic text-foreground">Past papers are not yet ready for your institute</h3>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+                Help us curate the papers students at your institute need most.
+              </p>
+              <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+                <Button asChild variant="outline">
+                  <Link to="/contact-us?subject=campus-collaboration">Request campus collaboration</Link>
+                </Button>
+                <Button onClick={() => setShowCollaborateModal(true)}>Collaborate with Medmacs</Button>
+              </div>
+              <CollaborateModal open={showCollaborateModal} onOpenChange={setShowCollaborateModal} />
+            </div>
+          </div>
+        ) : visibleChapters.length === 0 ? (
+          <div className="col-span-full py-16 text-center">
+            <p className="font-semibold text-foreground">Question Bank chapters are being prepared.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Please check back soon.</p>
+          </div>
         ) : (
-          allChapters.map((ch, idx) => {
+          visibleChapters.map((ch) => {
             const isComingSoon = (ch.mcq_count || 0) === 0;
             const isSelected = selectedChapter?.id === ch.id;
             const isOfflineUnavailable = isOfflineMode && !offlineChapterIds.has(ch.id);
@@ -337,13 +365,8 @@ const MCQChapterSelectionPage = () => {
             const isFreeUnlimited = subject?.free_unlimited_access === true;
 
             return (
-              <motion.div
+              <div
                 key={ch.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: idx * 0.03 }}
-                whileHover={!isDisabled ? { scale: 1.02, x: 5 } : {}}
-                whileTap={isDisabled ? {} : { scale: 0.98 }}
                 onClick={() => !isDisabled && setSelectedChapter(ch)}
                 aria-disabled={isDisabled}
                 className={`group relative overflow-hidden rounded-2xl border-2 p-4 transition-all duration-300 ${
@@ -429,21 +452,20 @@ const MCQChapterSelectionPage = () => {
                     </div>
                   )}
                 </div>
-                <OfflineChapterNote chapterId={ch.id} />
-              </motion.div>
+                {offlineChapterIds.has(ch.id) && (
+                  <div className="mt-3 flex w-full items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                    <CheckCircle2 className="h-3 w-3" />
+                    This chapter is available for offline use
+                  </div>
+                )}
+              </div>
             );
           })
         )}
       </div>
 
-      <AnimatePresence>
-        {selectedChapter && (
-          <motion.div
-            initial={{ opacity: 0, y: 100 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 100 }}
-            className="fixed bottom-0 left-0 right-0 p-6 pb-[env(safe-area-inset-bottom)] z-50 flex justify-center pointer-events-none"
-          >
+      {selectedChapter && (
+          <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex justify-center p-6 pb-[env(safe-area-inset-bottom)]">
             <div className="w-full max-w-md pointer-events-auto">
               <Button
                 onClick={handleContinue}
@@ -451,17 +473,13 @@ const MCQChapterSelectionPage = () => {
                 size="lg"
               >
                 Start Practice Test
-                <motion.div
-                  animate={{ x: [0, 5, 0] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                >
+                <span>
                   <ArrowRight className="w-5 h-5 ml-2" />
-                </motion.div>
+                </span>
               </Button>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+      )}
 
       <div className="text-center pt-20 pb-10 opacity-40">
         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">© 2026 Medmacs App • MCQ Practice System</p>

@@ -27,6 +27,7 @@ export interface Chapter {
   chapter_number: number;
   subject_id: string;
   mcq_count?: number;
+  content_type?: 'question_bank' | 'past_paper' | null;
 }
 
 export interface MCQ {
@@ -80,20 +81,49 @@ const mergeById = <T extends { id: string }>(primary: T[], fallback: T[]) => {
   return Array.from(merged.values());
 };
 
+const SUBJECTS_CACHE_KEY = 'medmacs_mcq_subjects_cache';
+const OPTIONAL_QUERY_TIMEOUT_MS = 4000;
+
+export const readCachedSubjects = (): Subject[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const cached = localStorage.getItem(SUBJECTS_CACHE_KEY);
+    const parsed = cached ? JSON.parse(cached) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const cacheSubjects = (subjects: Subject[]) => {
+  if (typeof window === 'undefined' || subjects.length === 0) return;
+  try {
+    localStorage.setItem(SUBJECTS_CACHE_KEY, JSON.stringify(subjects));
+  } catch {
+    // Storage can be unavailable or full; subjects can still be used in memory.
+  }
+};
+
 const fetchSubjectFreeUnlimitedFlags = async (subjectIds: string[]) => {
   const uniqueIds = Array.from(new Set(subjectIds.filter(Boolean)));
   if (uniqueIds.length === 0) return new Map<string, boolean>();
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), OPTIONAL_QUERY_TIMEOUT_MS);
 
   try {
     const { data, error } = await supabase
       .from('subjects')
       .select('id, free_unlimited_access')
-      .in('id', uniqueIds);
+      .in('id', uniqueIds)
+      .abortSignal(controller.signal);
 
     if (error || !data) return new Map<string, boolean>();
     return new Map(data.map(subject => [subject.id, subject.free_unlimited_access === true]));
   } catch {
     return new Map<string, boolean>();
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 };
 
@@ -110,10 +140,17 @@ const applySubjectFreeUnlimitedFlags = async (subjects: Subject[]) => {
 export const fetchSubjects = async (): Promise<Subject[]> => {
   const [cloudSubjects, offlineSubjects] = await Promise.all([
     fetchCloudContent<Subject[]>('mcq-subjects'),
-    getOfflineSubjects(),
+    getOfflineSubjects().catch(() => []),
   ]);
 
-  return applySubjectFreeUnlimitedFlags(mergeById(cloudSubjects ?? [], offlineSubjects as Subject[]));
+  const cachedSubjects = readCachedSubjects();
+  const availableSubjects = mergeById(
+    cloudSubjects?.length ? cloudSubjects : cachedSubjects,
+    offlineSubjects as Subject[],
+  );
+  const subjects = await applySubjectFreeUnlimitedFlags(availableSubjects);
+  cacheSubjects(subjects);
+  return subjects;
 };
 
 export const fetchSubjectById = async (subjectId: string): Promise<Subject | null> => {
@@ -170,9 +207,29 @@ export const fetchMCQsBySubject = async (subjectId: string): Promise<MCQ[]> => {
 
 export const getUserStats = async (userId: string) => {
   try {
+    const { data: compactSummary, error: compactSummaryError } = await supabase
+      .rpc('get_mcq_practice_summary');
+    if (!compactSummaryError && compactSummary && typeof compactSummary === 'object') {
+      const summary = compactSummary as unknown as {
+        totalQuestions?: number;
+        correctAnswers?: number;
+        accuracy?: number;
+        averageTime?: number;
+        bestStreak?: number;
+      };
+      return {
+        totalQuestions: summary.totalQuestions || 0,
+        correctAnswers: summary.correctAnswers || 0,
+        accuracy: summary.accuracy || 0,
+        averageTime: summary.averageTime || 0,
+        bestStreak: summary.bestStreak || 0,
+        savedQuestions: 0,
+      };
+    }
+
     const { data: answers, error: answersError } = await supabase
       .from('user_answers')
-      .select('*')
+      .select('is_correct, time_taken, created_at')
       .eq('user_id', userId);
 
     if (answersError) {

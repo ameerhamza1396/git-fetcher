@@ -395,6 +395,7 @@ export type Database = {
       chapters: {
         Row: {
           chapter_number: number
+          content_type: string
           created_at: string
           description: string | null
           id: string
@@ -403,6 +404,7 @@ export type Database = {
         }
         Insert: {
           chapter_number: number
+          content_type?: string
           created_at?: string
           description?: string | null
           id?: string
@@ -411,6 +413,7 @@ export type Database = {
         }
         Update: {
           chapter_number?: number
+          content_type?: string
           created_at?: string
           description?: string | null
           id?: string
@@ -979,7 +982,9 @@ export type Database = {
       }
       user_answers: {
         Row: {
+          client_attempt_id: string | null
           created_at: string
+          correction_mode: boolean
           id: string
           is_correct: boolean
           mcq_id: string | null
@@ -989,7 +994,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          client_attempt_id?: string | null
           created_at?: string
+          correction_mode?: boolean
           id?: string
           is_correct: boolean
           mcq_id?: string | null
@@ -999,7 +1006,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          client_attempt_id?: string | null
           created_at?: string
+          correction_mode?: boolean
           id?: string
           is_correct?: boolean
           mcq_id?: string | null
@@ -1189,6 +1198,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      consume_mcq_submission: {
+        Args: { p_subject_id: string }
+        Returns: Json
+      }
+      reconcile_mcq_submission_count: {
+        Args: { p_attempt_date: string; p_count: number }
+        Returns: number
+      }
+      save_mcq_answer: {
+        Args: {
+          p_answer: Json
+          p_subject_id: string
+          p_counts_toward_daily_limit?: boolean
+        }
+        Returns: Json
+      }
       expire_old_plans: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -1213,6 +1238,17 @@ export type Database = {
         Args: { group_id_param: string }
         Returns: boolean
       }
+      get_mcq_chapter_progress: {
+        Args: { p_chapter_ids: string[] }
+        Returns: {
+          chapter_id: string
+          attempted_count: number
+        }[]
+      }
+      get_mcq_practice_summary: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       submit_rapid_fire_answer: {
         Args: {
           p_room_id: string
@@ -1223,6 +1259,10 @@ export type Database = {
           p_response_time_ms: number
         }
         Returns: Json
+      }
+      upsert_mcq_answers: {
+        Args: { p_answers: Json }
+        Returns: number
       }
     }
     Enums: {

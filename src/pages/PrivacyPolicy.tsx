@@ -417,7 +417,7 @@ If you have any questions about this Privacy Policy, You can contact us:
 * By email: [hi@medmacs.app](mailto:hi@medmacs.app)
 
 * By visiting this page on our website:
-    [instagram.com/medistics.app](instagram.com/medistics.app)
+    [instagram.com/medmacs.app](https://instagram.com/medmacs.app)
 `;
 
     return (
