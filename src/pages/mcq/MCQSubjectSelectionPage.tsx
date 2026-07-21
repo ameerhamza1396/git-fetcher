@@ -397,25 +397,6 @@ const MCQSubjectSelectionPage = () => {
     >
       <Seo title="MCQs Practice" description="Practice thousands of MCQs for MDCAT and other medical entrance exams with Medmacs App." canonical="https://medmacs.app/mcqs" />
       
-      <div className="mx-auto mb-2 w-full max-w-4xl shrink-0 px-4 sm:px-0">
-        <button
-          type="button"
-          onClick={() => setAnalyticsOpen(true)}
-          className="group ml-auto flex items-center gap-2 rounded-full border border-border/70 bg-card/55 px-3 py-2 text-left shadow-sm backdrop-blur-xl transition-colors hover:border-primary/35 hover:bg-primary/[0.04] dark:bg-white/[0.035]"
-          aria-label="Open MCQ practice analytics"
-        >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <Target className="h-4 w-4" />
-          </span>
-          <span className="text-[10px] font-black uppercase tracking-[0.16em] text-foreground">
-            Practice analytics
-          </span>
-          <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-black text-primary">
-            {formatCompactNumber(userStats.totalQuestions)}
-          </span>
-        </button>
-      </div>
-
       <Sheet open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
         <SheetContent
           side="bottom"
@@ -438,10 +419,18 @@ const MCQSubjectSelectionPage = () => {
 
       <div className="z-50 -mx-3 shrink-0 bg-gradient-to-b from-background via-background to-background/95 px-3 sm:mx-0 sm:px-0">
         <div className="max-w-4xl mx-auto px-4 sm:px-0">
-          <div className="py-3 text-center">
-              <h2 className="brand-syne text-2xl uppercase italic leading-tight text-foreground sm:text-3xl">
-                Select <span className="live-gradient-text">Subject&nbsp;</span>
+          <div className="py-3">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-['Syne'] text-2xl font-extrabold leading-tight tracking-[-0.035em] text-foreground sm:text-3xl">
+                Select <span className="live-gradient-text">Subject</span>
               </h2>
+              <button type="button" onClick={() => setAnalyticsOpen(true)} className="flex shrink-0 items-center gap-2 rounded-full border border-border/70 bg-card/55 px-3 py-2 shadow-sm backdrop-blur-xl" aria-label="Open MCQ practice analytics">
+                <Target className="h-4 w-4 text-primary" />
+                <span className="hidden text-[11px] font-bold sm:inline">Practice Analytics</span>
+                <span className="text-[11px] font-bold sm:hidden">Analyze</span>
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-black text-primary">{formatCompactNumber(userStats.totalQuestions)}</span>
+              </button>
+            </div>
             <p className="mx-auto mt-1 max-w-lg text-center text-xs font-medium text-muted-foreground">
               Choose a subject to begin your practice. Each subject contains comprehensive chapters and high-yield MCQs.
             </p>

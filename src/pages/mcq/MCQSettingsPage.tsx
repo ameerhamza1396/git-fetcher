@@ -1,10 +1,12 @@
 import { useState, useEffect, useLayoutEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Play, Clock, Zap, ArrowRight, CheckCircle, Timer } from 'lucide-react';
+import { Play, Clock, Zap, ArrowRight, CheckCircle, Target, Timer } from 'lucide-react';
 import { fetchChapterById, fetchSubjectById, Subject, Chapter } from '@/utils/mcqData';
 import { MCQPageLayout } from './MCQPageLayout';
+import { useAuth } from '@/hooks/useAuth';
+import { prepareMCQQuiz } from '@/features/mcq/quizBootstrap';
 
 interface TimerPreset {
   value: number;
@@ -92,10 +94,13 @@ const MCQSettingsPage = () => {
   }, []);
 
   const { subjectId, chapterId } = useParams<{ subjectId: string; chapterId: string }>();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [subject, setSubject] = useState<Subject | null>(null);
-  const [chapter, setChapter] = useState<Chapter | null>(null);
-  const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const routeState = location.state as { subject?: Subject; chapter?: Chapter } | null;
+  const [subject, setSubject] = useState<Subject | null>(() => routeState?.subject ?? null);
+  const [chapter, setChapter] = useState<Chapter | null>(() => routeState?.chapter ?? null);
+  const [loading, setLoading] = useState(() => !routeState?.subject || !routeState?.chapter);
   const [timePerQuestion, setTimePerQuestion] = useState(0);
 
   const selectedPreset = timerPresets.find(p => p.value === timePerQuestion) ?? timerPresets[0];
@@ -103,6 +108,10 @@ const MCQSettingsPage = () => {
   useEffect(() => {
     const loadData = async () => {
       if (!subjectId || !chapterId) return;
+      if (routeState?.subject?.id === subjectId && routeState?.chapter?.id === chapterId) {
+        setLoading(false);
+        return;
+      }
       
       setLoading(true);
       
@@ -118,11 +127,29 @@ const MCQSettingsPage = () => {
     };
     
     loadData();
-  }, [subjectId, chapterId]);
+  }, [subjectId, chapterId, routeState?.chapter, routeState?.subject]);
+
+  useEffect(() => {
+    if (loading || !chapterId || !user?.id) return;
+    const preloadTimer = window.setTimeout(() => {
+      void Promise.all([
+        import('@/pages/mcq/MCQQuizPage'),
+        prepareMCQQuiz({
+          chapterId,
+          userId: user.id,
+        }),
+      ]).catch(error => {
+        console.warn('MCQ background preparation will retry when the quiz opens.', error);
+      });
+    }, 400);
+    return () => window.clearTimeout(preloadTimer);
+  }, [chapterId, loading, user?.id]);
 
   const handleStartQuiz = () => {
     if (subjectId && chapterId) {
-      navigate(`/mcqs/quiz/${subjectId}/${chapterId}?timer=${timePerQuestion > 0}&time=${timePerQuestion}`);
+      navigate(`/mcqs/quiz/${subjectId}/${chapterId}?timer=${timePerQuestion > 0}&time=${timePerQuestion}`, {
+        state: { subject, chapter },
+      });
     }
   };
 
@@ -138,21 +165,18 @@ const MCQSettingsPage = () => {
   }
 
   return (
-    <MCQPageLayout backTo={subjectId ? `/mcqs/chapter/${subjectId}` : '/mcqs'}>
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-4 px-4"
-      >
-        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-3 block">Step 3 of 3</span>
-      </motion.div>
-
-      <div className="sticky top-0 z-50 bg-background/45 dark:bg-background/20 backdrop-blur-xl pt-[env(safe-area-inset-top)] -mx-3 sm:mx-0 px-3 sm:px-0">
+    <MCQPageLayout backTo={subjectId ? `/mcqs/chapter/${subjectId}` : '/mcqs'} scrollable>
+      <div className="z-50 -mx-3 shrink-0 bg-gradient-to-b from-background via-background to-background/95 px-3 sm:mx-0 sm:px-0">
         <div className="max-w-4xl mx-auto px-4 sm:px-0">
-          <div className="pt-4 pb-3">
-            <h2 className="px-1 text-3xl sm:text-5xl font-black tracking-normal text-foreground uppercase italic leading-[1.08] text-center">
-              Quiz <span className="live-gradient-text">Settings</span>
-            </h2>
+          <div className="py-3">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-['Syne'] text-2xl font-extrabold leading-tight tracking-[-0.035em] text-foreground sm:text-3xl">
+                Quiz <span className="live-gradient-text">Settings</span>
+              </h2>
+              <Button asChild variant="outline" className="h-9 shrink-0 rounded-full px-3">
+                <Link to="/detailed-analytics"><Target className="mr-2 h-4 w-4 text-primary" /><span className="hidden text-[11px] sm:inline">Practice Analytics</span><span className="text-[11px] sm:hidden">Analyze</span></Link>
+              </Button>
+            </div>
             <div className="mt-2 flex flex-col items-center gap-1">
               <p className="text-muted-foreground text-sm font-bold uppercase tracking-widest">
                 {subject?.name} • Chapter {chapter?.chapter_number}
@@ -166,7 +190,7 @@ const MCQSettingsPage = () => {
         <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-0">
+      <div className="no-scrollbar mx-auto min-h-0 w-full max-w-4xl flex-1 overflow-y-auto px-4 pb-32 sm:px-0">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -287,7 +311,7 @@ const MCQSettingsPage = () => {
           initial={{ opacity: 0, y: 100 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="fixed bottom-0 left-0 right-0 p-6 pb-[env(safe-area-inset-bottom)] z-50 flex justify-center pointer-events-none"
+          className="pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex justify-center px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-6"
         >
           <div className="w-full max-w-md pointer-events-auto">
             <Button

@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useMemo } from 'reac
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, BookOpen, CheckCircle2, FileClock, WifiOff } from 'lucide-react';
+import { ArrowRight, BookOpen, CheckCircle2, FileClock, Target, WifiOff } from 'lucide-react';
 import { fetchChaptersBySubject, fetchSubjectById, Subject, Chapter } from '@/utils/mcqData';
 import { MCQPageLayout } from './MCQPageLayout';
 import { useQuery } from '@tanstack/react-query';
@@ -263,10 +263,15 @@ const MCQChapterSelectionPage = () => {
     <MCQPageLayout backTo="/mcqs" scrollable>
       <div className="z-50 -mx-3 shrink-0 bg-gradient-to-b from-background via-background to-background/95 px-3 sm:mx-0 sm:px-0">
         <div className="max-w-4xl mx-auto px-4 sm:px-0">
-          <div className="py-3 text-center">
-              <h2 className="brand-syne text-2xl uppercase italic leading-tight text-foreground sm:text-3xl">
-                Select <span className="live-gradient-text">Chapter&nbsp;</span>
+          <div className="py-3">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-['Syne'] text-2xl font-extrabold leading-tight tracking-[-0.035em] text-foreground sm:text-3xl">
+                Select <span className="live-gradient-text">Chapter</span>
               </h2>
+              <Button asChild variant="outline" className="h-9 shrink-0 rounded-full px-3">
+                <Link to="/detailed-analytics"><Target className="mr-2 h-4 w-4 text-primary" /><span className="hidden text-[11px] sm:inline">Practice Analytics</span><span className="text-[11px] sm:hidden">Analyze</span></Link>
+              </Button>
+            </div>
             <div className="mt-1 flex flex-col items-center gap-1">
               <p className="text-muted-foreground text-sm font-bold uppercase tracking-widest">{subject?.name}</p>
               <p className="text-muted-foreground/60 text-[10px] font-medium uppercase tracking-[0.2em]">
