@@ -69,13 +69,18 @@ const ChapterProgressDonut = ({
 };
 
 const ChapterCardSkeleton = () => (
-  <div className="relative overflow-hidden rounded-2xl bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl p-4 animate-pulse border border-border/30">
-    <div className="flex items-center gap-4">
-      <div className="w-12 h-12 rounded-xl bg-muted" />
-      <div className="flex-1 space-y-2">
-        <div className="h-4 w-1/4 bg-muted rounded-full" />
-        <div className="h-3 w-3/4 bg-muted rounded-full" />
+  <div className="relative min-h-[112px] animate-pulse overflow-hidden rounded-2xl border-2 border-border/40 bg-white/5 p-4 backdrop-blur-xl dark:bg-white/[0.035]">
+    <div className="flex items-center gap-3">
+      <div className="h-12 w-12 shrink-0 rounded-xl bg-muted" />
+      <div className="min-w-0 flex-1 pr-1">
+        <div className="h-3.5 w-1/3 rounded-full bg-muted" />
+        <div className="mt-2 min-h-10 space-y-1.5">
+          <div className="h-3.5 w-full rounded-full bg-muted" />
+          <div className="h-3.5 w-2/3 rounded-full bg-muted" />
+        </div>
+        <div className="mt-1 h-2.5 w-1/2 rounded-full bg-muted" />
       </div>
+      <div className="h-12 w-12 shrink-0 rounded-full bg-muted" />
     </div>
   </div>
 );
@@ -267,7 +272,7 @@ const MCQChapterSelectionPage = () => {
       <div className="z-50 -mx-3 shrink-0 bg-gradient-to-b from-background via-background to-background/95 px-3 sm:mx-0 sm:px-0">
         <div className="max-w-4xl mx-auto px-4 sm:px-0">
           <div className="py-3 text-center">
-              <h2 className="text-2xl font-black uppercase italic leading-tight text-foreground sm:text-3xl">
+              <h2 className="brand-syne text-2xl uppercase italic leading-tight text-foreground sm:text-3xl">
                 Select <span className="live-gradient-text">Chapter&nbsp;</span>
               </h2>
             <div className="mt-1 flex flex-col items-center gap-1">
@@ -336,7 +341,7 @@ const MCQChapterSelectionPage = () => {
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                 <FileClock className="h-7 w-7" />
               </div>
-              <h3 className="mt-5 text-xl font-black uppercase italic text-foreground">Past papers are not yet ready for your institute</h3>
+              <h3 className="brand-syne mt-5 text-xl uppercase italic text-foreground">Past papers are not yet ready for your institute</h3>
               <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
                 Help us curate the papers students at your institute need most.
               </p>
@@ -410,12 +415,12 @@ const MCQChapterSelectionPage = () => {
                   </div>
 
                   <div className="min-w-0 flex-1 pr-1">
-                    <h3 className={`text-sm font-black uppercase italic tracking-normal leading-snug transition-colors ${
+                    <h3 className={`brand-syne text-sm uppercase italic tracking-normal leading-snug transition-colors ${
                       isSelected ? 'text-primary' : 'text-foreground'
                     }`}>
                       Chapter {ch.chapter_number}
                     </h3>
-                    <p className="mt-0.5 line-clamp-2 min-h-10 break-words text-sm font-bold leading-snug text-foreground/90">
+                    <p className="brand-syne mt-0.5 line-clamp-2 min-h-10 break-words text-sm leading-snug text-foreground/90">
                       {ch.name}
                     </p>
                     <p className="mt-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground/70">

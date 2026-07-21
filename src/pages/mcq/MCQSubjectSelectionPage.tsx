@@ -23,13 +23,20 @@ import {
 } from '@/components/ui/sheet';
 
 const SubjectCardSkeleton = () => (
-  <div className="relative overflow-hidden rounded-3xl bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl p-6 animate-pulse border border-border/40">
-    <div className="flex items-center gap-4">
-      <div className="w-16 h-16 rounded-2xl bg-muted" />
-      <div className="flex-1 space-y-2">
-        <div className="h-5 w-1/3 bg-muted rounded-full" />
-        <div className="h-3 w-2/3 bg-muted rounded-full" />
+  <div className="relative min-h-[136px] animate-pulse overflow-hidden rounded-3xl border-2 border-border/40 bg-white/5 p-6 backdrop-blur-xl dark:bg-white/[0.035]">
+    <div className="flex items-center gap-5">
+      <div className="h-16 w-16 shrink-0 rounded-2xl bg-muted" />
+      <div className="min-w-0 flex-1">
+        <div className="min-h-[3.25rem] space-y-2 pt-1">
+          <div className="h-5 w-2/3 rounded-full bg-muted" />
+          <div className="h-5 w-2/5 rounded-full bg-muted" />
+        </div>
+        <div className="mt-1.5 space-y-1.5">
+          <div className="h-3 w-full rounded-full bg-muted" />
+          <div className="h-3 w-3/4 rounded-full bg-muted" />
+        </div>
       </div>
+      <div className="h-8 w-8 shrink-0 rounded-full bg-muted" />
     </div>
   </div>
 );
@@ -391,7 +398,7 @@ const MCQSubjectSelectionPage = () => {
       <Seo title="MCQs Practice" description="Practice thousands of MCQs for MDCAT and other medical entrance exams with Medmacs App." canonical="https://medmacs.app/mcqs" />
       
       <div className="mb-6 shrink-0 animate-fade-in text-center sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-normal leading-[1.08] text-foreground uppercase italic mb-3">
+        <h1 className="brand-syne mb-3 text-2xl uppercase italic leading-[1.08] tracking-normal text-foreground sm:text-3xl md:text-4xl">
           📚 MCQ <span className="text-primary">Practice</span>
         </h1>
         <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] max-w-2xl mx-auto px-4 sm:px-0">
@@ -455,7 +462,7 @@ const MCQSubjectSelectionPage = () => {
       <div className="z-50 -mx-3 shrink-0 bg-gradient-to-b from-background via-background to-background/95 px-3 sm:mx-0 sm:px-0">
         <div className="max-w-4xl mx-auto px-4 sm:px-0">
           <div className="py-3 text-center">
-              <h2 className="text-2xl font-black uppercase italic leading-tight text-foreground sm:text-3xl">
+              <h2 className="brand-syne text-2xl uppercase italic leading-tight text-foreground sm:text-3xl">
                 Select <span className="live-gradient-text">Subject&nbsp;</span>
               </h2>
             <p className="mx-auto mt-1 max-w-lg text-center text-xs font-medium text-muted-foreground">
@@ -506,7 +513,7 @@ const MCQSubjectSelectionPage = () => {
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className={`line-clamp-2 min-h-[3.25rem] text-xl font-black uppercase italic tracking-normal leading-snug transition-colors ${
+                      <h3 className={`brand-syne line-clamp-2 min-h-[3.25rem] text-xl uppercase italic tracking-normal leading-snug transition-colors ${
                         isSelected ? 'text-primary' : 'text-foreground'
                       }`}>
                         {subject.name}
