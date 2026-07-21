@@ -390,7 +390,7 @@ const MCQSubjectSelectionPage = () => {
     >
       <Seo title="MCQs Practice" description="Practice thousands of MCQs for MDCAT and other medical entrance exams with Medmacs App." canonical="https://medmacs.app/mcqs" />
       
-      <div className="text-center mb-6 sm:mb-8 animate-fade-in">
+      <div className="mb-6 shrink-0 animate-fade-in text-center sm:mb-8">
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-normal leading-[1.08] text-foreground uppercase italic mb-3">
           📚 MCQ <span className="text-primary">Practice</span>
         </h1>
@@ -399,7 +399,7 @@ const MCQSubjectSelectionPage = () => {
         </p>
       </div>
 
-      <div className="mx-auto mb-6 max-w-4xl px-4 sm:mb-8 sm:px-0">
+      <div className="mx-auto mb-6 w-full max-w-4xl shrink-0 px-4 sm:mb-8 sm:px-0">
         <button
           type="button"
           onClick={() => setAnalyticsOpen(true)}
@@ -447,12 +447,12 @@ const MCQSubjectSelectionPage = () => {
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-4 px-4"
+        className="mb-4 shrink-0 px-4 text-center"
       >
         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-3 block">Step 1 of 3</span>
       </motion.div>
 
-      <div className="sticky top-0 z-50 -mx-3 bg-gradient-to-b from-background via-background to-background/95 px-3 pt-[env(safe-area-inset-top)] sm:mx-0 sm:px-0">
+      <div className="z-50 -mx-3 shrink-0 bg-gradient-to-b from-background via-background to-background/95 px-3 sm:mx-0 sm:px-0">
         <div className="max-w-4xl mx-auto px-4 sm:px-0">
           <div className="py-3 text-center">
               <h2 className="text-2xl font-black uppercase italic leading-tight text-foreground sm:text-3xl">
@@ -466,7 +466,7 @@ const MCQSubjectSelectionPage = () => {
         <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-0 pb-32 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="no-scrollbar mx-auto grid min-h-0 w-full max-w-4xl flex-1 grid-cols-1 gap-4 overflow-y-auto px-4 pb-32 sm:px-0 md:grid-cols-2">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => <SubjectCardSkeleton key={i} />)
         ) : subjects.length > 0 ? (
@@ -553,6 +553,9 @@ const MCQSubjectSelectionPage = () => {
             </Button>
           </div>
         )}
+        <div className="col-span-full py-10 text-center opacity-40">
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">© 2026 Medmacs App • All rights reserved</p>
+        </div>
       </div>
 
       {selectedSubject && (
@@ -572,9 +575,6 @@ const MCQSubjectSelectionPage = () => {
           </div>
       )}
 
-      <div className="text-center pt-20 pb-10 opacity-40">
-        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">© 2026 Medmacs App • All rights reserved</p>
-      </div>
     </MCQPageLayout>
   );
 };

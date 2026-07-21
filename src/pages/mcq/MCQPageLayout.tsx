@@ -42,9 +42,9 @@ export const MCQPageLayout = ({
     <div
       ref={scrollRef}
       onScroll={onScroll}
-      className="min-h-screen w-full overflow-x-hidden bg-[#F8FAFC] dark:bg-gray-950"
+      className={`${scrollable ? 'h-[100dvh] overflow-hidden' : 'min-h-screen overflow-x-hidden'} w-full bg-[#F8FAFC] dark:bg-gray-950`}
     >
-      <div className="container mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8 max-w-full pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      <div className={`${scrollable ? 'flex h-full min-h-0 flex-col' : ''} container mx-auto max-w-full px-3 py-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:px-4 sm:py-8 lg:px-8`}>
         {children}
       </div>
     </div>
