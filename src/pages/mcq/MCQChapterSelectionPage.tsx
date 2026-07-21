@@ -261,14 +261,6 @@ const MCQChapterSelectionPage = () => {
 
   return (
     <MCQPageLayout backTo="/mcqs" scrollable>
-      <motion.div 
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-4 shrink-0 px-4 text-center"
-      >
-        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-3 block">Step 2 of 3</span>
-      </motion.div>
-
       <div className="z-50 -mx-3 shrink-0 bg-gradient-to-b from-background via-background to-background/95 px-3 sm:mx-0 sm:px-0">
         <div className="max-w-4xl mx-auto px-4 sm:px-0">
           <div className="py-3 text-center">
@@ -415,12 +407,12 @@ const MCQChapterSelectionPage = () => {
                   </div>
 
                   <div className="min-w-0 flex-1 pr-1">
-                    <h3 className={`brand-syne text-sm uppercase italic tracking-normal leading-snug transition-colors ${
+                    <h3 className={`text-sm font-black uppercase italic tracking-normal leading-snug transition-colors ${
                       isSelected ? 'text-primary' : 'text-foreground'
                     }`}>
                       Chapter {ch.chapter_number}
                     </h3>
-                    <p className="brand-syne mt-0.5 line-clamp-2 min-h-10 break-words text-sm leading-snug text-foreground/90">
+                    <p className="mt-0.5 line-clamp-2 min-h-10 break-words text-sm font-bold leading-snug text-foreground/90">
                       {ch.name}
                     </p>
                     <p className="mt-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground/70">
