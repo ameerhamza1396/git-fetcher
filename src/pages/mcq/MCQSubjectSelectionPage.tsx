@@ -479,7 +479,7 @@ const MCQSubjectSelectionPage = () => {
                 key={subject.id}
                 onClick={() => !isOfflineUnavailable && setSelectedSubject(subject)}
                 aria-disabled={isOfflineUnavailable}
-                className={`group relative overflow-hidden rounded-3xl border-2 p-6 transition-all duration-300 ${
+                className={`group relative min-h-[136px] overflow-hidden rounded-3xl border-2 p-6 transition-all duration-300 ${
                   isOfflineUnavailable ? 'cursor-not-allowed opacity-45 grayscale' : 'cursor-pointer'
                 } ${
                   isSelected
@@ -506,7 +506,7 @@ const MCQSubjectSelectionPage = () => {
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className={`text-xl font-black uppercase italic tracking-normal leading-snug transition-colors ${
+                      <h3 className={`line-clamp-2 min-h-[3.25rem] text-xl font-black uppercase italic tracking-normal leading-snug transition-colors ${
                         isSelected ? 'text-primary' : 'text-foreground'
                       }`}>
                         {subject.name}
@@ -559,7 +559,7 @@ const MCQSubjectSelectionPage = () => {
       </div>
 
       {selectedSubject && (
-          <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex justify-center p-6 pb-[env(safe-area-inset-bottom)]">
+          <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex justify-center px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-6">
             <div className="w-full max-w-md pointer-events-auto">
               <Button
                 onClick={handleContinue}

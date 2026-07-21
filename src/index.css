@@ -902,6 +902,7 @@ body,
 }
 
 .mcq-document-scroll-lock {
+  overflow: hidden !important;
   -ms-overflow-style: none;
   scrollbar-width: none !important;
 }

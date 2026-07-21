@@ -369,7 +369,7 @@ const MCQChapterSelectionPage = () => {
                 key={ch.id}
                 onClick={() => !isDisabled && setSelectedChapter(ch)}
                 aria-disabled={isDisabled}
-                className={`group relative overflow-hidden rounded-2xl border-2 p-4 transition-all duration-300 ${
+                className={`group relative min-h-[112px] overflow-hidden rounded-2xl border-2 p-4 transition-all duration-300 ${
                   isDisabled ? 'opacity-40 cursor-not-allowed grayscale' : 'cursor-pointer'
                 } ${
                   isSelected
@@ -415,7 +415,7 @@ const MCQChapterSelectionPage = () => {
                     }`}>
                       Chapter {ch.chapter_number}
                     </h3>
-                    <p className="mt-0.5 text-sm font-bold leading-snug text-foreground/90 break-words">
+                    <p className="mt-0.5 line-clamp-2 min-h-10 break-words text-sm font-bold leading-snug text-foreground/90">
                       {ch.name}
                     </p>
                     <p className="mt-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground/70">
@@ -468,7 +468,7 @@ const MCQChapterSelectionPage = () => {
       </div>
 
       {selectedChapter && (
-          <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex justify-center p-6 pb-[env(safe-area-inset-bottom)]">
+          <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex justify-center px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-6">
             <div className="w-full max-w-md pointer-events-auto">
               <Button
                 onClick={handleContinue}
