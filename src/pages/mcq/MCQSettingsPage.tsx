@@ -332,10 +332,10 @@ const MCQSettingsPage = () => {
           </div>
         </motion.div>
 
-        <div className="text-center pt-20 pb-10 opacity-40">
-          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">© 2026 Medmacs App • MCQ Practice System</p>
-        </div>
       </div>
+      <footer className="shrink-0 py-2 text-center opacity-40">
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">© 2026 Medmacs App • MCQ Practice System</p>
+      </footer>
     </MCQPageLayout>
   );
 };

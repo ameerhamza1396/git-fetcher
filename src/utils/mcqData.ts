@@ -138,16 +138,19 @@ const applySubjectFreeUnlimitedFlags = async (subjects: Subject[]) => {
 };
 
 export const fetchSubjects = async (): Promise<Subject[]> => {
-  const [cloudSubjects, offlineSubjects] = await Promise.all([
-    fetchCloudContent<Subject[]>('mcq-subjects'),
+  const [cloudResult, offlineSubjects] = await Promise.all([
+    fetchCloudContent<Subject[]>('mcq-subjects', {}, { throwOnFailure: true })
+      .then(data => ({ data, error: null }))
+      .catch(error => ({ data: null, error })),
     getOfflineSubjects().catch(() => []),
   ]);
 
   const cachedSubjects = readCachedSubjects();
   const availableSubjects = mergeById(
-    cloudSubjects?.length ? cloudSubjects : cachedSubjects,
+    cloudResult.data?.length ? cloudResult.data : cachedSubjects,
     offlineSubjects as Subject[],
   );
+  if (cloudResult.error && availableSubjects.length === 0) throw cloudResult.error;
   const subjects = await applySubjectFreeUnlimitedFlags(availableSubjects);
   cacheSubjects(subjects);
   return subjects;
@@ -163,23 +166,33 @@ export const fetchSubjectById = async (subjectId: string): Promise<Subject | nul
     };
   };
 
-  const subject = await fetchCloudContent<Subject>('mcq-subject', { subjectId });
+  let cloudError: unknown = null;
+  const subject = await fetchCloudContent<Subject>('mcq-subject', { subjectId }, { throwOnFailure: true })
+    .catch(error => {
+      cloudError = error;
+      return null;
+    });
   if (subject) return withFreeUnlimitedFlag(subject);
 
   const offlineSubject = await getOfflineSubjectById(subjectId);
   if (offlineSubject) return withFreeUnlimitedFlag(offlineSubject as Subject);
 
   const subjects = await fetchSubjects();
-  return subjects.find(item => item.id === subjectId) ?? null;
+  const cachedSubject = subjects.find(item => item.id === subjectId) ?? null;
+  if (!cachedSubject && cloudError) throw cloudError;
+  return cachedSubject;
 };
 
 export const fetchChaptersBySubject = async (subjectId: string): Promise<Chapter[]> => {
-  const [cloudChapters, offlineChapters] = await Promise.all([
-    fetchCloudContent<Chapter[]>('mcq-chapters', { subjectId }),
-    getOfflineChaptersBySubject(subjectId),
+  const [cloudResult, offlineChapters] = await Promise.all([
+    fetchCloudContent<Chapter[]>('mcq-chapters', { subjectId }, { throwOnFailure: true })
+      .then(data => ({ data, error: null }))
+      .catch(error => ({ data: null, error })),
+    getOfflineChaptersBySubject(subjectId).catch(() => []),
   ]);
 
-  return mergeById(cloudChapters ?? [], offlineChapters as Chapter[])
+  if (cloudResult.error && offlineChapters.length === 0) throw cloudResult.error;
+  return mergeById(cloudResult.data ?? [], offlineChapters as Chapter[])
     .sort((a, b) => a.chapter_number - b.chapter_number);
 };
 

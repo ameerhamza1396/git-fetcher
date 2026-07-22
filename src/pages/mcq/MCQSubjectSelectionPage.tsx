@@ -250,6 +250,7 @@ const MCQSubjectSelectionPage = () => {
 
   const [subjects, setSubjects] = useState<Subject[]>(readCachedSubjects);
   const [loading, setLoading] = useState(() => readCachedSubjects().length === 0);
+  const [loadError, setLoadError] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [isOfflineMode, setIsOfflineMode] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
   const [offlineSubjectIds, setOfflineSubjectIds] = useState<Set<string>>(new Set());
@@ -277,12 +278,14 @@ const MCQSubjectSelectionPage = () => {
   const loadSubjects = useCallback(async () => {
     const requestId = ++subjectRequestRef.current;
     setLoading(true);
+    setLoadError(false);
     try {
       const data = await fetchSubjects();
       if (requestId !== subjectRequestRef.current) return;
       setSubjects(current => data.length > 0 ? data : current);
     } catch (error) {
       console.error('Unable to load MCQ subjects:', error);
+      if (requestId === subjectRequestRef.current) setLoadError(true);
     } finally {
       if (requestId === subjectRequestRef.current) setLoading(false);
     }
@@ -511,10 +514,10 @@ const MCQSubjectSelectionPage = () => {
           <div className="col-span-full rounded-3xl border border-amber-500/20 bg-amber-500/10 p-8 text-center">
             <WifiOff className="mx-auto h-9 w-9 text-amber-600 dark:text-amber-300" />
             <h3 className="mt-4 text-sm font-black uppercase tracking-wider text-foreground">
-              Subjects could not be loaded
+              {loadError ? 'Connection failure' : 'No subjects available'}
             </h3>
             <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-muted-foreground">
-              Check your connection and try again. If the issue continues, contact{' '}
+              {loadError ? 'We could not connect to the content server. Check your connection and try again.' : 'No subjects are currently available for your institute.'}{' '}
               <a className="font-semibold underline underline-offset-2" href="mailto:hi@medmacs.app">
                 hi@medmacs.app
               </a>
@@ -526,10 +529,10 @@ const MCQSubjectSelectionPage = () => {
             </Button>
           </div>
         )}
-        <div className="col-span-full py-10 text-center opacity-40">
-          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">© 2026 Medmacs App • All rights reserved</p>
-        </div>
       </div>
+      <footer className="shrink-0 py-2 text-center opacity-40">
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">© 2026 Medmacs App • All rights reserved</p>
+      </footer>
 
       {selectedSubject && (
           <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex justify-center px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-6">

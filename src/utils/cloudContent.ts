@@ -41,12 +41,22 @@ const extractContentPayload = <T>(payload: any): T | null => {
 export const fetchCloudContent = async <T>(
   resource: string,
   params: Record<string, string | number | null | undefined> = {},
+  options: { throwOnFailure?: boolean } = {},
 ): Promise<T | null> => {
   try {
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
+    let sessionTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    const sessionResult = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise<null>(resolve => {
+        sessionTimeoutId = setTimeout(() => resolve(null), CONTENT_API_TIMEOUT_MS);
+      }),
+    ]);
+    if (sessionTimeoutId) clearTimeout(sessionTimeoutId);
+
+    const token = sessionResult?.data.session?.access_token;
 
     if (!token) {
+      if (options.throwOnFailure) throw new Error('Content session unavailable');
       return null;
     }
 
@@ -73,12 +83,14 @@ export const fetchCloudContent = async <T>(
     clearTimeout(timeout);
 
     if (!response.ok) {
+      if (options.throwOnFailure) throw new Error(`Content request failed (${response.status})`);
       return null;
     }
 
     const payload = await response.json();
     return extractContentPayload<T>(payload);
-  } catch {
+  } catch (error) {
+    if (options.throwOnFailure) throw error;
     return null;
   }
 };

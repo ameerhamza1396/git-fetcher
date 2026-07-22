@@ -105,6 +105,7 @@ const MCQChapterSelectionPage = () => {
   const { user } = useAuth();
   const [allChapters, setAllChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
   const [showCollaborateModal, setShowCollaborateModal] = useState(false);
   const [subject, setSubject] = useState<Subject | null>(null);
@@ -176,17 +177,20 @@ const MCQChapterSelectionPage = () => {
     if (!subjectId) return;
 
     setLoading(true);
-
-    const [subjectData, chapters] = await Promise.all([
-      fetchSubjectById(subjectId),
-      fetchChaptersBySubject(subjectId)
-    ]);
-
-    if (subjectData) {
-      setSubject(subjectData);
+    setLoadError(false);
+    try {
+      const [subjectData, chapters] = await Promise.all([
+        fetchSubjectById(subjectId),
+        fetchChaptersBySubject(subjectId)
+      ]);
+      if (subjectData) setSubject(subjectData);
+      setAllChapters(chapters);
+    } catch (error) {
+      console.error('Unable to load MCQ chapters:', error);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
     }
-    setAllChapters(chapters);
-    setLoading(false);
   }, [subjectId]);
 
   const loadOfflineAvailability = useCallback(async () => {
@@ -322,6 +326,13 @@ const MCQChapterSelectionPage = () => {
       <div className="no-scrollbar mx-auto grid min-h-0 w-full max-w-4xl flex-1 grid-cols-1 gap-4 overflow-y-auto px-4 pb-32 sm:px-0 md:grid-cols-2">
         {loading ? (
           Array.from({ length: 6 }).map((_, i) => <ChapterCardSkeleton key={i} />)
+        ) : loadError ? (
+          <div className="col-span-full rounded-3xl border border-amber-500/20 bg-amber-500/10 p-8 text-center">
+            <WifiOff className="mx-auto h-9 w-9 text-amber-600 dark:text-amber-300" />
+            <h3 className="mt-4 text-sm font-black uppercase tracking-wider text-foreground">Connection failure</h3>
+            <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-muted-foreground">We could not connect to the content server. Check your connection and try again.</p>
+            <Button type="button" className="mt-5 rounded-xl" onClick={loadData}>Try again</Button>
+          </div>
         ) : allChapters.length === 0 ? (
           <div className="col-span-full text-center py-16">
             <p className="font-semibold text-foreground">We are not fully available in your institute yet.</p>
@@ -464,10 +475,10 @@ const MCQChapterSelectionPage = () => {
             );
           })
         )}
-        <div className="col-span-full py-10 text-center opacity-40">
-          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">© 2026 Medmacs App • MCQ Practice System</p>
-        </div>
       </div>
+      <footer className="shrink-0 py-2 text-center opacity-40">
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">© 2026 Medmacs App • MCQ Practice System</p>
+      </footer>
 
       {selectedChapter && (
           <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex justify-center px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-6">
