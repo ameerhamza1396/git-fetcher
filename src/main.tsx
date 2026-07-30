@@ -8,14 +8,6 @@ import { StatusBar } from "@capacitor/status-bar";
 import { Capacitor } from "@capacitor/core";
 import { markOtaBundleReady } from "@/services/otaUpdateService";
 
-import { setupIonicReact } from "@ionic/react";
-
-setupIonicReact({
-  mode: "md",
-  scrollAssist: true,
-  scrollPadding: true
-});
-
 const BUILD_ID = "v10-STABLE";
 
 void markOtaBundleReady();
@@ -46,7 +38,7 @@ const Root = () => {
 if ("serviceWorker" in navigator && import.meta.env.PROD && !Capacitor.isNativePlatform()) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("./service-worker.js")
+      .register("/service-worker.js")
       .catch(err => console.log("SW failed", err));
   });
 } else if ("serviceWorker" in navigator) {

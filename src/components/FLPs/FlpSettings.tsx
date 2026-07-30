@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, Zap, ArrowLeft, ArrowRight } from "lucide-react";
@@ -16,7 +15,7 @@ interface FlpSettingsProps {
 interface Subject {
   id: string;
   name: string;
-  year?: number;
+  year?: string;
   icon?: string;
   color?: string;
   institutes?: string[] | null;

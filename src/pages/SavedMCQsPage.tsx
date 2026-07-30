@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -319,10 +318,10 @@ const SavedMCQsPage = () => {
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleConfirmUnsave}
-                disabled={unsaveMCQMutation.isLoading}
+                disabled={unsaveMCQMutation.isPending}
                 className="flex-1 rounded-2xl h-11 font-black bg-gradient-to-r from-red-500 to-rose-500 text-white hover:from-red-600 hover:to-rose-600"
               >
-                {unsaveMCQMutation.isLoading ? (
+                {unsaveMCQMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <>

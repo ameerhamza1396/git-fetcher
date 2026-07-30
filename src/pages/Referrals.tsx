@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,7 @@ import { Gift, Copy, Users, Loader2, Share2, CheckCircle2, ChevronLeft, UserPlus
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import Seo from '@/components/Seo';
 
@@ -18,7 +17,9 @@ interface ReferredUser {
   updated_at: string | null;
 }
 
-const containerVariants = {
+const easing = [0.25, 0.1, 0.25, 1] as const;
+
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -26,9 +27,9 @@ const containerVariants = {
   },
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 16 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.25, 0.1, 0.25, 1] } },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: easing } },
 };
 
 const ReferralSkeleton = () => (

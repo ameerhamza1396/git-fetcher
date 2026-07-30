@@ -23,11 +23,11 @@ import {
 } from '@/components/ui/sheet';
 
 const SubjectCardSkeleton = () => (
-  <div className="relative min-h-[136px] animate-pulse overflow-hidden rounded-3xl border-2 border-border/40 bg-white/5 p-6 backdrop-blur-xl dark:bg-white/[0.035]">
-    <div className="flex items-center gap-5">
-      <div className="h-16 w-16 shrink-0 rounded-2xl bg-muted" />
+  <div className="relative h-full min-h-[128px] animate-pulse overflow-hidden rounded-2xl border-2 border-border/40 bg-white/5 p-4 backdrop-blur-xl dark:bg-white/[0.035]">
+    <div className="grid h-full grid-cols-[3.25rem_minmax(0,1fr)] items-center gap-3 sm:grid-cols-[4rem_minmax(0,1fr)] sm:gap-4">
+      <div className="h-[3.25rem] w-[3.25rem] shrink-0 rounded-xl bg-muted sm:h-16 sm:w-16" />
       <div className="min-w-0 flex-1">
-        <div className="min-h-[3.25rem] space-y-2 pt-1">
+        <div className="space-y-2 pt-1">
           <div className="h-5 w-2/3 rounded-full bg-muted" />
           <div className="h-5 w-2/5 rounded-full bg-muted" />
         </div>
@@ -36,7 +36,6 @@ const SubjectCardSkeleton = () => (
           <div className="h-3 w-3/4 rounded-full bg-muted" />
         </div>
       </div>
-      <div className="h-8 w-8 shrink-0 rounded-full bg-muted" />
     </div>
   </div>
 );
@@ -442,7 +441,7 @@ const MCQSubjectSelectionPage = () => {
         <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
       </div>
 
-      <div className="no-scrollbar mx-auto grid min-h-0 w-full max-w-4xl flex-1 grid-cols-1 gap-4 overflow-y-auto px-4 pb-32 sm:px-0 md:grid-cols-2">
+      <div className="no-scrollbar mx-auto grid min-h-0 w-full max-w-4xl flex-1 auto-rows-max grid-cols-1 items-stretch gap-3 overflow-y-auto px-4 pb-32 sm:gap-4 sm:px-0 md:grid-cols-2 md:auto-rows-fr">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => <SubjectCardSkeleton key={i} />)
         ) : subjects.length > 0 ? (
@@ -451,63 +450,70 @@ const MCQSubjectSelectionPage = () => {
             const isOfflineUnavailable = isOfflineMode && !offlineSubjectIds.has(subject.id);
             const isFreeUnlimited = subject.free_unlimited_access === true;
             return (
-              <div
+              <button
+                type="button"
                 key={subject.id}
                 onClick={() => !isOfflineUnavailable && setSelectedSubject(subject)}
+                aria-pressed={isSelected}
                 aria-disabled={isOfflineUnavailable}
-                className={`group relative min-h-[136px] overflow-hidden rounded-3xl border-2 p-6 transition-all duration-300 ${
+                disabled={isOfflineUnavailable}
+                className={`group relative h-full min-h-[128px] w-full overflow-hidden rounded-2xl border-2 p-4 text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   isOfflineUnavailable ? 'cursor-not-allowed opacity-45 grayscale' : 'cursor-pointer'
                 } ${
                   isSelected
-                    ? 'border-primary bg-primary/5 shadow-2xl shadow-primary/10'
+                    ? 'border-primary bg-primary/10 shadow-2xl shadow-primary/20 ring-1 ring-primary/30'
                     : 'border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl hover:border-primary/30 hover:bg-primary/5'
                 }`}
               >
                 {isOfflineUnavailable && (
-                  <div className="absolute top-3 right-3 z-20 flex items-center gap-1 rounded-full bg-amber-500 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-white">
+                  <div className="absolute right-3 top-3 z-20 flex items-center gap-1 rounded-full bg-amber-500 px-2 py-1 text-[7px] font-black uppercase tracking-wider text-white sm:px-2.5 sm:text-[8px] sm:tracking-widest">
                     <WifiOff className="h-3 w-3" />
                     Not downloaded
                   </div>
                 )}
                 {isSelected && (
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 blur-[60px] -mr-16 -mt-16 pointer-events-none" />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/12 via-transparent to-primary/5" />
                 )}
 
-                <div className="flex items-center gap-5 relative z-10">
-                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-xl transition-transform duration-300 group-hover:scale-110 ${
-                    isSelected ? 'bg-primary text-white' : isOfflineUnavailable ? 'bg-muted/40 text-muted-foreground' : 'bg-muted/50 text-foreground/70'
+                <div className="relative z-10 grid h-full grid-cols-[3.25rem_minmax(0,1fr)_1.75rem] items-center gap-3 sm:grid-cols-[4rem_minmax(0,1fr)_2rem] sm:gap-4">
+                  <div className={`flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center rounded-xl text-2xl leading-none transition-all duration-300 group-hover:scale-105 sm:h-16 sm:w-16 sm:text-3xl sm:group-hover:scale-110 ${
+                    isSelected
+                      ? 'bg-primary text-white shadow-lg shadow-primary/30'
+                      : isOfflineUnavailable
+                        ? 'bg-muted/40 text-muted-foreground'
+                        : 'bg-muted/50 text-foreground/70'
                   }`}>
-                    {subject.icon || '📚'}
+                    <span className="block leading-none">{subject.icon || '📚'}</span>
                   </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className={`line-clamp-2 min-h-[3.25rem] text-xl font-black uppercase italic tracking-normal leading-snug transition-colors ${
+
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex items-start gap-2">
+                      <h3 className={`line-clamp-2 text-base font-black uppercase italic tracking-normal leading-snug transition-colors sm:text-xl ${
                         isSelected ? 'text-primary' : 'text-foreground'
                       }`}>
                         {subject.name}
                       </h3>
                       {isSelected && (
-                        <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                        <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary animate-pulse" />
                       )}
                     </div>
-                    <p className="text-muted-foreground text-xs font-medium leading-relaxed line-clamp-2">
+                    <p className="mt-1 line-clamp-2 text-[11px] font-medium leading-relaxed text-muted-foreground sm:text-xs">
                       {subject.description || `Master ${subject.name} with our structured question bank and detailed explanations.`}
                     </p>
                     {isFreeUnlimited && (
                       <div className="mt-3 inline-flex rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300">
-                        Free · No limits
+                        Free
                       </div>
                     )}
                   </div>
 
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                    isSelected ? 'bg-primary text-white' : 'bg-muted opacity-0 group-hover:opacity-100'
+                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center justify-self-end rounded-full transition-all sm:h-8 sm:w-8 ${
+                    isSelected ? 'bg-primary text-white' : 'bg-muted text-muted-foreground opacity-70 group-hover:text-foreground group-hover:opacity-100'
                   }`}>
                     <ArrowRight className="w-4 h-4" />
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })
         ) : (

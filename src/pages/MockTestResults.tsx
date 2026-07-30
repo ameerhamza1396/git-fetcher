@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -72,7 +71,7 @@ const MockTestResults = () => {
     },
     enabled: !!user?.id, // Only run this query if user.id is available
     staleTime: 5 * 60 * 1000, // Data considered fresh for 5 minutes
-    cacheTime: 10 * 60 * 1000, // Data stays in cache for 10 minutes
+    gcTime: 10 * 60 * 1000, // Data stays in cache for 10 minutes
   });
 
   // Get user test results
@@ -86,7 +85,6 @@ const MockTestResults = () => {
       // IMPORTANT: Updated log to reflect 'user_id' as the column used for filtering
       console.log("Attempting to fetch test results for user ID (used as 'user_id' in DB):", user.id);
 
-      // @ts-ignore: 'user_test_results' is not in the generated Supabase types.
       // IMPORTANT: Removed .limit(1) to fetch all results
       const { data, error } = await (supabase
         .from('user_test_results' as any) // Make sure 'user_test_results' is the actual table name
@@ -129,7 +127,7 @@ const MockTestResults = () => {
     },
     enabled: !!user?.id, // Only run this query if user.id is available
     staleTime: 5 * 60 * 1000, // Data considered fresh for 5 minutes
-    cacheTime: 10 * 60 * 1000, // Data stays in cache for 10 minutes
+    gcTime: 10 * 60 * 1000, // Data stays in cache for 10 minutes
   });
 
   // Define plan color schemes

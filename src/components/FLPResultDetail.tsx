@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -28,6 +27,7 @@ interface MCQ {
 }
 
 interface QuestionAttempt {
+    id?: string;
     mcq_id: string;
     selectedAnswer: string | null;
     isCorrect: boolean;
@@ -278,7 +278,7 @@ const FLPResultDetail = () => {
                                 : [];
 
                             return (
-                                <AccordionItem key={attempt.id} value={attempt.id} className="border rounded-lg px-4">
+                                <AccordionItem key={attempt.id || attempt.mcq_id} value={attempt.id || attempt.mcq_id} className="border rounded-lg px-4">
                                     <AccordionTrigger className="hover:no-underline">
                                         <div className="flex items-center gap-3 text-left">
                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${attempt.isCorrect ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>

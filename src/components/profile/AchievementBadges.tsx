@@ -1,6 +1,5 @@
-// @ts-nocheck
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type UseQueryOptions } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Award, BookOpenCheck, CheckCircle2, Flame, HelpCircle, Library, MessageSquare, ScrollText, ShieldCheck, Swords, Target, Trophy, UserPlus } from 'lucide-react';
@@ -341,8 +340,23 @@ const AchievementUnlockToast = ({ badge, onDismiss }: { badge: BadgeDefinition |
   </AnimatePresence>
 );
 
-export const useAchievementData = (userId?: string, queryOptions: any = {}) => {
-  return useQuery({
+type AchievementData = {
+  stats: AchievementStats;
+  earnedBadgeIds: string[];
+  profileBadges: {
+    earned_badge_ids?: string[];
+    stats?: Partial<AchievementStats> & {
+      flpCompletionCount?: number;
+      flashcardsGeneratedCount?: number;
+    };
+  } | null;
+};
+
+export const useAchievementData = (
+  userId?: string,
+  queryOptions: Partial<UseQueryOptions<AchievementData>> = {},
+) => {
+  return useQuery<AchievementData>({
     queryKey: ['achievement-data', userId],
     queryFn: async () => {
       if (!userId) return { stats: defaultStats, earnedBadgeIds: [], profileBadges: null };
@@ -369,7 +383,7 @@ export const useAchievementData = (userId?: string, queryOptions: any = {}) => {
       const correctMcqs = answers.filter((answer) => answer.is_correct).length;
       const lifetimeMcqs = answers.length;
       const accuracy = lifetimeMcqs > 0 ? Math.round((correctMcqs / lifetimeMcqs) * 100) : 0;
-      const profileBadges = profileResult.data?.badges || {};
+      const profileBadges = (profileResult.data?.badges || {}) as AchievementData['profileBadges'];
       const previousStats = profileBadges?.stats || {};
 
       const stats: AchievementStats = {

@@ -25,7 +25,7 @@ interface BattleRoomProps {
   onBattleStart: (roomData: RoomData) => void;
 }
 
-interface RoomData {
+export interface RoomData {
   id: string;
   room_code: string;
   battle_type: BattleType;
@@ -33,6 +33,7 @@ interface RoomData {
   status: 'waiting' | 'in_progress' | 'completed';
   time_per_question: number;
   total_questions: number;
+  current_question: number;
   subject_id: string | null;
   chapter_id: string | null;
   questions: any[] | null;

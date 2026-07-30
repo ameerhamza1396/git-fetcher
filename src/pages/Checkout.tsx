@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -15,11 +14,15 @@ import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Browser } from '@capacitor/browser';
+import { useConsent } from '@/components/consent/ConsentProvider';
+import { trackMetaAddPaymentInfo, trackMetaInitiatedCheckout, trackMetaPurchase } from '@/utils/metaAppEvents';
+import { trackGoogleAddPaymentInfo, trackGoogleBeginCheckout, trackGooglePurchase } from '@/utils/googleAnalytics';
 
 const EASYPAISA_API_URL = "https://medmacs.app/api/pay-easypaisa";
 
 const Checkout = () => {
     const { user } = useAuth();
+    const { measurementAllowed } = useConsent();
     const location = useLocation();
     const lastScrollY = useRef(0);
     const [headerVisible, setHeaderVisible] = useState(true);
@@ -40,6 +43,34 @@ const Checkout = () => {
     // WebView Specific States
     const [showPayFastModal, setShowPayFastModal] = useState(false);
     const [payFastHtml, setPayFastHtml] = useState<string | null>(null);
+    const checkoutTracked = useRef(false);
+    const googleCheckoutTracked = useRef(false);
+
+    const { planName = 'Premium', price: basePriceStr, duration = 'Monthly', currency = 'PKR', validity = 'monthly', planId = planName.toLowerCase() } = location.state || {};
+    const basePrice = basePriceStr ? parseFloat(String(basePriceStr).replace(/,/g, '')) : 0;
+    const validityDisplay = validity?.toLowerCase() === 'yearly' ? 'Validity: 365 Days' : 'Validity: 30 Days';
+    const priceAfterPromo = discountedPrice !== null ? discountedPrice : basePrice;
+    const grandTotal = priceAfterPromo;
+    const isPayFastDisabled = grandTotal < 20;
+    const commerceDetails = {
+        planId,
+        planName,
+        price: grandTotal,
+        billingPeriod: validity?.toLowerCase() === 'yearly' ? 'yearly' as const : 'monthly' as const,
+        marketingConsent: measurementAllowed,
+    };
+
+    useEffect(() => {
+        if (!location.state || checkoutTracked.current || !measurementAllowed) return;
+        checkoutTracked.current = true;
+        void trackMetaInitiatedCheckout(commerceDetails);
+    }, [measurementAllowed]);
+
+    useEffect(() => {
+        if (!location.state || googleCheckoutTracked.current || !measurementAllowed) return;
+        googleCheckoutTracked.current = true;
+        trackGoogleBeginCheckout({ ...commerceDetails, analyticsConsent: true });
+    }, [measurementAllowed]);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -54,9 +85,11 @@ const Checkout = () => {
     const checkPaymentStatus = async () => {
         if (!user) return;
         try {
-            const { data } = await supabase.from('pending_payments').select('status, error_message').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1).single();
+            const { data } = await supabase.from('pending_payments').select('status, error_message, order_id, amount, plan_name').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1).single();
             if (data) {
                 if (data.status === 'success') {
+                    void trackMetaPurchase({ ...commerceDetails, price: Number(data.amount) || grandTotal, planName: data.plan_name || planName, orderId: data.order_id, paymentMethod });
+                    trackGooglePurchase({ ...commerceDetails, price: Number(data.amount) || grandTotal, planName: data.plan_name || planName, orderId: data.order_id, paymentMethod, analyticsConsent: measurementAllowed });
                     setModalState('success');
                     setShowPayFastModal(false); // Close WebView on success
                     setIsLoading(false);
@@ -81,6 +114,8 @@ const Checkout = () => {
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pending_payments', filter: `user_id=eq.${user.id}` },
                 (payload) => {
                     if (payload.new.status === 'success') {
+                        void trackMetaPurchase({ ...commerceDetails, price: Number(payload.new.amount) || grandTotal, planName: payload.new.plan_name || planName, orderId: payload.new.order_id, paymentMethod });
+                        trackGooglePurchase({ ...commerceDetails, price: Number(payload.new.amount) || grandTotal, planName: payload.new.plan_name || planName, orderId: payload.new.order_id, paymentMethod, analyticsConsent: measurementAllowed });
                         setModalState('success');
                         setIsLoading(false);
                         Browser.close().catch(() => {});
@@ -108,13 +143,6 @@ const Checkout = () => {
         };
     }, [user, modalState]);
 
-    const { planName = 'Premium', price: basePriceStr, duration = 'Monthly', currency = 'PKR', validity = 'monthly' } = location.state || {};
-    const basePrice = basePriceStr ? parseFloat(basePriceStr) : 0;
-    const validityDisplay = validity?.toLowerCase() === 'yearly' ? 'Validity: 365 Days' : 'Validity: 30 Days';
-    const priceAfterPromo = discountedPrice !== null ? discountedPrice : basePrice;
-    const grandTotal = priceAfterPromo;
-    const isPayFastDisabled = grandTotal < 20;
-
     useEffect(() => {
         if (isPayFastDisabled && paymentMethod === 'payfast') setPaymentMethod('easypaisa');
     }, [isPayFastDisabled, paymentMethod]);
@@ -137,6 +165,8 @@ const Checkout = () => {
 
     const handleEasypaisaPayment = async () => {
         if (!mobileNumber || mobileNumber.length !== 11 || !mobileNumber.startsWith('03')) { setError("Please enter a valid 11-digit Easypaisa number starting with 03."); return; }
+        void trackMetaAddPaymentInfo({ ...commerceDetails, paymentMethod: 'easypaisa' });
+        trackGoogleAddPaymentInfo({ ...commerceDetails, paymentMethod: 'easypaisa', analyticsConsent: measurementAllowed });
         setError(null); setIsLoading(true); setModalState('processing');
         const orderRefNum = `EP-${Date.now()}`;
         const amountFormatted = grandTotal.toFixed(2);
@@ -151,6 +181,8 @@ const Checkout = () => {
     };
 
     const handlePayFastPayment = async () => {
+        void trackMetaAddPaymentInfo({ ...commerceDetails, paymentMethod: 'payfast' });
+        trackGoogleAddPaymentInfo({ ...commerceDetails, paymentMethod: 'payfast', analyticsConsent: measurementAllowed });
         setIsLoading(true); setError(null);
         const basketId = `ORD-${Date.now()}`;
         const finalAmount = grandTotal.toFixed(2);
@@ -400,7 +432,7 @@ const Checkout = () => {
                     {/* Terms and Button */}
                     <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } } }}>
                         <div className="flex items-start space-x-3 p-3 mb-4 rounded-xl hover:bg-muted/50 transition-colors">
-                            <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(checked) => setAgreedToTerms(checked)} className="mt-1" />
+                            <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(checked) => setAgreedToTerms(checked === true)} className="mt-1" />
                             <label htmlFor="terms" className="text-xs leading-snug text-muted-foreground cursor-pointer">
                                 By continuing to pay to Medmacs/Hmacs Studios, you agree to our{' '}
                                 <Link to="/terms" className="text-primary hover:underline font-medium transition-colors">Terms and Conditions</Link>,{' '}

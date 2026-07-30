@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import BrandedLoader from '@/components/BrandedLoader';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -18,11 +19,7 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }, [user, loading, navigate]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
+    return <BrandedLoader label="Checking your session" fullscreen />;
   }
 
   if (!user) {

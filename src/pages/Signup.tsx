@@ -1,5 +1,4 @@
-// @ts-nocheck
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ChangeEvent, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -16,17 +15,36 @@ import {
 import Seo from "@/components/Seo";
 import { motion } from "framer-motion";
 import GoogleSignin from "@/components/GoogleSignin";
+import type { LucideIcon } from "lucide-react";
 
-const EmailVerificationModal = ({ email, isOpen, onClose, onResend, resendLoading, resendDelay }) => {
+type SignupFormData = {
+  email: string;
+  fullName: string;
+  password: string;
+  confirmPassword: string;
+};
+
+type SignupErrors = Partial<Record<keyof SignupFormData, string>>;
+
+type EmailVerificationModalProps = {
+  email: string;
+  isOpen: boolean;
+  onClose: () => void;
+  onResend: () => void;
+  resendLoading: boolean;
+  resendDelay: number;
+};
+
+const EmailVerificationModal = ({ email, isOpen, onClose, onResend, resendLoading, resendDelay }: EmailVerificationModalProps) => {
   const navigate = useNavigate();
   const [countdown, setCountdown] = useState(resendDelay);
 
   useEffect(() => {
-    let timer;
+    let timer: ReturnType<typeof setInterval> | undefined;
     if (isOpen) {
       setCountdown(resendDelay);
       timer = setInterval(() => {
-        setCountdown((prev) => {
+        setCountdown((prev: number) => {
           if (prev <= 1) { clearInterval(timer); return 0; }
           return prev - 1;
         });
@@ -81,6 +99,21 @@ const EmailVerificationModal = ({ email, isOpen, onClose, onResend, resendLoadin
   );
 };
 
+type InputFieldProps = {
+  id: keyof SignupFormData;
+  label: string;
+  type?: string;
+  placeholder: string;
+  error?: string;
+  showToggle?: boolean;
+  showState?: boolean;
+  onToggle?: () => void;
+  icon?: LucideIcon;
+  value: string;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  getInputIcon: (fieldName: keyof SignupFormData, hasError: boolean, hasValue: boolean) => React.ReactNode;
+};
+
 const InputField = ({
   id,
   label,
@@ -94,17 +127,17 @@ const InputField = ({
   value,
   onChange,
   getInputIcon
-}) => (
+}: InputFieldProps) => (
   <div className="space-y-1.5">
     <Label
       htmlFor={id}
-      className="text-white/80 text-xs font-semibold uppercase tracking-wider"
+      className="text-xs font-semibold uppercase tracking-wider text-slate-500"
     >
       {label}
     </Label>
 
     <div className="relative">
-      {Icon && <Icon className="absolute left-3.5 top-3.5 h-4 w-4 text-white/30" />}
+      {Icon && <Icon className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-300" />}
 
       <Input
         id={id}
@@ -124,16 +157,17 @@ const InputField = ({
                 : "off"
         }
         className={`${Icon ? "pl-10" : "pl-3.5"} ${showToggle ? "pr-10" : ""}
-        bg-white/[0.08] border-white/10 text-white placeholder:text-white/25
-        focus:border-[#2dd4bf]/50 focus:ring-[#2dd4bf]/20
-        h-12 rounded-xl ${error ? "border-red-400/50" : ""}`}
+        h-12 rounded-none border-0 border-b border-slate-200 bg-transparent text-slate-950 shadow-none placeholder:text-slate-300
+        focus:border-[#2dd4bf] focus-visible:ring-0 focus-visible:ring-offset-0
+        ${error ? "border-red-400/60" : ""}`}
       />
 
       {showToggle && (
         <button
           type="button"
           onClick={onToggle}
-          className="absolute right-3.5 top-3.5 text-white/30 hover:text-white/60 transition-colors"
+          aria-label={showState ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+          className="absolute right-3.5 top-3.5 text-slate-300 transition-colors hover:text-slate-600"
         >
           {showState ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </button>
@@ -146,7 +180,7 @@ const InputField = ({
       )}
     </div>
 
-    {error && <p className="text-red-300/80 text-[11px]">{error}</p>}
+    {error && <p className="text-red-500 text-[11px]">{error}</p>}
   </div>
 );
 
@@ -166,7 +200,7 @@ const Signup = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
-  const [validationErrors, setValidationErrors] = useState({});
+  const [validationErrors, setValidationErrors] = useState<SignupErrors>({});
   const [mounted, setMounted] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -183,8 +217,8 @@ const Signup = () => {
     if (user) navigate("/dashboard");
   }, [user, navigate]);
 
-  const validateForm = useCallback((data) => {
-    const errors = {};
+  const validateForm = useCallback((data: SignupFormData) => {
+    const errors: SignupErrors = {};
 
     if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email))
       errors.email = "Invalid email";
@@ -215,7 +249,7 @@ const Signup = () => {
     return () => clearTimeout(timer);
   }, [resendCooldown]);
 
-  const handleInputChange = useCallback((e) => {
+  const handleInputChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   }, []);
@@ -356,7 +390,7 @@ const Signup = () => {
   if (!mounted) return null;
 
   return (
-    <div className="fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-[#0a2e2e] via-[#0f172a] to-[#020617]">
+    <div className="fixed inset-0 flex flex-col overflow-hidden bg-white text-slate-950">
 
       <Seo
         title="Sign Up"
@@ -377,21 +411,21 @@ const Signup = () => {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-[#020617]/70 backdrop-blur-xl px-5"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-white/80 px-5 backdrop-blur-xl"
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.94, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.25 }}
-            className="w-full max-w-sm rounded-3xl border border-white/15 bg-white/[0.09] p-6 shadow-2xl shadow-black/50"
+            className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,.14)]"
           >
             <div className="mb-5 text-center">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#2dd4bf]/30 bg-[#2dd4bf]/15">
                 <Mail className="h-7 w-7 text-[#5eead4]" />
               </div>
-              <h2 className="text-2xl font-black text-white">Verify your email</h2>
-              <p className="mt-2 text-sm text-white/55">
-                Enter the 6-digit code sent to <span className="font-semibold text-[#99f6e4]">{formData.email}</span>.
+              <h2 className="text-2xl font-black text-slate-950">Verify your email</h2>
+              <p className="mt-2 text-sm text-slate-500">
+                Enter the 6-digit code sent to <span className="font-semibold text-[#0ea5e9]">{formData.email}</span>.
               </p>
             </div>
 
@@ -404,7 +438,7 @@ const Signup = () => {
                 placeholder="123456"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                className="h-14 rounded-2xl border-white/15 bg-white/[0.08] text-center text-xl font-black tracking-[0.45em] text-white placeholder:text-white/20 focus:border-[#2dd4bf]/60"
+                className="h-14 rounded-2xl border-slate-200 bg-white text-center text-xl font-black tracking-[0.45em] text-slate-950 placeholder:text-slate-300 focus:border-[#2dd4bf]/60"
                 autoFocus
               />
               <Button
@@ -420,7 +454,7 @@ const Signup = () => {
                 variant="outline"
                 onClick={handleResendVerification}
                 disabled={resendLoading || resendCooldown > 0}
-                className="h-11 w-full rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10"
+                className="h-11 w-full rounded-2xl border-slate-200 bg-white text-slate-950 hover:bg-slate-50"
               >
                 {resendLoading
                   ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -431,7 +465,7 @@ const Signup = () => {
               <button
                 type="button"
                 onClick={() => setSignupStep("form")}
-                className="w-full pt-1 text-sm font-semibold text-white/55 hover:text-white/80"
+                className="w-full pt-1 text-sm font-semibold text-slate-500 hover:text-slate-800"
               >
                 Edit signup details
               </button>
@@ -439,15 +473,6 @@ const Signup = () => {
           </motion.div>
         </motion.div>
       )}
-
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 right-0 w-96 h-96 bg-[#2dd4bf]/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute top-1/3 -left-32 w-80 h-80 bg-[#67e8f9]/12 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1.5s" }} />
-        <div className="absolute -bottom-32 right-1/4 w-72 h-72 bg-[#0ea5e9]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "0.8s" }} />
-        <div className="absolute inset-0 opacity-[0.03]" style={{
-          backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.5) 20px, rgba(255,255,255,0.5) 21px)`
-        }} />
-      </div>
 
       <div className="pt-[env(safe-area-inset-top)]" />
 
@@ -457,7 +482,7 @@ const Signup = () => {
         transition={{ duration: 0.4 }}
         className="relative z-10 flex items-center justify-between px-5 py-4"
       >
-        <Link to="/" className="flex items-center space-x-2 text-white/70 hover:text-white transition-colors">
+        <Link to="/" className="flex items-center space-x-2 text-slate-400 transition-colors hover:text-slate-950">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
             viewBox="0 0 24 24" fill="none" stroke="currentColor"
             strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -466,16 +491,11 @@ const Signup = () => {
           <span className="text-sm font-medium">Back</span>
         </Link>
 
-        <div className="flex items-center space-x-2">
-          <img
-            src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png"
-            alt="Logo"
-            className="w-7 h-7"
-          />
-          <span className="text-white font-bold text-lg tracking-tight">
-            Medmacs
-          </span>
-        </div>
+        <img
+          src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png"
+          alt="Logo"
+          className="h-9 w-9 object-contain"
+        />
       </motion.div>
 
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-5 pb-[env(safe-area-inset-bottom)] overflow-y-auto">
@@ -487,27 +507,23 @@ const Signup = () => {
         >
 
           <div className="text-center mb-6">
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md rounded-full px-4 py-1.5 mb-3 border border-white/10"
-            >
-              <span className="text-[#2dd4bf] text-xs font-semibold uppercase tracking-widest">
-                Get Started
-              </span>
-            </motion.div>
-
-            <h1 className="text-white text-3xl font-black tracking-tight">
-              Create your account
+            <h1 className="whitespace-nowrap font-['Syne'] text-[clamp(2rem,8vw,2.55rem)] font-extrabold tracking-[-.055em]">
+              <motion.span
+                className="inline-block bg-[linear-gradient(90deg,#2dd4bf,#0ea5e9,#22d3ee,#2dd4bf)] bg-[length:220%_100%] bg-clip-text text-transparent"
+                animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
+              >
+                Medmacs
+              </motion.span>
+              <span className="text-slate-950">.app</span>
             </h1>
 
-            <p className="text-white/50 text-sm mt-2">
-              Join the best medical learning platform
+            <p className="mt-2 text-sm font-bold uppercase tracking-widest text-slate-400">
+              Create your account
             </p>
           </div>
 
-          <div className="bg-white/[0.07] backdrop-blur-2xl rounded-3xl p-6 border border-white/10 shadow-2xl">
+          <div className="px-1">
             <form onSubmit={handleSubmit} className="space-y-4">
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -581,23 +597,25 @@ const Signup = () => {
 
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-white/10" />
+                <span className="w-full border-t border-slate-200" />
               </div>
 
               <div className="relative flex justify-center text-xs">
-                <span className="bg-transparent px-3 text-white/30 text-[10px] uppercase tracking-widest">
+                <span className="bg-white px-3 text-[10px] uppercase tracking-widest text-slate-400">
                   or continue with
                 </span>
               </div>
             </div>
 
-            <GoogleSignin variant="signup" />
+            <div className="space-y-3">
+              <GoogleSignin />
+            </div>
 
-            <p className="text-center text-white/40 text-sm mt-5">
+            <p className="text-center text-sm mt-5 text-slate-500">
               Already have an account?{" "}
               <Link
                 to="/login"
-                className="text-[#2dd4bf] font-semibold hover:text-[#2dd4bf]/80 transition-colors"
+                className="font-semibold text-[#0ea5e9] transition-colors hover:text-[#0284c7]"
               >
                 Sign in
               </Link>
@@ -606,6 +624,9 @@ const Signup = () => {
           </div>
         </motion.div>
       </div>
+      <p className="relative z-10 pb-[max(8px,env(safe-area-inset-bottom))] text-center text-xs text-slate-400">
+        A project by <span className="font-semibold text-slate-600">HMACS Studios</span>
+      </p>
     </div>
   );
 };

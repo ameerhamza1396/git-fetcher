@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 import {
   ArrowLeft,
   ArrowRight,
@@ -247,7 +247,9 @@ const getInstagramUrl = (member: TeamMember) => {
   return `https://instagram.com/${raw.replace('@', '')}`;
 };
 
-const cardVariants = {
+const cardEasing = [0.22, 1, 0.36, 1] as const;
+
+const cardVariants: Variants = {
   hidden: { opacity: 0, y: 18, scale: 0.98 },
   show: (index: number) => ({
     opacity: 1,
@@ -256,7 +258,7 @@ const cardVariants = {
     transition: {
       delay: Math.min(index * 0.045, 0.28),
       duration: 0.36,
-      ease: [0.22, 1, 0.36, 1],
+      ease: cardEasing,
     },
   }),
 };

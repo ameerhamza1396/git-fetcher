@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -200,7 +199,10 @@ const AnnouncementsPage = () => {
                                                 src={announcement.media_url}
                                                 alt="Announcement media"
                                                 className="w-full h-auto object-cover max-h-96"
-                                                onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/600x400/cccccc/333333?text=Image+Not+Available'; }}
+                                                onError={(e) => {
+                                                    e.currentTarget.onerror = null;
+                                                    e.currentTarget.src = 'https://placehold.co/600x400/cccccc/333333?text=Image+Not+Available';
+                                                }}
                                             />
                                         ) : announcement.media_url.match(/\.(mp4|webm|ogg)$/i) ? (
                                             <video controls className="w-full h-auto max-h-96">

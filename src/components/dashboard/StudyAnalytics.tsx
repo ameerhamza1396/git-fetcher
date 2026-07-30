@@ -160,7 +160,7 @@ export const StudyAnalytics = () => {
 
       if (uniqueStudyDates.length > 0) {
         const isTodayActive = uniqueStudyDates.includes(todayStr);
-        let checkDate = new Date(todayPKT);
+        const checkDate = new Date(todayPKT);
         if (!isTodayActive) {
           checkDate.setDate(checkDate.getDate() - 1);
         }

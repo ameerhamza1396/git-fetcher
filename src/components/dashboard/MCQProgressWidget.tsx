@@ -12,11 +12,23 @@ export interface SavedMCQSession {
   subjectId: string;
   chapterId: string;
   lastIndex: number;
-  timestamp: string; // ISO string 
+  timestamp: string; // ISO string
+}
+
+interface MCQProgressSession extends SavedMCQSession {
+  chapterName: string;
+  subjectName: string;
+  subjectColor: string;
+  totalMCQs: number;
+  completedMCQs: number;
+  resumeIndex: number;
+  percentage: number;
 }
 
 const GET_SAVED_SESSIONS = async (userId: string): Promise<SavedMCQSession[]> => {
   try {
+    const localData = localStorage.getItem('mcq_saved_sessions');
+    const localSessions: SavedMCQSession[] = localData ? JSON.parse(localData) : [];
     const { data, error } = await supabase
       .from('profiles')
       .select('in_progress_mcqs')
@@ -25,35 +37,25 @@ const GET_SAVED_SESSIONS = async (userId: string): Promise<SavedMCQSession[]> =>
     
     if (error || !data?.in_progress_mcqs) {
       // Fallback to local storage if not found in db
-      const localData = localStorage.getItem('mcq_saved_sessions');
-      return localData ? JSON.parse(localData) : [];
+      return localSessions;
     }
     
-    return data.in_progress_mcqs as unknown as SavedMCQSession[];
-  } catch (e) {
+    const cloudSessions = Array.isArray(data.in_progress_mcqs)
+      ? data.in_progress_mcqs as unknown as SavedMCQSession[]
+      : [];
+    const mergedByChapter = new Map<string, SavedMCQSession>();
+
+    [...cloudSessions, ...localSessions]
+      .filter(session => session?.chapterId && session?.subjectId)
+      .sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')))
+      .forEach((session) => {
+        if (!mergedByChapter.has(session.chapterId)) mergedByChapter.set(session.chapterId, session);
+      });
+
+    return Array.from(mergedByChapter.values()).slice(0, 5);
+  } catch {
     const localData = localStorage.getItem('mcq_saved_sessions');
     return localData ? JSON.parse(localData) : [];
-  }
-};
-
-// Get completed MCQ count for a chapter
-const GET_COMPLETED_COUNT = async (userId: string, chapterId: string): Promise<number> => {
-  try {
-    const { count, error } = await supabase
-      .from('user_answers')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('mcq_id', 
-        supabase
-          .from('mcqs')
-          .select('id')
-          .eq('chapter_id', chapterId)
-      );
-    
-    if (error) return 0;
-    return count || 0;
-  } catch (e) {
-    return 0;
   }
 };
 
@@ -181,16 +183,21 @@ export const MCQProgressWidget = () => {
 
       if (chError || subError) return [];
 
-      const mcqIds = allMCQs.map(m => m.id);
-      const { data: answeredMCQs } = mcqIds.length
-        ? await supabase
+      const { data: resumeSnapshots, error: resumeError } = await supabase.rpc(
+        'get_mcq_resume_snapshots',
+        { p_chapter_ids: chapterIds },
+      );
+      let attemptedIds = (resumeSnapshots || [])
+        .flatMap(snapshot => snapshot.attempted_mcq_ids || []);
+      if ((resumeError || attemptedIds.length === 0) && allMCQs.length > 0) {
+        const { data: compatibilityAnswers } = await supabase
           .from('user_answers')
           .select('mcq_id')
           .eq('user_id', userData?.id)
-          .in('mcq_id', mcqIds)
-        : { data: [] };
-
-      const answeredSet = new Set(answeredMCQs?.map(a => a.mcq_id) || []);
+          .in('mcq_id', allMCQs.map(mcq => mcq.id));
+        attemptedIds = compatibilityAnswers?.map(answer => answer.mcq_id) || [];
+      }
+      const answeredSet = new Set(attemptedIds);
       const chaptersById = new Map(chapters?.map(chapter => [chapter.id, chapter]) || []);
       const subjectsById = new Map(subjects?.map(subject => [subject.id, subject]) || []);
       const mcqsByChapter = new Map<string, typeof allMCQs>();
@@ -204,10 +211,12 @@ export const MCQProgressWidget = () => {
       return sessions.map(session => {
         const chapter = chaptersById.get(session.chapterId);
         const subject = subjectsById.get(session.subjectId);
-        const subjectYear = String((subject as any)?.year || '').trim();
-        const visibleForInstitute = isSubjectVisibleForInstitute(subject as any, userInstitute);
+        if (!chapter || !subject) return null;
+
+        const subjectYear = String(subject.year || '').trim();
+        const visibleForInstitute = isSubjectVisibleForInstitute(subject, userInstitute);
         const visibleForYear = !userYear || !subjectYear || subjectYear === userYear;
-        if (!chapter || !subject || !visibleForInstitute || !visibleForYear) return null;
+        if (!visibleForInstitute || !visibleForYear) return null;
 
         // Count completed MCQs for this chapter
         const chapterMCQs = mcqsByChapter.get(session.chapterId) || [];
@@ -254,7 +263,7 @@ export const MCQProgressWidget = () => {
   if (isLoading) return <MCQProgressSkeleton />;
   if (!chaptersData || chaptersData.length === 0) return null;
 
-  const handleResume = (session: any) => {
+  const handleResume = (session: MCQProgressSession) => {
     navigate(`/mcqs/quiz/${session.subjectId}/${session.chapterId}`, { 
       state: { 
         autoResume: true, 

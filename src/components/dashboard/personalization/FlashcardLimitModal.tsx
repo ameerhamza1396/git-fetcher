@@ -2,40 +2,68 @@ import { Crown, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
+export type AiLimitPeriod = 'daily' | 'weekly' | 'monthly';
+export type AiLimitKind = 'free' | 'plan';
+
 type FlashcardLimitModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   plan?: string;
   limit?: number;
+  period?: AiLimitPeriod;
+  limitKind?: AiLimitKind;
+  featureLabel?: string;
   onUpgrade: () => void;
 };
 
-const getLimitMessage = (plan: string, limit: number) => {
-  if (plan === 'premium') {
-    return `You have reached today's ${limit} flashcard fair-use limit. It refreshes tomorrow.`;
-  }
-  if (plan === 'iconic') {
-    return `You have used all ${limit} Iconic flashcards for today. Upgrade to Premium to keep learning with the higher fair-use limit.`;
-  }
-  return `You have used your ${limit} free flashcards for today. Upgrade your plan to continue generating flashcards.`;
+export const getAiLimitDetails = (error: any, fallbackPlan = 'free', fallbackLimit = 2) => {
+  const payload = error?.payload || {};
+  const text = `${error?.code || ''} ${error?.message || ''} ${payload.limit_type || ''} ${payload.period || ''}`.toLowerCase();
+  const period: AiLimitPeriod = text.includes('monthly') ? 'monthly' : text.includes('weekly') ? 'weekly' : 'daily';
+  const plan = String(payload.plan || payload.current_plan || fallbackPlan || 'free').toLowerCase();
+  const limit = Number(payload.limit || payload.allowed || payload.max || fallbackLimit);
+  const limitKind: AiLimitKind = plan === 'free' || text.includes('free') ? 'free' : 'plan';
+
+  return { plan, limit, period, limitKind };
 };
 
-export const FlashcardLimitModal = ({ open, onOpenChange, plan = 'free', limit = 2, onUpgrade }: FlashcardLimitModalProps) => {
+export const isAiLimitError = (error: any) => {
+  const text = `${error?.code || ''} ${error?.message || ''}`.toLowerCase();
+  return error?.status === 429 || text.includes('quota') || text.includes('rate limit') || text.includes('limit reached') || text.includes('limit exceeded');
+};
+
+const getLimitMessage = (plan: string, limit: number, period: AiLimitPeriod, limitKind: AiLimitKind, featureLabel: string) => {
+  const allowance = limitKind === 'free' ? 'free limit' : `allowed limit on your ${plan} plan`;
+  const limitText = Number.isFinite(limit) && limit > 0 ? ` of ${limit}` : '';
+  return `Your ${period} AI ${allowance}${limitText} has been reached for ${featureLabel}. Upgrade your plan to continue now, or continue using the free experience where available.`;
+};
+
+export const FlashcardLimitModal = ({
+  open,
+  onOpenChange,
+  plan = 'free',
+  limit = 2,
+  period = 'daily',
+  limitKind,
+  featureLabel = 'this AI feature',
+  onUpgrade,
+}: FlashcardLimitModalProps) => {
   const normalizedPlan = String(plan || 'free').toLowerCase();
-  const isPremium = normalizedPlan === 'premium';
+  const normalizedKind = limitKind || (normalizedPlan === 'free' ? 'free' : 'plan');
+  const title = `${period.charAt(0).toUpperCase()}${period.slice(1)} AI Limit Reached`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md overflow-hidden rounded-3xl border-border/40 p-0">
         <DialogHeader className="bg-gradient-to-br from-amber-500/15 via-primary/10 to-cyan-500/10 px-5 py-5 text-left">
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-            {isPremium ? <Sparkles className="h-5 w-5" /> : <Crown className="h-5 w-5" />}
+            {normalizedKind === 'plan' ? <Sparkles className="h-5 w-5" /> : <Crown className="h-5 w-5" />}
           </div>
           <DialogTitle className="text-xl font-black uppercase italic tracking-tight">
-            {isPremium ? 'Daily Limit Reached' : 'Upgrade To Continue'}
+            {title}
           </DialogTitle>
           <DialogDescription className="text-sm leading-relaxed">
-            {getLimitMessage(normalizedPlan, limit)}
+            {getLimitMessage(normalizedPlan, limit, period, normalizedKind, featureLabel)}
           </DialogDescription>
         </DialogHeader>
 
@@ -44,16 +72,18 @@ export const FlashcardLimitModal = ({ open, onOpenChange, plan = 'free', limit =
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">Current Plan</p>
             <p className="mt-1 text-sm font-black uppercase text-foreground">{normalizedPlan}</p>
             <p className="mt-2 text-xs text-muted-foreground">
-              Free: 2/day · Iconic: 10/day · Premium: 500/day fair-use
+              {normalizedKind === 'free'
+                ? `Free ${period} limit reached.`
+                : `${normalizedPlan} plan ${period} allowance reached.`}
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <Button variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>
-              Not Now
-            </Button>
+          <div className="grid grid-cols-1 gap-2">
             <Button className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 font-black text-white hover:from-amber-600 hover:to-orange-600" onClick={onUpgrade}>
-              {isPremium ? 'View Plans' : 'Upgrade Plan'}
+              Upgrade
+            </Button>
+            <Button variant="ghost" className="rounded-xl text-muted-foreground" onClick={() => onOpenChange(false)}>
+              Continue Using Free
             </Button>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { ApiRequest, ApiResponse } from './http-types';
 import { fetchReferenceChunks, publicReferenceChunk } from './reference-utils';
 
 const GROQ_MODEL = process.env.GROQ_EXPLAIN_MODEL || process.env.GROQ_SUMMARY_MODEL || process.env.GROQ_VERIFICATION_MODEL || 'openai/gpt-oss-120b';
@@ -53,7 +53,7 @@ const parseJsonObject = (text: string) => {
   }
 };
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 

@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { ApiRequest, ApiResponse } from './http-types';
 import { fetchReferenceChunks } from './reference-utils';
 
 const GROQ_MODEL = process.env.GROQ_VERIFICATION_MODEL || 'openai/gpt-oss-120b';
@@ -11,7 +11,7 @@ const parseVerification = (text: string) => {
   return JSON.parse(jsonMatch[0]);
 };
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
@@ -66,7 +66,9 @@ Return only JSON in this exact shape:
 Rules:
 - Use "verified" only when evidence supports the question and marked correct answer.
 - Use "incorrect" only when internal evidence plus secondary model-knowledge verification suggest the marked answer is wrong, or when the options are mismarked.
-- Use "no_references" when no useful internal references were found.
+- Use "verified" with sourceBasis "llm_knowledge" when no useful internal references were found but the question and marked answer appear correct by medical knowledge.
+- In that case, start the summary exactly with: "No internal reference found, however question appears to be correct." Then add one concise explanation sentence.
+- Use "no_references" only when no useful internal references were found and you cannot confirm correctness from medical knowledge.
 - Use "unconfirmed" when evidence is weak, mixed, or insufficient.
 - Set markedAnswerWrong true if the marked correct answer appears wrong.
 - matchingIndexes must only include internal snippets that directly support the verdict.

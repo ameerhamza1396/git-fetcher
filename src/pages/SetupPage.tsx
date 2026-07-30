@@ -15,9 +15,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { fetchInstitutes, getInstituteByCode, isSpecializedTestCode, isSpecializedTestInstitute, type Institute } from '@/utils/institutes';
-import { getProfileCompletion, VALID_PROFILE_YEARS } from '@/utils/profileCompletion';
+import { getInstituteYearOptions, getProfileCompletion, VALID_PROFILE_YEARS } from '@/utils/profileCompletion';
 import { generateUniqueReferralCode, resolveReferralCode } from '@/utils/referral';
 import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
+import { getUsernameValidationError, isUsernameConflict, normalizeUsername } from '@/utils/username';
 
 const VALID_YEARS = VALID_PROFILE_YEARS;
 type SetupSelectionCategory = 'institute' | 'specialized_test';
@@ -54,6 +55,12 @@ const getInstituteProvince = (inst: Institute) => {
   return value || 'Other';
 };
 
+const formatYearOptionLabel = (value: string) => value
+  .split('_')
+  .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+  .join(' ')
+  .replace(/\bAllied\b/g, '& Allied');
+
 const SetupWizard = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -75,7 +82,7 @@ const SetupWizard = () => {
   const [referralStepCode, setReferralStepCode] = useState('');
   const [heardAboutUs, setHeardAboutUs] = useState('');
   const [heardAboutUsOptions, setHeardAboutUsOptions] = useState<HeardAboutUsOption[]>(fallbackHeardAboutUsOptions);
-  const [setupTheme, setSetupTheme] = useState<SetupThemeChoice>('dark');
+  const [setupTheme, setSetupTheme] = useState<SetupThemeChoice>('light');
   const [studySearchExpanded, setStudySearchExpanded] = useState(false);
   const [studyFiltersExpanded, setStudyFiltersExpanded] = useState(false);
   const [studySearch, setStudySearch] = useState('');
@@ -248,7 +255,9 @@ const SetupWizard = () => {
   const getInitialStep = useCallback((profile: any, instituteRows: Institute[]) => {
     const hasUsername = !!profile?.username;
     const hasInstitute = !!profile?.institute;
-    const hasValidYear = !!profile?.year && VALID_YEARS.includes(profile.year);
+    const selectedInstitute = getInstituteByCode(profile?.institute || '', instituteRows);
+    const yearOptions = getInstituteYearOptions(selectedInstitute);
+    const hasValidYear = yearOptions.length === 0 || yearOptions.includes(String(profile?.year || '').trim());
 
     // Brand-new users should see the welcome step first.
     if (!hasUsername && !hasInstitute && !hasValidYear) return 0;
@@ -348,7 +357,7 @@ const SetupWizard = () => {
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'there';
 
   useEffect(() => {
-    const value = username.trim();
+    const value = normalizeUsername(username);
     if (!user?.id) return;
 
     if (!value) {
@@ -357,19 +366,14 @@ const SetupWizard = () => {
       return;
     }
 
-    if (value.length < 3) {
+    const validationError = getUsernameValidationError(value);
+    if (validationError) {
       setUsernameStatus('invalid');
-      setUsernameError('At least 3 characters');
+      setUsernameError(validationError);
       return;
     }
 
-    if (!/^[a-zA-Z0-9_]+$/.test(value)) {
-      setUsernameStatus('invalid');
-      setUsernameError('Letters, numbers, underscores only');
-      return;
-    }
-
-    if (existingProfile?.username === value) {
+    if (normalizeUsername(existingProfile?.username || '') === value) {
       setUsernameStatus('available');
       setUsernameError('');
       return;
@@ -383,9 +387,9 @@ const SetupWizard = () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('id')
-        .eq('username', value)
+        .ilike('username', value)
         .neq('id', user.id)
-        .maybeSingle();
+        .limit(1);
 
       if (cancelled) return;
 
@@ -395,7 +399,7 @@ const SetupWizard = () => {
         return;
       }
 
-      if (data) {
+      if ((data || []).length > 0) {
         setUsernameStatus('taken');
         setUsernameError('Username already taken');
       } else {
@@ -411,11 +415,12 @@ const SetupWizard = () => {
   }, [username, user?.id, existingProfile?.username]);
 
   const validateUsername = async (value: string) => {
-    const normalizedValue = value.trim();
-    if (normalizedValue.length < 3) { setUsernameError('At least 3 characters'); return false; }
-    if (!/^[a-zA-Z0-9_]+$/.test(normalizedValue)) { setUsernameError('Letters, numbers, underscores only'); return false; }
-    const { data } = await supabase.from('profiles').select('id').eq('username', normalizedValue).neq('id', user!.id).maybeSingle();
-    if (data) { setUsernameError('Username already taken'); return false; }
+    const normalizedValue = normalizeUsername(value);
+    const validationError = getUsernameValidationError(normalizedValue);
+    if (validationError) { setUsernameError(validationError); return false; }
+    const { data, error } = await supabase.from('profiles').select('id').ilike('username', normalizedValue).neq('id', user!.id).limit(1);
+    if (error) { setUsernameError('Could not verify username availability'); return false; }
+    if ((data || []).length > 0) { setUsernameError('Username already taken'); return false; }
     setUsernameError('');
     return true;
   };
@@ -428,12 +433,18 @@ const SetupWizard = () => {
       if (!valid) { setSaving(false); return; }
       const { error } = await supabase.from('profiles').upsert({
         id: user!.id,
-        username: username.trim(),
+        username: normalizeUsername(username),
         full_name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || null,
         updated_at: new Date().toISOString(),
       } as any, { onConflict: 'id' });
       setSaving(false);
-      if (error) { toast.error('Failed to save username'); return; }
+      if (error) {
+        const message = isUsernameConflict(error) ? 'Username already taken' : 'Failed to save username';
+        setUsernameError(message);
+        if (isUsernameConflict(error)) setUsernameStatus('taken');
+        toast.error(message);
+        return;
+      }
       setCurrentStep(2);
       return;
     }
@@ -453,18 +464,15 @@ const SetupWizard = () => {
         selectionCategory === 'specialized_test' ||
         isSpecializedTestInstitute(selectedInstitute) ||
         isSpecializedTestCode(institute);
-      if (studyPathChangeMode && !selectedSpecializedTest) {
-        setCurrentStep(3);
-        return;
-      }
+      const yearOptions = getInstituteYearOptions(selectedInstitute);
+      const nextYear = yearOptions.length === 1 ? yearOptions[0] : null;
+      const requiresYearChoice = yearOptions.length > 1;
       const profilePatch: any = {
         institute,
+        year: nextYear,
         updated_at: new Date().toISOString(),
       };
-      if (selectedSpecializedTest) {
-        profilePatch.year = null;
-        if (studyPathChangeMode) profilePatch.study_path_changed_at = new Date().toISOString();
-      }
+      if (studyPathChangeMode) profilePatch.study_path_changed_at = new Date().toISOString();
       setSaving(true);
       const { error } = studyPathChangeMode
         ? await supabase.from('profiles').update(profilePatch).eq('id', user!.id)
@@ -474,13 +482,19 @@ const SetupWizard = () => {
         toast.error(selectedSpecializedTest ? 'Failed to save specialized test' : 'Failed to save institute');
         return;
       }
-      if (studyPathChangeMode && selectedSpecializedTest) {
+      if (requiresYearChoice) {
+        setYear('');
+        setCurrentStep(3);
+        return;
+      }
+      if (nextYear) setYear(nextYear);
+      if (studyPathChangeMode) {
         sessionStorage.removeItem('medmacs_setup_change_verified');
-        toast.success('Specialized test updated.');
+        toast.success(selectedSpecializedTest ? 'Specialized test updated.' : 'Institute updated.');
         navigate('/dashboard', { replace: true });
         return;
       }
-      setCurrentStep(selectedSpecializedTest ? 4 : 3);
+      setCurrentStep(4);
       return;
     }
     if (currentStep === 3) {
@@ -552,7 +566,7 @@ const SetupWizard = () => {
   const handleBack = () => {
     if (currentStep === 4) {
       const selectedInstitute = getInstituteByCode(institute, institutes);
-      if (isSpecializedTestInstitute(selectedInstitute) || isSpecializedTestCode(institute)) {
+      if (getInstituteYearOptions(selectedInstitute).length === 0) {
         setCurrentStep(2);
         return;
       }
@@ -581,7 +595,7 @@ const SetupWizard = () => {
   ];
   const haloLayout = haloLayouts[currentStep] || haloLayouts[0];
   const setupIsDark = setupTheme === 'dark';
-  const progressFillDuration = 0.28;
+  const headingClass = "font-['Syne'] text-[clamp(2rem,8vw,2.8rem)] font-extrabold leading-[1.02] tracking-[-.055em] text-white";
 
   if (loading || authLoading) {
     return (
@@ -595,10 +609,10 @@ const SetupWizard = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 p-6 text-center">
         <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-6 text-white shadow-2xl">
-          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10">
-            <User className="h-8 w-8 text-white/80" />
+          <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
+            <User className="h-6 w-6 text-white/80" />
           </div>
-          <h1 className="text-2xl font-black">Profile Setup Unavailable</h1>
+          <h1 className="font-['Syne'] text-2xl font-extrabold tracking-[-.045em]">Profile Setup Unavailable</h1>
           <p className="mt-3 text-sm leading-relaxed text-white/60">{setupLoadError}</p>
           <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Button onClick={() => navigate('/dashboard', { replace: true })} variant="outline" className="h-12 rounded-2xl border-white/20 bg-white/5 text-white hover:bg-white/10">
@@ -647,9 +661,10 @@ const SetupWizard = () => {
     const studyOverlayOpen = studySearchExpanded || studyFiltersExpanded;
     const renderStudyPathRow = (inst: Institute, compact = false) => {
       const selected = institute === inst.code;
+      const yearOptions = getInstituteYearOptions(inst);
       const metadata = selectionCategory === 'institute'
-        ? inst.short_name
-        : 'Specialized test';
+        ? `${inst.short_name}${yearOptions.length ? ` · ${yearOptions.length} year${yearOptions.length === 1 ? '' : 's'}` : ''}`
+        : yearOptions.length ? `${yearOptions.length} option${yearOptions.length === 1 ? '' : 's'}` : 'No selection required';
 
       return (
         <button
@@ -713,19 +728,37 @@ const SetupWizard = () => {
     switch (currentStep) {
       case 0:
         return (
-          <div className="text-center max-w-lg mx-auto">
+          <div className="mx-auto flex max-w-md flex-col items-center text-center">
             <motion.div initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', delay: 0.12 }}>
               <img
                 src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png"
                 alt="Medmacs"
-                className="w-36 h-36 md:w-44 md:h-44 object-contain mx-auto mb-6 drop-shadow-2xl"
+                className="mx-auto mb-5 h-32 w-32 object-contain drop-shadow-2xl md:h-40 md:w-40"
               />
             </motion.div>
-            <h2 className="text-3xl md:text-4xl font-black text-white mb-3">
-              Welcome, <span className="text-cyan-300">{displayName}</span>!
+            <h2 className={`${headingClass} mb-3 max-w-full text-balance`}>
+              <span className="block">Welcome,</span>
+              <motion.span
+                className="mx-auto mt-1 inline-block max-w-full break-words bg-[linear-gradient(90deg,#2dd4bf,#0ea5e9,#22d3ee,#2dd4bf)] bg-[length:220%_100%] bg-clip-text text-transparent"
+                initial={{ opacity: 0, y: 12, filter: 'blur(8px)' }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                  filter: 'blur(0px)',
+                  backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+                }}
+                transition={{
+                  opacity: { delay: 0.28, duration: 0.6, ease: [0.22, 1, 0.36, 1] },
+                  y: { delay: 0.28, duration: 0.6, ease: [0.22, 1, 0.36, 1] },
+                  filter: { delay: 0.28, duration: 0.6, ease: [0.22, 1, 0.36, 1] },
+                  backgroundPosition: { duration: 3.8, repeat: Infinity, ease: 'easeInOut' },
+                }}
+              >
+                {displayName}!
+              </motion.span>
             </h2>
-            <p className="text-white/70 text-lg mb-6">Let's set up your profile in 3 quick steps.</p>
-            <div className="grid grid-cols-2 gap-3">
+            <p className="mx-auto mb-7 max-w-xs text-sm font-semibold leading-6 text-white/70">Let's set up your profile in 3 quick steps.</p>
+            <div className="grid w-full grid-cols-2 gap-4">
               {([
                 { value: 'dark' as const, label: 'Dark', icon: Moon, description: 'Pitch black setup' },
                 { value: 'light' as const, label: 'Light', icon: Sun, description: 'Bright and soft' },
@@ -736,19 +769,19 @@ const SetupWizard = () => {
                   <button
                     key={option.value}
                     onClick={() => chooseSetupTheme(option.value)}
-                    className={`rounded-3xl border-2 p-5 text-left transition-all duration-200 ${
+                    className={`min-h-36 rounded-3xl border-2 p-6 text-left transition-all duration-200 ${
                       selected
                         ? 'border-cyan-300 bg-cyan-400/15 shadow-2xl shadow-cyan-500/20'
                         : 'border-white/10 bg-white/5 hover:bg-white/10'
                     }`}
                   >
                     <div className="mb-5 flex items-center justify-between">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-400/15">
-                        <Icon className="h-6 w-6 text-white" />
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/15">
+                        <Icon className="h-5 w-5 text-white" />
                       </div>
                       {selected && <CheckCircle2 className="h-5 w-5 text-cyan-300" />}
                     </div>
-                    <p className="text-lg font-black text-white">{option.label}</p>
+                    <p className="font-['Syne'] text-lg font-extrabold tracking-[-.035em] text-white">{option.label}</p>
                     <p className="mt-1 text-xs font-semibold text-white/50">{option.description}</p>
                   </button>
                 );
@@ -760,20 +793,18 @@ const SetupWizard = () => {
       case 1:
         return (
           <div className="text-center max-w-md mx-auto">
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
-              <div className="w-20 h-20 rounded-3xl bg-white/15 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20">
-                <User className="w-10 h-10 text-white" />
-              </div>
-            </motion.div>
-            <h2 className="text-3xl font-black text-white mb-2">Choose Your Username</h2>
+            <h2 className={`${headingClass} mb-2`}>Choose Your Username</h2>
             <p className="text-white/60 text-sm mb-8">This will be visible on leaderboards and battles.</p>
             <div className="relative">
               <Input
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => setUsername(e.target.value.toLowerCase())}
                 placeholder="Enter your username"
                 className="h-14 rounded-2xl bg-white/10 border-white/20 text-white placeholder:text-white/40 text-center text-lg font-bold focus:ring-2 focus:ring-white/30"
                 maxLength={20}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
               />
               {usernameStatus === 'checking' && (
                 <p className="text-cyan-300 text-xs mt-2 font-semibold">Checking availability...</p>
@@ -792,7 +823,10 @@ const SetupWizard = () => {
         return (
           <div className="text-center max-w-lg mx-auto">
             <div className="relative mb-5">
-              <div ref={studyOverlayRef} className="absolute right-0 top-0 z-40 flex items-start justify-end gap-2">
+              <div
+                ref={studyOverlayRef}
+                className="absolute -top-16 right-0 z-50 flex items-start justify-end gap-2"
+              >
                 <motion.div
                   initial={false}
                   animate={{ width: studySearchExpanded ? 210 : 44 }}
@@ -858,12 +892,17 @@ const SetupWizard = () => {
                 </motion.div>
                 <button
                   type="button"
+                  disabled={selectionCategory !== 'institute'}
                   onClick={() => {
+                    if (selectionCategory !== 'institute') return;
                     setStudySearchExpanded(false);
                     setStudyFiltersExpanded((value) => !value);
                   }}
+                  title={selectionCategory === 'institute' ? 'Filter by province' : 'Province filter is available for institutes'}
                   className={`flex h-11 w-11 items-center justify-center rounded-2xl border transition-all ${
-                    studyFiltersExpanded || provinceFilter !== 'all'
+                    selectionCategory !== 'institute'
+                      ? 'cursor-not-allowed border-white/5 bg-white/5 text-white/25'
+                      : studyFiltersExpanded || provinceFilter !== 'all'
                       ? 'border-cyan-300 bg-cyan-400/15 text-cyan-300'
                       : 'border-white/10 bg-white/10 text-white/70 hover:text-white'
                   }`}
@@ -881,15 +920,15 @@ const SetupWizard = () => {
                       }`}
                     >
                       <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-white/50">Province</p>
-                      <div className="flex gap-2 overflow-x-auto pb-1">
+                      <div className="flex max-h-72 flex-col gap-2 overflow-y-auto pr-1">
                         {['all', ...availableProvinces].map((province) => (
                           <button
                             key={province}
                             type="button"
                             onClick={() => setProvinceFilter(province)}
-                            className={`shrink-0 rounded-full px-3 py-2 text-xs font-black transition-all ${
+                            className={`w-full rounded-2xl px-4 py-3 text-left text-xs font-black transition-all ${
                               provinceFilter === province
-                                ? 'bg-cyan-500 text-white'
+                                ? 'bg-gradient-to-r from-cyan-500 to-teal-400 !text-white shadow-lg shadow-cyan-500/20'
                                 : 'bg-white/10 text-white/60 hover:bg-white/15 hover:text-white'
                             }`}
                           >
@@ -902,12 +941,7 @@ const SetupWizard = () => {
                 </AnimatePresence>
               </div>
               <div className={`transition-all duration-300 ${studyOverlayOpen ? 'pointer-events-none blur-[2px] opacity-55' : ''}`}>
-              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
-                <div className="w-20 h-20 rounded-3xl bg-white/15 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20">
-                  <Building2 className="w-10 h-10 text-white" />
-                </div>
-              </motion.div>
-              <h2 className="text-3xl font-black text-white mb-2">Choose Your Study Path</h2>
+              <h2 className={`${headingClass} mb-2`}>Choose Your Study Path</h2>
               <p className="text-white/60 text-sm">
                 {selectionCategory === 'specialized_test'
                   ? "We'll tailor content for your selected exam."
@@ -922,11 +956,11 @@ const SetupWizard = () => {
             </div>
             <div className={`transition-all duration-300 ${studyOverlayOpen ? 'pointer-events-none blur-[2px] opacity-55' : ''}`}>
             <Tabs value={selectionCategory} onValueChange={handleSelectionCategoryChange} className="mb-4">
-              <TabsList className="grid h-12 w-full grid-cols-2 rounded-2xl bg-white/10 p-1">
-                <TabsTrigger value="institute" className="rounded-xl text-xs font-black text-white/70 data-[state=active]:bg-white data-[state=active]:text-black">
+              <TabsList className="grid h-auto w-full grid-cols-2 rounded-none border-b border-white/10 bg-transparent p-0">
+                <TabsTrigger value="institute" className="rounded-none border-b-2 border-transparent bg-transparent px-2 pb-3 pt-1 text-xs font-black text-white/50 shadow-none transition-all data-[state=active]:border-cyan-400 data-[state=active]:bg-transparent data-[state=active]:!text-cyan-300 data-[state=active]:shadow-none">
                   Institutes
                 </TabsTrigger>
-                <TabsTrigger value="specialized_test" className="rounded-xl text-xs font-black text-white/70 data-[state=active]:bg-white data-[state=active]:text-black">
+                <TabsTrigger value="specialized_test" className="rounded-none border-b-2 border-transparent bg-transparent px-2 pb-3 pt-1 text-xs font-black text-white/50 shadow-none transition-all data-[state=active]:border-cyan-400 data-[state=active]:bg-transparent data-[state=active]:!text-cyan-300 data-[state=active]:shadow-none">
                   Specialized Tests
                 </TabsTrigger>
               </TabsList>
@@ -955,18 +989,22 @@ const SetupWizard = () => {
           </div>
         );
 
-      case 3:
+      case 3: {
+        const selectedInstitute = getInstituteByCode(institute, institutes);
+        const yearOptions = getInstituteYearOptions(selectedInstitute);
+        const selectedIsSpecializedTest =
+          isSpecializedTestInstitute(selectedInstitute) || isSpecializedTestCode(institute);
+        const selectionLabel = selectedIsSpecializedTest ? 'Specialty' : 'Year';
+        const options = yearOptions.length > 0 ? yearOptions : VALID_YEARS;
+
         return (
           <div className="text-center max-w-md mx-auto">
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
-              <div className="w-20 h-20 rounded-3xl bg-white/15 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20">
-                <GraduationCap className="w-10 h-10 text-white" />
-              </div>
-            </motion.div>
-            <h2 className="text-3xl font-black text-white mb-2">Select Your Year</h2>
-            <p className="text-white/60 text-sm mb-8">Pick your current MBBS year.</p>
+            <h2 className={`${headingClass} mb-2`}>Select Your {selectionLabel}</h2>
+            <p className="text-white/60 text-sm mb-8">
+              Pick your {selectedIsSpecializedTest ? 'FCPS specialty' : 'current Medical year'}.
+            </p>
             <div className="grid grid-cols-2 gap-3">
-              {VALID_YEARS.map((y) => (
+              {options.map((y) => (
                 <button
                   key={y}
                   onClick={() => setYear(y)}
@@ -976,22 +1014,18 @@ const SetupWizard = () => {
                       : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
                   }`}
                 >
-                  {y} Year MBBS
+                  {formatYearOptionLabel(y)}{selectedIsSpecializedTest ? '' : ' Year MBBS'}
                 </button>
               ))}
             </div>
           </div>
         );
+      }
 
       case 4:
         return (
           <div className="text-center max-w-md mx-auto">
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
-              <div className="w-20 h-20 rounded-3xl bg-white/15 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20">
-                <Gift className="w-10 h-10 text-white" />
-              </div>
-            </motion.div>
-            <h2 className="text-3xl font-black text-white mb-2">Referral</h2>
+            <h2 className={`${headingClass} mb-2`}>Referral</h2>
             {referredByName ? (
               <div className="rounded-2xl bg-white/5 border-2 border-white/10 p-5 opacity-60 select-none">
                 <div className="flex items-center justify-center gap-2 mb-2">
@@ -1019,12 +1053,7 @@ const SetupWizard = () => {
       case 5:
         return (
           <div className="text-center max-w-lg mx-auto">
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}>
-              <div className="w-20 h-20 rounded-3xl bg-white/15 flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/20">
-                <Megaphone className="w-10 h-10 text-white" />
-              </div>
-            </motion.div>
-            <h2 className="text-3xl font-black text-white mb-2">Where did you hear about us?</h2>
+            <h2 className={`${headingClass} mb-2`}>Where did you hear about us?</h2>
             <p className="text-white/60 text-sm mb-6">This helps us understand what is working. You can skip it.</p>
             <div className="grid grid-cols-2 gap-3">
               {heardAboutUsOptions.map((option) => {
@@ -1042,12 +1071,12 @@ const SetupWizard = () => {
                     }`}
                   >
                     <div className="mb-3 flex items-center justify-between">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/15">
-                        <Icon className="h-5 w-5 text-white" />
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-400/15">
+                        <Icon className="h-4 w-4 text-white" />
                       </span>
                       {selected && <CheckCircle2 className="h-5 w-5 text-cyan-300" />}
                     </div>
-                    <p className="text-sm font-black leading-tight text-white">{option.label}</p>
+                    <p className="font-['Syne'] text-sm font-extrabold leading-tight tracking-[-.025em] text-white">{option.label}</p>
                   </button>
                 );
               })}
@@ -1062,9 +1091,9 @@ const SetupWizard = () => {
               <img src="/mascots/Mascot14.png" alt="All Set" className="w-48 h-auto mx-auto mb-6 drop-shadow-2xl" />
             </motion.div>
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.4, type: 'spring' }}>
-              <CheckCircle2 className="w-16 h-16 text-emerald-300 mx-auto mb-4" />
+              <CheckCircle2 className="mx-auto mb-4 h-10 w-10 text-emerald-300" />
             </motion.div>
-            <h2 className="text-3xl md:text-4xl font-black text-white mb-3">You're All Set!</h2>
+            <h2 className={`${headingClass} mb-3`}>You're All Set!</h2>
             <p className="text-white/70 text-lg">Your profile is complete. Let's start learning!</p>
             <Button
               onClick={handleNext}
@@ -1100,7 +1129,7 @@ const SetupWizard = () => {
   };
 
   return (
-    <div className={`setup-theme-${setupTheme} fixed inset-0 isolate h-dvh w-full flex flex-col items-center justify-center overflow-hidden overscroll-none transition-all duration-700 ${setupIsDark ? 'bg-black' : 'bg-slate-50'}`}>
+    <div className={`setup-theme-${setupTheme} fixed inset-0 isolate h-dvh w-full flex flex-col items-center justify-center overflow-hidden overscroll-none transition-all duration-700 ${setupIsDark ? 'bg-black' : 'bg-white'}`}>
       {!setupIsDark && (
         <style>{`
           .setup-theme-light .text-white { color: rgb(15 23 42) !important; }
@@ -1112,53 +1141,53 @@ const SetupWizard = () => {
           .setup-theme-light .text-white\\/30 { color: rgba(15, 23, 42, 0.32) !important; }
           .setup-theme-light .text-cyan-300 { color: rgb(8 145 178) !important; }
           .setup-theme-light .text-emerald-300 { color: rgb(5 150 105) !important; }
-          .setup-theme-light .text-black { color: rgb(255 255 255) !important; }
-          .setup-theme-light .bg-white { background-color: rgb(8 145 178) !important; }
-          .setup-theme-light .bg-white\\/20 { background-color: rgba(8, 145, 178, 0.14) !important; }
-          .setup-theme-light .bg-white\\/15 { background-color: rgba(8, 145, 178, 0.12) !important; }
-          .setup-theme-light .bg-white\\/10 { background-color: rgba(8, 145, 178, 0.08) !important; }
-          .setup-theme-light .bg-white\\/5 { background-color: rgba(8, 145, 178, 0.05) !important; }
-          .setup-theme-light .border-white { border-color: rgb(8 145 178) !important; }
-          .setup-theme-light .border-white\\/20 { border-color: rgba(8, 145, 178, 0.22) !important; }
-          .setup-theme-light .border-white\\/10 { border-color: rgba(8, 145, 178, 0.16) !important; }
+          .setup-theme-light .text-black { color: rgb(15 23 42) !important; }
+          .setup-theme-light .bg-white { background-color: rgb(255 255 255) !important; }
+          .setup-theme-light .bg-white\\/20 { background-color: rgba(45, 212, 191, 0.14) !important; }
+          .setup-theme-light .bg-white\\/15 { background-color: rgba(45, 212, 191, 0.12) !important; }
+          .setup-theme-light .bg-white\\/10 { background-color: rgba(45, 212, 191, 0.08) !important; }
+          .setup-theme-light .bg-white\\/5 { background-color: rgba(45, 212, 191, 0.05) !important; }
+          .setup-theme-light .bg-white\\/\\[0\\.02\\] { background-color: rgba(45, 212, 191, 0.03) !important; }
+          .setup-theme-light .border-white { border-color: rgb(45 212 191) !important; }
+          .setup-theme-light .border-white\\/20 { border-color: rgba(45, 212, 191, 0.24) !important; }
+          .setup-theme-light .border-white\\/10 { border-color: rgba(45, 212, 191, 0.18) !important; }
+          .setup-theme-light .border-white\\/5 { border-color: rgba(45, 212, 191, 0.12) !important; }
+          .setup-theme-light .shadow-cyan-500\\/20,
+          .setup-theme-light .shadow-cyan-700\\/20 { --tw-shadow-color: rgba(14, 165, 233, 0.16) !important; }
           .setup-theme-light .placeholder\\:text-white\\/40::placeholder { color: rgba(15, 23, 42, 0.42) !important; }
+          .setup-theme-light .setup-brand-gradient {
+            background-image: linear-gradient(90deg, #0891b2 0%, #00a6c8 42%, #0f766e 100%) !important;
+          }
         `}</style>
       )}
-      <div className={`absolute h-80 w-80 rounded-full blur-3xl transition-all duration-700 ${haloLayout.primary} ${setupIsDark ? 'bg-cyan-500/25' : 'bg-cyan-300/45'}`} />
-      <div className={`absolute h-96 w-96 rounded-full blur-3xl transition-all duration-700 ${haloLayout.secondary} ${setupIsDark ? 'bg-teal-400/20' : 'bg-teal-200/50'}`} />
-      <div className={`absolute inset-0 z-0 transition-all duration-700 ${setupIsDark ? 'bg-black/45' : 'bg-white/55'}`} />
-      <div className="absolute top-[calc(env(safe-area-inset-top,0px)+16px)] left-6 right-6 z-50">
-        <div className="flex gap-2">
-          {steps.map((_, i) => (
-            <div key={i} className="flex-1 h-1.5 rounded-full overflow-hidden bg-white/15">
-              <motion.div
-                className="h-full bg-white rounded-full"
-                initial={{ width: '0%' }}
-                animate={{ width: i <= currentStep ? '100%' : '0%' }}
-                transition={{
-                  duration: progressFillDuration,
-                  ease: 'linear',
-                  delay: i <= currentStep ? i * progressFillDuration : 0,
-                }}
-              />
-            </div>
-          ))}
-        </div>
-        <div className="flex justify-between mt-2">
-          {steps.map((s, i) => (
-            <span key={i} className={`text-[9px] font-bold uppercase tracking-wider transition-all ${
-              i <= currentStep ? 'text-white/80' : 'text-white/30'
-            }`}>
-              {s.title}
-            </span>
-          ))}
-        </div>
-      </div>
+      {setupIsDark && (
+        <>
+          <div className={`absolute h-80 w-80 rounded-full bg-cyan-500/25 blur-3xl transition-all duration-700 ${haloLayout.primary}`} />
+          <div className={`absolute h-96 w-96 rounded-full bg-teal-400/20 blur-3xl transition-all duration-700 ${haloLayout.secondary}`} />
+          <div className="absolute inset-0 z-0 bg-black/45 transition-all duration-700" />
+        </>
+      )}
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.12, duration: 0.42, ease: 'easeOut' }}
+        className="absolute left-6 top-[calc(env(safe-area-inset-top,0px)+18px)] z-50 flex items-center gap-2.5"
+      >
+        <img
+          src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png"
+          alt="Medmacs"
+          className="h-9 w-9 object-contain"
+        />
+        <span className="font-['Syne'] text-sm font-extrabold tracking-[-.045em]">
+          <span className="setup-brand-gradient bg-gradient-to-r from-cyan-300 via-sky-300 to-teal-300 bg-clip-text text-transparent">Medmacs</span>
+          <span className="text-white">.app</span>
+        </span>
+      </motion.div>
 
       {currentStep === 0 && (
         <button
           onClick={() => setCurrentStep(1)}
-          className="absolute top-[calc(env(safe-area-inset-top,0px)+16px)] right-6 z-50 text-white/40 hover:text-white text-xs font-bold uppercase tracking-widest"
+          className="absolute right-6 top-[calc(env(safe-area-inset-top,0px)+22px)] z-50 text-xs font-bold uppercase tracking-widest text-white/40 hover:text-white"
         >
           Skip
         </button>
@@ -1180,6 +1209,24 @@ const SetupWizard = () => {
 
       {currentStep !== 6 && (
       <div className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+24px)] left-6 right-6 z-50">
+        <div className="mb-4 flex items-center justify-center gap-2.5">
+          {steps.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => i <= currentStep && setCurrentStep(i)}
+              aria-label={`Go to setup step ${i + 1}`}
+              aria-current={i === currentStep ? 'step' : undefined}
+              className={`rounded-full transition-all duration-300 ${
+                i === currentStep
+                  ? `h-4 w-4 ${setupIsDark ? 'bg-white' : 'bg-cyan-600'}`
+                  : i < currentStep
+                    ? `h-2.5 w-2.5 ${setupIsDark ? 'bg-white/70' : 'bg-cyan-500/70'}`
+                    : `h-2.5 w-2.5 ${setupIsDark ? 'bg-white/20' : 'bg-slate-300'}`
+              }`}
+            />
+          ))}
+        </div>
         <div className={`flex items-center gap-3 ${currentStep > 0 ? 'justify-between' : 'justify-center'}`}>
           {currentStep > 0 && currentStep < 6 && (
             <Button

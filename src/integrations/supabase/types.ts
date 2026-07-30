@@ -125,6 +125,48 @@ export type Database = {
         }
         Relationships: []
       }
+      dashboard_promotions: {
+        Row: {
+          action_type: string
+          created_at: string
+          display_order: number
+          enabled: boolean
+          id: string
+          image_url: string | null
+          subtitle: string
+          target_url: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          action_type?: string
+          created_at?: string
+          display_order?: number
+          enabled?: boolean
+          id?: string
+          image_url?: string | null
+          subtitle?: string
+          target_url?: string | null
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          display_order?: number
+          enabled?: boolean
+          id?: string
+          image_url?: string | null
+          subtitle?: string
+          target_url?: string | null
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           created_at: string
@@ -1198,6 +1240,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_delete_dashboard_promotion: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
+      admin_save_dashboard_promotion: {
+        Args: {
+          p_action_type: string
+          p_display_order: number
+          p_enabled: boolean
+          p_id: string | null
+          p_image_url: string | null
+          p_subtitle: string
+          p_target_url: string | null
+          p_title: string
+        }
+        Returns: string
+      }
       consume_mcq_submission: {
         Args: { p_subject_id: string }
         Returns: Json
@@ -1243,6 +1302,47 @@ export type Database = {
         Returns: {
           chapter_id: string
           attempted_count: number
+        }[]
+      }
+      get_mcq_chapter_latest_answers: {
+        Args: { p_chapter_id: string }
+        Returns: {
+          mcq_id: string
+          selected_answer: string
+        }[]
+      }
+      get_mcq_chapter_access: {
+        Args: { p_chapter_id: string }
+        Returns: Json
+      }
+      admin_list_mcq_chapter_locks: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          chapter_id: string
+          is_locked: boolean
+          message: string
+          updated_at: string
+        }[]
+      }
+      admin_set_mcq_chapter_lock: {
+        Args: {
+          p_chapter_id: string
+          p_is_locked: boolean
+          p_message?: string | null
+        }
+        Returns: Json
+      }
+      is_mcq_lock_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      get_mcq_resume_snapshots: {
+        Args: { p_chapter_ids: string[] }
+        Returns: {
+          chapter_id: string
+          attempted_count: number
+          last_mcq_id: string | null
+          attempted_mcq_ids: string[]
         }[]
       }
       get_mcq_practice_summary: {

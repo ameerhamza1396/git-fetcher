@@ -1,5 +1,4 @@
-// @ts-nocheck
-import { useState, useEffect, useRef } from 'react';
+import { forwardRef, lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -7,7 +6,7 @@ import {
   Clock, CheckCircle, XCircle, Timer, Bot, MessageSquare, X, Bookmark,
   BookmarkCheck, Crown, LogOut, AlertTriangle, MoreVertical, Flag, BotOff,
   Moon, Sun, Zap, Sparkles, BookOpen, ChevronLeft, Loader2, Star, Award,
-  TrendingUp, Brain, Target, Shield, ShieldAlert, Trash2, PanelBottom, Lock, RotateCcw, WifiOff,
+  TrendingUp, Brain, Target, Shield, ShieldAlert, Trash2, Menu, Lock, RotateCcw, WifiOff,
   ThumbsUp, ThumbsDown, MessageCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,19 +15,16 @@ import { Badge } from '@/components/ui/badge';
 import { useReferenceSearch } from '@/hooks/useReferenceSearch';
 import { aiApiJson } from '@/utils/aiApi';
 import { isAiPolicyNotice } from '@/utils/aiPolicyNotice';
-import { fetchChapterById, fetchMCQsByChapter, fetchSubjectById, Chapter, MCQ, Subject } from '@/utils/mcqData';
+import { fetchChapterById, fetchSubjectById, Chapter, Subject } from '@/utils/mcqData';
 import { supabase } from '@/integrations/supabase/client';
-import { AIChatbot } from './AIChatbot';
 import { useQuery } from '@tanstack/react-query';
 import { playCorrectSound, playIncorrectSound } from '@/utils/soundEffects';
 import { Textarea } from '@/components/ui/textarea';
 import { useTheme } from 'next-themes';
-import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
 import { ChapterDownloadButton } from '@/components/mcq/ChapterDownloadButton';
 import { useOfflineChapterStatus } from '@/hooks/useOfflineChapterStatus';
 import {
   getQueuedMCQAnswerIds,
-  getQueuedMCQAnswerMap,
   queueMCQAnswerForSync,
   subscribeOfflineAnswerChanges,
 } from '@/utils/offlineAnswerSync';
@@ -36,6 +32,28 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { MCQTimer } from '@/features/mcq/components/MCQTimer';
+import { MCQAnswerOption } from '@/features/mcq/components/MCQAnswerOption';
+import {
+  clearPreparedMCQQuiz,
+  ChapterLockedError,
+  prepareMCQQuiz,
+  type PreparedMCQ,
+} from '@/features/mcq/quizBootstrap';
+import { MCQQuestionMapDrawer } from '@/features/mcq/components/MCQQuestionMapDrawer';
+import MCQLoadingSkeleton from '@/features/mcq/components/MCQLoadingSkeleton';
+import {
+  getPakistanDateKey,
+  cacheMCQPlan,
+  mergeLocalMCQAttemptCount,
+  readCachedMCQPlan,
+  reserveLocalMCQAttempt,
+  setLocalMCQAttemptCount,
+} from '@/utils/mcqAttemptQuota';
+
+const LazyAIChatbot = lazy(() =>
+  import('./AIChatbot').then((module) => ({ default: module.AIChatbot })),
+);
 
 interface MCQDisplayProps {
   subject: string;
@@ -47,21 +65,9 @@ interface MCQDisplayProps {
   isAiGenerated?: boolean;
   mistakeMode?: boolean;
   mistakeMcqIds?: string[];
+  initialSubject?: Subject | null;
+  initialChapter?: Chapter | null;
 }
-
-interface ShuffledMCQ extends Omit<MCQ, 'options'> {
-  shuffledOptions: string[];
-  originalCorrectIndex: number;
-}
-
-const shuffleArray = <T,>(array: T[]): T[] => {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-};
 
 const LAST_ATTEMPTED_MCQ_KEY = 'lastAttemptedMCQIndex';
 const LAST_ATTEMPTED_SUBJECT_KEY = 'lastAttemptedMCQSubject';
@@ -74,41 +80,54 @@ export interface SavedMCQSession {
   timestamp: string;
 }
 
-const updateSavedSessionsList = async (userId: string | undefined, subjectId: string, chapterId: string, lastIndex: number) => {
+let savedSessionSyncTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingSavedSessionSync: { userId: string; sessions: SavedMCQSession[] } | null = null;
+
+const flushSavedSessions = async () => {
+  if (savedSessionSyncTimer) {
+    clearTimeout(savedSessionSyncTimer);
+    savedSessionSyncTimer = null;
+  }
+  const pending = pendingSavedSessionSync;
+  pendingSavedSessionSync = null;
+  if (!pending) return;
+  const { error } = await supabase
+    .from('profiles')
+    .update({ in_progress_mcqs: pending.sessions })
+    .eq('id', pending.userId);
+  if (error) console.warn('Unable to sync saved MCQ sessions:', error);
+};
+
+const updateSavedSessionsList = (userId: string | undefined, subjectId: string, chapterId: string, lastIndex: number) => {
   if (typeof window === 'undefined') return;
   try {
-    let sessions: SavedMCQSession[] = [];
-    if (userId) {
-      const { data: profile } = await supabase.from('profiles').select('in_progress_mcqs').eq('id', userId).single();
-      if (profile?.in_progress_mcqs) sessions = profile.in_progress_mcqs as unknown as SavedMCQSession[];
-    }
-    if (sessions.length === 0) {
-      const localData = localStorage.getItem(SAVED_SESSIONS_LIST_KEY);
-      sessions = localData ? JSON.parse(localData) : [];
-    }
+    const localData = localStorage.getItem(SAVED_SESSIONS_LIST_KEY);
+    let sessions: SavedMCQSession[] = localData ? JSON.parse(localData) : [];
     sessions = sessions.filter(s => s.chapterId !== chapterId);
     sessions.unshift({ subjectId, chapterId, lastIndex, timestamp: new Date().toISOString() });
     if (sessions.length > 5) sessions = sessions.slice(0, 5);
     localStorage.setItem(SAVED_SESSIONS_LIST_KEY, JSON.stringify(sessions));
-    if (userId) await supabase.from('profiles').update({ in_progress_mcqs: sessions }).eq('id', userId);
+    if (userId) {
+      pendingSavedSessionSync = { userId, sessions };
+      if (savedSessionSyncTimer) clearTimeout(savedSessionSyncTimer);
+      savedSessionSyncTimer = setTimeout(() => {
+        void flushSavedSessions();
+      }, 2500);
+    }
   } catch (e) { console.error("Failed to update saved sessions array", e); }
 };
 
 const removeSavedSessionFromList = async (userId: string | undefined, chapterId: string) => {
   if (typeof window === 'undefined') return;
   try {
-    let sessions: SavedMCQSession[] = [];
-    if (userId) {
-      const { data: profile } = await supabase.from('profiles').select('in_progress_mcqs').eq('id', userId).single();
-      if (profile?.in_progress_mcqs) sessions = profile.in_progress_mcqs as unknown as SavedMCQSession[];
-    }
-    if (sessions.length === 0) {
-      const localData = localStorage.getItem(SAVED_SESSIONS_LIST_KEY);
-      sessions = localData ? JSON.parse(localData) : [];
-    }
+    const localData = localStorage.getItem(SAVED_SESSIONS_LIST_KEY);
+    let sessions: SavedMCQSession[] = localData ? JSON.parse(localData) : [];
     sessions = sessions.filter(s => s.chapterId !== chapterId);
     localStorage.setItem(SAVED_SESSIONS_LIST_KEY, JSON.stringify(sessions));
-    if (userId) await supabase.from('profiles').update({ in_progress_mcqs: sessions }).eq('id', userId);
+    if (userId) {
+      pendingSavedSessionSync = { userId, sessions };
+      await flushSavedSessions();
+    }
   } catch (e) { console.error("Failed to remove saved session from array", e); }
 };
 
@@ -117,13 +136,19 @@ const removeSavedSessionFromList = async (userId: string | undefined, chapterId:
 // explicit z-[200]/z-[201] so they always render above the z-[100] quiz container.
 // The overlay uses a fully opaque dark background so the card beneath doesn't bleed through.
 
-const ModalOverlay = () => (
+const ModalOverlay = forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Overlay>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
+>(({ className = '', ...props }, ref) => (
   <DialogPrimitive.Overlay
-    className="fixed inset-0 bg-black/75 z-[200]
+    ref={ref}
+    className={`fixed inset-0 bg-black/75 z-[200]
       data-[state=open]:animate-in data-[state=closed]:animate-out
-      data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+      data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ${className}`}
+    {...props}
   />
-);
+));
+ModalOverlay.displayName = 'ModalOverlay';
 
 const ModalContent = ({ children, className = '', ...props }) => (
   <DialogPrimitive.Portal>
@@ -143,6 +168,17 @@ const ModalContent = ({ children, className = '', ...props }) => (
   </DialogPrimitive.Portal>
 );
 
+const MenuModalContent = ({ children }) => (
+  <DialogPrimitive.Portal>
+    <DialogPrimitive.Overlay className="fixed inset-0 z-[200] bg-black/30 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:duration-150 data-[state=open]:duration-150" />
+    <DialogPrimitive.Content
+      className="fixed right-3 top-[calc(env(safe-area-inset-top)+3.75rem)] z-[201] max-h-[calc(100dvh-env(safe-area-inset-top)-4.5rem)] w-[calc(100%-1.5rem)] max-w-[400px] origin-top-right overflow-y-auto outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 data-[state=closed]:duration-150 data-[state=open]:duration-180"
+    >
+      {children}
+    </DialogPrimitive.Content>
+  </DialogPrimitive.Portal>
+);
+
 // ─── Modals ────────────────────────────────────────────────────────────────────
 
 const MCQSettingsModal = ({
@@ -156,7 +192,7 @@ const MCQSettingsModal = ({
 
   return (
     <DialogPrimitive.Root open={isOpen} onOpenChange={onClose}>
-      <ModalContent className="sm:max-w-[400px]">
+      <MenuModalContent>
         {/* Solid card — no bg-background (CSS var can be transparent) */}
         <div className="bg-white dark:bg-zinc-900 border-2 border-primary/20 rounded-3xl overflow-hidden shadow-2xl">
         <div className="p-6 pb-0">
@@ -259,7 +295,7 @@ const MCQSettingsModal = ({
           </div>
         </div>
       </div>
-      </ModalContent>
+      </MenuModalContent>
     </DialogPrimitive.Root>
   );
 };
@@ -431,6 +467,11 @@ const REFERENCE_VERIFICATION_COPY = {
 const isInternalVerification = (sourceBasis = '') =>
   ['internal', 'book', 'books', 'rag'].includes(String(sourceBasis).toLowerCase());
 
+const isExternalVerification = (sourceBasis = '') =>
+  ['external', 'llm_knowledge'].includes(String(sourceBasis).toLowerCase());
+
+const EXTERNAL_VERIFIED_PREFIX = 'No internal reference found, however question appears to be correct.';
+
 const isGenericReferenceBook = (book = '') =>
   /^(reference source|referece source|reference)$/i.test(String(book).trim());
 
@@ -447,12 +488,13 @@ const getVerificationDisplay = (verification) => {
 
   if (verification?.verdict === 'verified') {
     const internal = isInternalVerification(verification?.sourceBasis);
+    const external = isExternalVerification(verification?.sourceBasis);
     return {
       icon: CheckCircle,
-      label: internal ? 'Reference found' : 'Reference found externally',
-      tone: internal ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300',
-      border: internal ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-950/30' : 'border-amber-200 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30',
-      chip: internal ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+      label: internal ? 'Reference found' : external ? 'Question verified' : 'Question verified',
+      tone: 'text-emerald-700 dark:text-emerald-300',
+      border: 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-950/30',
+      chip: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
     };
   }
 
@@ -790,32 +832,6 @@ const ReferenceModal = ({
   );
 };
 
-const QuestionMapDrawer = ({ isOpen, onOpenChange, children }) => (
-  <DialogPrimitive.Root open={isOpen} onOpenChange={onOpenChange}>
-    <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay
-        className="fixed inset-0 z-[200] bg-black/70 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
-      />
-      <DialogPrimitive.Content
-        className="fixed inset-y-0 left-0 z-[201] flex h-full w-[300px] max-w-[85vw] flex-col border-r border-slate-200 bg-background shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left data-[state=closed]:duration-300 data-[state=open]:duration-300 dark:border-slate-800 sm:w-[350px]"
-      >
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
-          <DialogPrimitive.Title className="text-lg font-semibold text-foreground">
-            Question <span className="text-blue-600">Map</span>
-          </DialogPrimitive.Title>
-          <DialogPrimitive.Close className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </DialogPrimitive.Close>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-6">
-          {children}
-        </div>
-      </DialogPrimitive.Content>
-    </DialogPrimitive.Portal>
-  </DialogPrimitive.Root>
-);
-
 export const MCQDisplay = ({
   subject,
   chapter,
@@ -825,33 +841,43 @@ export const MCQDisplay = ({
   initialIndex = 0,
   isAiGenerated = false,
   mistakeMode = false,
-  mistakeMcqIds = []
+  mistakeMcqIds = [],
+  initialSubject,
+  initialChapter,
 }: MCQDisplayProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
-  const [mcqs, setMcqs] = useState<ShuffledMCQ[]>([]);
+  const [mcqs, setMcqs] = useState<PreparedMCQ[]>([]);
   const [loading, setLoading] = useState(true);
+  const [chapterLockMessage, setChapterLockMessage] = useState<string | null>(null);
+  const [preparationError, setPreparationError] = useState<string | null>(null);
+  const [preparationAttempt, setPreparationAttempt] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(timePerQuestion);
-  const [startTime, setStartTime] = useState<number>(Date.now());
+  const [startTime, setStartTime] = useState(0);
   const [score, setScore] = useState(0);
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [usedAiHelpByQuestion, setUsedAiHelpByQuestion] = useState<Record<string, boolean>>({});
   const helpToastTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownOfflineSyncToastRef = useRef(false);
-  const [isCurrentMCQSaved, setIsCurrentMCQSaved] = useState(false);
+  const [savedMcqIds, setSavedMcqIds] = useState<Set<string>>(new Set());
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [hasOpenedSettingsMenu, setHasOpenedSettingsMenu] = useState(false);
   const [isReportSubmitting, setIsReportSubmitting] = useState(false);
   const [hasAttemptedAny, setHasAttemptedAny] = useState(false);
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
   const isSubmittingAnswerRef = useRef(false);
+  const hasUserInteractedRef = useRef(false);
+  const answerSelectImplementationRef = useRef<(answer: string) => void>(() => undefined);
+  const stableAnswerSelectRef = useRef((answer: string) => {
+    answerSelectImplementationRef.current(answer);
+  });
   const [isOnline, setIsOnline] = useState(() => {
     if (typeof navigator === 'undefined') return true;
     return navigator.onLine;
@@ -873,6 +899,7 @@ export const MCQDisplay = ({
   });
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [dailySubmissionsCount, setDailySubmissionsCount] = useState(0);
+  const [cachedUserPlan, setCachedUserPlan] = useState<string | null>(null);
   const [lastSubmissionResetDate, setLastSubmissionResetDate] = useState<string | null>(null);
   const [upgradeModalMessage, setUpgradeModalMessage] = useState("Upgrade to premium for unlimited access!");
   const [isReferenceModalOpen, setIsReferenceModalOpen] = useState(false);
@@ -891,8 +918,8 @@ export const MCQDisplay = ({
   const [summaryGenerationCounts, setSummaryGenerationCounts] = useState<Record<string, number>>({});
   const [explainGenerationCounts, setExplainGenerationCounts] = useState<Record<string, number>>({});
   const [isConfirmingReferences, setIsConfirmingReferences] = useState(false);
-  const [downloadSubject, setDownloadSubject] = useState<Subject | null>(null);
-  const [downloadChapter, setDownloadChapter] = useState<Chapter | null>(null);
+  const [downloadSubject, setDownloadSubject] = useState<Subject | null>(initialSubject ?? null);
+  const [downloadChapter, setDownloadChapter] = useState<Chapter | null>(initialChapter ?? null);
   const { search, loading: isSearchingReference, error: referenceError, data: referenceData, setData: setReferenceData } = useReferenceSearch();
   const referenceResults = referenceData?.results || [];
 
@@ -900,30 +927,20 @@ export const MCQDisplay = ({
     queryKey: ['profileForChatbot', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data, error } = await supabase.from('profiles').select('plan, daily_mcq_submissions, last_submission_reset_date').eq('id', user.id).maybeSingle();
+      const { data, error } = await supabase.from('profiles').select('plan, daily_mcq_submissions, last_submission_reset_date, full_name').eq('id', user.id).maybeSingle();
       if (error) { console.error('Error fetching profile for chatbot:', error); return null; }
       return data;
     },
     enabled: !!user?.id
   });
 
-  const userPlanForChatbot = profile?.plan?.toLowerCase() || 'free';
+  const userPlanForChatbot = profile?.plan?.toLowerCase() || cachedUserPlan || 'free';
   const isPremium = true;
   const canUseAiSummary = true;
   const isSubjectFreeUnlimited = downloadSubject?.free_unlimited_access === true;
 
-  const isNewDayPKT = (lastResetDateStr: string | null): boolean => {
-    if (!lastResetDateStr) return true;
-    const now = new Date();
-    const nowPKT = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Karachi" }));
-    const today12AMPKT = new Date(nowPKT);
-    today12AMPKT.setHours(0, 0, 0, 0);
-    const lastResetDateTime = new Date(lastResetDateStr);
-    const lastResetDateTimePKT = new Date(lastResetDateTime.toLocaleString("en-US", { timeZone: "Asia/Karachi" }));
-    return lastResetDateTimePKT < today12AMPKT;
-  };
-
   const currentMCQ = mcqs[currentQuestionIndex];
+  const isCurrentMCQSaved = currentMCQ ? savedMcqIds.has(currentMCQ.id) : false;
   const totalQuestions = mcqs.length;
   const progressPercentage = totalQuestions > 0 ? ((currentQuestionIndex + 1) / totalQuestions) * 100 : 0;
   const effectiveQuickSubmit = quickSubmit;
@@ -982,10 +999,16 @@ export const MCQDisplay = ({
 
     if (staleVerifiedBookCache) return null;
 
+    const cachedSummary = String(data.summary || '').trim();
+
     return {
       verdict: cachedVerdict,
       sourceBasis: cachedSourceBasis,
-      summary: data.summary || '',
+      summary: cachedVerdict === 'verified' && isExternalVerification(cachedSourceBasis)
+        ? cachedSummary.startsWith(EXTERNAL_VERIFIED_PREFIX)
+          ? cachedSummary
+          : `${EXTERNAL_VERIFIED_PREFIX}${cachedSummary ? ` ${cachedSummary}` : ''}`
+        : cachedSummary,
       citations,
       correctAnswerSuggestion: data.correct_answer_suggestion || '',
       markedAnswerWrong: data.marked_answer_wrong === true,
@@ -1015,24 +1038,6 @@ export const MCQDisplay = ({
     }
   };
 
-  const loadQuestionFeedback = async () => {
-    if (!user || !currentMCQ?.id) return;
-    const { data, error } = await (supabase.from('question_feedbacks') as any)
-      .select('feedback')
-      .eq('user_id', user.id)
-      .eq('mcq_id', currentMCQ.id)
-      .maybeSingle();
-
-    if (error) {
-      console.warn('Question feedback load failed:', error);
-      return;
-    }
-
-    if (data?.feedback === 'up' || data?.feedback === 'down') {
-      setQuestionFeedback(prev => ({ ...prev, [currentMCQ.id]: data.feedback }));
-    }
-  };
-
   const saveQuestionFeedback = async (feedback: 'up' | 'down') => {
     if (!user || !currentMCQ?.id || savingQuestionFeedback) return;
     setSavingQuestionFeedback(true);
@@ -1059,9 +1064,11 @@ export const MCQDisplay = ({
 
   const handleAnswerSelect = (answer: string) => {
     if (showExplanation) return;
+    hasUserInteractedRef.current = true;
     setSelectedAnswer(answer);
     if (effectiveQuickSubmit) setTimeout(() => handleSubmitAnswer(false, answer), 150);
   };
+  answerSelectImplementationRef.current = handleAnswerSelect;
 
   const handleSubmitAnswer = async (timeUp = false, providedAnswer?: string) => {
     if (!currentMCQ || !user || showExplanation || isSubmittingAnswerRef.current) return;
@@ -1078,26 +1085,25 @@ export const MCQDisplay = ({
         subjectIsFreeUnlimited = subjectData?.free_unlimited_access === true;
       }
 
+      let reservedSubmissionCount = dailySubmissionsCount;
       if (userPlanForChatbot === 'free' && !subjectIsFreeUnlimited) {
-        const isNewDay = isNewDayPKT(lastSubmissionResetDate);
-        let currentSubmissions = dailySubmissionsCount;
-        let currentResetDate = lastSubmissionResetDate;
-        if (isNewDay) { currentSubmissions = 0; currentResetDate = new Date().toISOString(); }
-        if (currentSubmissions >= 50) {
+        const reservation = reserveLocalMCQAttempt(
+          user.id,
+          dailySubmissionsCount,
+          lastSubmissionResetDate,
+        );
+        if (!reservation.allowed) {
           setUpgradeModalMessage(
             isOnline
               ? "You've reached the daily limit of 50 free MCQ submissions. Upgrade to a premium plan for unlimited practice!"
-              : "Offline mode: you've reached the locally known daily limit of 50 free MCQ submissions. Reconnect to sync your latest progress or upgrade for unlimited practice."
+              : "Offline mode: you've reached today's limit of 50 free MCQ submissions. Reconnect or upgrade for unlimited practice."
           );
           setShowUpgradeModal(true);
           return;
         }
-        const { error: limitUpdateError } = await supabase.from('profiles').update({ daily_mcq_submissions: currentSubmissions + 1, last_submission_reset_date: currentResetDate }).eq('id', user.id);
-        if (limitUpdateError && !isOnline) {
-          console.warn('Daily MCQ limit update deferred in offline mode:', limitUpdateError);
-        }
-        setDailySubmissionsCount(currentSubmissions + 1);
-        setLastSubmissionResetDate(currentResetDate);
+        reservedSubmissionCount = reservation.count;
+        setDailySubmissionsCount(reservation.count);
+        setLastSubmissionResetDate(new Date().toISOString());
       }
       const answer = timeUp ? '' : (providedAnswer || selectedAnswer);
       const timeTaken = Math.floor((Date.now() - startTime) / 1000);
@@ -1120,35 +1126,89 @@ export const MCQDisplay = ({
         is_correct: isCorrect,
         time_taken: timeTaken,
         used_ai_help: usedAiHelp,
-        correction_mode: mistakeMode
+        correction_mode: mistakeMode,
+        client_attempt_id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `${user.id}:${currentMCQ.id}:${Date.now()}`,
       };
+      clearPreparedMCQQuiz({
+        chapterId: chapter,
+        userId: user.id,
+        mistakeMode,
+        mistakeMcqIds,
+      });
 
-      try {
-        const { error } = await supabase.from('user_answers').insert(answerRow);
-        if (error) throw error;
-        notifyAchievementProgress('mcq_answer');
-      } catch (error) {
-        console.error('Error saving answer, queued for offline sync:', error);
+      setShowExplanation(true);
+
+      const answeredMcqId = currentMCQ.id;
+      void (async () => {
         try {
-          await queueMCQAnswerForSync(answerRow);
-          setQueuedAnswerIds(prev => new Set(prev).add(currentMCQ.id));
-          if (!hasShownOfflineSyncToastRef.current) {
-            hasShownOfflineSyncToastRef.current = true;
-            toast({
-              title: 'Answers saved offline',
-              description: 'Your MCQ attempts will sync automatically when the connection returns.',
+          const countsTowardDailyLimit =
+            userPlanForChatbot === 'free' && !subjectIsFreeUnlimited;
+          const { data: saveResult, error: atomicSaveError } = await supabase.rpc(
+            'save_mcq_answer',
+            {
+              p_answer: answerRow,
+              p_subject_id: subject,
+              p_counts_toward_daily_limit: countsTowardDailyLimit,
+            },
+          );
+
+          if (!atomicSaveError) {
+            const result = saveResult as {
+              quota?: { allowed?: boolean; count?: number };
+            } | null;
+            if (typeof result?.quota?.count === 'number') {
+              const mergedCount = mergeLocalMCQAttemptCount(
+                user.id,
+                result.quota.count,
+                new Date().toISOString(),
+              );
+              setDailySubmissionsCount(mergedCount);
+            }
+            if (result?.quota?.allowed === false) {
+              setLocalMCQAttemptCount(user.id, 50);
+              setDailySubmissionsCount(50);
+            }
+          } else {
+            const { error: batchError } = await supabase.rpc('upsert_mcq_answers', {
+              p_answers: [answerRow],
+            });
+            if (batchError) {
+              const { error: insertError } = await supabase.from('user_answers').insert(answerRow);
+              if (insertError) throw insertError;
+            }
+          }
+          if (atomicSaveError && countsTowardDailyLimit) {
+            await supabase.rpc('reconcile_mcq_submission_count', {
+              p_attempt_date: getPakistanDateKey(),
+              p_count: reservedSubmissionCount,
             });
           }
-        } catch (queueError) {
-          console.error('Error queueing offline answer:', queueError);
-          toast({
-            title: 'Answer not synced',
-            description: 'This answer could not be saved for sync on this device.',
-            variant: 'destructive',
-          });
+          const achievementModule = await import('@/components/profile/AchievementBadges');
+          achievementModule.notifyAchievementProgress('mcq_answer');
+        } catch (error) {
+          console.error('Error saving answer, queued for offline sync:', error);
+          try {
+            await queueMCQAnswerForSync(answerRow);
+            setQueuedAnswerIds((previous) => new Set(previous).add(answeredMcqId));
+            if (!hasShownOfflineSyncToastRef.current) {
+              hasShownOfflineSyncToastRef.current = true;
+              toast({
+                title: 'Answers saved offline',
+                description: 'Your MCQ attempts will sync automatically when the connection returns.',
+              });
+            }
+          } catch (queueError) {
+            console.error('Error queueing offline answer:', queueError);
+            toast({
+              title: 'Answer not synced',
+              description: 'This answer could not be saved for sync on this device.',
+              variant: 'destructive',
+            });
+          }
         }
-      }
-      setShowExplanation(true);
+      })();
     } finally {
       isSubmittingAnswerRef.current = false;
       setIsSubmittingAnswer(false);
@@ -1165,7 +1225,6 @@ export const MCQDisplay = ({
       setScore(0);
       setSelectedAnswer(null);
       setShowExplanation(false);
-      setTimeLeft(timePerQuestion);
       setStartTime(Date.now());
 
       // Clear persistence
@@ -1182,11 +1241,11 @@ export const MCQDisplay = ({
   };
 
   const handleNextQuestion = () => {
+    hasUserInteractedRef.current = true;
     if (currentQuestionIndex < totalQuestions - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
       setSelectedAnswer(null);
       setShowExplanation(false);
-      setTimeLeft(timePerQuestion);
       setStartTime(Date.now());
     } else {
       toast({ title: "🎉 Quiz Completed!", description: `You scored ${score}/${totalQuestions}`, className: "bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0" });
@@ -1205,15 +1264,26 @@ export const MCQDisplay = ({
     try {
       if (isCurrentMCQSaved) {
         await supabase.from('saved_mcqs').delete().eq('user_id', user.id).eq('mcq_id', currentMCQ.id);
-        setIsCurrentMCQSaved(false);
+        setSavedMcqIds((previous) => {
+          const next = new Set(previous);
+          next.delete(currentMCQ.id);
+          return next;
+        });
         toast({ title: "📚 MCQ Unsaved", description: "Removed from your bookmarks" });
       } else {
         await supabase.from('saved_mcqs').insert({ user_id: user.id, mcq_id: currentMCQ.id });
-        notifyAchievementProgress('saved_mcq');
-        setIsCurrentMCQSaved(true);
+        const achievementModule = await import('@/components/profile/AchievementBadges');
+        achievementModule.notifyAchievementProgress('saved_mcq');
+        setSavedMcqIds((previous) => new Set(previous).add(currentMCQ.id));
         toast({ title: "⭐ MCQ Saved!", description: "Added to your bookmarks" });
       }
-    } catch (error) { }
+    } catch {
+      toast({
+        title: "Could not update bookmark",
+        description: "Please check your connection and try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleReportSubmit = async ({ category, reason }: { category: string; reason: string }) => {
@@ -1230,6 +1300,7 @@ export const MCQDisplay = ({
 
   const goToQuestion = (index: number) => {
     setCurrentQuestionIndex(index);
+    setStartTime(Date.now());
     setIsDrawerOpen(false);
     if (contentRef.current) {
       contentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1268,7 +1339,11 @@ export const MCQDisplay = ({
     setReferenceActionError('');
     setOfflineReferenceMessage('');
     setIsReferenceModalOpen(true);
-    await search(currentMCQ.question, 5);
+    const [cached] = await Promise.all([
+      readCachedVerification(),
+      search(currentMCQ.question, 5),
+    ]);
+    if (cached) setReferenceVerification(cached);
   };
 
   const getFallbackConfirmedReferenceIndexes = (references = referenceResults) => {
@@ -1354,6 +1429,12 @@ export const MCQDisplay = ({
         : [];
       const shouldAutoReport = verdict === 'incorrect' || parsed?.markedAnswerWrong === true;
       let autoReported = false;
+      const normalizedSummary = String(parsed?.summary || '').trim();
+      const summary = verdict === 'verified' && isExternalVerification(sourceBasis)
+        ? normalizedSummary.startsWith(EXTERNAL_VERIFIED_PREFIX)
+          ? normalizedSummary
+          : `${EXTERNAL_VERIFIED_PREFIX}${normalizedSummary ? ` ${normalizedSummary}` : ''}`
+        : normalizedSummary;
 
       setConfirmedReferenceIndexes(finalIndexes);
       if (shouldAutoReport) {
@@ -1367,7 +1448,7 @@ export const MCQDisplay = ({
       const verification = {
         verdict,
         sourceBasis,
-        summary: parsed?.summary || '',
+        summary,
         citations,
         correctAnswerSuggestion: parsed?.correctAnswerSuggestion || '',
         markedAnswerWrong: parsed?.markedAnswerWrong === true,
@@ -1516,20 +1597,22 @@ export const MCQDisplay = ({
   }, [currentQuestionIndex]);
 
   useEffect(() => {
-    if (showExplanation) {
-      loadQuestionFeedback();
-      readCachedVerification().then(cached => {
-        if (cached) setReferenceVerification(cached);
-      });
-    }
-  }, [showExplanation, currentMCQ?.id]);
-
-  useEffect(() => {
-    if (profile && !profileLoading) {
-      setDailySubmissionsCount(profile.daily_mcq_submissions || 0);
+    if (profile && !profileLoading && user?.id) {
+      const normalizedPlan = profile.plan?.toLowerCase() || 'free';
+      cacheMCQPlan(user.id, normalizedPlan);
+      setCachedUserPlan(normalizedPlan);
+      setDailySubmissionsCount(mergeLocalMCQAttemptCount(
+        user.id,
+        profile.daily_mcq_submissions || 0,
+        profile.last_submission_reset_date,
+      ));
       setLastSubmissionResetDate(profile.last_submission_reset_date);
     }
-  }, [profile, profileLoading]);
+  }, [profile, profileLoading, user?.id]);
+
+  useEffect(() => {
+    setCachedUserPlan(readCachedMCQPlan(user?.id));
+  }, [user?.id]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1542,6 +1625,19 @@ export const MCQDisplay = ({
     return () => {
       window.removeEventListener('online', updateOnlineStatus);
       window.removeEventListener('offline', updateOnlineStatus);
+    };
+  }, []);
+
+  useEffect(() => {
+    const flushWhenHidden = () => {
+      if (document.visibilityState === 'hidden') {
+        void flushSavedSessions();
+      }
+    };
+    document.addEventListener('visibilitychange', flushWhenHidden);
+    return () => {
+      document.removeEventListener('visibilitychange', flushWhenHidden);
+      void flushSavedSessions();
     };
   }, []);
 
@@ -1568,15 +1664,6 @@ export const MCQDisplay = ({
   }, [showExplanation]);
 
   useEffect(() => {
-    if (!timerEnabled || showExplanation || loading || mcqs.length === 0) return;
-    if (timeLeft <= 0) { handleTimeUp(); return; }
-    const interval = setInterval(() => {
-      setTimeLeft(prev => { if (prev <= 1) { clearInterval(interval); return 0; } return prev - 1; });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [timerEnabled, showExplanation, loading, mcqs.length, timeLeft]);
-
-  useEffect(() => {
     const qId = currentMCQ?.id;
     if (qId && answeredQuestions[qId]) {
       setSelectedAnswer(answeredQuestions[qId].selectedAnswer);
@@ -1589,116 +1676,122 @@ export const MCQDisplay = ({
 
   useEffect(() => {
     if (contentRef.current) {
-      contentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      contentRef.current.scrollTo({ top: 0 });
     }
   }, [currentQuestionIndex]);
 
-  const lastScrollY = useRef(0);
-  const scrollThrottle = useRef(false);
-
   useEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
-    const handleScroll = () => {
-      if (scrollThrottle.current) return;
-      scrollThrottle.current = true;
-      setTimeout(() => { scrollThrottle.current = false; }, 300);
-      const scrollTop = el.scrollTop;
-      const scrollHeight = el.scrollHeight;
-      const clientHeight = el.clientHeight;
-      const distFromBottom = scrollHeight - scrollTop - clientHeight;
-      if (distFromBottom < 60 && scrollTop < lastScrollY.current) {
-        setIsDrawerOpen(true);
-      }
-      lastScrollY.current = scrollTop;
-    };
-    el.addEventListener('scroll', handleScroll, { passive: true });
-    return () => el.removeEventListener('scroll', handleScroll);
-  }, []);
+    let cancelled = false;
 
-  useEffect(() => {
     const loadMCQs = async () => {
       setLoading(true);
-      const chapterMCQs = await fetchMCQsByChapter(chapter);
-      let data = chapterMCQs;
+      setChapterLockMessage(null);
+      setPreparationError(null);
+      if (!user?.id) return;
 
-      if (mistakeMode && user?.id) {
-        let wrongIds = mistakeMcqIds;
-        if (!wrongIds.length && chapterMCQs.length > 0) {
-          const { data: wrongAnswers } = await supabase
-            .from('user_answers')
-            .select('mcq_id')
-            .eq('user_id', user.id)
-            .eq('is_correct', false)
-            .in('mcq_id', chapterMCQs.map(m => m.id));
-
-          wrongIds = [...new Set((wrongAnswers || []).map(answer => answer.mcq_id).filter(Boolean))];
-        }
-
-        const wrongSet = new Set(wrongIds);
-        data = chapterMCQs.filter(mcq => wrongSet.has(mcq.id));
-      }
-
-      // Load previous answers for this chapter
-      let firstUnattemptedIndex = 0;
-      const answerMap: Record<string, { selectedAnswer: string }> = {};
-
-      data.forEach(mcq => {
-        const selectedAnswer = (mcq as any).selected_answer || (mcq as any).selectedAnswer;
-        if (selectedAnswer) answerMap[mcq.id] = { selectedAnswer };
+      const preparedQuiz = await prepareMCQQuiz({
+        chapterId: chapter,
+        userId: user.id,
+        mistakeMode,
+        mistakeMcqIds: mistakeMcqIdsKey ? mistakeMcqIdsKey.split('|') : [],
       });
+      if (cancelled) return;
 
-      if (user?.id && !mistakeMode && data.length > 0) {
-        const mcqIds = data.map(m => m.id);
-        const { data: previousAnswers } = await supabase
-          .from('user_answers')
-          .select('mcq_id, selected_answer, created_at')
-          .eq('user_id', user.id)
-          .in('mcq_id', mcqIds)
-          .order('created_at', { ascending: true });
+      const savedSubject = localStorage.getItem(LAST_ATTEMPTED_SUBJECT_KEY);
+      const savedChapter = localStorage.getItem(LAST_ATTEMPTED_CHAPTER_KEY);
+      const savedIndex = Number(localStorage.getItem(LAST_ATTEMPTED_MCQ_KEY) || 0);
+      const preferredIndex = initialIndex > 0
+        ? initialIndex
+        : savedSubject === subject && savedChapter === chapter
+          ? savedIndex
+          : preparedQuiz.firstUnansweredIndex;
+      const clampedPreferredIndex = Math.min(
+        Math.max(preferredIndex, 0),
+        Math.max(preparedQuiz.questions.length - 1, 0),
+      );
+      const nextUnansweredIndex = preparedQuiz.questions.findIndex(
+        (question, index) => index >= clampedPreferredIndex && !preparedQuiz.answers[question.id],
+      );
+      const resolvedInitialIndex = nextUnansweredIndex >= 0
+        ? nextUnansweredIndex
+        : preparedQuiz.firstUnansweredIndex;
+      const initialQuestion = preparedQuiz.questions[resolvedInitialIndex];
+      const initialAnswer = initialQuestion
+        ? preparedQuiz.answers[initialQuestion.id]?.selectedAnswer
+        : undefined;
 
-        if (previousAnswers) {
-          previousAnswers.forEach(ans => {
-            answerMap[ans.mcq_id] = { selectedAnswer: ans.selected_answer };
-          });
+      setAnsweredQuestions(preparedQuiz.answers);
+      setCurrentQuestionIndex(resolvedInitialIndex);
+      setSelectedAnswer(initialAnswer ?? null);
+      setShowExplanation(Boolean(initialAnswer));
+      setMcqs(preparedQuiz.questions);
+      setStartTime(Date.now());
+      setLoading(false);
+
+      if (preparedQuiz.invalidQuestions.length > 0) {
+        toast({
+          title: preparedQuiz.invalidQuestions.length === 1
+            ? 'Problematic question skipped'
+            : `${preparedQuiz.invalidQuestions.length} problematic questions skipped`,
+          description: 'The question was skipped without affecting your score.',
+        });
+
+        if (user?.id && typeof navigator !== 'undefined' && navigator.onLine) {
+          const invalidIds = preparedQuiz.invalidQuestions.map(mcq => mcq.id).filter(Boolean);
+          if (invalidIds.length > 0) {
+            void (async () => {
+              const { data: existingReports } = await supabase
+                .from('reported_questions')
+                .select('mcq_id')
+                .eq('user_id', user.id)
+                .in('mcq_id', invalidIds);
+              const alreadyReported = new Set((existingReports || []).map((report) => report.mcq_id));
+              const newReports = preparedQuiz.invalidQuestions
+                .filter((mcq) => mcq.id && !alreadyReported.has(mcq.id))
+                .map((mcq) => ({
+                  user_id: user.id,
+                  mcq_id: mcq.id,
+                  reason: 'Auto-report: no valid correct answer could be identified among the available options.',
+                  status: 'pending',
+                }));
+
+              if (newReports.length > 0) {
+                const { error: reportError } = await supabase
+                  .from('reported_questions')
+                  .insert(newReports);
+                if (reportError) console.error('Unable to auto-report invalid MCQs:', reportError);
+              }
+            })();
+          }
         }
-
-        const queuedAnswers = await getQueuedMCQAnswerMap(user.id, mcqIds);
-        Object.assign(answerMap, queuedAnswers);
-
-        setAnsweredQuestions(answerMap);
-
-        const foundIndex = data.findIndex(m => !answerMap[m.id]);
-        if (foundIndex !== -1) firstUnattemptedIndex = foundIndex;
-        else firstUnattemptedIndex = data.length - 1;
       }
-
-      const shuffledMCQs = data.map(mcq => {
-        const shuffledOptions = shuffleArray(mcq.options);
-        return { ...mcq, shuffledOptions, originalCorrectIndex: shuffledOptions.indexOf(mcq.correct_answer) };
-      });
-      setMcqs(shuffledMCQs);
-      if (shuffledMCQs.length === 0) {
+    };
+    void loadMCQs().catch(error => {
+      if (!cancelled) {
+        if (error instanceof ChapterLockedError) {
+          setChapterLockMessage(error.message);
+        } else {
+          setPreparationError(
+            error instanceof Error
+              ? error.message
+              : 'The quiz could not be prepared. Please try again.',
+          );
+        }
         setLoading(false);
       }
-
-      if (initialIndex > 0) {
-        // Find nearest unanswered from initialIndex going forward
-        const nearestForward = data.findIndex((m, i) => i >= initialIndex && !answerMap[m.id]);
-        if (nearestForward !== -1) {
-          setCurrentQuestionIndex(nearestForward);
-        } else {
-          setCurrentQuestionIndex(firstUnattemptedIndex);
-        }
-      } else {
-        setCurrentQuestionIndex(firstUnattemptedIndex);
-      }
-
+    });
+    return () => {
+      cancelled = true;
     };
-    loadMCQs();
-  }, [chapter, user?.id, mistakeMode, mistakeMcqIdsKey, initialIndex]);
+  }, [chapter, user?.id, mistakeMode, mistakeMcqIdsKey, initialIndex, subject, toast, preparationAttempt]);
 
   useEffect(() => {
+    if (initialSubject?.id === subject && initialChapter?.id === chapter) {
+      setDownloadSubject(initialSubject);
+      setDownloadChapter(initialChapter);
+      return;
+    }
+
     let cancelled = false;
 
     const loadDownloadContext = async () => {
@@ -1717,14 +1810,7 @@ export const MCQDisplay = ({
     return () => {
       cancelled = true;
     };
-  }, [subject, chapter]);
-
-  // Keep skeleton until shuffled mcqs have been committed to the DOM
-  useEffect(() => {
-    if (loading && mcqs.length > 0) {
-      setLoading(false);
-    }
-  }, [mcqs]);
+  }, [subject, chapter, initialSubject, initialChapter]);
 
   useEffect(() => {
     if (!loading && mcqs.length > 0 && typeof window !== 'undefined' && hasAttemptedAny) {
@@ -1736,15 +1822,25 @@ export const MCQDisplay = ({
   }, [currentQuestionIndex, subject, chapter, loading, mcqs.length, user?.id, hasAttemptedAny]);
 
   useEffect(() => {
-    const checkSavedStatus = async () => {
-      if (!user || !mcqs[currentQuestionIndex]?.id) { setIsCurrentMCQSaved(false); return; }
-      try {
-        const { data } = await supabase.from('saved_mcqs').select('id').eq('user_id', user.id).eq('mcq_id', mcqs[currentQuestionIndex].id).single();
-        setIsCurrentMCQSaved(!!data);
-      } catch (error) { setIsCurrentMCQSaved(false); }
+    if (!user?.id || mcqs.length === 0) {
+      setSavedMcqIds(new Set());
+      return;
+    }
+    let cancelled = false;
+    void supabase
+      .from('saved_mcqs')
+      .select('mcq_id')
+      .eq('user_id', user.id)
+      .in('mcq_id', mcqs.map((mcq) => mcq.id))
+      .then(({ data }) => {
+        if (!cancelled) {
+          setSavedMcqIds(new Set((data || []).map((row) => row.mcq_id)));
+        }
+      });
+    return () => {
+      cancelled = true;
     };
-    if (!loading && mcqs.length > 0) checkSavedStatus();
-  }, [mcqs, currentQuestionIndex, user, loading]);
+  }, [mcqs, user?.id]);
 
   useEffect(() => {
     setReferenceData(null);
@@ -1779,7 +1875,7 @@ export const MCQDisplay = ({
       <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
         {mcqs.map((mcq, index) => (
           <button key={mcq.id}
-            className={`relative w-full h-10 rounded-xl text-sm font-bold transition-all ${
+            className={`relative h-10 w-full rounded-xl text-sm font-bold transition-[background-color,border-color,color,box-shadow] duration-150 ${
               currentQuestionIndex === index
                 ? 'bg-gradient-to-br from-primary to-blue-600 text-white border-transparent shadow-lg shadow-primary/30'
                 : isQuestionAnswered(mcq.id)
@@ -1802,44 +1898,61 @@ export const MCQDisplay = ({
     </>
   );
 
-  if (loading || profileLoading) {
+  if (loading) {
+    return <MCQLoadingSkeleton />;
+  }
+
+  if (chapterLockMessage) {
     return (
-      <div className="fixed inset-0 z-[100] bg-background flex flex-col">
-        {/* Header skeleton */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-slate-800">
-          <div className="flex items-center gap-2">
-            <Skeleton className="w-8 h-8 rounded-lg" />
-            <Skeleton className="h-4 w-24" />
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background p-6 text-center">
+        <div className="w-full max-w-md rounded-3xl border border-amber-500/30 bg-card p-7 shadow-xl">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10">
+            <Lock className="h-8 w-8 text-amber-500" />
           </div>
-          <div className="flex items-center gap-1">
-            <Skeleton className="w-9 h-9 rounded-lg" />
-            <Skeleton className="w-9 h-9 rounded-lg" />
-            <Skeleton className="w-9 h-9 rounded-lg" />
+          <h2 className="mt-5 text-xl font-black text-foreground">Chapter unavailable</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            {chapterLockMessage}
+          </p>
+          <Button onClick={onBack} className="mt-6 w-full rounded-xl">
+            Choose another chapter
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (preparationError) {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background p-6 text-center">
+        <div className="w-full max-w-md rounded-3xl border bg-card p-7 shadow-xl">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10">
+            <AlertTriangle className="h-8 w-8 text-amber-500" />
           </div>
-        </div>
-
-        {/* Progress bar skeleton */}
-        <div className="flex items-center gap-3 px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-slate-800">
-          <Skeleton className="h-4 w-12" />
-          <Skeleton className="flex-1 h-2 rounded-full" />
-        </div>
-
-        {/* Question text skeleton */}
-        <div className="px-4 sm:px-6 py-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
-          <Skeleton className="h-3 w-24 mb-3" />
-          <Skeleton className="h-5 w-full mb-2" />
-          <Skeleton className="h-5 w-3/4" />
-        </div>
-
-        {/* Options skeleton */}
-        <div className="flex-1 px-4 sm:px-6 py-4 space-y-3">
-          <Skeleton className="h-3 w-28 mb-3" />
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="flex items-center gap-3 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-700">
-              <Skeleton className="w-8 h-8 rounded-lg shrink-0" />
-              <Skeleton className="flex-1 h-5" />
-            </div>
-          ))}
+          <h2 className="mt-5 text-xl font-black text-foreground">Quiz could not load</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            {preparationError}
+          </p>
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <Button onClick={onBack} variant="outline" className="rounded-xl">
+              Go back
+            </Button>
+            <Button
+              onClick={() => {
+                if (user?.id) {
+                  clearPreparedMCQQuiz({
+                    chapterId: chapter,
+                    userId: user.id,
+                    mistakeMode,
+                    mistakeMcqIds,
+                  });
+                }
+                setPreparationAttempt(attempt => attempt + 1);
+              }}
+              className="rounded-xl"
+            >
+              Try again
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -1866,20 +1979,46 @@ export const MCQDisplay = ({
     ))
     : [];
   const currentQuestionFeedback = currentMCQ ? questionFeedback[currentMCQ.id] : undefined;
+  const fullName = String(
+    profile?.full_name ||
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.fullName ||
+    'Future Doctor',
+  ).trim();
 
   return (
-    <div className="fixed inset-0 z-[100] bg-background flex flex-col">
+    <div className="fixed inset-0 z-[100] flex flex-col overflow-hidden bg-gradient-to-b from-primary/10 via-background to-background text-foreground dark:from-primary/15 dark:via-background dark:to-background">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-slate-800 bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-        <div className="flex items-center gap-2">
+      <div className="border-b border-border/40 bg-gradient-to-b from-background/95 via-background/90 to-background/75 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-xl sm:px-6">
+        <div className="mx-auto flex w-full max-w-4xl items-center justify-between">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsDrawerOpen(true)}
+            className="h-9 w-9 shrink-0 rounded-xl"
+            aria-label="Open question map"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
           <div className="w-8 h-8 rounded-lg overflow-hidden">
             <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs.App" className="w-full h-full object-contain" />
           </div>
-          <span className="text-xs font-semibold text-primary">Medmacs.App</span>
+          <div className="min-w-0 leading-none">
+            <p className="whitespace-nowrap font-['Syne'] text-[13px] font-extrabold tracking-[-0.035em]">
+              <span className="text-primary">Medmacs</span><span className="text-foreground">.app</span>
+            </p>
+            <p className="mt-1 whitespace-nowrap text-[8px] font-bold leading-none tracking-[0.02em] text-muted-foreground">
+              By HMACS Studios
+            </p>
+          </div>
           {timerEnabled && (
-            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${timeLeft <= 5 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-primary/10 text-primary'}`}>
-              {timeLeft}s
-            </span>
+            <MCQTimer
+              key={`${currentMCQ?.id || currentQuestionIndex}-${timePerQuestion}`}
+              seconds={timePerQuestion}
+              paused={showExplanation || loading}
+              onTimeUp={handleTimeUp}
+            />
           )}
         </div>
         <div className="flex items-center gap-1">
@@ -1895,44 +2034,47 @@ export const MCQDisplay = ({
               <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300">Correction</span>
             </div>
           )}
-          <Button variant="ghost" size="icon" onClick={handleSaveMCQ} className="w-9 h-9 rounded-lg">
+          <Button variant="ghost" size="icon" onClick={handleSaveMCQ} className="w-9 h-9 rounded-lg" aria-label={isCurrentMCQSaved ? 'Remove bookmark' : 'Bookmark question'}>
             {isCurrentMCQSaved ? <BookmarkCheck className="w-4 h-4 fill-primary text-primary" /> : <Bookmark className="w-4 h-4" />}
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setIsDrawerOpen(true)} className="w-9 h-9 rounded-lg">
-            <PanelBottom className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => setShowSettingsModal(true)} className="w-9 h-9 rounded-lg">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setHasOpenedSettingsMenu(true);
+              setShowSettingsModal(true);
+            }}
+            className="w-9 h-9 rounded-lg"
+            aria-label="Open quiz menu"
+          >
             <MoreVertical className="w-4 h-4" />
           </Button>
+        </div>
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div className="relative px-4 sm:px-6 z-50 flex items-center gap-3 py-3 border-b border-slate-200 dark:border-slate-800 bg-background">
-        <span className="text-sm font-bold text-foreground shrink-0">Q{currentQuestionIndex + 1}/{totalQuestions}</span>
-        <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-primary to-blue-500 rounded-full transition-all duration-300" style={{ width: `${progressPercentage}%` }} />
+      <div className="relative z-50 border-b border-border/30 bg-background/75 px-4 py-3 backdrop-blur-lg sm:px-6">
+        <div className="mx-auto flex w-full max-w-4xl items-center gap-3">
+          <span className="shrink-0 text-sm font-black tracking-tight text-foreground">Q{currentQuestionIndex + 1}/{totalQuestions}</span>
+          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-primary/10 ring-1 ring-primary/10">
+            <div className="h-full rounded-full bg-gradient-to-r from-primary to-blue-500 transition-[width] duration-200 ease-out" style={{ width: `${progressPercentage}%` }} />
+          </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div ref={contentRef} className="flex-1 relative z-10 flex flex-col overflow-y-auto">
-        <motion.div
-          key={currentQuestionIndex}
-          initial={{ opacity: 0, x: 30 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.35, ease: "easeOut" }}
-          className="flex flex-col flex-1"
-        >
+      <div ref={contentRef} className="relative z-10 mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-y-auto overscroll-contain">
+        <div key={currentMCQ?.id} className="flex flex-1 flex-col">
             {/* Question Section */}
-            <div className="px-4 sm:px-6 py-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
-              <p className="text-xs font-semibold text-primary mb-2">{mistakeMode ? 'Mistake correction' : 'Question'} {currentQuestionIndex + 1}</p>
-              <h2 className="text-base sm:text-lg font-semibold text-foreground leading-relaxed">{currentMCQ?.question}</h2>
-            </div>
+            <section className="mx-3 mt-3 rounded-2xl border border-border/50 bg-card/80 px-4 py-5 shadow-sm backdrop-blur-sm sm:mx-6 sm:px-6 sm:py-6">
+              <p className="mb-2.5 text-[11px] font-black uppercase tracking-[0.16em] text-primary">{mistakeMode ? 'Mistake correction' : 'Question'} {currentQuestionIndex + 1}</p>
+              <h1 className="text-[1.08rem] font-bold leading-[1.65] tracking-[-0.01em] text-foreground sm:text-xl sm:leading-[1.6]">{currentMCQ?.question}</h1>
+            </section>
 
             {/* Options */}
-            <div className="flex-1 px-4 sm:px-6 py-4 space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground mb-3">Select your answer:</p>
+            <div className="flex-1 space-y-2.5 px-3 py-4 sm:px-6">
+              <p className="mb-3 px-1 text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Select your answer</p>
               {currentMCQ?.shuffledOptions.map((option, index) => {
                 const isSelected = selectedAnswer === option;
                 const isCorrect = option === currentMCQ.correct_answer;
@@ -1943,81 +2085,53 @@ export const MCQDisplay = ({
                   else if (isCorrect) state = 'correct';
                 } else if (isSelected) state = 'selected';
 
-                const getThemeClasses = () => {
-                  if (state === 'correct') return 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300';
-                  if (state === 'incorrect') return 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300';
-                  if (state === 'selected') return 'bg-primary/5 border-primary/30 text-primary dark:text-primary';
-                  return 'bg-background border-slate-200 dark:border-slate-700 text-foreground hover:border-primary/30 hover:bg-slate-50 dark:hover:bg-slate-800/50';
-                };
-
                 const optionAiExplanation = optionExplanations[option];
 
                 return (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, y: 20, scale: 0.97 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ delay: index * 0.08, duration: 0.3, ease: "easeOut" }}
-                  >
-                    <motion.button
-                      onClick={() => handleAnswerSelect(option)}
-                      disabled={showExplanation}
-                      whileHover={!showExplanation ? { scale: 1.02 } : {}}
-                      whileTap={!showExplanation ? { scale: 0.98 } : {}}
-                      className={`w-full p-3 sm:p-4 rounded-xl text-left border transition-all duration-200 flex items-center gap-3 ${getThemeClasses()}`}
-                    >
-                      <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 ${state === 'default' ? 'bg-slate-100 dark:bg-slate-800 text-slate-500' :
-                        state === 'correct' ? 'bg-emerald-500 text-white' :
-                          state === 'incorrect' ? 'bg-red-500 text-white' :
-                            'bg-primary text-white'
-                        }`}>
-                        {String.fromCharCode(65 + index)}
-                      </span>
-                      <span className="flex-1 text-sm sm:text-base font-medium leading-snug">{option}</span>
-                      {showExplanation && (isCorrect || isSelected) && (
-                        isCorrect ? <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" /> : <XCircle className="w-5 h-5 text-red-500 shrink-0" />
-                      )}
-                    </motion.button>
-                    {showExplanation && optionAiExplanation?.explanation && (
-                      <div className={`mx-2 mb-2 mt-2 rounded-xl border p-3 text-xs font-medium leading-relaxed ${
-                        optionAiExplanation.verdict === 'correct'
-                          ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200'
-                          : 'border-red-200 bg-red-50 text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200'
-                      }`}>
-                        <span className="font-black">{optionAiExplanation.verdict === 'correct' ? 'Supported: ' : 'Why wrong: '}</span>
-                        {optionAiExplanation.explanation}
-                      </div>
-                    )}
-                    {showExplanation && isExplainingOptions && !optionAiExplanation?.explanation && (
-                      <div className="mx-2 mb-2 mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/50">
-                        <div className="mb-2 flex items-center gap-2">
-                          <Skeleton className="h-3 w-16 rounded-full" />
-                          <Skeleton className="h-3 w-20 rounded-full" />
-                        </div>
-                        <Skeleton className="h-3 w-full" />
-                        <Skeleton className="mt-2 h-3 w-8/12" />
-                      </div>
-                    )}
-                  </motion.div>
+                  <MCQAnswerOption
+                    key={option}
+                    option={option}
+                    index={index}
+                    state={state}
+                    disabled={showExplanation}
+                    explanation={optionAiExplanation}
+                    isExplaining={isExplainingOptions}
+                    onSelect={stableAnswerSelectRef.current}
+                  />
                 );
               })}
             </div>
 
-            {/* Explanation */}
-            <AnimatePresence>
-              {showExplanation && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
+            {/* Bottom encouragement becomes the explanation after answering. */}
+            <AnimatePresence mode="wait" initial={false}>
+            {!showExplanation ? (
+              <motion.section
+                key="encouragement"
+                initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.25, ease: "easeOut" }}
-                className="px-4 sm:px-6 py-5 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-800"
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.14, ease: 'easeOut' }}
+                className="mx-3 mb-4 rounded-2xl border border-primary/15 bg-primary/[0.055] px-4 py-4 text-center sm:mx-6"
+              >
+                <p className="font-['Syne'] text-sm font-extrabold tracking-tight text-foreground">
+                  Best of luck, <span className="text-primary">{fullName}</span>
+                </p>
+                <p className="mt-1 text-[11px] font-medium text-muted-foreground">Read carefully. Trust your preparation.</p>
+              </motion.section>
+            ) : (
+              <motion.section
+                key="explanation"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.16, ease: 'easeOut' }}
+                className="mx-3 mb-4 rounded-2xl border border-primary/15 bg-card/85 px-4 py-5 shadow-sm sm:mx-6 sm:px-6"
               >
                 <div className="flex items-center gap-2 mb-3">
                   <BookOpen className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-semibold text-primary">Explanation</span>
+                  <span className="text-sm font-black uppercase tracking-[0.08em] text-primary">Explanation</span>
                 </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">{currentMCQ?.explanation || "No explanation provided."}</p>
+                <p className="text-[0.95rem] font-medium leading-7 text-foreground/85 sm:text-base">{currentMCQ?.explanation || "No explanation provided."}</p>
                 {verifiedAgainstBooks.length > 0 && (
                   <div className="mt-3 flex max-w-full flex-nowrap gap-2 overflow-x-auto pb-1">
                     <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
@@ -2078,28 +2192,28 @@ export const MCQDisplay = ({
                     ) : (
                       <Sparkles className="w-4 h-4 mr-2" />
                     )}
-                    {isExplainingOptions ? 'Explaining...' : 'AI Explain'}
+                    {isExplainingOptions ? 'Explaining...' : 'Options Explain'}
                   </Button>
                 </div>
-              </motion.div>
+              </motion.section>
             )}
             </AnimatePresence>
-          </motion.div>
+          </div>
         </div>
 
-      <footer className="relative z-50 px-4 sm:px-6 py-3 pb-[env(safe-area-inset-bottom)] border-t border-slate-200 dark:border-slate-800 bg-background">
-        <div className="flex items-center gap-3">
+      <footer className="relative z-50 border-t border-border/40 bg-gradient-to-t from-background via-background/95 to-background/80 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl sm:px-6">
+        <div className="mx-auto flex w-full max-w-4xl items-center gap-3">
           <Button
             variant="outline"
             onClick={() => {
               if (currentQuestionIndex > 0) {
+                hasUserInteractedRef.current = true;
                 setCurrentQuestionIndex(prevIndex => prevIndex - 1);
-                setTimeLeft(timePerQuestion);
                 setStartTime(Date.now());
               }
             }}
             disabled={currentQuestionIndex === 0}
-            className="w-28 sm:w-32 h-11 rounded-lg font-medium disabled:opacity-50"
+            className="h-12 w-28 rounded-xl font-bold disabled:opacity-50 sm:w-32"
           >
             <ChevronLeft className="w-4 h-4 mr-1" />
             Previous
@@ -2108,7 +2222,7 @@ export const MCQDisplay = ({
           {showExplanation ? (
             <Button
               onClick={handleNextQuestion}
-              className="flex-1 h-11 rounded-lg font-semibold bg-primary hover:bg-primary/90"
+              className="h-12 flex-1 rounded-xl bg-primary font-black shadow-md shadow-primary/15 hover:bg-primary/90"
             >
               {currentQuestionIndex === totalQuestions - 1 ? (
                 <>Finish<Award className="w-4 h-4 ml-2" /></>
@@ -2121,7 +2235,7 @@ export const MCQDisplay = ({
               <Button
                 onClick={() => handleSubmitAnswer()}
                 disabled={!selectedAnswer || isSubmittingAnswer}
-                className="flex-1 h-11 rounded-lg font-semibold bg-primary hover:bg-primary/90 disabled:opacity-50"
+                className="h-12 flex-1 rounded-xl bg-primary font-black shadow-md shadow-primary/15 hover:bg-primary/90 disabled:opacity-50"
               >
                 {isSubmittingAnswer ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -2136,7 +2250,7 @@ export const MCQDisplay = ({
       </footer>
 
       {/* Modals */}
-      <MCQSettingsModal
+      {hasOpenedSettingsMenu && <MCQSettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
         onExit={() => { setShowSettingsModal(false); setShowLeaveModal(true); }}
@@ -2168,11 +2282,11 @@ export const MCQDisplay = ({
         setTheme={setTheme}
         downloadSubject={downloadSubject}
         downloadChapter={downloadChapter}
-      />
-      <LeaveTestModal isOpen={showLeaveModal} onClose={() => setShowLeaveModal(false)} onConfirm={() => { setShowLeaveModal(false); onBack(); }} />
-      <ReportMCQModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} onSubmit={handleReportSubmit} isSubmitting={isReportSubmitting} />
-      <UpgradeAccountModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} onUpgradeClick={handleUpgradeClick} message={upgradeModalMessage} />
-      <ReferenceModal
+      />}
+      {showLeaveModal && <LeaveTestModal isOpen={showLeaveModal} onClose={() => setShowLeaveModal(false)} onConfirm={() => { setShowLeaveModal(false); onBack(); }} />}
+      {showReportModal && <ReportMCQModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} onSubmit={handleReportSubmit} isSubmitting={isReportSubmitting} />}
+      {showUpgradeModal && <UpgradeAccountModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} onUpgradeClick={handleUpgradeClick} message={upgradeModalMessage} />}
+      {isReferenceModalOpen && <ReferenceModal
         isOpen={isReferenceModalOpen}
         onClose={() => setIsReferenceModalOpen(false)}
         references={referenceResults}
@@ -2194,26 +2308,28 @@ export const MCQDisplay = ({
         isPremium={isPremium}
         canUseAiSummary={canUseAiSummary}
         offlineMessage={offlineReferenceMessage}
-      />
-      <QuestionMapDrawer isOpen={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+      />}
+      <MCQQuestionMapDrawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
         <QuestionMapGrid />
-      </QuestionMapDrawer>
+      </MCQQuestionMapDrawer>
 
       {currentMCQ && (
-        <AIChatbot
-          isOpen={isChatbotOpen}
-          onClose={() => setIsChatbotOpen(false)}
-          questionContext={currentMCQ.question}
-          explanationContext={currentMCQ.explanation || ''}
-          currentAnswer={selectedAnswer}
-          correctAnswer={currentMCQ.correct_answer}
-          userPlan={userPlanForChatbot}
-          isHidden={showExplanation || !effectiveQuickSubmit} // Hide when navigation (next/prev) or submit buttons are visible
-          isOnline={isOnline}
-          onOpen={() => setIsChatbotOpen(true)}
-          onQuestionHelp={() => setUsedAiHelpByQuestion(prev => ({ ...prev, [currentMCQ.id]: true }))}
-          prefillPrompt={chatPrefillPrompt}
-        />
+        <Suspense fallback={null}>
+          <LazyAIChatbot
+            isOpen={isChatbotOpen}
+            onClose={() => setIsChatbotOpen(false)}
+            questionContext={currentMCQ.question}
+            explanationContext={currentMCQ.explanation || ''}
+            currentAnswer={selectedAnswer}
+            correctAnswer={currentMCQ.correct_answer}
+            userPlan={userPlanForChatbot}
+            isHidden={showExplanation || !effectiveQuickSubmit}
+            isOnline={isOnline}
+            onOpen={() => setIsChatbotOpen(true)}
+            onQuestionHelp={() => setUsedAiHelpByQuestion(prev => ({ ...prev, [currentMCQ.id]: true }))}
+            prefillPrompt={chatPrefillPrompt}
+          />
+        </Suspense>
       )}
 
     </div>

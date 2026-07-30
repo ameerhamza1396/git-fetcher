@@ -2,6 +2,12 @@ import { getInstituteByCode, isSpecializedTestCode, isSpecializedTestInstitute, 
 
 export const VALID_PROFILE_YEARS = ['1st', '2nd', '3rd', '4th', '5th'];
 
+export const getInstituteYearOptions = (institute?: Pick<Institute, 'years'> | null): string[] => (
+  Array.isArray(institute?.years)
+    ? institute.years.map(item => String(item).trim()).filter(Boolean)
+    : []
+);
+
 export type ProfileCompletionReason =
   | 'missing_profile'
   | 'missing_username'
@@ -44,7 +50,8 @@ export function getProfileCompletion(
     return { complete: false, reason: 'unknown_institute', isSpecializedTest: false };
   }
 
-  if (!isSpecializedTest && !VALID_PROFILE_YEARS.includes(profile.year)) {
+  const yearOptions = getInstituteYearOptions(selectedInstitute);
+  if (yearOptions.length > 0 && !yearOptions.includes(String(profile.year || '').trim())) {
     return { complete: false, reason: 'missing_year', selectedInstitute, isSpecializedTest };
   }
 

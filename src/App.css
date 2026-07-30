@@ -2,10 +2,9 @@
 html,
 body {
   overscroll-behavior-y: none !important;
-  height: 100vh !important;
-  overflow: hidden !important;
-  position: fixed;
-  width: 100wh;
+  min-height: 100vh !important;
+  overflow-x: hidden !important;
+  width: 100vw;
 }
 
 /* Ensure the glass effect can see through the layers */

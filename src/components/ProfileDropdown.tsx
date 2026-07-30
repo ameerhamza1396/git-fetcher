@@ -19,7 +19,8 @@ import {
     LogOut,
     Mail,
     Megaphone,
-    ShieldCheck
+    ShieldCheck,
+    MonitorSmartphone
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useQuery } from '@tanstack/react-query';
@@ -101,6 +102,16 @@ export const ProfileDropdown = () => {
 
                 <DropdownMenuItem onSelect={() => window.dispatchEvent(new Event('open-privacy-preferences'))}>
                     <ShieldCheck className="mr-2 h-4 w-4" /><span>Privacy Preferences</span>
+                </DropdownMenuItem>
+
+                <DropdownMenuItem asChild>
+                    <Link
+                        to="/profile/devices"
+                        className="flex items-center cursor-pointer"
+                    >
+                        <MonitorSmartphone className="mr-2 h-4 w-4" />
+                        <span>Devices & Sessions</span>
+                    </Link>
                 </DropdownMenuItem>
 
                 <DropdownMenuItem asChild>

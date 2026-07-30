@@ -11,6 +11,8 @@ import { CollaborateModal } from '@/components/CollaborateModal';
 import { ChapterDownloadButton } from '@/components/mcq/ChapterDownloadButton';
 import { getOfflineChapterSummaries, subscribeOfflineChapterChanges } from '@/utils/offlineChapters';
 import { useAuth } from '@/hooks/useAuth';
+import { prepareMCQQuiz } from '@/features/mcq/quizBootstrap';
+import { isConstrainedConnection } from '@/utils/networkQuality';
 
 const ChapterProgressDonut = ({
   attempted,
@@ -30,7 +32,7 @@ const ChapterProgressDonut = ({
   const dashOffset = circumference - (percentage / 100) * circumference;
 
   return (
-    <div className="flex shrink-0 flex-col items-center justify-center gap-1">
+    <div className="flex shrink-0 flex-col items-center justify-center">
       <div className="relative h-12 w-12">
         <svg className="-rotate-90 h-12 w-12" viewBox="0 0 48 48" aria-hidden="true">
           <circle
@@ -59,11 +61,6 @@ const ChapterProgressDonut = ({
           </span>
         </div>
       </div>
-      <span className={`text-[9px] font-black uppercase tracking-widest ${
-        isSelected ? 'text-primary' : 'text-muted-foreground/60'
-      }`}>
-        Progress
-      </span>
     </div>
   );
 };
@@ -179,12 +176,14 @@ const MCQChapterSelectionPage = () => {
     setLoading(true);
     setLoadError(false);
     try {
-      const [subjectData, chapters] = await Promise.all([
-        fetchSubjectById(subjectId),
-        fetchChaptersBySubject(subjectId)
-      ]);
-      if (subjectData) setSubject(subjectData);
+      const subjectPromise = fetchSubjectById(subjectId);
+      const chaptersPromise = fetchChaptersBySubject(subjectId);
+
+      const chapters = await chaptersPromise;
       setAllChapters(chapters);
+
+      const subjectData = await subjectPromise;
+      if (subjectData) setSubject(subjectData);
     } catch (error) {
       console.error('Unable to load MCQ chapters:', error);
       setLoadError(true);
@@ -223,6 +222,24 @@ const MCQChapterSelectionPage = () => {
   }, [loadData]);
 
   useEffect(() => {
+    setActiveTab('question_bank');
+    setSelectedChapter(null);
+  }, [subjectId]);
+
+  useEffect(() => {
+    if (loading || loadError || allChapters.length === 0) return;
+    if (chaptersByType.question_bank.length > 0) return;
+
+    setActiveTab('past_paper');
+    setSelectedChapter(null);
+  }, [
+    loading,
+    loadError,
+    allChapters.length,
+    chaptersByType.question_bank.length,
+  ]);
+
+  useEffect(() => {
     loadOfflineAvailability();
     return subscribeOfflineChapterChanges(loadOfflineAvailability);
   }, [loadOfflineAvailability]);
@@ -239,6 +256,14 @@ const MCQChapterSelectionPage = () => {
         state: { subject, chapter: selectedChapter },
       });
     }
+  };
+
+  const prefetchChapter = (chapterId: string, speculative = false) => {
+    if (!user?.id || isOfflineMode || (speculative && isConstrainedConnection())) return;
+    void prepareMCQQuiz({
+      chapterId,
+      userId: user.id,
+    }).catch(() => undefined);
   };
 
   const selectTab = (tab: ChapterTab) => {
@@ -370,9 +395,10 @@ const MCQChapterSelectionPage = () => {
         ) : (
           visibleChapters.map((ch) => {
             const isComingSoon = (ch.mcq_count || 0) === 0;
+            const isLocked = ch.is_locked === true;
             const isSelected = selectedChapter?.id === ch.id;
             const isOfflineUnavailable = isOfflineMode && !offlineChapterIds.has(ch.id);
-            const isDisabled = isComingSoon || isOfflineUnavailable;
+            const isDisabled = isComingSoon || isOfflineUnavailable || isLocked;
             const attemptedCount = attemptedByChapter[ch.id] || 0;
             const totalCount = ch.mcq_count || 0;
             const isFreeUnlimited = subject?.free_unlimited_access === true;
@@ -380,19 +406,33 @@ const MCQChapterSelectionPage = () => {
             return (
               <div
                 key={ch.id}
-                onClick={() => !isDisabled && setSelectedChapter(ch)}
+                onPointerEnter={() => !isDisabled && prefetchChapter(ch.id, true)}
+                onTouchStart={() => !isDisabled && prefetchChapter(ch.id, true)}
+                onClick={() => {
+                  if (isDisabled) return;
+                  prefetchChapter(ch.id);
+                  setSelectedChapter(ch);
+                }}
                 aria-disabled={isDisabled}
-                className={`group relative min-h-[112px] overflow-hidden rounded-2xl border-2 p-4 transition-all duration-300 ${
+                className={`group relative min-h-[128px] overflow-hidden rounded-2xl border-2 p-4 transition-all duration-300 ${
                   isDisabled ? 'opacity-40 cursor-not-allowed grayscale' : 'cursor-pointer'
                 } ${
                   isSelected
-                    ? 'border-primary bg-primary/5 shadow-xl shadow-primary/10'
+                    ? 'border-primary bg-primary/10 shadow-2xl shadow-primary/20 ring-1 ring-primary/30'
                     : 'border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl hover:border-primary/30 hover:bg-primary/5'
                 }`}
               >
+                {isSelected && (
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/12 via-transparent to-primary/5" />
+                )}
                 {isComingSoon && (
                   <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">
                     Coming Soon
+                  </div>
+                )}
+                {isLocked && (
+                  <div className="absolute right-2 top-2 z-20 rounded-full bg-slate-800 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-white">
+                    Locked
                   </div>
                 )}
                 {isOfflineUnavailable && (
@@ -402,7 +442,7 @@ const MCQChapterSelectionPage = () => {
                   </div>
                 )}
 
-                <div className="relative z-10 flex items-center gap-3">
+                <div className="relative z-10 flex items-start gap-3">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center">
                     {!isDisabled && subject ? (
                       <ChapterDownloadButton
@@ -422,31 +462,21 @@ const MCQChapterSelectionPage = () => {
                     )}
                   </div>
 
-                  <div className="min-w-0 flex-1 pr-1">
-                    <h3 className={`text-sm font-black uppercase italic tracking-normal leading-snug transition-colors ${
-                      isSelected ? 'text-primary' : 'text-foreground'
+                  <div className="min-w-0 flex-1 self-stretch pr-1">
+                    <p className={`line-clamp-2 min-h-10 break-words text-base font-black leading-snug transition-colors sm:text-[1.05rem] ${
+                      isSelected ? 'text-primary' : 'text-foreground/90'
                     }`}>
-                      Chapter {ch.chapter_number}
-                    </h3>
-                    <p className="mt-0.5 line-clamp-2 min-h-10 break-words text-sm font-bold leading-snug text-foreground/90">
                       {ch.name}
                     </p>
-                    <p className="mt-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground/70">
-                      {isOfflineMode
-                        ? `${totalCount} questions`
-                        : progressLoading
-                        ? '--/-- questions'
-                        : `${Math.min(attemptedCount, totalCount)}/${totalCount} questions`}
-                    </p>
                     {isFreeUnlimited && (
-                      <p className="mt-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300">
-                        Free · No limits
-                      </p>
+                      <span className="mt-2 inline-flex rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300">
+                        Free
+                      </span>
                     )}
                   </div>
 
                   {!isDisabled && (
-                    <div className="ml-auto flex shrink-0 items-center justify-end">
+                    <div className="ml-auto flex shrink-0 flex-col items-center justify-start text-center">
                       {isOfflineMode ? (
                         <div className="flex w-12 flex-col items-center justify-center">
                           <WifiOff className="mb-1 h-4 w-4 text-amber-600 dark:text-amber-300" />
@@ -455,12 +485,19 @@ const MCQChapterSelectionPage = () => {
                           </span>
                         </div>
                       ) : (
-                        <ChapterProgressDonut
-                          attempted={attemptedCount}
-                          total={totalCount}
-                          isSelected={isSelected}
-                          isLoading={progressLoading}
-                        />
+                        <>
+                          <ChapterProgressDonut
+                            attempted={attemptedCount}
+                            total={totalCount}
+                            isSelected={isSelected}
+                            isLoading={progressLoading}
+                          />
+                          <p className="mt-1 max-w-[4.5rem] text-[9px] font-black uppercase leading-tight tracking-wider text-muted-foreground/70">
+                            {progressLoading
+                              ? '--/-- questions'
+                              : `${Math.min(attemptedCount, totalCount)}/${totalCount} questions`}
+                          </p>
+                        </>
                       )}
                     </div>
                   )}
@@ -470,6 +507,11 @@ const MCQChapterSelectionPage = () => {
                     <CheckCircle2 className="h-3 w-3" />
                     This chapter is available for offline use
                   </div>
+                )}
+                {isLocked && (
+                  <p className="mt-3 line-clamp-2 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                    {ch.lock_message || 'This chapter is temporarily unavailable.'}
+                  </p>
                 )}
               </div>
             );

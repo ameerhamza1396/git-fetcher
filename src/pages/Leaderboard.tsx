@@ -97,7 +97,7 @@ const Leaderboard = () => {
     const { user } = useAuth();
     const [activeScope, setActiveScope] = useState<LeaderboardScope>('pakistan');
     const [activePeriod, setActivePeriod] = useState<LeaderboardPeriod>('all-time');
-    const headerRef = useRef<HTMLElement>(null);
+    const headerRef = useRef<HTMLDivElement>(null);
     const lastScrollY = useRef(0);
     const [headerVisible, setHeaderVisible] = useState(true);
 
@@ -128,7 +128,7 @@ const Leaderboard = () => {
 
     const { data: institutes = [] } = useQuery({
         queryKey: ['leaderboard-institutes'],
-        queryFn: fetchInstitutes,
+        queryFn: () => fetchInstitutes(),
     });
 
     const instituteName = currentProfile?.institute

@@ -56,7 +56,13 @@ public class MetaAppEventsPlugin extends Plugin {
             }
         }
 
-        AppEventsLogger.newLogger(getContext()).logEvent(name, parameters);
+        Double valueToSum = call.getDouble("valueToSum");
+        AppEventsLogger logger = AppEventsLogger.newLogger(getContext());
+        if (valueToSum != null) {
+            logger.logEvent(name, valueToSum, parameters);
+        } else {
+            logger.logEvent(name, parameters);
+        }
         call.resolve();
     }
 }

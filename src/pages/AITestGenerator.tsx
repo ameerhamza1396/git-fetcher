@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { ArrowLeft, ArrowRight, X, Sparkles, CheckCircle, XCircle, PanelLeft } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -17,6 +17,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { Skeleton } from '@/components/ui/skeleton';
 import { motion, AnimatePresence } from 'framer-motion';
 import { aiApiJson } from '@/utils/aiApi';
+import { FlashcardLimitModal, getAiLimitDetails, isAiLimitError } from '@/components/dashboard/personalization/FlashcardLimitModal';
 
 interface Question {
     question: string;
@@ -38,6 +39,7 @@ const topicMapping = (subjectCode: string): string => {
 
 const AITestGenerator: React.FC = () => {
     const { user, loading: authLoading } = useAuth();
+    const navigate = useNavigate();
 
     const { data: profile, isLoading: planLoading } = useQuery({
         queryKey: ['plan_and_year', user?.id],
@@ -66,6 +68,8 @@ const AITestGenerator: React.FC = () => {
     const [revealed, setRevealed] = useState<Record<number, boolean>>({});
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [limitModalOpen, setLimitModalOpen] = useState(false);
+    const [limitDetails, setLimitDetails] = useState(getAiLimitDetails(null));
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const batchTimerRef = useRef<NodeJS.Timeout | null>(null);
     const [showExitConfirm, setShowExitConfirm] = useState(false);
@@ -196,6 +200,13 @@ const AITestGenerator: React.FC = () => {
                 setFetchedCount(prev => Math.min(prev + trimmedQuestions.length, totalQ));
             } catch (e: any) {
                 console.error('AI Test Generation Error:', e);
+                if (isAiLimitError(e)) {
+                    setLimitDetails(getAiLimitDetails(e, profile?.plan || 'free', totalQ));
+                    setLimitModalOpen(true);
+                    setLoading(0);
+                    if (timerRef.current) clearInterval(timerRef.current);
+                    return;
+                }
                 let errorMessage = 'Something went wrong. Please try again.';
                 if (e.message.includes('network') || e.message.includes('fetch')) {
                     errorMessage = 'Network error. Please check your connection and try again.';
@@ -995,6 +1006,19 @@ const AITestGenerator: React.FC = () => {
                             </div>
                         </div>
                     )}
+                    <FlashcardLimitModal
+                        open={limitModalOpen}
+                        onOpenChange={setLimitModalOpen}
+                        plan={limitDetails.plan}
+                        limit={limitDetails.limit}
+                        period={limitDetails.period}
+                        limitKind={limitDetails.limitKind}
+                        featureLabel="AI Test Generator"
+                        onUpgrade={() => {
+                            setLimitModalOpen(false);
+                            navigate('/pricing');
+                        }}
+                    />
                 </div>
             </main>
         </div>

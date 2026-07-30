@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { ProfileDropdown } from '@/components/ProfileDropdown'; // NEW: Import ProfileDropdown
 import PlanBadge from '@/components/PlanBadge';
+import { getUsernameValidationError, isUsernameConflict, normalizeUsername } from '@/utils/username';
 
 
 const UsernamePage = () => {
@@ -83,11 +84,12 @@ const UsernamePage = () => {
     queryKey: ['checkUsernameAvailability', debouncedUsername],
     queryFn: async () => {
       // Only check if it's a new username and not empty
-      if (!debouncedUsername.trim() || debouncedUsername.trim() === profile?.username) return false;
+      const username = normalizeUsername(debouncedUsername);
+      if (!username || username === normalizeUsername(profile?.username || '')) return false;
       const { data, error } = await supabase
         .from('profiles')
         .select('username')
-        .eq('username', debouncedUsername)
+        .ilike('username', username)
         .limit(1);
       if (error) throw new Error('Failed to check username availability.');
       return data.length > 0;
@@ -95,8 +97,8 @@ const UsernamePage = () => {
     enabled:
       !!debouncedUsername.trim() &&
       debouncedUsername.trim().length >= 3 &&
-      /^[a-zA-Z0-9_]*$/.test(debouncedUsername.trim()) &&
-      debouncedUsername.trim() !== profile?.username &&
+      !getUsernameValidationError(debouncedUsername) &&
+      normalizeUsername(debouncedUsername) !== normalizeUsername(profile?.username || '') &&
       isEditingUsername, // Only check availability if in editing mode
   });
 
@@ -104,13 +106,10 @@ const UsernamePage = () => {
     // Only show availability messages if in editing mode
     if (!isEditingUsername) return;
 
-    if (!newUsername.trim()) { // Use newUsername here, not debounced, for immediate feedback
-      setUsernameMessage({ type: 'error', text: 'Username cannot be empty.' });
-    } else if (newUsername.trim().length < 3) {
-      setUsernameMessage({ type: 'error', text: 'Username must be at least 3 characters long.' });
-    } else if (!/^[a-zA-Z0-9_]*$/.test(newUsername.trim())) {
-      setUsernameMessage({ type: 'error', text: 'Username can only contain letters, numbers, and underscores.' });
-    } else if (newUsername.trim() === profile?.username) {
+    const validationError = getUsernameValidationError(newUsername);
+    if (validationError) {
+      setUsernameMessage({ type: 'error', text: validationError });
+    } else if (normalizeUsername(newUsername) === normalizeUsername(profile?.username || '')) {
       setUsernameMessage({ type: 'success', text: 'This is your current username.' }); // More descriptive message
     } else if (usernameCheckError) {
       setUsernameMessage({ type: 'error', text: usernameCheckError.message || 'Error checking username.' });
@@ -133,7 +132,9 @@ const UsernamePage = () => {
         .from('profiles')
         .update({ username, updated_at: new Date().toISOString() })
         .eq('id', user.id);
-      if (error) throw new Error(error.message || 'Failed to update username.');
+      if (error) {
+        throw new Error(isUsernameConflict(error) ? 'This username is already taken.' : error.message || 'Failed to update username.');
+      }
       return data;
     },
     onSuccess: () => {
@@ -154,7 +155,7 @@ const UsernamePage = () => {
   });
 
   const handleUsernameChange = (e) => {
-    const value = e.target.value;
+    const value = e.target.value.toLowerCase();
     setNewUsername(value);
     setUsernameUpdatedSuccessfully(false); // Reset this flag if user starts typing again
   };
@@ -162,10 +163,8 @@ const UsernamePage = () => {
   const isButtonDisabled = () => {
     if (!isEditingUsername) return false; // If not in editing mode, the button's purpose changes (Go to Dashboard)
 
-    const isInvalid = !newUsername.trim() ||
-      newUsername.trim().length < 3 ||
-      !/^[a-zA-Z0-9_]*$/.test(newUsername.trim()) ||
-      newUsername.trim() === profile?.username; // Cannot update to the same username
+    const isInvalid = !!getUsernameValidationError(newUsername) ||
+      normalizeUsername(newUsername) === normalizeUsername(profile?.username || ''); // Cannot update to the same username
 
     return (
       isProfileLoading ||
@@ -186,7 +185,7 @@ const UsernamePage = () => {
 
     // Otherwise, proceed with update
     setIsSubmitting(true);
-    updateUsernameMutation.mutate(newUsername.trim());
+    updateUsernameMutation.mutate(normalizeUsername(newUsername));
   };
 
   // Helper to determine if we should show the "Go to Dashboard" button (or the confirmed username message)
@@ -255,6 +254,9 @@ const UsernamePage = () => {
                       value={newUsername}
                       onChange={handleUsernameChange}
                       placeholder="Enter new username"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       className="mt-2 w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
                       disabled={isProfileLoading || isSubmitting || !isEditingUsername} // Disable if not in editing mode
                     />
@@ -300,7 +302,7 @@ const UsernamePage = () => {
               <p className="font-medium mb-2">Important Information:</p>
               <ul className="space-y-1 text-xs">
                 <li>• Your username must be unique.</li>
-                <li>• It can only contain letters, numbers, and underscores.</li>
+                <li>• Use lowercase letters, numbers, underscores, hyphens, or periods only.</li>
                 <li>• It must be at least 3 characters long.</li>
                 <li>• Changes to your username will be reflected immediately.</li>
                 <li>• You can change your username at any time.</li>

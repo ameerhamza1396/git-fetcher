@@ -1,7 +1,6 @@
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { CapacitorUpdater, type BundleInfo, type DownloadEvent } from '@capgo/capacitor-updater';
-import { supabase } from '@/integrations/supabase/client';
 
 export type OtaUpdatePhase = 'idle' | 'checking' | 'downloading' | 'preparing' | 'installing' | 'complete' | 'failed' | 'error';
 
@@ -28,6 +27,7 @@ type OtaLatestResponse =
     };
 
 const OTA_CHANNEL = import.meta.env.VITE_OTA_CHANNEL || 'production';
+const MEDMACS_API_BASE_URL = (import.meta.env.VITE_MEDMACS_API_BASE_URL || 'https://medmacs.ameerhamza1396.workers.dev').replace(/\/+$/, '');
 const INSTALL_ID_KEY = 'medmacs_ota_install_id';
 const FAILED_VERSIONS_KEY = 'medmacs_ota_failed_versions';
 const INSTALLING_VERSION_KEY = 'medmacs_ota_installing_version';
@@ -231,18 +231,23 @@ export const initializeOtaUpdates = async () => {
       platform: Capacitor.getPlatform(),
     });
 
-    const { data, error } = await supabase.functions.invoke<OtaLatestResponse>('ota-latest', {
-      body: {
+    const response = await fetch(`${MEDMACS_API_BASE_URL}/api/ota/latest`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         platform: Capacitor.getPlatform(),
         nativeVersionCode,
         currentBundleVersion,
         failedBundleVersions,
         channel: OTA_CHANNEL,
         installId: getInstallId(),
-      },
+      }),
     });
 
-    if (error) throw error;
+    if (!response.ok) throw new Error(`OTA check failed with status ${response.status}`);
+    const data = await response.json() as OtaLatestResponse;
     recordDiagnostic('server_check_response', { data });
     if (!data?.available) {
       if (currentState.phase === 'checking') {

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,9 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import Seo from '@/components/Seo';
 import PageSkeleton from '@/components/skeletons/PageSkeleton';
+import { useConsent } from '@/components/consent/ConsentProvider';
+import { trackMetaAddToCart } from '@/utils/metaAppEvents';
+import { trackGoogleAddToCart } from '@/utils/googleAnalytics';
 
 interface SupabasePlan {
     id: string;
@@ -93,7 +95,8 @@ const EcgLine = ({ className = '' }: { className?: string }) => (
 );
 
 const Pricing = () => {
-    const { user, isLoading: isAuthLoading } = useAuth();
+    const { user, loading: isAuthLoading } = useAuth();
+    const { measurementAllowed } = useConsent();
     const [isMonthly, setIsMonthly] = useState(true);
     const [activePlanId, setActivePlanId] = useState<string>('free');
     const [headerVisible, setHeaderVisible] = useState(true);
@@ -453,6 +456,23 @@ const Pricing = () => {
                                             <Link
                                                 to={plan.id === 'free' ? '/dashboard' : '/checkout'}
                                                 className="block"
+                                                onClick={() => {
+                                                    if (plan.id === 'free') return;
+                                                    const selectedPlan = {
+                                                        planId: plan.id,
+                                                        planName: plan.display,
+                                                        price: Number(displayPrice.replace(/,/g, '')) || 0,
+                                                        billingPeriod: isMonthly ? 'monthly' : 'yearly',
+                                                    } as const;
+                                                    void trackMetaAddToCart({
+                                                        ...selectedPlan,
+                                                        marketingConsent: measurementAllowed,
+                                                    });
+                                                    trackGoogleAddToCart({
+                                                        ...selectedPlan,
+                                                        analyticsConsent: measurementAllowed,
+                                                    });
+                                                }}
                                                 state={plan.id === 'free' ? undefined : {
                                                     planName: plan.display,
                                                     price: displayPrice,

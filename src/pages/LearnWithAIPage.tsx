@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MCQPageLayout } from '@/pages/mcq/MCQPageLayout';
 import { fetchChaptersBySubject, fetchMCQsByChapter, fetchSubjects, Chapter, MCQ, Subject } from '@/utils/mcqData';
-import { FlashcardLimitModal } from '@/components/dashboard/personalization/FlashcardLimitModal';
+import { FlashcardLimitModal, getAiLimitDetails, isAiLimitError } from '@/components/dashboard/personalization/FlashcardLimitModal';
 import { fetchReferenceSnippet } from '@/components/dashboard/personalization/personalizationUtils';
 import { recordGeneratedFlashcards } from '@/components/profile/AchievementBadges';
 import { useAuth } from '@/hooks/useAuth';
@@ -147,7 +147,7 @@ const LearnWithAIPage = () => {
   const [cardsLoading, setCardsLoading] = useState(false);
   const [flashcardModalOpen, setFlashcardModalOpen] = useState(false);
   const [limitModalOpen, setLimitModalOpen] = useState(false);
-  const [limitDetails, setLimitDetails] = useState({ plan: 'free', limit: 2 });
+  const [limitDetails, setLimitDetails] = useState(getAiLimitDetails(null));
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['profile', user?.id, 'learn-ai'],
@@ -235,7 +235,13 @@ const LearnWithAIPage = () => {
       setFlashcards(nextCards);
       await recordGeneratedFlashcards(user?.id, nextCards.length);
       setBatchIndex(nextIndex);
-    } catch {
+    } catch (error) {
+      if (isAiLimitError(error)) {
+        setFlashcardModalOpen(false);
+        setLimitDetails(getAiLimitDetails(error, userPlan, 2));
+        setLimitModalOpen(true);
+        return;
+      }
       const sourceMcqs = flashcardSourceMcqs.length ? flashcardSourceMcqs : await loadSourceMcqs(scope);
       setFlashcardSourceMcqs(sourceMcqs);
       const nextCards = buildFallbackCards(sourceMcqs, nextIndex, allowedCount);
@@ -528,6 +534,9 @@ const LearnWithAIPage = () => {
         onOpenChange={setLimitModalOpen}
         plan={limitDetails.plan}
         limit={limitDetails.limit}
+        period={limitDetails.period}
+        limitKind={limitDetails.limitKind}
+        featureLabel="Dr Ahroid flashcards"
         onUpgrade={() => {
           setLimitModalOpen(false);
           navigate('/pricing');

@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getLocalMCQAttemptCount, getPakistanDateKey } from '@/utils/mcqAttemptQuota';
 
 type QueuedMCQAnswer = {
   id: string;
@@ -9,6 +10,7 @@ type QueuedMCQAnswer = {
   time_taken: number;
   used_ai_help: boolean;
   correction_mode: boolean;
+  client_attempt_id: string;
   queued_at: string;
 };
 
@@ -18,6 +20,7 @@ const ANSWER_STORE = 'mcq_answers';
 const SYNC_EVENT = 'medmacs-offline-answers-changed';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
+const DB_OPEN_TIMEOUT_MS = 3000;
 
 const openDb = () => {
   if (typeof window === 'undefined' || !window.indexedDB) {
@@ -28,6 +31,12 @@ const openDb = () => {
 
   dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
+    let settled = false;
+    const timeoutId = window.setTimeout(() => {
+      settled = true;
+      dbPromise = null;
+      reject(new Error('Offline answer database did not open in time.'));
+    }, DB_OPEN_TIMEOUT_MS);
 
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -38,8 +47,29 @@ const openDb = () => {
       }
     };
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      window.clearTimeout(timeoutId);
+      if (settled) {
+        request.result.close();
+        return;
+      }
+      settled = true;
+      resolve(request.result);
+    };
+    request.onerror = () => {
+      window.clearTimeout(timeoutId);
+      if (settled) return;
+      settled = true;
+      dbPromise = null;
+      reject(request.error);
+    };
+    request.onblocked = () => {
+      window.clearTimeout(timeoutId);
+      if (settled) return;
+      settled = true;
+      dbPromise = null;
+      reject(new Error('Offline answer database is blocked.'));
+    };
   });
 
   return dbPromise;
@@ -85,6 +115,15 @@ const deleteQueuedAnswer = async (id: string) => {
   const db = await openDb();
   const transaction = db.transaction(ANSWER_STORE, 'readwrite');
   transaction.objectStore(ANSWER_STORE).delete(id);
+  await transactionDone(transaction);
+};
+
+const deleteQueuedAnswers = async (ids: string[]) => {
+  if (ids.length === 0) return;
+  const db = await openDb();
+  const transaction = db.transaction(ANSWER_STORE, 'readwrite');
+  const store = transaction.objectStore(ANSWER_STORE);
+  ids.forEach((id) => store.delete(id));
   await transactionDone(transaction);
 };
 
@@ -181,12 +220,33 @@ const saveLatestAnswer = async (answer: QueuedMCQAnswer) => {
 };
 
 export const syncQueuedMCQAnswers = async () => {
-  const queued = await getAllQueuedAnswers();
-  if (queued.length === 0) return { synced: 0, remaining: 0 };
+  const allQueued = await getAllQueuedAnswers();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { synced: 0, remaining: allQueued.length };
+
+  const queued = allQueued.filter(answer => answer.user_id === user.id);
+  if (queued.length === 0) return { synced: 0, remaining: allQueued.length };
 
   let synced = 0;
   const latestQueued = compactLatestAnswers(queued);
   const latestIds = new Set(latestQueued.map(answer => answer.id));
+
+  const batchRows = latestQueued.map(({ id: _id, queued_at: _queuedAt, ...answer }) => answer);
+  const { error: batchError } = await supabase.rpc('upsert_mcq_answers', {
+    p_answers: batchRows,
+  });
+  if (!batchError) {
+    await deleteQueuedAnswers(queued.map((answer) => answer.id));
+    await supabase.rpc('reconcile_mcq_submission_count', {
+      p_attempt_date: getPakistanDateKey(),
+      p_count: getLocalMCQAttemptCount(user.id),
+    });
+    if (queued.length > 0) emitSyncChange();
+    return {
+      synced: latestQueued.length,
+      remaining: allQueued.length - queued.length,
+    };
+  }
 
   for (const answer of latestQueued) {
     const error = await saveLatestAnswer(answer);
@@ -205,5 +265,14 @@ export const syncQueuedMCQAnswers = async () => {
   );
 
   if (synced > 0) emitSyncChange();
-  return { synced, remaining: latestQueued.length - synced };
+  if (synced > 0) {
+    await supabase.rpc('reconcile_mcq_submission_count', {
+      p_attempt_date: getPakistanDateKey(),
+      p_count: getLocalMCQAttemptCount(user.id),
+    });
+  }
+  return {
+    synced,
+    remaining: allQueued.length - queued.length + latestQueued.length - synced,
+  };
 };

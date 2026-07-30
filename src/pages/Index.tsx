@@ -3,100 +3,130 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  ChevronRight, ChevronLeft, BarChart3, Swords,
-  HelpCircle, BookOpen, GraduationCap, BadgeCheck,
-  BrainCircuit, FileCheck2, Crown, ArrowRight
+  ChevronRight, ChevronLeft, HelpCircle, ArrowRight, Stethoscope
 } from "lucide-react";
 import AppTransitionScreen from "@/components/AppTransitionScreen";
 
+const BOTTOM_SAFE_CLEARANCE = "max(12px, env(safe-area-inset-bottom, 0px))";
+const WIZARD_SEEN_KEY = "medmacs.indexWizard.seen.v2";
+const LEGACY_WIZARD_SEEN_KEY = "hasSeenWizard";
+
 const STEPS = [
   {
+    eyebrow: "",
+    title: "Welcome to Medmacs",
+    description: "",
+    mascot: "",
+    action: "intro"
+  },
+  {
     eyebrow: "Welcome to Medmacs",
-    title: "Pakistan's Largest MCQ Library",
+    title: "MBBS, FCPS and NLE Library",
     description: "Built for medical students who want focused practice, stronger recall, and better exam performance.",
-    mascot: "/mascots/Mascot14.png",
-    kind: "library"
+    mascot: "/mascots/Mascot9.png",
+    action: "wave"
   },
   {
     eyebrow: "Study with confidence",
     title: "Live References & Validation",
     description: "Every important MCQ is backed by syllabus books, explanations, and verifiable learning context.",
-    mascot: "/mascots/Mascot9.png",
-    kind: "references"
+    mascot: "/mascots/Mascot13.png",
+    action: "confused"
   },
   {
     eyebrow: "Your AI study partner",
     title: "Meet Dr Ahroid",
     description: "Pakistan's advanced medical AI, trained to explain concepts with the depth and clarity medical students need.",
     mascot: "/mascots/Mascot6.png",
-    kind: "ai"
+    action: "phone"
   },
   {
     eyebrow: "Practice smarter",
     title: "Compete. Analyze. Grow.",
     description: "Turn daily practice into measurable progress with battles, smart tests, rankings, and in-depth analytics.",
-    mascot: "/mascots/Mascot13.png",
-    kind: "growth"
+    mascot: "/mascots/Mascot10.png",
+    action: "stethoscope"
   },
   {
     eyebrow: "Your medical success",
     title: "Starts Today",
     description: "Join Medmacs and build a learning experience around your year, goals, and exam journey.",
-    mascot: "/mascots/Mascot11.png",
-    kind: "start"
+    mascot: "/mascots/Mascot14.png",
+    action: "thumbs"
   }
 ];
 
-function StepVisual({ kind, mascot }: { kind: string; mascot: string }) {
-  if (kind === "library") return <>
-    <img src={mascot} alt="Dr Ahroid welcoming you" className="absolute bottom-8 left-1/2 h-[88%] -translate-x-1/2 object-contain drop-shadow-[0_24px_30px_rgba(0,0,0,.55)]" />
-    <div className="absolute inset-x-4 bottom-1 grid grid-cols-2 gap-2 rounded-2xl border border-teal-400/35 bg-[#031b1d]/90 p-3 shadow-2xl backdrop-blur-xl">
-      <div className="flex min-w-0 items-center gap-2"><BookOpen className="h-7 w-7 shrink-0 text-teal-300"/><div className="min-w-0 leading-none"><b className="block text-xs leading-4 text-white">50,000+</b><span className="block text-[10px] leading-4 text-slate-400">Verified MCQs</span></div></div>
-      <div className="flex min-w-0 items-center gap-2"><GraduationCap className="h-7 w-7 shrink-0 text-cyan-300"/><div className="min-w-0 leading-none"><b className="block text-xs leading-4 text-white">All Institutes</b><span className="block text-[10px] leading-4 text-slate-400">All Exams</span></div></div>
-    </div>
-  </>;
+function StepVisual({ action, mascot }: { action: string; mascot: string }) {
+  const actionMotion = {
+    wave: {
+      animate: { rotate: [0, -2.5, 2.5, -1.5, 0], x: [0, -3, 3, -2, 0] },
+      transition: { delay: .55, duration: 1.1, ease: "easeInOut" as const },
+    },
+    book: {
+      animate: { rotateY: [18, -5, 0], scale: [.9, 1.035, 1] },
+      transition: { delay: .45, duration: .85, ease: "easeOut" as const },
+    },
+    phone: {
+      animate: { scale: [.92, 1.04, 1], rotate: [0, -1.5, 1.5, 0] },
+      transition: { delay: .5, duration: .9, ease: "easeOut" as const },
+    },
+    stethoscope: {
+      animate: { y: [-22, 3, 0], scale: [.94, 1.02, 1] },
+      transition: { delay: .45, duration: .8, ease: "easeOut" as const },
+    },
+    thumbs: {
+      animate: { y: [18, -8, 0], scale: [.88, 1.06, 1] },
+      transition: { delay: .42, duration: .85, ease: "easeOut" as const },
+    },
+    confused: {
+      animate: { rotate: [0, -3, 2, -1, 0], x: [0, -2, 2, 0], scale: [.94, 1.02, 1] },
+      transition: { delay: .45, duration: 1, ease: "easeOut" as const },
+    },
+  }[action] || {
+    animate: { y: [12, 0], scale: [.94, 1] },
+    transition: { delay: .4, duration: .65, ease: "easeOut" as const },
+  };
 
-  if (kind === "references") return <>
-    <div className="absolute right-4 top-3 w-[58%] rotate-2 rounded-lg border border-amber-200/30 bg-gradient-to-br from-[#26372f] to-[#101d19] p-4 shadow-2xl">
-      <div className="text-center font-serif text-[9px] tracking-[.18em] text-amber-200">STANDARD TEXTBOOK</div>
-      <div className="mt-3 text-center font-serif text-xl text-amber-100">MEDICINE</div>
-      <div className="mt-1 text-center text-[8px] text-amber-300/70">LIVE BOOK REFERENCE</div>
-    </div>
-    <img src={mascot} alt="Dr Ahroid checking a reference" className="absolute -bottom-4 -left-8 h-[92%] object-contain drop-shadow-[0_24px_30px_rgba(0,0,0,.55)]" />
-    <div className="absolute bottom-2 right-2 w-[62%] rounded-xl border border-white/15 bg-white/95 p-3 text-[#102527] shadow-2xl">
-      <p className="text-[9px] font-semibold">Which finding best supports the diagnosis?</p>
-      <div className="mt-2 rounded-md bg-teal-100 px-2 py-1.5 text-[9px] font-bold text-teal-900">B. Iron deficiency <BadgeCheck className="float-right h-3 w-3"/></div>
-      <p className="mt-2 flex items-center gap-1 text-[8px] text-slate-600"><FileCheck2 className="h-3 w-3 text-teal-600"/> Validated from syllabus book</p>
-    </div>
-  </>;
-
-  if (kind === "ai") return <>
-    <div className="absolute left-3 top-8 max-w-[58%] rounded-2xl rounded-bl-sm border border-teal-400/40 bg-[#062b2d]/90 px-3 py-2 text-[10px] text-teal-50 shadow-xl">Explain ACE inhibitors in a way I'll remember.</div>
-    <div className="absolute right-3 top-[34%] flex gap-2"><span className="grid h-12 w-12 place-items-center rounded-full border border-cyan-300/40 bg-cyan-400/10"><BrainCircuit className="h-6 w-6 text-cyan-300"/></span><span className="grid h-12 w-12 place-items-center rounded-full border border-teal-300/40 bg-teal-400/10"><BookOpen className="h-6 w-6 text-teal-300"/></span></div>
-    <img src={mascot} alt="Dr Ahroid AI tutor" className="absolute -bottom-10 left-1/2 h-[88%] -translate-x-1/2 object-contain drop-shadow-[0_24px_30px_rgba(0,0,0,.55)]" />
-    <div className="absolute bottom-3 left-3 max-w-[62%] rounded-2xl rounded-bl-sm border border-teal-400/40 bg-[#062b2d]/95 px-3 py-2 text-[9px] leading-relaxed text-teal-50">They block conversion of Angiotensin I to II—lowering vasoconstriction and aldosterone.</div>
-  </>;
-
-  if (kind === "growth") return <>
-    <div className="absolute left-2 top-1 w-[67%] space-y-1.5">
-      {[[Swords,"Battle Mode","1v1, 2v2 & FFA"],[FileCheck2,"AI Tests","Made for your weak areas"],[BarChart3,"Deep Analytics","Find gaps faster"],[Crown,"Leaderboards","Climb and compete"]].map(([Icon,title,sub]: any) => <div key={title} className="flex items-center gap-2 rounded-xl border border-teal-400/15 bg-teal-400/10 px-3 py-2 backdrop-blur"><Icon className="h-5 w-5 text-teal-300"/><div><b className="block text-[10px] text-white">{title}</b><span className="block text-[8px] text-slate-400">{sub}</span></div></div>)}
-    </div>
-    <div className="absolute bottom-3 left-2 grid h-24 w-24 place-items-center rounded-2xl border border-teal-400/25 bg-[#062426]/90">
-      <div className="grid h-16 w-16 place-items-center rounded-full p-[7px]" style={{ background: "conic-gradient(#2dd4bf 0 82%, rgba(45,212,191,.16) 82% 100%)" }}>
-        <div className="grid h-full w-full place-items-center rounded-full bg-[#062426] text-lg font-black text-white">82%</div>
+  return (
+    <motion.div
+      className="relative h-full w-full"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: .28 }}
+    >
+      <div className="absolute inset-0 flex items-center justify-center px-10 pb-1 pt-2">
+        <motion.img
+          src={mascot}
+          alt={`Dr Ahroid ${action}`}
+          initial={{ opacity: 0, y: 18, scale: .92 }}
+          animate={{ opacity: 1, ...actionMotion.animate }}
+          transition={actionMotion.transition}
+          className="h-full w-full object-contain"
+        />
       </div>
-    </div>
-    <img src={mascot} alt="Dr Ahroid showing your progress" className="absolute -bottom-8 -right-10 h-[80%] object-contain drop-shadow-[0_24px_30px_rgba(0,0,0,.55)]" />
-  </>;
-
-  return <>
-    <img src={mascot} alt="Dr Ahroid ready to begin" className="absolute -bottom-10 left-1/2 h-[92%] -translate-x-1/2 object-contain drop-shadow-[0_24px_30px_rgba(0,0,0,.55)]" />
-    <div className="absolute inset-x-3 bottom-2 rounded-2xl border border-teal-400/35 bg-[#031b1d]/95 p-4 shadow-2xl backdrop-blur-xl">
-      <p className="text-sm font-bold text-white">Let's get you started <span aria-hidden>🚀</span></p>
-      <div className="my-3 h-px bg-white/10" />
-      <div className="space-y-2 text-[10px] text-slate-300"><div className="rounded-lg bg-white/5 px-3 py-2">Choose your institute</div><div className="rounded-lg bg-white/5 px-3 py-2">Select your current MBBS year</div></div>
-    </div>
-  </>;
+      {action === "stethoscope" && (
+        <motion.div
+          initial={{ opacity: 0, y: -28, rotate: -12 }}
+          animate={{ opacity: [0, 1, 0], y: [-28, 28, 42], rotate: [-12, 4, 0] }}
+          transition={{ delay: .35, duration: 1, ease: "easeOut" }}
+          className="pointer-events-none absolute left-1/2 top-[22%] -translate-x-1/2 text-teal-600"
+        >
+          <Stethoscope className="h-10 w-10" strokeWidth={1.5} />
+        </motion.div>
+      )}
+      {action === "confused" && (
+        <motion.div
+          initial={{ opacity: 0, y: 8, scale: .8 }}
+          animate={{ opacity: [0, 1, 1, 0], y: [8, -10, -18, -24], scale: [.8, 1, 1, .9] }}
+          transition={{ delay: .55, duration: 1.35, ease: "easeOut" }}
+          className="pointer-events-none absolute right-[26%] top-[20%] text-teal-600"
+        >
+          <HelpCircle className="h-9 w-9" strokeWidth={1.8} />
+        </motion.div>
+      )}
+    </motion.div>
+  );
 }
 
 export default function Welcome() {
@@ -107,13 +137,13 @@ export default function Welcome() {
   const navigate = useNavigate();
 
   const welcomeMascot = useMemo(() => {
-    const avatars = ["Mascot2", "Mascot8", "Mascot9", "Mascot10", "Mascot13", "Mascot14"];
+    const avatars = ["Mascot2", "Mascot9", "Mascot10", "Mascot13", "Mascot14"];
     return `/mascots/${avatars[Math.floor(Math.random() * avatars.length)]}.png`;
   }, []);
 
   useEffect(() => {
     async function checkState() {
-      const hasSeenWizard = localStorage.getItem("hasSeenWizard");
+      const hasSeenWizard = localStorage.getItem(WIZARD_SEEN_KEY);
       const { data } = await supabase.auth.getSession();
       const userExists = !!data?.session;
       setIsLoggedIn(userExists);
@@ -138,7 +168,8 @@ export default function Welcome() {
   };
 
   const completeSetup = () => {
-    localStorage.setItem("hasSeenWizard", "true");
+    localStorage.setItem(WIZARD_SEEN_KEY, "true");
+    localStorage.setItem(LEGACY_WIZARD_SEEN_KEY, "true");
     if (isLoggedIn) navigate("/dashboard", { replace: true });
     else setShowWizard(false);
   };
@@ -157,37 +188,150 @@ export default function Welcome() {
         <motion.div
           key="wizard"
           initial={{ opacity: 1 }} exit={{ opacity: 0, scale: .97 }}
-          className="fixed inset-0 overflow-hidden overscroll-none bg-[#020909] text-white"
+          className="fixed inset-0 overflow-hidden overscroll-none bg-white text-slate-950"
         >
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(13,148,136,.22),transparent_42%),linear-gradient(180deg,#020909_0%,#031416_55%,#020909_100%)]" />
-          <div className="pointer-events-none absolute inset-0 opacity-[.06] [background-image:linear-gradient(rgba(45,212,191,.4)_1px,transparent_1px),linear-gradient(90deg,rgba(45,212,191,.4)_1px,transparent_1px)] [background-size:34px_34px]" />
-
-          <main className="relative z-10 mx-auto flex h-full w-full max-w-md flex-col px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-[max(18px,env(safe-area-inset-top))]">
-            <header className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5"><img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs" className="h-9 w-9 object-contain"/><span className="text-xl font-black tracking-tight">Medmacs.App</span></div>
-              <button onClick={completeSetup} className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.16em] text-slate-400 transition hover:text-white">Skip</button>
-            </header>
+          <main
+            className="relative z-10 mx-auto flex h-full w-full max-w-md flex-col px-5 pt-[max(18px,env(safe-area-inset-top))]"
+            style={{ paddingBottom: BOTTOM_SAFE_CLEARANCE }}
+          >
+            {STEPS[currentStep].action !== "intro" && <motion.header
+              initial={{ opacity: 0, y: -12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: .45, ease: "easeOut" }}
+              className="flex items-center justify-between"
+            >
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: .12, duration: .4 }}
+                className="flex items-center gap-2.5"
+              >
+                <span className="font-['Syne'] text-lg font-extrabold tracking-[-.045em]">
+                  <span className="bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] bg-clip-text text-transparent">Medmacs</span>
+                  <span className="text-slate-950">.app</span>
+                </span>
+              </motion.div>
+              <motion.button
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: .18, duration: .4 }}
+                onClick={completeSetup}
+                className="cursor-pointer rounded-full px-3 py-2 text-xs font-bold text-slate-400 transition-colors hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+              >
+                Skip
+              </motion.button>
+            </motion.header>}
 
             <AnimatePresence mode="wait">
-              <motion.section key={currentStep} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: .28 }} className="flex min-h-0 flex-1 flex-col">
+              <motion.section key={currentStep} initial={{ opacity: 0, x: 28 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -28 }} transition={{ duration: .38, ease: [0.22, 1, 0.36, 1] }} className="relative flex min-h-0 flex-1 flex-col">
+                {STEPS[currentStep].action === "intro" ? (
+                  <div className="relative flex min-w-0 flex-1 flex-col items-center text-center">
+                    <motion.img
+                      src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png"
+                      alt="Medmacs"
+                      initial={{ opacity: 0, y: -8, scale: .92 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: .12, duration: .42, ease: "easeOut" }}
+                      className="fixed left-5 top-[max(18px,env(safe-area-inset-top))] z-20 h-12 w-12 object-contain"
+                    />
+                    <motion.h1
+                      initial={{ opacity: 0, y: 18, filter: "blur(8px)" }}
+                      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                      transition={{ duration: .6, ease: [0.22, 1, 0.36, 1] }}
+                      className="mx-auto mt-auto w-full max-w-[min(360px,calc(100vw-48px))] text-center font-['Syne'] font-extrabold leading-[1.02]"
+                    >
+                      <span className="mx-auto block w-fit text-[clamp(1.9rem,8vw,2.65rem)] tracking-[-.045em] text-slate-950">Welcome to</span>
+                      <span className="mx-auto mt-2 block w-fit max-w-full whitespace-nowrap text-[clamp(1.65rem,7.2vw,2.2rem)] tracking-[-.065em]">
+                        <motion.span
+                          className="inline-block bg-[linear-gradient(90deg,#2dd4bf,#0ea5e9,#22d3ee,#2dd4bf)] bg-[length:220%_100%] bg-clip-text text-transparent"
+                          animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                          transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
+                        >
+                          Medmacs
+                        </motion.span>
+                        <span className="text-slate-950">.app</span>
+                      </span>
+                    </motion.h1>
+                    <motion.button
+                      initial={{ opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: .25, duration: .45, ease: "easeOut" }}
+                      onClick={handleNext}
+                      className="mt-auto w-full cursor-pointer rounded-2xl bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] px-10 py-4 text-base font-extrabold text-white shadow-[0_12px_32px_rgba(14,165,233,.25)] transition-transform hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0ea5e9] focus-visible:ring-offset-2 active:scale-95"
+                    >
+                      Onboard
+                    </motion.button>
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: .55, duration: .45 }}
+                      className="mt-4 shrink-0 text-center text-xs text-slate-400"
+                    >
+                      A project by <span className="font-semibold text-slate-600">HMACS Studios</span>
+                    </motion.p>
+                  </div>
+                ) : (
+                  <>
                 <div className="mx-auto max-w-sm px-2 pt-7 text-center">
-                  <p className="text-[11px] font-black uppercase tracking-[.2em] text-teal-300/75">{STEPS[currentStep].eyebrow}</p>
-                  <h1 className="mt-2 text-[clamp(1.75rem,7vw,2.45rem)] font-black leading-[1.02] tracking-[-.035em] text-white"><span className="bg-gradient-to-r from-white via-teal-100 to-teal-400 bg-clip-text text-transparent">{STEPS[currentStep].title}</span></h1>
-                  <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-slate-400">{STEPS[currentStep].description}</p>
+                  <motion.h1
+                    initial={{ opacity: 0, y: 18, scale: .94, filter: "blur(8px)" }}
+                    animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+                    transition={{ delay: .16, duration: .5, ease: "easeOut" }}
+                    className="font-['Syne'] text-[clamp(1.7rem,6.4vw,2.2rem)] font-extrabold leading-[1.02] tracking-[-.05em] text-slate-950"
+                  >
+                    {STEPS[currentStep].title}
+                  </motion.h1>
+                  <motion.p
+                    initial={{ opacity: 0, y: 14, filter: "blur(6px)" }}
+                    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                    transition={{ delay: .32, duration: .5, ease: [0.22, 1, 0.36, 1] }}
+                    className="mx-auto mt-3 max-w-xs text-sm leading-6 text-slate-500"
+                  >
+                    {STEPS[currentStep].description}
+                  </motion.p>
                 </div>
 
-                <div className="relative mx-auto mt-4 min-h-0 w-full max-w-sm flex-1 overflow-hidden rounded-[2rem] border border-teal-300/15 bg-gradient-to-b from-teal-950/30 to-black/20 shadow-[0_24px_80px_rgba(0,0,0,.45),inset_0_1px_rgba(255,255,255,.04)]">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(20,184,166,.17),transparent_48%)]" />
-                  <StepVisual kind={STEPS[currentStep].kind} mascot={STEPS[currentStep].mascot} />
+                <div className="relative mx-auto mt-2 min-h-0 w-full max-w-sm flex-1 overflow-hidden">
+                  <StepVisual action={STEPS[currentStep].action} mascot={STEPS[currentStep].mascot} />
                 </div>
+                  </>
+                )}
               </motion.section>
             </AnimatePresence>
 
-            <footer className="mt-4 flex items-center justify-between">
-              <button onClick={handleBack} disabled={currentStep === 0} aria-label="Previous step" className="grid h-12 w-12 place-items-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition disabled:invisible"><ChevronLeft className="h-5 w-5"/></button>
-              <div className="flex gap-2">{STEPS.map((_, idx) => <button key={idx} onClick={() => setCurrentStep(idx)} aria-label={`Go to step ${idx + 1}`} className={`h-2 rounded-full transition-all ${idx === currentStep ? "w-7 bg-teal-400" : "w-2 bg-slate-600"}`} />)}</div>
-              <button onClick={handleNext} aria-label={currentStep === STEPS.length - 1 ? "Get started" : "Next step"} className="grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-teal-400 to-teal-600 text-white shadow-[0_10px_30px_rgba(20,184,166,.35)] transition active:scale-95">{currentStep === STEPS.length - 1 ? <ArrowRight className="h-6 w-6"/> : <ChevronRight className="h-7 w-7"/>}</button>
-            </footer>
+            {STEPS[currentStep].action !== "intro" && <footer className="mt-2">
+              <motion.div
+                key={`controls-${currentStep}`}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: .5, duration: .4, ease: "easeOut" }}
+                className="mx-auto flex max-w-[320px] items-center justify-between px-1 py-1.5"
+              >
+                <button onClick={handleBack} disabled={currentStep === 0} aria-label="Previous step" className="grid h-10 w-10 cursor-pointer place-items-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 disabled:invisible">
+                  <ChevronLeft className="h-5 w-5"/>
+                </button>
+                <div className="flex h-8 items-center gap-2.5" aria-label={`Step ${currentStep + 1} of ${STEPS.length}`}>
+                  {STEPS.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setCurrentStep(idx)}
+                      aria-label={`Go to step ${idx + 1}`}
+                      aria-current={idx === currentStep ? "step" : undefined}
+                      className={`cursor-pointer rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
+                        idx === currentStep
+                          ? "h-4 w-4 bg-teal-500"
+                          : idx < currentStep
+                            ? "h-2.5 w-2.5 bg-teal-300 hover:bg-teal-400"
+                            : "h-2.5 w-2.5 bg-slate-200 hover:bg-slate-300"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <button onClick={handleNext} aria-label={currentStep === STEPS.length - 1 ? "Get started" : "Next step"} className="grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-slate-950 text-white transition-colors hover:bg-teal-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white">
+                  {currentStep === STEPS.length - 1 ? <ArrowRight className="h-5 w-5"/> : <ChevronRight className="h-5 w-5"/>}
+                </button>
+              </motion.div>
+            </footer>}
           </main>
         </motion.div>
       ) : (
@@ -206,33 +350,45 @@ export default function Welcome() {
               delay: 0.1
             }
           }}
-          className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#0a2e2e] via-[#0f172a] to-[#020617] overflow-hidden overscroll-none"
+          className="fixed inset-0 flex flex-col items-center justify-center overflow-hidden overscroll-none bg-white text-slate-950"
         >
           {/* Help/Revisit Button */}
           <button
             onClick={restartWizard}
-            className="absolute top-8 right-8 z-50 text-cyan-100/40 hover:text-cyan-400 transition-colors p-2"
+            className="absolute right-8 top-8 z-50 p-2 text-slate-300 transition-colors hover:text-teal-500"
             title="Revisit App Tour"
           >
             <HelpCircle className="w-7 h-7" />
           </button>
 
-          <div className="absolute top-[-10%] left-[-10%] w-72 h-72 bg-[#2dd4bf]/30 rounded-full blur-[80px]" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-[#0ea5e9]/20 rounded-full blur-[100px]" />
-
-          <div className="relative z-10 flex flex-col items-center w-full max-w-sm px-8">
+          <div
+            className="relative z-10 flex min-h-0 w-full max-w-md flex-1 flex-col items-center px-5 pt-[max(18px,env(safe-area-inset-top))]"
+            style={{ paddingBottom: BOTTOM_SAFE_CLEARANCE }}
+          >
             <motion.img
               initial={{ y: 20 }} animate={{ y: 0 }}
-              src={welcomeMascot} alt="Mascot" className="w-40 h-auto drop-shadow-2xl animate-[float_4s_ease-in-out_infinite]"
+              src={welcomeMascot} alt="Mascot" className="mt-auto w-40 h-auto drop-shadow-2xl animate-[float_4s_ease-in-out_infinite]"
             />
             <div className="text-center mt-8">
-              <h1 className="text-4xl font-extrabold text-white">Medmacs<span className="text-[#2dd4bf]">.App</span></h1>
-              <p className="text-cyan-100/70 text-sm uppercase mt-2 font-bold tracking-widest">Master the MBBS Journey</p>
+              <h1 className="whitespace-nowrap font-['Syne'] text-[clamp(2rem,8vw,2.55rem)] font-extrabold tracking-[-.055em]">
+                <motion.span
+                  className="inline-block bg-[linear-gradient(90deg,#2dd4bf,#0ea5e9,#22d3ee,#2dd4bf)] bg-[length:220%_100%] bg-clip-text text-transparent"
+                  animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                  transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  Medmacs
+                </motion.span>
+                <span className="text-slate-950">.app</span>
+              </h1>
+              <p className="mt-2 text-sm font-bold uppercase tracking-widest text-slate-400">Master the Medical Journey</p>
             </div>
-            <div className="mt-12 w-full flex flex-col gap-4">
+            <div className="mt-auto w-full flex flex-col gap-4">
               <button onClick={() => navigate("/signup")} className="w-full py-4 bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-transform">Create Account</button>
-              <button onClick={() => navigate("/login")} className="w-full py-4 bg-white/10 border border-white/20 text-white font-semibold rounded-2xl active:scale-95 transition-transform backdrop-blur-md">Login</button>
+              <button onClick={() => navigate("/login")} className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-4 text-sm font-semibold text-slate-950 shadow-sm transition-transform active:scale-95 sm:text-base">Already have a Medmacs.app account? Login</button>
             </div>
+            <p className="mt-4 shrink-0 text-center text-xs text-slate-400">
+              A project by <span className="font-semibold text-slate-600">HMACS Studios</span>
+            </p>
           </div>
           <style>{`@keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-15px); } }`}</style>
         </motion.div>

@@ -13,7 +13,7 @@
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://www.medmacs.vercel.app" />
+  <meta property="og:url" content="https://medistics.app" />
   <meta property="og:image" content="https://i.postimg.cc/W4m0SDHK/medmacs-poster.png">
   <meta property="og:title" content="Medmacs | Learn MBBS with AI">
   <meta property="og:description" content="Pakistan&#39;s most advanced MBBS Learning platform">
@@ -32,6 +32,18 @@
   <link rel="manifest" href="./manifest.json" />
   <meta name="theme-color" content="#4f46e5" />
   <link rel="apple-touch-icon" href="./icons/icon-192x192.png" />
+  <script>
+    if (!Promise.allSettled) {
+      Promise.allSettled = function (promises) {
+        return Promise.all(Array.prototype.map.call(promises, function (promise) {
+          return Promise.resolve(promise).then(
+            function (value) { return { status: 'fulfilled', value: value }; },
+            function (reason) { return { status: 'rejected', reason: reason }; }
+          );
+        }));
+      };
+    }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700;1,800&family=Sora:wght@500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
@@ -107,25 +119,14 @@
   <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
   <script type="module" src="/src/main.tsx"></script>
 
-  <!-- Register Service Worker -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js')
-          .then(reg => console.log('Service Worker registered', reg))
-          .catch(err => console.log('Service Worker registration failed', err));
-      });
-    }
-  </script>
-
   <!-- Schema.org Structured Data -->
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
       "name": "Medmacs.app",
-      "url": "https://www.medmqcs.vercel.app",
-      "logo": "https://www.medmacs.vercel.app/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png",
+      "url": "https://medistics.app",
+      "logo": "https://medistics.app/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png",
       "description": "Pakistan’s Most Advanced AI-Powered MBBS Learning Platform. Featuring adaptive MCQs, real-time testing, personalized learning paths and national leaderboard.",
       "applicationCategory": "EducationalApplication",
       "operatingSystem": "Web",

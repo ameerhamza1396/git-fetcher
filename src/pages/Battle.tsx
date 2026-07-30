@@ -1,8 +1,7 @@
-// @ts-nocheck
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { BattleLobby } from '@/components/battle/BattleLobby';
-import { BattleRoom } from '@/components/battle/BattleRoom';
+import { BattleRoom, type RoomData } from '@/components/battle/BattleRoom';
 import { BattleGame } from '@/components/battle/BattleGame';
 import { RapidFireGame } from '@/components/battle/RapidFireGame';
 import { BattleResults } from '@/components/battle/BattleResults';
@@ -15,35 +14,6 @@ import Seo from '@/components/Seo';
 import PageSkeleton from '@/components/skeletons/PageSkeleton';
 
 type BattleState = 'lobby' | 'room' | 'game' | 'results';
-
-interface RoomData {
-  id: string;
-  room_code: string;
-  battle_type: '1v1' | '2v2' | 'ffa' | 'rapid_fire';
-  max_players: number;
-  status: 'waiting' | 'in_progress' | 'completed';
-  time_per_question: number;
-  total_questions: number;
-  subject: string;
-  host_id: string;
-  questions: any[] | null;
-  current_question: number;
-  question_started_at?: string | null;
-  win_target?: number | null;
-  winner_user_id?: string | null;
-  winner_team?: number | null;
-  paused_at?: string | null;
-  is_private?: boolean | null;
-  battle_participants: {
-    id: string;
-    user_id: string;
-    username: string;
-    team?: number | null;
-    score: number;
-    is_bot?: boolean | null;
-    bot_accuracy?: number | null;
-  }[];
-}
 
 const Battle: React.FC = () => {
   const { user, loading } = useAuth();
@@ -227,7 +197,7 @@ const Battle: React.FC = () => {
           <BattleRoom roomId={currentRoomId} userId={user.id} onLeave={handleLeaveBattle} onBattleStart={handleBattleStart} />
         )}
         {battleState === 'game' && gameData && gameData.battle_type !== 'rapid_fire' && (
-          <BattleGame roomData={gameData} userId={user.id} onGameComplete={handleGameComplete} onExit={handleLeaveBattle} />
+          <BattleGame roomData={gameData as React.ComponentProps<typeof BattleGame>['roomData']} userId={user.id} onGameComplete={handleGameComplete} onExit={handleLeaveBattle} />
         )}
         {battleState === 'game' && gameData && gameData.battle_type === 'rapid_fire' && (
           <RapidFireGame roomData={gameData as any} userId={user.id} onGameComplete={handleGameComplete} />

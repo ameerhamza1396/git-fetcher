@@ -131,18 +131,13 @@ const MCQSettingsPage = () => {
 
   useEffect(() => {
     if (loading || !chapterId || !user?.id) return;
-    const preloadTimer = window.setTimeout(() => {
-      void Promise.all([
-        import('@/pages/mcq/MCQQuizPage'),
-        prepareMCQQuiz({
-          chapterId,
-          userId: user.id,
-        }),
-      ]).catch(error => {
-        console.warn('MCQ background preparation will retry when the quiz opens.', error);
-      });
-    }, 400);
-    return () => window.clearTimeout(preloadTimer);
+    void Promise.all([
+      import('@/pages/mcq/MCQQuizPage'),
+      prepareMCQQuiz({
+        chapterId,
+        userId: user.id,
+      }),
+    ]).catch(() => undefined);
   }, [chapterId, loading, user?.id]);
 
   const handleStartQuiz = () => {

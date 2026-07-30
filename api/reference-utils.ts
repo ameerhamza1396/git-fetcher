@@ -17,6 +17,7 @@ export interface ReferenceChunk {
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://pxjvltgarzvoptdfdkxq.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_RVLZ7IetJ-w7raWeYGWa5A_5wV4g5rI';
+const REFERENCE_API_URL = process.env.REFERENCE_API_URL || 'https://medmacs-refs-cqd2.onrender.com';
 
 export const CLEAN_BOOK_MAPPINGS: Mapping[] = [
   { source_pattern: '[Medicalstudyzone.com] Pathoma 2023 PDF', canonical_name: 'Pathoma', edition: '2023', page_offset: 0, show_extracted_text: false },
@@ -141,7 +142,7 @@ const readBookReferenceMappings = async () => {
 
 export const fetchReferenceChunks = async (query: string, topK = 5) => {
   const [refRes, mappings] = await Promise.all([
-    fetch('https://reference.medmacs.app/search', {
+    fetch(`${REFERENCE_API_URL}/search`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query, top_k: Math.min(topK, 20) }),

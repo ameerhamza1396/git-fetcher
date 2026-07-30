@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -20,7 +19,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { fetchInstitutes, getInstituteByCode, getInstituteDisplayName, isSpecializedTestInstitute, type Institute } from '@/utils/institutes';
 import PageSkeleton from '@/components/skeletons/PageSkeleton';
 import { useAchievementData } from '@/components/profile/AchievementBadges';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
+import { getUsernameValidationError, isUsernameConflict, normalizeUsername } from '@/utils/username';
 
 const planStyles = {
     free: { gradient: 'from-slate-500 via-slate-600 to-slate-700', icon: Shield, accent: 'bg-slate-300' },
@@ -28,7 +28,9 @@ const planStyles = {
     iconic: { gradient: 'from-rose-600 via-red-600 to-orange-700', icon: Crown, accent: 'bg-amber-400' },
 };
 
-const containerVariants = {
+const easing = [0.25, 0.1, 0.25, 1] as const;
+
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -36,15 +38,15 @@ const containerVariants = {
   },
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 16 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.25, 0.1, 0.25, 1] } },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: easing } },
 };
 
 const Profile = () => {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
-    const { user, isLoading: authLoading } = useAuth();
+    const { user, loading: authLoading } = useAuth();
 
     const [editableProfile, setEditableProfile] = useState({ full_name: '', username: '', year: '' });
     const [loadingUpdateProfile, setLoadingUpdateProfile] = useState(false);
@@ -67,7 +69,7 @@ const Profile = () => {
     };
 
     const { data: profileData, isLoading: profileLoading, isError: profileFetchError, error: profileFetchErrorMessage } = useQuery({
-        queryKey: ['profile', user?.id],
+        queryKey: ['profile-page', user?.id],
         queryFn: async () => {
             if (!user?.id) return null;
             const { data, error } = await supabase.from('profiles').select('id, full_name, username, email, avatar_url, plan, plan_expiry_date, role, year, institute, badges, referral_code, study_path_changed_at').eq('id', user.id).maybeSingle();
@@ -113,6 +115,14 @@ const Profile = () => {
         year: 'numeric',
     });
     const { data: achievementData } = useAchievementData(user?.id);
+
+    useEffect(() => {
+        if (!canChangeStudyPath) {
+            setShowStudyPathModal(false);
+            setStudyPathOtp('');
+            setStudyPathOtpSent(false);
+        }
+    }, [canChangeStudyPath]);
     const achievementStats = achievementData?.stats || {
         lifetimeMcqs: 0, flpCompletions: 0, aiChatSessions: 0, points: 0, accuracy: 0,
     };
@@ -123,22 +133,29 @@ const Profile = () => {
             toast.error("Please fill in all required fields.");
             return;
         }
+        const normalizedUsername = normalizeUsername(editableProfile.username);
+        const usernameValidationError = getUsernameValidationError(normalizedUsername);
+        if (usernameValidationError) {
+            toast.error(usernameValidationError);
+            return;
+        }
         setLoadingUpdateProfile(true);
         try {
-            const { data: existingProfile, error: checkError } = await supabase.from('profiles').select('id').eq('username', editableProfile.username).neq('id', user?.id).maybeSingle();
+            const { data: existingProfile, error: checkError } = await supabase.from('profiles').select('id').ilike('username', normalizedUsername).neq('id', user?.id).maybeSingle();
             if (checkError && checkError.code !== 'PGRST116') throw checkError;
             if (existingProfile) { toast.error("Username already in use."); setLoadingUpdateProfile(false); return; }
             const { error } = await supabase.from('profiles').upsert({
                 id: user?.id, full_name: editableProfile.full_name.trim(),
-                username: editableProfile.username.trim(),
+                username: normalizedUsername,
                 year: selectedSpecializedTest ? null : editableProfile.year.trim(),
                 updated_at: new Date().toISOString()
             }, { onConflict: 'id' });
             if (error) throw error;
             queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+            queryClient.invalidateQueries({ queryKey: ['profile-page', user.id] });
             toast.success("Profile updated successfully.");
         } catch (error) {
-            toast.error(error.message || "Failed to update profile.");
+            toast.error(isUsernameConflict(error) ? 'Username already in use.' : error.message || "Failed to update profile.");
         } finally { setLoadingUpdateProfile(false); }
     };
 
@@ -155,8 +172,22 @@ const Profile = () => {
             toast.error('No email is attached to this account.');
             return;
         }
-        if (!canChangeStudyPath) {
-            toast.error(`You can change this once per week. Try again after ${nextStudyPathChangeLabel}.`);
+        const { data: latestProfile, error: cooldownError } = await supabase
+            .from('profiles')
+            .select('study_path_changed_at')
+            .eq('id', user.id)
+            .maybeSingle();
+        if (cooldownError) {
+            toast.error('Could not verify the institute-change cooldown. Please try again.');
+            return;
+        }
+        const latestChangedAt = latestProfile?.study_path_changed_at ? new Date(latestProfile.study_path_changed_at) : null;
+        const latestNextChangeAt = latestChangedAt && !Number.isNaN(latestChangedAt.getTime())
+            ? new Date(latestChangedAt.getTime() + 7 * 24 * 60 * 60 * 1000)
+            : null;
+        if (latestNextChangeAt && latestNextChangeAt.getTime() > Date.now()) {
+            setShowStudyPathModal(false);
+            toast.error(`You can change this once per week. Try again after ${latestNextChangeAt.toLocaleString()}.`);
             return;
         }
 
@@ -256,19 +287,19 @@ const Profile = () => {
     }
 
     return (
-        <div className="dashboard-modern-font min-h-screen w-full bg-background">
+        <div className="dashboard-modern-font relative flex h-[100dvh] w-full flex-col overflow-hidden bg-gradient-to-b from-background via-primary/[0.055] to-background text-foreground">
             <Seo title="User Profile" description="Manage your Medmacs App profile" canonical="https://medmacs.app/profile" />
 
             {/* Ambient orbs */}
-            <div className="pointer-events-none fixed inset-0 overflow-hidden">
-                <div className="absolute -left-32 top-1/4 h-72 w-72 rounded-full bg-primary/10 blur-[100px]" />
-                <div className="absolute -right-32 top-1/3 h-64 w-64 rounded-full bg-primary/5 blur-[100px]" />
-                <div className="absolute bottom-0 left-1/3 h-56 w-56 rounded-full bg-sky-500/10 blur-[100px]" />
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                <div className="absolute -left-32 -top-24 h-80 w-80 rounded-full bg-primary/15 blur-[110px]" />
+                <div className="absolute -right-32 top-[38%] h-72 w-72 rounded-full bg-sky-500/10 blur-[110px]" />
+                <div className="absolute -bottom-24 left-1/4 h-64 w-64 rounded-full bg-primary/10 blur-[110px]" />
             </div>
 
             {/* Fixed glass header */}
-            <header className="fixed left-0 right-0 top-0 z-50 border-b border-border/30 bg-background/80 pt-[env(safe-area-inset-top)] backdrop-blur-2xl">
-                <div className="flex h-14 items-center justify-between px-5">
+            <header className="fixed inset-x-0 top-0 z-50 border-b border-border/30 bg-background/75 pt-[env(safe-area-inset-top)] backdrop-blur-2xl">
+                <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-5">
                     <Link to="/dashboard" className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground transition-colors hover:bg-muted">
                         <ChevronLeft className="h-5 w-5" />
                     </Link>
@@ -281,8 +312,8 @@ const Profile = () => {
             </header>
 
             {/* Scrollable content */}
-            <div className="px-5 pt-[calc(env(safe-area-inset-top)+3.5rem)] pb-[env(safe-area-inset-bottom)]">
-                <div className="mx-auto max-w-2xl py-6">
+            <div className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-[calc(env(safe-area-inset-top)+3.5rem)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="mx-auto max-w-2xl py-5">
                     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-5">
 
                         {/* Profile hero card */}
@@ -294,7 +325,7 @@ const Profile = () => {
                                 onKeyDown={(event) => {
                                     if (event.key === 'Enter' || event.key === ' ') setShowStatsModal(true);
                                 }}
-                                className={`relative overflow-hidden rounded-[2rem] bg-gradient-to-br ${style.gradient} text-white shadow-2xl active:scale-[0.99] transition-transform cursor-pointer`}
+                                className={`relative overflow-hidden rounded-3xl bg-gradient-to-br ${style.gradient} text-white shadow-xl shadow-primary/10 active:scale-[0.99] transition-transform cursor-pointer`}
                             >
                                 <div className="absolute -bottom-4 -right-4 opacity-[0.1]">
                                     <PlanIcon className="h-28 w-28" />
@@ -332,7 +363,7 @@ const Profile = () => {
                         {/* Referral code card */}
                         {profileData?.referral_code && (
                             <motion.div variants={itemVariants}>
-                                <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700 text-white shadow-2xl shadow-emerald-500/20">
+                                <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700 text-white shadow-xl shadow-emerald-500/15">
                                     <div className="absolute -bottom-5 -right-5 opacity-[0.12]">
                                         <Gift className="h-24 w-24" />
                                     </div>
@@ -375,12 +406,8 @@ const Profile = () => {
 
                         {/* Personal Information card */}
                         <motion.div variants={itemVariants}>
-                            <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-500 via-slate-600 to-slate-700 text-white shadow-2xl p-0.5">
-                                <div className="absolute inset-0 opacity-10" style={{
-                                    backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`,
-                                    maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
-                                }} />
-                                <div className="relative z-10 rounded-[1.9rem] bg-background/95 backdrop-blur-xl p-5">
+                            <div className="relative overflow-hidden rounded-3xl border border-border/40 bg-card/85 shadow-sm backdrop-blur-xl">
+                                <div className="relative z-10 p-5">
                                     <div className="mb-5 flex items-center gap-2">
                                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
                                             <Settings className="h-4 w-4 text-primary" />
@@ -404,15 +431,16 @@ const Profile = () => {
                                             <div className="mt-1.5 flex gap-2">
                                                 <Input id="institute" value={userInstituteName} disabled
                                                     className="h-11 rounded-xl border-border/40 bg-muted/30 text-muted-foreground cursor-not-allowed" />
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    className="h-11 rounded-xl font-bold"
-                                                    onClick={openStudyPathChangeModal}
-                                                    disabled={!canChangeStudyPath}
-                                                >
-                                                    {canChangeStudyPath ? 'Change' : 'Locked'}
-                                                </Button>
+                                                {canChangeStudyPath && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        className="h-11 rounded-xl font-bold"
+                                                        onClick={openStudyPathChangeModal}
+                                                    >
+                                                        Change
+                                                    </Button>
+                                                )}
                                             </div>
                                             <p className="mt-1 text-[10px] text-muted-foreground/60">
                                                 You can change this once per week. Email OTP verification is required.
@@ -432,7 +460,8 @@ const Profile = () => {
                                                 <User className="mr-1 inline h-3 w-3" /> Username *
                                             </Label>
                                             <Input id="username" value={editableProfile.username}
-                                                onChange={(e) => setEditableProfile({ ...editableProfile, username: e.target.value })}
+                                                onChange={(e) => setEditableProfile({ ...editableProfile, username: e.target.value.toLowerCase() })}
+                                                autoCapitalize="none" autoCorrect="off" spellCheck={false}
                                                 className="mt-1.5 h-11 rounded-xl border-border/40 bg-muted/20 text-foreground placeholder:text-muted-foreground/50" required />
                                             <p className="mt-1 text-[10px] text-muted-foreground/60">Displayed on leaderboards</p>
                                         </div>

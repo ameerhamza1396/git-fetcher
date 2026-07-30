@@ -1,84 +1,110 @@
-import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { BrowserRouter as Router, Navigate, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConsentProvider } from '@/components/consent/ConsentProvider';
 import { ThemeProvider, useTheme } from 'next-themes';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as SonnerToaster } from '@/components/ui/sonner';
-import { IonContent, IonPage } from '@ionic/react';
 import { StatusBar, Style } from '@capacitor/status-bar';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 
 // Internal Components & Pages
 import BackHandler from "@/components/backhandler";
 import ScrollToTop from "@/components/ScrollToTop";
 import ConnectionStatusModal from "@/components/ConnectionStatusModal";
-import Index from '@/pages/Index';
-import Login from '@/pages/Login';
-import Signup from '@/pages/Signup';
-import Dashboard from '@/pages/Dashboard';
-import MCQs from '@/pages/MCQs';
-import { MCQSubjectSelectionPage, MCQChapterSelectionPage, MCQSettingsPage, MCQQuizPage } from '@/pages/mcq';
-import Battle from '@/pages/Battle';
-import AI from '@/pages/AI';
-import AITestGeneratorPage from '@/pages/AITestGenerator';
-import AIChatbotPage from '@/pages/AIChatbot';
-import Leaderboard from '@/pages/Leaderboard';
-import Profile from '@/pages/Profile';
-import Pricing from '@/pages/Pricing';
-import TermsAndConditions from '@/pages/TermsAndConditions';
-import PrivacyPolicy from '@/pages/PrivacyPolicy';
-import RefundPolicy from '@/pages/RefundPolicy';
-import DCMAPolicy from '@/pages/DCMAPolicy';
-import Checkout from '@/pages/Checkout';
-import NotFound from '@/pages/NotFound';
-import ChangePassword from '@/pages/ChangePassword';
-import MockTest from '@/pages/MockTest';
-import TestCompletionPage from '@/pages/TestCompletion';
-import VerifyEmail from '@/pages/VerifyEmail';
-import UsernamePage from '@/pages/UsernamePage';
-import AllSetPage from '@/pages/AllSetPage';
-import MockTestResults from '@/pages/MockTestResults';
-import TestCompletion from '@/pages/TestResults';
-import Career from '@/pages/Career';
-import TeachingAmbassadors from '@/pages/TeachingAmbassadors';
-import InternshipApplication from '@/pages/InternshipApplication';
-import SavedMCQsPage from '@/pages/SavedMCQsPage';
-import MistakeBookPage from '@/pages/MistakeBookPage';
-import TitrationPage from '@/pages/TitrationPage';
-import LearnWithAIPage from '@/pages/LearnWithAIPage';
-import Announcements from '@/pages/Announcements';
-import ContactUsPage from '@/pages/ContactUsPage';
-import FLP from '@/pages/FLP';
-import FLPResults from '@/pages/FLPResults';
-import FLPResultDetail from '@/components/FLPResultDetail';
-import FLPTestPage from '@/pages/flp/FLPTestPage';
-import ForgotPassword from '@/pages/ForgotPassword';
-import UpdatePassword from '@/pages/UpdatePassword';
-import SelectYear from '@/pages/SelectYear';
-import Teams from '@/pages/Team';
-import InstallApp from '@/pages/InstallApp';
-import PracticalPage from '@/pages/PracticalPage';
-import SEQs from '@/pages/SEQs';
-import { SEQSubjectSelectionPage, SEQChapterSelectionPage, SEQQuizPage } from '@/pages/seq';
-import PracticalNotesDetails from "@/components/PracticalNotes/PracticalNotesDetails";
-import RedeemCode from '@/pages/RedeemCode';
-import Referrals from '@/pages/Referrals';
-import PurchaseHistory from '@/pages/PurchaseHistory';
-import PaymentFailure from "@/pages/PaymentFailure.tsx";
-import PaymentSuccess from "@/pages/PaymentSuccess.tsx";
-import Setup from "@/pages/SetupPage";
-import DetailedAnalytics from "@/pages/DetailedAnalytics";
+import AppTransitionScreen from '@/components/AppTransitionScreen';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import BlockedUserOverlay from '@/components/auth/BlockedUserOverlay';
-import { AchievementUnlockNotifier } from '@/components/profile/AchievementBadges';
 import { useQuery } from '@tanstack/react-query';
 import OtaUpdateScreen from '@/components/OtaUpdateScreen';
 import OtaDiagnosticsPanel from '@/components/OtaDiagnosticsPanel';
+import DeviceActivityTracker from '@/components/auth/DeviceActivityTracker';
+
+type InstallStatePluginApi = {
+  consumeFreshInstall: () => Promise<{ freshInstall: boolean }>;
+};
+
+const InstallState = registerPlugin<InstallStatePluginApi>('InstallState');
+
+const Index = lazy(() => import('@/pages/Index'));
+const Login = lazy(() => import('@/pages/Login'));
+const Signup = lazy(() => import('@/pages/Signup'));
+const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const MCQSubjectSelectionPage = lazy(() => import('@/pages/mcq/MCQSubjectSelectionPage'));
+const MCQChapterSelectionPage = lazy(() => import('@/pages/mcq/MCQChapterSelectionPage'));
+const MCQSettingsPage = lazy(() => import('@/pages/mcq/MCQSettingsPage'));
+const MCQQuizPage = lazy(() => import('@/pages/mcq/MCQQuizPage'));
+const ChapterLocks = lazy(() => import('@/pages/admin/ChapterLocks'));
+const OtaUpdates = lazy(() => import('@/pages/admin/OtaUpdates'));
+const Battle = lazy(() => import('@/pages/Battle'));
+const AI = lazy(() => import('@/pages/AI'));
+const AITestGeneratorPage = lazy(() => import('@/pages/AITestGenerator'));
+const AIChatbotPage = lazy(() => import('@/pages/AIChatbot'));
+const Leaderboard = lazy(() => import('@/pages/Leaderboard'));
+const Profile = lazy(() => import('@/pages/Profile'));
+const Devices = lazy(() => import('@/pages/Devices'));
+const Pricing = lazy(() => import('@/pages/Pricing'));
+const TermsAndConditions = lazy(() => import('@/pages/TermsAndConditions'));
+const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
+const RefundPolicy = lazy(() => import('@/pages/RefundPolicy'));
+const DCMAPolicy = lazy(() => import('@/pages/DCMAPolicy'));
+const Checkout = lazy(() => import('@/pages/Checkout'));
+const NotFound = lazy(() => import('@/pages/NotFound'));
+const ChangePassword = lazy(() => import('@/pages/ChangePassword'));
+const MockTest = lazy(() => import('@/pages/MockTest'));
+const TestCompletionPage = lazy(() => import('@/pages/TestCompletion'));
+const VerifyEmail = lazy(() => import('@/pages/VerifyEmail'));
+const UsernamePage = lazy(() => import('@/pages/UsernamePage'));
+const AllSetPage = lazy(() => import('@/pages/AllSetPage'));
+const MockTestResults = lazy(() => import('@/pages/MockTestResults'));
+const TestCompletion = lazy(() => import('@/pages/TestResults'));
+const Career = lazy(() => import('@/pages/Career'));
+const TeachingAmbassadors = lazy(() => import('@/pages/TeachingAmbassadors'));
+const InternshipApplication = lazy(() => import('@/pages/InternshipApplication'));
+const SavedMCQsPage = lazy(() => import('@/pages/SavedMCQsPage'));
+const MistakeBookPage = lazy(() => import('@/pages/MistakeBookPage'));
+const SmartDeckPage = lazy(() => import('@/pages/SmartDeckPage'));
+const LearnWithAIPage = lazy(() => import('@/pages/LearnWithAIPage'));
+const Announcements = lazy(() => import('@/pages/Announcements'));
+const ContactUsPage = lazy(() => import('@/pages/ContactUsPage'));
+const FLP = lazy(() => import('@/pages/FLP'));
+const FLPResults = lazy(() => import('@/pages/FLPResults'));
+const FLPResultDetail = lazy(() => import('@/components/FLPResultDetail'));
+const FLPTestPage = lazy(() => import('@/pages/flp/FLPTestPage'));
+const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
+const UpdatePassword = lazy(() => import('@/pages/UpdatePassword'));
+const SelectYear = lazy(() => import('@/pages/SelectYear'));
+const Teams = lazy(() => import('@/pages/Team'));
+const InstallApp = lazy(() => import('@/pages/InstallApp'));
+const PracticalPage = lazy(() => import('@/pages/PracticalPage'));
+const SEQSubjectSelectionPage = lazy(() => import('@/pages/seq/SEQSubjectSelectionPage'));
+const SEQChapterSelectionPage = lazy(() => import('@/pages/seq/SEQChapterSelectionPage'));
+const SEQQuizPage = lazy(() => import('@/pages/seq/SEQQuizPage'));
+const RedeemCode = lazy(() => import('@/pages/RedeemCode'));
+const Referrals = lazy(() => import('@/pages/Referrals'));
+const PurchaseHistory = lazy(() => import('@/pages/PurchaseHistory'));
+const PaymentFailure = lazy(() => import('@/pages/PaymentFailure'));
+const PaymentSuccess = lazy(() => import('@/pages/PaymentSuccess'));
+const Setup = lazy(() => import('@/pages/SetupPage'));
+const DetailedAnalytics = lazy(() => import('@/pages/DetailedAnalytics'));
+const AchievementUnlockNotifier = lazy(() =>
+  import('@/components/profile/AchievementBadges').then((module) => ({
+    default: module.AchievementUnlockNotifier,
+  })),
+);
 
 
 const queryClient = new QueryClient();
+
+type RestrictionDetails = {
+  user_restricted: boolean;
+  reason: string | null;
+  duration: string | null;
+  reviewed: boolean;
+  decision: boolean;
+  appeal?: string | null;
+};
 
 /**
  * StatusBarHandler: 
@@ -122,8 +148,7 @@ const UserRestrictionHandler = () => {
         return null;
       }
       
-      // Cast the JSONB to our expected type
-      return data?.restriction_details as any;
+      return data?.restriction_details as unknown as RestrictionDetails | null;
     },
     enabled: !!user?.id,
     refetchInterval: 60000, // Check every minute
@@ -146,10 +171,48 @@ const UserRestrictionHandler = () => {
 
 const AchievementNotifierHandler = () => {
   const { user } = useAuth();
-  return <AchievementUnlockNotifier userId={user?.id} />;
+  if (!user?.id) return null;
+  return (
+    <Suspense fallback={null}>
+      <AchievementUnlockNotifier userId={user.id} />
+    </Suspense>
+  );
 };
 
 function App() {
+  const [themeRestoreChecked, setThemeRestoreChecked] = useState(
+    () => !Capacitor.isNativePlatform(),
+  );
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let active = true;
+    InstallState.consumeFreshInstall()
+      .then(({ freshInstall }) => {
+        if (freshInstall) {
+          localStorage.removeItem('theme');
+          document.documentElement.classList.remove('dark');
+          document.documentElement.classList.add('light');
+          document.documentElement.style.colorScheme = 'light';
+        }
+      })
+      .catch((error) => {
+        console.warn('Unable to verify restored theme state', error);
+      })
+      .finally(() => {
+        if (active) setThemeRestoreChecked(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (!themeRestoreChecked) {
+    return <div className="fixed inset-0 bg-white" aria-hidden="true" />;
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider
@@ -170,8 +233,10 @@ function App() {
             <ScrollToTop />
               <BackHandler />
               <ConnectionStatusModal />
+              <DeviceActivityTracker />
               <UserRestrictionHandler />
               <AchievementNotifierHandler />
+              <Suspense fallback={<AppTransitionScreen label="Loading page" />}>
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
@@ -181,12 +246,15 @@ function App() {
                 <Route path="/mcqs/chapter/:subjectId" element={<MCQChapterSelectionPage />} />
                 <Route path="/mcqs/settings/:subjectId/:chapterId" element={<MCQSettingsPage />} />
                 <Route path="/mcqs/quiz/:subjectId/:chapterId" element={<MCQQuizPage />} />
+                <Route path="/medmacs-supers/chapter-locks" element={<ChapterLocks />} />
+                <Route path="/medmacs-supers/updates" element={<OtaUpdates />} />
                 <Route path="/battle" element={<Battle />} />
                 <Route path="/ai" element={<AI />} />
                 <Route path="/ai/test-generator" element={<AITestGeneratorPage />} />
                 <Route path="/ai/chatbot" element={<AIChatbotPage />} />
                 <Route path="/leaderboard" element={<Leaderboard />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/profile/devices" element={<Devices />} />
                 <Route path="/profile/password" element={<ChangePassword />} />
                 <Route path="/profile/upgrade" element={<Profile />} />
                 <Route path="/pricing" element={<Pricing />} />
@@ -208,7 +276,9 @@ function App() {
                 <Route path="/summerinternship2025" element={<InternshipApplication />} />
                 <Route path="/saved-mcqs" element={<SavedMCQsPage />} />
                 <Route path="/mistake-book" element={<MistakeBookPage />} />
-                <Route path="/titration" element={<TitrationPage />} />
+                <Route path="/smart-deck" element={<SmartDeckPage />} />
+                <Route path="/revision-queue" element={<Navigate to="/smart-deck" replace />} />
+                <Route path="/titration" element={<Navigate to="/smart-deck" replace />} />
                 <Route path="/learn-with-ai" element={<LearnWithAIPage />} />
                 <Route path="/announcements" element={<Announcements />} />
                 <Route path="/contact-us" element={<ContactUsPage />} />
@@ -225,8 +295,6 @@ function App() {
                 <Route path="/seqs" element={<SEQSubjectSelectionPage />} />
                 <Route path="/seqs/chapter/:subjectId" element={<SEQChapterSelectionPage />} />
                 <Route path="/seqs/quiz/:subjectId/:chapterId" element={<SEQQuizPage />} />
-                <Route path="/practical-notes" element={<PracticalPage />} />
-                <Route path="/practical-notes/subject/:id" element={<PracticalNotesDetails />} />
                 <Route path="/redeem" element={<RedeemCode />} />
                 <Route path="/referrals" element={<Referrals />} />
                 <Route path="/purchase-history" element={<PurchaseHistory />} />
@@ -236,6 +304,7 @@ function App() {
                 <Route path="/detailed-analytics" element={<DetailedAnalytics />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              </Suspense>
               <Toaster />
               <SonnerToaster position="bottom-center" />
             </div>

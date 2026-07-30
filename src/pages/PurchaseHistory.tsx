@@ -1,8 +1,7 @@
-// @ts-nocheck
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, ShoppingBag, CheckCircle, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, CheckCircle, AlertTriangle, Receipt, CalendarDays } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -57,30 +56,38 @@ const PurchaseHistory = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#F8FAFC] dark:bg-gray-950">
+    <div className="dashboard-modern-font min-h-screen w-full bg-background bg-mesh text-foreground relative overflow-x-hidden">
       <Seo title="Purchase History" description="View your purchase history" />
 
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute bottom-0 -left-32 h-80 w-80 rounded-full bg-primary/5 blur-3xl" />
+      </div>
+
       <div
-        className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
+        className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-2xl border-b border-border/30 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
       >
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center max-w-7xl">
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="w-9 h-9 p-0 hover:scale-110">
+        <div className="container mx-auto px-5 h-14 flex justify-between items-center max-w-7xl">
+          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="w-9 h-9 p-0">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-2">
             <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-7 h-7" />
-            <span className="text-lg font-black">Purchase History</span>
+            <span className="text-base font-black">Purchase History</span>
           </div>
           <div className="w-9" />
         </div>
       </div>
 
-      <main className="container mx-auto px-4 py-8 max-w-xl mt-[var(--header-height)]">
+      <main className="relative z-10 container mx-auto px-5 py-8 max-w-lg mt-[var(--header-height)]">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-black text-foreground uppercase tracking-tight italic">
-            Your <span className="text-blue-600">Purchases</span>
+          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary">
+            <Receipt className="h-7 w-7" />
+          </div>
+          <h1 className="text-2xl font-black text-foreground tracking-tight">
+            Your Purchases
           </h1>
-          <p className="text-muted-foreground text-xs uppercase tracking-[0.2em] mt-2">Payment history & receipts</p>
+          <p className="text-muted-foreground text-sm mt-2">Payment history and subscription receipts</p>
         </div>
 
         {isLoading && (
@@ -90,16 +97,16 @@ const PurchaseHistory = () => {
         )}
 
         {!isLoading && (!purchases || purchases.length === 0) && (
-          <div className="text-center py-16 space-y-4">
+          <div className="rounded-3xl border border-border/50 bg-card/80 px-6 py-12 text-center shadow-sm backdrop-blur-xl space-y-4">
             <div className="relative inline-block">
-              <div className="absolute inset-0 bg-blue-400 blur-2xl opacity-20 rounded-full" />
-              <div className="relative bg-gradient-to-br from-slate-500 to-slate-600 p-5 rounded-3xl shadow-xl">
-                <ShoppingBag className="w-10 h-10 text-white" />
+              <div className="absolute inset-0 bg-primary blur-2xl opacity-15 rounded-full" />
+              <div className="relative bg-primary/10 p-5 rounded-3xl">
+                <ShoppingBag className="w-9 h-9 text-primary" />
               </div>
             </div>
             <p className="text-sm text-muted-foreground font-medium">No purchases yet</p>
             <Button onClick={() => navigate('/pricing')}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl h-11 px-8 font-black uppercase text-xs tracking-widest">
+              className="rounded-xl h-11 px-8 font-bold text-xs">
               View Plans
             </Button>
           </div>
@@ -112,40 +119,40 @@ const PurchaseHistory = () => {
             const durationType = p.validity?.toLowerCase() === 'yearly' ? 'Yearly' : 'Monthly';
             
             return (
-              <div key={p.id} className={`relative overflow-hidden rounded-[1.5rem] bg-gradient-to-br ${expired ? 'from-slate-500 via-slate-600 to-slate-700' : 'from-blue-600 via-indigo-600 to-violet-700'} text-white shadow-xl p-4`}>
-                <div className="absolute inset-0 opacity-10" style={{
-                  backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.3) 15px, rgba(255,255,255,0.3) 30px)`,
-                  maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
-                }} />
-                <div className="relative z-10">
+              <div key={p.id} className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/90 text-card-foreground shadow-sm backdrop-blur-xl">
+                <div className={`h-1 w-full ${expired ? 'bg-muted-foreground/35' : 'bg-primary'}`} />
+                <div className="p-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-black uppercase tracking-tight">{p.plan_name || p.plan || 'Premium'} Plan</p>
-                      <p className="text-[11px] text-white/60 mt-0.5">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${expired ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'}`}><Receipt className="h-5 w-5" /></div>
+                      <div className="min-w-0">
+                      <p className="truncate text-sm font-black">{p.plan_name || p.plan || 'Premium'} Plan</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
                         {new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-2xl font-black">Rs. {p.amount || '—'}</span>
+                    <div className="shrink-0 pl-3 text-right">
+                      <span className="text-lg font-black">Rs. {p.amount || '—'}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge className="bg-white/20 text-white border-white/20 text-[9px] font-bold uppercase tracking-widest">
+                  <div className="flex flex-wrap items-center gap-2 mt-4">
+                    <Badge variant="secondary" className="text-[9px] font-bold uppercase tracking-widest">
                       {durationType}
                     </Badge>
                     {expired ? (
-                      <Badge className="bg-red-500/30 text-red-100 border-red-300/30 text-[9px] font-bold uppercase tracking-widest">
+                      <Badge className="bg-destructive/10 text-destructive border-destructive/15 text-[9px] font-bold uppercase tracking-widest">
                         <AlertTriangle className="w-3 h-3 mr-1" /> Expired
                       </Badge>
                     ) : (
-                      <Badge className="bg-emerald-500/30 text-emerald-100 border-emerald-300/30 text-[9px] font-bold uppercase tracking-widest">
+                      <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/15 text-[9px] font-bold uppercase tracking-widest">
                         <CheckCircle className="w-3 h-3 mr-1" /> Active
                       </Badge>
                     )}
                   </div>
                   {expiry && (
-                    <p className="text-[10px] text-white/50 mt-1.5">
-                      {expired ? 'Expired' : 'Expires'}: {expiry.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    <p className="mt-3 flex items-center gap-1.5 border-t border-border/40 pt-3 text-[10px] text-muted-foreground">
+                      <CalendarDays className="h-3.5 w-3.5" /> {expired ? 'Expired' : 'Expires'} {expiry.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </p>
                   )}
                 </div>

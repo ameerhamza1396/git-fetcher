@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -106,7 +105,7 @@ const MockTest = () => {
       return data;
     },
     staleTime: 5 * 60 * 1000,
-    cacheTime: 10 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   useEffect(() => {
@@ -191,7 +190,7 @@ const MockTest = () => {
     // Only enable if user is logged in, test is active, test config is loaded, and user CAN attempt again
     enabled: !!user && !!dynamicTestUnlockTime && isTestActive && canAttemptAgain === true,
     staleTime: 5 * 60 * 1000,
-    cacheTime: 10 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   const currentQuestion = mockMcqs ? mockMcqs[currentQuestionIndex] : null;
@@ -261,14 +260,14 @@ const MockTest = () => {
   };
 
   const isQuestionAnswered = (questionId: number) => {
-    return userAnswers.hasOwnProperty(questionId);
+    return Object.prototype.hasOwnProperty.call(userAnswers, questionId);
   };
 
   const countUnattempted = () => {
     if (!mockMcqs) return 0;
     let count = 0;
     mockMcqs.forEach(mcq => {
-      if (!userAnswers.hasOwnProperty(mcq.id)) {
+      if (!Object.prototype.hasOwnProperty.call(userAnswers, mcq.id)) {
         count++;
       }
     });

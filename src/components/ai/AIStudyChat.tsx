@@ -6,13 +6,16 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Send, MessageSquare, Plus } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { Message, ChatSession, ChatSessionInsert, ChatSessionUpdate } from '@/types/ai';
 import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
-import { aiApiJson } from '@/utils/aiApi';
+import { aiApiStream, type AiStreamStatus } from '@/utils/aiApi';
 import { renderAiMessageText } from '@/utils/format';
 import { InstagramCreatorCta, shouldShowCreatorInstagramCta } from '@/components/ai/InstagramCreatorCta';
 import { isAiPolicyNotice } from '@/utils/aiPolicyNotice';
+import { FlashcardLimitModal, getAiLimitDetails, isAiLimitError } from '@/components/dashboard/personalization/FlashcardLimitModal';
+import { useNavigate } from 'react-router-dom';
 
 export const AIStudyChat = () => {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
@@ -21,9 +24,13 @@ export const AIStudyChat = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
+  const [loadingStatus, setLoadingStatus] = useState<AiStreamStatus | null>(null);
+  const [limitModalOpen, setLimitModalOpen] = useState(false);
+  const [limitDetails, setLimitDetails] = useState(getAiLimitDetails(null));
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -32,6 +39,10 @@ export const AIStudyChat = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    if (!isLoading) setLoadingStatus(null);
+  }, [isLoading]);
 
   useEffect(() => {
     if (user) loadSessions();
@@ -120,20 +131,34 @@ export const AIStudyChat = () => {
     setMessages(newMsgs);
     setInput('');
     setIsLoading(true);
+    setLoadingStatus(null);
 
     try {
-      const data = await aiApiJson<{ answer?: string }>('ai/study-chat', {
+      let streamedAnswer = '';
+      const data = await aiApiStream('ai/study-chat', {
         topic: currentSession.session_name,
         question: userMsg.content,
+      }, {
+        onStatus: (status) => { setLoadingStatus(status); },
+        onDelta: (text) => {
+          streamedAnswer += text;
+          setMessages([...newMsgs, { role: 'assistant', content: streamedAnswer, timestamp: new Date().toISOString() }]);
+        },
       });
 
-      const { answer } = data;
+      const answer = data.answer || streamedAnswer;
       const aiMsg: Message = { role: 'assistant', content: answer, timestamp: new Date().toISOString() };
       const final = [...newMsgs, aiMsg];
       setMessages(final);
       await saveSession(final);
     } catch (e: any) {
       console.error('Error sending message:', e);
+      if (isAiLimitError(e)) {
+        setLimitDetails(getAiLimitDetails(e, 'free', 2));
+        setLimitModalOpen(true);
+        setMessages(newMsgs);
+        return;
+      }
       setMessages([...newMsgs, {
         role: 'assistant',
         content: e.message || 'Failed to send message',
@@ -160,6 +185,7 @@ export const AIStudyChat = () => {
   }
 
   return (
+    <>
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[600px]">
       {/* Sidebar */}
       <Card className="lg:col-span-1">
@@ -235,7 +261,27 @@ export const AIStudyChat = () => {
             )}
             {isLoading && (
               <div className="flex justify-start">
-                <Loader2 className="w-4 h-4 animate-spin bg-gray-100 p-3 rounded-lg" />
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3" role="status" aria-label={loadingStatus?.text || 'Working'}>
+                    <motion.img
+                      src="/favicon.png"
+                      alt=""
+                      aria-hidden="true"
+                      animate={{ y: [0, -7, 0] }}
+                      transition={{ duration: 0.75, repeat: Infinity, ease: 'easeInOut' }}
+                      className="h-7 w-7 rounded-md object-cover"
+                    />
+                    {loadingStatus?.text ? (
+                      <motion.span
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-sm font-medium text-gray-500"
+                      >
+                        {loadingStatus.text}
+                      </motion.span>
+                    ) : null}
+                  </div>
+                </div>
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -259,5 +305,19 @@ export const AIStudyChat = () => {
         </CardContent>
       </Card>
     </div>
+    <FlashcardLimitModal
+      open={limitModalOpen}
+      onOpenChange={setLimitModalOpen}
+      plan={limitDetails.plan}
+      limit={limitDetails.limit}
+      period={limitDetails.period}
+      limitKind={limitDetails.limitKind}
+      featureLabel="AI Study Chat"
+      onUpgrade={() => {
+        setLimitModalOpen(false);
+        navigate('/pricing');
+      }}
+    />
+    </>
   );
 };

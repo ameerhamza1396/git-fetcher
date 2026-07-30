@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -24,7 +23,7 @@ interface MCQ {
 interface Subject {
   id: string;
   name: string;
-  year?: number;
+  year?: string;
   icon?: string;
   color?: string;
   institutes?: string[] | null;
@@ -42,7 +41,7 @@ interface FLPSessionData {
 const FLP_STORAGE_KEY = 'flp_session';
 
 const FLP = () => {
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user, loading: isAuthLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -137,7 +136,9 @@ const FLP = () => {
   const handleStartFresh = () => {
     try {
       localStorage.removeItem(FLP_STORAGE_KEY);
-    } catch (e) {}
+    } catch {
+      // Storage can be unavailable in privacy-restricted browser contexts.
+    }
     setSavedSession(null);
     setShowResumeDialog(false);
     setWizardStep(1);
@@ -151,9 +152,9 @@ const FLP = () => {
       const subjectName = selectedSubjectRecord?.name || '';
       const mcqsData = await fetchMCQsBySubject(selectedSubject);
 
-      if (!mcqsData || mcqsData.length === 0) { toast({ title: "No MCQs Found", variant: "warning" }); setIsFetchingMcqs(false); return; }
+      if (!mcqsData || mcqsData.length === 0) { toast({ title: "No MCQs Found" }); setIsFetchingMcqs(false); return; }
       const shuffled = shuffleArray(mcqsData as MCQ[]);
-      if (shuffled.length < selectedMcqCount) { toast({ title: "Not Enough Questions", description: `Only ${shuffled.length} available.`, variant: "warning" }); setIsFetchingMcqs(false); return; }
+      if (shuffled.length < selectedMcqCount) { toast({ title: "Not Enough Questions", description: `Only ${shuffled.length} available.` }); setIsFetchingMcqs(false); return; }
       const selectedMcqs = shuffled.slice(0, selectedMcqCount);
       navigate('/flp/test', { state: { mcqs: selectedMcqs, subjectName } });
     } catch (err) {

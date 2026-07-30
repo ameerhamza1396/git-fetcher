@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';

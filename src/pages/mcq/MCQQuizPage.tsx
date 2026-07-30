@@ -1,8 +1,8 @@
-import { useEffect, useLayoutEffect, useMemo } from 'react';
+import { useLayoutEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { MCQDisplay } from '@/components/mcq/MCQDisplay';
 import { useAuth } from '@/hooks/useAuth';
-import PageSkeleton from '@/components/skeletons/PageSkeleton';
+import MCQLoadingSkeleton from '@/features/mcq/components/MCQLoadingSkeleton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Lock } from 'lucide-react';
@@ -22,21 +22,21 @@ const MCQQuizPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading: authLoading } = useAuth();
-  const initialIndex = ((location.state as { startIndex?: number } | null)?.startIndex) || 0;
+  const routeState = location.state as {
+    startIndex?: number;
+    wrongMcqIds?: string[];
+    subject?: import('@/utils/mcqData').Subject | null;
+    chapter?: import('@/utils/mcqData').Chapter | null;
+  } | null;
+  const initialIndex = routeState?.startIndex || 0;
   const mistakeMcqIds = useMemo(
-    () => (location.state as any)?.wrongMcqIds || [],
-    [location.state],
+    () => routeState?.wrongMcqIds || [],
+    [routeState?.wrongMcqIds],
   );
 
   const timerEnabled = searchParams.get('timer') === 'true';
   const mistakeMode = searchParams.get('mode') === 'mistakes';
   const timePerQuestion = parseInt(searchParams.get('time') || '30', 10);
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      console.log('User not authenticated, quiz cannot start');
-    }
-  }, [user, authLoading]);
 
   const handleBack = () => {
     if (mistakeMode) {
@@ -51,7 +51,7 @@ const MCQQuizPage = () => {
   };
 
   if (authLoading) {
-    return <PageSkeleton />;
+    return <MCQLoadingSkeleton />;
   }
 
   if (!user) {
@@ -101,6 +101,8 @@ const MCQQuizPage = () => {
       initialIndex={initialIndex}
       mistakeMode={mistakeMode}
       mistakeMcqIds={mistakeMcqIds}
+      initialSubject={routeState?.subject}
+      initialChapter={routeState?.chapter}
     />
   );
 };

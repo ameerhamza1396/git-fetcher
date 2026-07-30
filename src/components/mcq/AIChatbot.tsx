@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, X, Loader2, WifiOff } from 'lucide-react';
+import { Copy, Send, X, WifiOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { aiApiJson, aiApiOrigin } from '@/utils/aiApi';
 import { isAiPolicyNotice } from '@/utils/aiPolicyNotice';
@@ -15,6 +15,48 @@ interface Message {
 
 import { renderAiMessageText } from '@/utils/format';
 import { InstagramCreatorCta, shouldShowCreatorInstagramCta } from '@/components/ai/InstagramCreatorCta';
+
+const WordRevealMessage = ({
+  text,
+  animate,
+  onComplete,
+}: {
+  text: string;
+  animate: boolean;
+  onComplete: () => void;
+}) => {
+  const words = React.useMemo(() => text.match(/\S+\s*/g) ?? [text], [text]);
+  const [visibleWords, setVisibleWords] = useState(animate ? 1 : words.length);
+  const onCompleteRef = useRef(onComplete);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  useEffect(() => {
+    if (!animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setVisibleWords(words.length);
+      onCompleteRef.current();
+      return;
+    }
+
+    setVisibleWords(1);
+    const interval = window.setInterval(() => {
+      setVisibleWords((current) => {
+        const next = Math.min(current + 1, words.length);
+        if (next === words.length) {
+          window.clearInterval(interval);
+          onCompleteRef.current();
+        }
+        return next;
+      });
+    }, 34);
+
+    return () => window.clearInterval(interval);
+  }, [animate, words.length]);
+
+  return <>{renderAiMessageText(words.slice(0, visibleWords).join(''))}</>;
+};
 
 interface AIChatbotProps {
   isOpen: boolean;
@@ -48,6 +90,8 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [revealingMessageIndex, setRevealingMessageIndex] = useState<number | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesScrollAreaRef = useRef<HTMLDivElement>(null);
   const pullStartYRef = useRef<number | null>(null);
@@ -73,6 +117,7 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
       return;
     }
     const userMessage: Message = { role: 'user', content: message.trim(), timestamp: new Date().toISOString() };
+    const responseIndex = messages.length + 1;
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
@@ -83,13 +128,20 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
       }
       const data = await aiApiJson<{ answer?: string }>('ai/study-chat', { question: composedPrompt });
       const answer = data.answer || 'Sorry, I could not generate a response.';
+      setRevealingMessageIndex(responseIndex);
       setMessages(prev => [...prev, { role: 'assistant', content: answer, timestamp: new Date().toISOString() }]);
     } catch (error: any) {
+      setRevealingMessageIndex(responseIndex);
       setMessages(prev => [...prev, { role: 'assistant', content: error?.message || `Sorry, there was an error connecting to the AI service. Please check if the server at ${aiApiOrigin} is running and try again.`, timestamp: new Date().toISOString() }]);
     } finally { setIsLoading(false); }
   };
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); sendMessage(input); };
+  const copyToClipboard = (text: string, index: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(index);
+    window.setTimeout(() => setCopiedIndex(null), 2000);
+  };
   const getMessagesViewport = () => (
     messagesScrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement | null
   );
@@ -169,24 +221,24 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed inset-0 z-50 sm:inset-auto sm:bottom-4 sm:right-4 sm:w-96 sm:h-[500px] sm:rounded-2xl overflow-hidden shadow-2xl border border-border/30 bg-background/60 backdrop-blur-2xl flex flex-col"
+            className="fixed inset-0 z-50 flex flex-col overflow-hidden border border-border/40 bg-background/95 shadow-2xl backdrop-blur-2xl sm:inset-auto sm:bottom-4 sm:right-4 sm:h-[540px] sm:w-[26rem] sm:rounded-2xl"
           >
             {/* Edge-to-edge header with fade — no colored bar, content fades into status bar */}
             <div className="relative flex-shrink-0">
               {/* Fade overlay at top for status bar blend */}
               <div className="absolute top-0 left-0 right-0 h-[env(safe-area-inset-top,0px)] bg-gradient-to-b from-background to-transparent z-10 pointer-events-none" />
 
-              <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+12px)] pb-3 border-b border-border/20">
+              <div className="flex items-center justify-between border-b border-border/40 px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+12px)]">
                 <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
-                    <img src="/lovable-uploads/Mascot-mini.png" alt="Dr. Ahroid" className="w-full h-full object-contain" />
+                  <div className="h-9 w-9 overflow-hidden">
+                    <img src="/lovable-uploads/Mascot-mini.png" alt="Dr. Ahroid" className="h-full w-full object-contain" />
                   </div>
                   <div>
-                    <span className="text-sm font-bold text-foreground">Dr. Ahroid</span>
+                    <span className="font-['Syne'] text-sm font-extrabold tracking-[-0.03em] text-foreground">Dr. <span className="text-primary">Ahroid</span></span>
                     <p className="text-[10px] text-muted-foreground">AI Study Assistant</p>
                   </div>
                 </div>
-                <Button variant="ghost" size="sm" onClick={onClose} className="w-8 h-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted">
+                <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 rounded-lg p-0 text-muted-foreground hover:bg-muted hover:text-foreground">
                   <X className="w-5 h-5" />
                 </Button>
               </div>
@@ -211,15 +263,15 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
                     <p className="text-xs text-muted-foreground mt-1">Connect to the internet and try again.</p>
                   </div>
                 ) : messages.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                      <div className="w-16 h-16 rounded-full bg-primary/10 backdrop-blur-lg flex items-center justify-center mb-4 overflow-hidden">
-                        <img src="/mascots/Mascot12.png" alt="Dr. Ahroid" className="w-full h-full object-contain opacity-80" />
+                    <div className="flex h-full flex-col items-center justify-center py-12 text-center">
+                      <div className="mb-4 h-16 w-16 overflow-hidden">
+                        <img src="/lovable-uploads/Mascot-mini.png" alt="Dr. Ahroid" className="h-full w-full object-contain" />
                       </div>
-                      <p className="text-sm font-medium text-foreground">Ask me anything!</p>
+                      <p className="font-['Syne'] text-base font-extrabold tracking-[-0.03em] text-foreground">Ask me anything</p>
                       <p className="text-xs text-muted-foreground mt-1">I'm Dr. Ahroid, your MBBS tutor.</p>
                     </div>
                   ) : (
-                    <div className="space-y-3 w-full">
+                    <div className="w-full space-y-5">
                       {messages.map((message, index) => (
                         <div key={index} className={`flex w-full ${message.role === 'user' ? 'justify-end' : isAiPolicyNotice(message.content) ? 'justify-center' : 'justify-start'}`}>
                           {message.role !== 'user' && isAiPolicyNotice(message.content) ? (
@@ -229,31 +281,66 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
                                 View upgrade options
                               </a>
                             </div>
+                          ) : message.role === 'user' ? (
+                            <div className="flex max-w-[86%] flex-col items-end">
+                              <div className="rounded-2xl rounded-br-sm bg-slate-200 px-4 py-3 text-sm text-slate-900 shadow-md shadow-black/5 dark:bg-slate-700 dark:text-slate-50 dark:shadow-black/20">
+                                <div className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</div>
+                              </div>
+                              <div className="mt-1 flex items-center gap-1.5 pr-1 text-muted-foreground">
+                                <span className="text-[9px] font-bold">
+                                  {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                <span aria-hidden="true" className="h-0.5 w-0.5 rounded-full bg-current opacity-50" />
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(message.content, index)}
+                                  className="flex h-6 items-center gap-1 rounded-md px-1.5 text-[9px] font-bold transition-colors hover:bg-muted hover:text-foreground"
+                                  aria-label="Copy your message"
+                                >
+                                  {copiedIndex === index ? 'Copied' : <><Copy className="h-3 w-3" /> Copy</>}
+                                </button>
+                              </div>
+                            </div>
                           ) : (
-                          <div className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm backdrop-blur-lg ${message.role === 'user'
-                            ? 'bg-primary text-white dark:bg-slate-700 dark:text-white rounded-br-md'
-                            : 'bg-muted/60 text-foreground rounded-bl-md'
-                            }`}>
-                            <div className="whitespace-pre-wrap break-words leading-relaxed">{renderAiMessageText(message.content)}</div>
-                            {message.role === 'assistant' && shouldShowCreatorInstagramCta(message.content) && (
-                              <InstagramCreatorCta />
-                            )}
-                            <p className={`text-[10px] mt-1 ${message.role === 'user' ? 'text-white/70' : 'text-muted-foreground'}`}>
-                              {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                          </div>
+                            <div className="w-full">
+                              <div className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
+                                <WordRevealMessage
+                                  text={message.content}
+                                  animate={revealingMessageIndex === index}
+                                  onComplete={() => setRevealingMessageIndex(current => current === index ? null : current)}
+                                />
+                              </div>
+                              {shouldShowCreatorInstagramCta(message.content) && (
+                                <InstagramCreatorCta />
+                              )}
+                              <div className="mt-1.5 flex items-center gap-1.5 text-muted-foreground">
+                                <span className="text-[9px] font-bold">
+                                  {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                <span aria-hidden="true" className="h-0.5 w-0.5 rounded-full bg-current opacity-50" />
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(message.content, index)}
+                                  className="flex h-6 items-center gap-1 rounded-md px-1.5 text-[9px] font-bold transition-colors hover:bg-muted hover:text-foreground"
+                                  aria-label="Copy Dr. Ahroid's response"
+                                >
+                                  {copiedIndex === index ? 'Copied' : <><Copy className="h-3 w-3" /> Copy</>}
+                                </button>
+                              </div>
+                            </div>
                           )}
                         </div>
                       ))}
                       {isLoading && (
-                        <div className="flex justify-start">
-                          <div className="bg-muted/60 backdrop-blur-lg px-4 py-3 rounded-2xl rounded-bl-md">
-                            <div className="flex space-x-1">
-                              <div className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                              <div className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                              <div className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                            </div>
-                          </div>
+                        <div className="flex justify-start" role="status" aria-label="Dr. Ahroid is thinking">
+                          <motion.img
+                            src="/favicon.png"
+                            alt=""
+                            aria-hidden="true"
+                            animate={{ y: [0, -7, 0] }}
+                            transition={{ duration: 0.75, repeat: Infinity, ease: 'easeInOut' }}
+                            className="h-7 w-7 rounded-md object-cover"
+                          />
                         </div>
                       )}
                       <div ref={messagesEndRef} />
@@ -263,25 +350,28 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
 
               {/* Help button */}
               {questionContext && (
-                <div className="px-3 py-2 border-t border-border/30 flex-shrink-0">
-                  <Button variant="outline" size="sm" onClick={handleQuestionHelp} disabled={!isOnline} className="w-full text-xs rounded-xl h-9 bg-background/40 backdrop-blur-lg border-border/30">
+                <div className="flex-shrink-0 border-t border-border/30 px-3 py-2">
+                  <Button variant="outline" size="sm" onClick={handleQuestionHelp} disabled={!isOnline} className="h-9 w-full rounded-xl border-border/50 bg-background/40 font-['Syne'] text-xs backdrop-blur-lg">
                     Help with current question
                   </Button>
                 </div>
               )}
 
               {/* Input */}
-              <div className="px-3 py-3 border-t border-border/30 flex-shrink-0 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:pb-3">
-                <form onSubmit={handleSubmit} className="flex space-x-2">
+              <div className="flex-shrink-0 border-t border-border/30 px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:pb-3">
+                <form
+                  onSubmit={handleSubmit}
+                  className="flex min-h-14 items-center gap-2 rounded-2xl border border-border/70 bg-card p-1.5 shadow-lg shadow-black/[0.04] transition-all focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/10"
+                >
                   <Input
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder={isOnline ? 'Type your question...' : 'Connect to internet to use AI chat'}
+                    placeholder={isOnline ? 'Ask Dr. Ahroid anything medical...' : 'Connect to internet to use AI chat'}
                     disabled={isLoading || !isOnline}
-                    className="flex-1 rounded-xl h-10 text-sm bg-muted/40 backdrop-blur-lg border-border/30"
+                    className="h-11 flex-1 rounded-none border-0 bg-transparent px-3 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                   />
-                  <Button type="submit" disabled={isLoading || !isOnline || !input.trim()} size="sm" className="bg-primary/80 backdrop-blur-lg hover:bg-primary/90 rounded-xl h-10 w-10 p-0">
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  <Button type="submit" disabled={isLoading || !isOnline || !input.trim()} size="sm" className="h-10 w-10 shrink-0 rounded-xl bg-primary p-0 shadow-md shadow-primary/20 hover:bg-primary/90">
+                    <Send className="h-4 w-4" />
                   </Button>
                 </form>
               </div>

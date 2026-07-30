@@ -15,6 +15,8 @@ import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { aiApiJson } from '@/utils/aiApi';
+import { FlashcardLimitModal, getAiLimitDetails, isAiLimitError } from '@/components/dashboard/personalization/FlashcardLimitModal';
+import { useNavigate } from 'react-router-dom';
 
 interface Question {
   question: string;
@@ -25,6 +27,7 @@ interface Question {
 
 export const AITestGenerator: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [topic, setTopic] = useState('');
   const [difficulty, setDifficulty] = useState('medium');
@@ -32,6 +35,8 @@ export const AITestGenerator: React.FC = () => {
   const [customPrompt, setCustomPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [savedTestId, setSavedTestId] = useState<string | null>(null);
+  const [limitModalOpen, setLimitModalOpen] = useState(false);
+  const [limitDetails, setLimitDetails] = useState(getAiLimitDetails(null));
 
   const [questions, setQuestions] = useState<Question[] | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -103,6 +108,11 @@ export const AITestGenerator: React.FC = () => {
       setTestSubmitted(false);
       toast.success(`Generated ${data.questions.length} questions!`);
     } catch (e: any) {
+      if (isAiLimitError(e)) {
+        setLimitDetails(getAiLimitDetails(e, 'free', questionCount));
+        setLimitModalOpen(true);
+        return;
+      }
       toast.error(`Failed to generate: ${e.message}`);
     } finally {
       setIsGenerating(false);
@@ -203,6 +213,19 @@ export const AITestGenerator: React.FC = () => {
             </Button>
           </div>
         </div>
+        <FlashcardLimitModal
+          open={limitModalOpen}
+          onOpenChange={setLimitModalOpen}
+          plan={limitDetails.plan}
+          limit={limitDetails.limit}
+          period={limitDetails.period}
+          limitKind={limitDetails.limitKind}
+          featureLabel="AI Test Generator"
+          onUpgrade={() => {
+            setLimitModalOpen(false);
+            navigate('/pricing');
+          }}
+        />
       </div>
     );
   }

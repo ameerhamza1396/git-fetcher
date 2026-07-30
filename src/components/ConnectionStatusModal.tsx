@@ -14,6 +14,7 @@ import {
   subscribeOfflineAnswerChanges,
   syncQueuedMCQAnswers,
 } from '@/utils/offlineAnswerSync';
+import { checkSupabaseConnectivity } from '@/integrations/supabase/client';
 
 const OFFLINE_TOLERANCE_MS = 2000;
 
@@ -24,10 +25,24 @@ const ConnectionStatusModal = () => {
   const [downloadedChapters, setDownloadedChapters] = useState<OfflineChapterSummary[]>([]);
   const [routeAllowsOffline, setRouteAllowsOffline] = useState(false);
   const [queuedAnswerCount, setQueuedAnswerCount] = useState(0);
-  const [isSyncingAnswers, setIsSyncingAnswers] = useState(false);
   const toleranceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncInFlight = useRef(false);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const syncOfflineAnswers = useCallback(async () => {
+    if (syncInFlight.current || !navigator.onLine) return;
+
+    syncInFlight.current = true;
+    try {
+      await syncQueuedMCQAnswers();
+      setQueuedAnswerCount(await getQueuedMCQAnswerCount());
+    } catch {
+      // Queued answers remain persisted and will retry on the next online event.
+    } finally {
+      syncInFlight.current = false;
+    }
+  }, []);
 
   const handleOnline = useCallback(() => {
     // Double check navigator.onLine to avoid false positives from browser events
@@ -38,7 +53,7 @@ const ConnectionStatusModal = () => {
       toleranceTimer.current = null;
     }
     setIsRetrying(false);
-    syncOfflineAnswers();
+    void syncOfflineAnswers();
     setIsOffline((prev) => {
       if (prev) {
         setShowRestored(true);
@@ -46,21 +61,7 @@ const ConnectionStatusModal = () => {
       }
       return false;
     });
-  }, []);
-
-  const syncOfflineAnswers = useCallback(async () => {
-    if (isSyncingAnswers || !navigator.onLine) return;
-
-    setIsSyncingAnswers(true);
-    try {
-      await syncQueuedMCQAnswers();
-      setQueuedAnswerCount(await getQueuedMCQAnswerCount());
-    } catch (error) {
-      console.warn('Offline answer sync failed:', error);
-    } finally {
-      setIsSyncingAnswers(false);
-    }
-  }, [isSyncingAnswers]);
+  }, [syncOfflineAnswers]);
 
   const handleOffline = useCallback(() => {
     toleranceTimer.current = setTimeout(() => {
@@ -130,29 +131,21 @@ const ConnectionStatusModal = () => {
   const handleRetry = async () => {
     setIsRetrying(true);
     
-    // Add a minimum delay for the animation to feel "real" and avoid flickering
+    // Keep the feedback visible long enough to avoid flickering.
     const minDelay = new Promise(resolve => setTimeout(resolve, 800));
     
     try {
-      // Use a cache-busting fetch to the origin to truly verify connectivity
-      // Favicon is usually a small, safe file to check.
-      const ping = fetch(`${window.location.origin}/favicon.ico?t=${Date.now()}`, { 
-        method: 'HEAD', 
-        mode: 'no-cors',
-        cache: 'no-store'
-      });
-      
-      await Promise.all([ping, minDelay]);
-      
-      // If fetch didn't throw, we likely have connectivity.
-      // But let's also check navigator.onLine one last time.
-      if (navigator.onLine) {
+      const [serverReachable] = await Promise.all([
+        checkSupabaseConnectivity(),
+        minDelay,
+      ]);
+
+      if (navigator.onLine && serverReachable) {
         handleOnline();
       } else {
-        throw new Error('Still offline');
+        throw new Error('Data server is still unreachable');
       }
-    } catch (error) {
-      console.log('Retry failed:', error);
+    } catch {
       await minDelay;
       setIsRetrying(false);
     }

@@ -1,9 +1,9 @@
-import React from "react";
-import { Button } from "@/components/ui/button";
+import React, { useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { Capacitor, registerPlugin } from "@capacitor/core";
+import { Loader2 } from "lucide-react";
 
 // MUST match @CapacitorPlugin(name = "GoogleNativeAuth")
 const GoogleNativeAuth = registerPlugin<any>("GoogleNativeAuth");
@@ -18,8 +18,14 @@ const GoogleSignin: React.FC<GoogleSigninProps> = ({
     const { toast } = useToast();
     const { signInWithGoogle, signInWithGoogleSupabase } = useAuth();
     const navigate = useNavigate();
+    const [isSigningIn, setIsSigningIn] = useState(false);
+    const signInActiveRef = useRef(false);
 
     const handleSignIn = async () => {
+        if (signInActiveRef.current) return;
+        signInActiveRef.current = true;
+        setIsSigningIn(true);
+
         try {
             if (Capacitor.getPlatform() === "android" && Capacitor.isNativePlatform()) {
                 const result = await GoogleNativeAuth.signIn({
@@ -33,7 +39,8 @@ const GoogleSignin: React.FC<GoogleSigninProps> = ({
                     navigate("/dashboard", { replace: true });
                 }
             } else {
-                await signInWithGoogle();
+                const { error } = await signInWithGoogle();
+                if (error) throw error;
                 navigate("/dashboard", { replace: true });
             }
         } catch (err: any) {
@@ -45,6 +52,9 @@ const GoogleSignin: React.FC<GoogleSigninProps> = ({
                 });
             }
             console.error(err);
+        } finally {
+            signInActiveRef.current = false;
+            setIsSigningIn(false);
         }
     };
 
@@ -52,10 +62,21 @@ const GoogleSignin: React.FC<GoogleSigninProps> = ({
         <button
             type="button"
             onClick={handleSignIn}
-            className="w-full flex items-center justify-center space-x-2 h-14 rounded-2xl border-2 border-white/20 bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 transition-all duration-300 font-bold text-xs uppercase tracking-widest"
+            disabled={isSigningIn}
+            aria-busy={isSigningIn}
+            className="flex h-14 w-full items-center justify-center space-x-2 rounded-2xl border border-slate-200 bg-white text-xs font-bold uppercase tracking-widest text-slate-700 shadow-sm transition-all duration-300 hover:border-[#0ea5e9]/30 hover:bg-slate-50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-60"
         >
-            <img src="/googlelogo.svg" alt="Google" className="w-4 h-4" />
-            <span>{buttonText}</span>
+            {isSigningIn ? (
+                <>
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    <span>Signing in...</span>
+                </>
+            ) : (
+                <>
+                    <img src="/googlelogo.svg" alt="" aria-hidden="true" className="h-4 w-4" />
+                    <span>{buttonText}</span>
+                </>
+            )}
         </button>
     );
 };

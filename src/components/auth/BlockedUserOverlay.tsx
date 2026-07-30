@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { 
@@ -13,7 +12,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
-import { Lock, Mail, ExternalLink, ShieldAlert, Send, CheckCircle2, AlertCircle, Info } from "lucide-react";
+import { Send, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { supabase } from '@/integrations/supabase/client';
@@ -107,64 +106,55 @@ const BlockedUserOverlay: React.FC<BlockedUserOverlayProps> = ({ details, onSign
   };
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-background/80 backdrop-blur-md p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[10000] isolate flex h-dvh items-start justify-center overflow-y-auto bg-white px-6 pb-24 pt-[calc(env(safe-area-inset-top,0px)+6rem)] text-slate-950 sm:items-center sm:py-28">
+      <div className="absolute left-6 top-[calc(env(safe-area-inset-top,0px)+18px)] z-20 flex items-center gap-2.5">
+        <img
+          src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png"
+          alt="Medmacs"
+          className="h-9 w-9 object-contain"
+        />
+        <span className="font-['Syne'] text-sm font-extrabold tracking-[-.045em]">
+          <span className="bg-gradient-to-r from-cyan-600 via-sky-500 to-teal-600 bg-clip-text text-transparent">Medmacs</span>
+          <span className="text-slate-950">.app</span>
+        </span>
+      </div>
+
       <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.5, type: "spring" }}
-        className="w-full max-w-lg"
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 w-full max-w-xl text-center"
       >
-        <Card className="shadow-2xl border-destructive/50 bg-card/95 overflow-hidden relative">
-          {/* Top Decorative bar */}
-          <div className="h-2 w-full bg-destructive" />
-          
-          <CardHeader className="space-y-4 pt-10 text-center">
-            <div className="mx-auto w-24 h-24 bg-destructive/10 rounded-full flex items-center justify-center mb-2">
-              <ShieldAlert className="w-12 h-12 text-destructive animate-pulse" />
-            </div>
-            
-            <div className="space-y-2">
-              <CardTitle className="text-3xl font-extrabold tracking-tight text-destructive">
-                Account Restricted
-              </CardTitle>
-              <CardDescription className="text-base text-muted-foreground">
-                Your access to Medmacs features has been temporarily suspended.
-              </CardDescription>
-            </div>
-          </CardHeader>
+        <p className="mb-3 text-xs font-black uppercase tracking-[0.22em] text-cyan-600">Access paused</p>
+        <h1 className="font-['Syne'] text-[clamp(2.2rem,9vw,3.3rem)] font-extrabold leading-[0.98] tracking-[-.055em] text-slate-950">
+          Account Restricted
+        </h1>
+        <p className="mx-auto mt-4 max-w-md text-sm font-semibold leading-6 text-slate-500">
+          Your Medmacs access is currently limited. You can review the reason below and submit an appeal if something needs a second look.
+        </p>
 
-          <CardContent className="space-y-8 pb-10">
-            {/* Mascot Image (Sad/Serious) */}
-            <div className="flex justify-center -my-4 h-48 pointer-events-none select-none">
-              <img 
-                src="/mascots/Mascot9.png" 
-                alt="Restricted Mascot" 
-                className="h-full object-contain filter grayscale-[0.5] opacity-80"
-              />
-            </div>
+        <div className="mt-8 space-y-7 text-left">
 
-            {/* Restriction Info */}
-            <div className="bg-muted/50 rounded-xl p-6 border border-border/50 space-y-4">
+            <div className="space-y-5 rounded-[2rem] border border-cyan-600/15 bg-cyan-600/[0.04] p-5 shadow-2xl shadow-cyan-950/5">
               <div className="space-y-1">
-                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Reason for restriction</span>
-                <p className="text-lg font-medium italic">
-                  "{details.reason || "Violating community guidelines or platform terms."}"
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Reason for restriction</span>
+                <p className="text-base font-bold leading-6 text-slate-900">
+                  {details.reason || "Violating community guidelines or platform terms."}
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div className="grid grid-cols-1 gap-4 border-t border-cyan-600/10 pt-4 sm:grid-cols-2">
                 <div className="space-y-1">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Duration</span>
-                  <p className="text-sm font-semibold flex items-center gap-2">
-                    <Lock className="w-3.5 h-3.5" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Duration</span>
+                  <p className="text-sm font-black text-slate-900">
                     {isInfinite ? "Permanent" : "Temporary"}
                   </p>
                 </div>
                 
                 {!isInfinite && unlockDate && (
                   <div className="space-y-1">
-                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Unlock Date</span>
-                    <p className="text-sm font-semibold">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Unlock Date</span>
+                    <p className="text-sm font-black text-slate-900">
                       {format(unlockDate, "PPPP 'at' p")}
                     </p>
                   </div>
@@ -173,7 +163,7 @@ const BlockedUserOverlay: React.FC<BlockedUserOverlayProps> = ({ details, onSign
               
               {details.reviewed && (
                 <div className="pt-2">
-                  <div className={`text-xs font-bold inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${details.decision ? 'bg-green-100 text-green-700 dark:bg-green-900/30' : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30'}`}>
+                  <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-black ${details.decision ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                     <div className={`w-1.5 h-1.5 rounded-full ${details.decision ? 'bg-green-500' : 'bg-orange-500'}`} />
                     Final Review Completed
                   </div>
@@ -181,25 +171,23 @@ const BlockedUserOverlay: React.FC<BlockedUserOverlayProps> = ({ details, onSign
               )}
             </div>
 
-            {/* Appeal Section */}
             <AnimatePresence mode="wait">
               {hasAlreadyAppealed ? (
                 <motion.div 
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900/50 rounded-xl p-6 space-y-3"
+                  className="space-y-3 rounded-[2rem] border border-cyan-600/15 bg-cyan-600/[0.04] p-5"
                 >
-                  <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 font-bold tracking-tight uppercase text-xs">
+                  <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-cyan-700">
                     <CheckCircle2 className="w-4 h-4" />
                     Appeal Submitted
                   </div>
-                  <div className="flex items-start gap-2.5 text-blue-800 dark:text-blue-300">
-                    <Info className="w-4 h-4 mt-0.5 shrink-0" />
-                    <p className="text-sm font-medium leading-relaxed">
+                  <div className="text-slate-600">
+                    <p className="text-sm font-semibold leading-relaxed">
                       Your appeal request has been received and is currently being processed by our moderation team.
                     </p>
                   </div>
-                  <p className="text-[11px] text-muted-foreground pt-1 border-t border-blue-200/50 dark:border-blue-800/50">
+                  <p className="border-t border-cyan-600/10 pt-3 text-[11px] font-semibold text-slate-400">
                     Response time typically varies from 24 to 48 hours depending on queue volume. You will be notified once a decision is made.
                   </p>
                 </motion.div>
@@ -211,13 +199,12 @@ const BlockedUserOverlay: React.FC<BlockedUserOverlayProps> = ({ details, onSign
                   className="space-y-4"
                 >
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-destructive font-bold uppercase text-xs">
-                      <AlertCircle className="w-4 h-4" />
+                    <div className="text-xs font-black uppercase tracking-[0.18em] text-cyan-700">
                       State your case for appeal
                     </div>
                     <Textarea 
                       placeholder="Explain why you believe this restriction should be lifted..."
-                      className="min-h-[120px] bg-background border-border/50 focus:ring-destructive/30 resize-none pt-3"
+                      className="min-h-[128px] resize-none rounded-[1.5rem] border-cyan-600/15 bg-cyan-600/[0.04] pt-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-cyan-500/30"
                       value={appealText}
                       onChange={(e) => setAppealText(e.target.value)}
                     />
@@ -227,6 +214,7 @@ const BlockedUserOverlay: React.FC<BlockedUserOverlayProps> = ({ details, onSign
                       variant="ghost" 
                       onClick={() => setShowAppealForm(false)}
                       disabled={isSubmitting}
+                      className="h-12 rounded-2xl font-black text-slate-500 hover:bg-slate-100 hover:text-slate-900"
                     >
                       Cancel
                     </Button>
@@ -234,7 +222,7 @@ const BlockedUserOverlay: React.FC<BlockedUserOverlayProps> = ({ details, onSign
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button 
-                          className="bg-destructive hover:bg-destructive/90 text-white gap-2"
+                          className="h-12 gap-2 rounded-2xl bg-gradient-to-r from-cyan-600 to-teal-500 font-black text-white shadow-2xl shadow-cyan-700/20 hover:from-cyan-500 hover:to-teal-400"
                           disabled={isSubmitting || !appealText.trim()}
                         >
                           <Send className="w-4 h-4" />
@@ -253,7 +241,7 @@ const BlockedUserOverlay: React.FC<BlockedUserOverlayProps> = ({ details, onSign
                           <AlertDialogCancel>Review Again</AlertDialogCancel>
                           <AlertDialogAction 
                             onClick={handleAppealSubmit}
-                            className="bg-destructive hover:bg-destructive/90 text-white"
+                            className="bg-gradient-to-r from-cyan-600 to-teal-500 text-white hover:from-cyan-500 hover:to-teal-400"
                           >
                             Yes, Submit Appeal
                           </AlertDialogAction>
@@ -265,31 +253,32 @@ const BlockedUserOverlay: React.FC<BlockedUserOverlayProps> = ({ details, onSign
               ) : (
                 <div className="flex flex-col gap-3">
                   <Button 
-                    className="w-full gap-2 bg-destructive hover:bg-destructive/90 text-white"
+                    className="h-14 w-full rounded-2xl bg-gradient-to-r from-cyan-600 to-teal-500 font-black text-white shadow-2xl shadow-cyan-700/20 hover:from-cyan-500 hover:to-teal-400"
                     onClick={() => setShowAppealForm(true)}
                   >
-                    <Mail className="w-4 h-4" />
                     Appeal this decision
                   </Button>
                   
                   <Button 
                     variant="secondary" 
-                    className="w-full gap-2"
+                    className="h-14 w-full rounded-2xl bg-slate-100 font-black text-slate-700 hover:bg-slate-200"
                     onClick={onSignOut}
                   >
-                    <ExternalLink className="w-4 h-4" />
                     Sign Out
                   </Button>
                 </div>
               )}
             </AnimatePresence>
             
-            <p className="text-[10px] text-center text-muted-foreground opacity-70 px-4">
+            <p className="px-4 text-center text-[11px] font-semibold leading-5 text-slate-400">
               Medmacs maintains a safe learning environment. All appeals are final and handled manually by our team.
             </p>
-          </CardContent>
-        </Card>
+        </div>
       </motion.div>
+
+      <p className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+18px)] left-0 right-0 z-20 text-center text-[11px] font-semibold text-slate-400">
+        A project by <span className="font-black text-slate-700">HMACS Studios</span>
+      </p>
     </div>
   );
 };

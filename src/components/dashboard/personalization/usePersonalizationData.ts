@@ -1,10 +1,9 @@
-// @ts-nocheck
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { normalizeWrongAttempts } from './personalizationUtils';
-import { MistakeSubject } from './types';
+import { MistakeChapter, MistakeSubject } from './types';
 
 export const usePersonalizationData = () => {
   const { user } = useAuth();
@@ -74,7 +73,10 @@ export const usePersonalizationData = () => {
   });
 
   const groupedSubjects: MistakeSubject[] = useMemo(() => {
-    const subjects = new Map<string, any>();
+    type WorkingSubject = Omit<MistakeSubject, 'chapters'> & {
+      chapters: Map<string, MistakeChapter>;
+    };
+    const subjects = new Map<string, WorkingSubject>();
     wrongAttempts.forEach(attempt => {
       const subjectKey = attempt.mcq.subjectId || attempt.mcq.subjectName;
       if (!subjects.has(subjectKey)) {
@@ -86,7 +88,7 @@ export const usePersonalizationData = () => {
           total: 0,
         });
       }
-      const subject = subjects.get(subjectKey);
+      const subject = subjects.get(subjectKey)!;
       subject.total += 1;
 
       const chapterKey = attempt.mcq.chapterId;
@@ -102,7 +104,7 @@ export const usePersonalizationData = () => {
       subject.chapters.get(chapterKey).attempts.push(attempt);
     });
 
-    return Array.from(subjects.values()).map(subject => ({
+    return Array.from(subjects.values()).map((subject) => ({
       ...subject,
       chapters: Array.from(subject.chapters.values()).sort((a, b) => b.attempts.length - a.attempts.length),
     }));

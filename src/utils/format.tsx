@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 
 const normalizeAiMarkdown = (text: string) => {
   const normalizedHeadingText = text
+    .replace(/\\n/g, '\n')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/&nbsp;/gi, ' ')
     .replace(/[ \t]+/g, ' ')
@@ -63,8 +64,8 @@ export const renderAiMessageText = (text: string): ReactNode => {
   const flushParagraph = () => {
     if (!paragraphLines.length) return;
     elements.push(
-      <p key={key++} className="mb-2 last:mb-0">
-        {parseBoldText(paragraphLines.join(' '))}
+      <p key={key++} className="mb-2 whitespace-pre-line last:mb-0">
+        {parseBoldText(paragraphLines.join('\n'))}
       </p>
     );
     paragraphLines = [];

@@ -4,6 +4,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
+import { markCurrentDeviceSignedOut } from '@/utils/deviceSessions';
+
+const MEDMACS_NOTIFICATION_CHANNEL_ID = 'medmacs_updates';
+const PRODUCTION_ORIGIN = 'https://medmacs.app';
+const DASHBOARD_REDIRECT_URL = `${PRODUCTION_ORIGIN}/dashboard`;
+
+const getAuthRedirectUrl = (path = '/dashboard') => {
+  const origin = window.location.origin;
+  const isLocalWeb = origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1');
+  const isMedmacsWeb = origin === PRODUCTION_ORIGIN || origin.endsWith('.medmacs.app');
+  const safeOrigin = isLocalWeb || isMedmacsWeb ? origin : PRODUCTION_ORIGIN;
+  return `${safeOrigin}${path}`;
+};
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -16,6 +29,19 @@ export const useAuth = () => {
     if (Capacitor.getPlatform() === 'web') return;
 
     try {
+      if (Capacitor.getPlatform() === 'android') {
+        await PushNotifications.createChannel({
+          id: MEDMACS_NOTIFICATION_CHANNEL_ID,
+          name: 'Medmacs Updates',
+          description: 'Study reminders, announcements, and important Medmacs updates',
+          importance: 5,
+          visibility: 1,
+          vibration: true,
+          lights: true,
+          lightColor: '#14B8A6',
+        });
+      }
+
       // Check/Request Permissions
       let permStatus = await PushNotifications.checkPermissions();
       if (permStatus.receive === 'prompt') {
@@ -23,7 +49,6 @@ export const useAuth = () => {
       }
 
       if (permStatus.receive !== 'granted') {
-        console.warn('Push permissions denied by user');
         return;
       }
 
@@ -31,34 +56,37 @@ export const useAuth = () => {
       await PushNotifications.removeAllListeners(); // Clean old listeners
 
       await PushNotifications.addListener('registration', async (token) => {
-        console.log('FCM Token Generated:', token.value);
-
         // Update Supabase profiles table
         const { error } = await supabase
           .from('profiles')
           .update({ fcm_token: token.value })
           .eq('id', userId);
 
-        if (error) console.error('Supabase token update error:', error);
+        if (error && import.meta.env.DEV) console.error('Supabase token update error:', error);
       });
 
       await PushNotifications.addListener('registrationError', (err) => {
-        console.error('Push registration error:', err.error);
+        if (import.meta.env.DEV) console.error('Push registration error:', err.error);
       });
 
       // Trigger FCM Registration
       await PushNotifications.register();
 
     } catch (error) {
-      console.error('Push initialization failed:', error);
+      if (import.meta.env.DEV) console.error('Push initialization failed:', error);
     }
   }, []);
 
   useEffect(() => {
+    const authTimeoutId = window.setTimeout(() => {
+      if (import.meta.env.DEV) console.warn('Authentication session restoration timed out.');
+      setLoading(false);
+    }, 10000);
+
     // 1. Listen for Auth Changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
-        console.log('Auth state changed:', event);
+        window.clearTimeout(authTimeoutId);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         setLoading(false);
@@ -71,17 +99,27 @@ export const useAuth = () => {
     );
 
     // 2. Check for existing session on mount
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      setLoading(false);
+    supabase.auth.getSession()
+      .then(({ data: { session: currentSession } }) => {
+        window.clearTimeout(authTimeoutId);
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        setLoading(false);
 
-      if (currentSession?.user) {
-        initializePushNotifications(currentSession.user.id);
-      }
-    });
+        if (currentSession?.user) {
+          initializePushNotifications(currentSession.user.id);
+        }
+      })
+      .catch(error => {
+        window.clearTimeout(authTimeoutId);
+        if (import.meta.env.DEV) console.error('Unable to restore authentication session:', error);
+        setLoading(false);
+      });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      window.clearTimeout(authTimeoutId);
+      subscription.unsubscribe();
+    };
   }, [initializePushNotifications]);
 
   const signUp = async (email: string, password: string, userData: any) => {
@@ -98,7 +136,7 @@ export const useAuth = () => {
         password,
         options: {
           data: meta,
-          emailRedirectTo: `${window.location.origin}/dashboard`
+          emailRedirectTo: getAuthRedirectUrl('/dashboard')
         }
       });
       if (error) throw error;
@@ -155,12 +193,26 @@ export const useAuth = () => {
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}/dashboard` },
+        options: { redirectTo: DASHBOARD_REDIRECT_URL },
       });
       if (error) throw error;
       return { data, error: null };
     } catch (error: any) {
       toast({ title: "Google Sign-in Failed", description: error.message, variant: "destructive" });
+      return { data: null, error };
+    }
+  };
+
+  const signInWithFacebook = async () => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'facebook',
+        options: { redirectTo: DASHBOARD_REDIRECT_URL },
+      });
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error: any) {
+      toast({ title: "Facebook Sign-in Failed", description: error.message, variant: "destructive" });
       return { data: null, error };
     }
   };
@@ -181,11 +233,10 @@ export const useAuth = () => {
 
   const signOut = async () => {
     try {
-      // Clear token from DB on logout for security (optional)
       if (user) {
-        await supabase.from('profiles').update({ fcm_token: null }).eq('id', user.id);
+        await markCurrentDeviceSignedOut(user.id);
       }
-      const { error } = await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
       if (error) throw error;
       window.location.href = '/';
     } catch (error: any) {
@@ -203,6 +254,7 @@ export const useAuth = () => {
     signIn,
     signOut,
     signInWithGoogle,
+    signInWithFacebook,
     signInWithGoogleSupabase,
   };
 };

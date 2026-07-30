@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,6 +9,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
 
 const UpdatePassword = () => {
+  type PasswordErrors = {
+    password?: string;
+    confirmPassword?: string;
+  };
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation(); // To get URL parameters like access_token
@@ -19,12 +22,12 @@ const UpdatePassword = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [validationErrors, setValidationErrors] = useState({});
+  const [validationErrors, setValidationErrors] = useState<PasswordErrors>({});
   const [isTokenValid, setIsTokenValid] = useState(false); // To check if the reset token is valid
 
   // Validate password and confirm password in real-time
   useEffect(() => {
-    const errors = {};
+    const errors: PasswordErrors = {};
 
     if (password) {
       if (password.length < 8) {
@@ -117,7 +120,7 @@ const UpdatePassword = () => {
       console.error("Error updating password:", error);
       toast({
         title: "Error",
-        description: error.message || "An unexpected error occurred while updating password. Please try again.",
+        description: error instanceof Error ? error.message : "An unexpected error occurred while updating password. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -168,6 +171,7 @@ const UpdatePassword = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Hide new password" : "Show new password"}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -197,6 +201,7 @@ const UpdatePassword = () => {
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? "Hide password confirmation" : "Show password confirmation"}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2"
                   >
                     {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

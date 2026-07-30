@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client'; // Reverted to relative path
@@ -138,12 +137,17 @@ const MyTestResults = () => {
             if (!selectedTestResultId) return [];
             const { data, error } = await supabase
                 .from('user_question_attempts')
-                .select('id, user_answer, correct_answer, is_correct, is_skipped, mock_test_questions(question, option_a, option_b, option_c, option_d, explanation)')
+                .select('id, question_id, user_answer, correct_answer, is_correct, is_skipped, mock_test_questions(question, option_a, option_b, option_c, option_d, explanation)')
                 .eq('test_result_id', selectedTestResultId)
                 .order('attempted_at', { ascending: true }); // Order for consistent display
 
             if (error) throw new Error(error.message);
-            return data as QuestionAttemptDetail[]; // Cast to the correct type
+            return (data || []).map((attempt) => ({
+                ...attempt,
+                mock_test_questions: Array.isArray(attempt.mock_test_questions)
+                    ? attempt.mock_test_questions[0]
+                    : attempt.mock_test_questions,
+            })) as QuestionAttemptDetail[];
         },
         enabled: !!selectedTestResultId && isDetailDialogOpen, // Only fetch when dialog is open and ID is set
     });
@@ -291,7 +295,6 @@ const MyTestResults = () => {
                             </div>
                         ) : (
                             <ScrollArea className="h-[60vh] pr-4">
-                                {console.log('Number of question attempts fetched:', questionAttempts?.length)}
                                 <div className="space-y-4 py-4">
                                     {questionAttempts && questionAttempts.length > 0 ? (
                                         <Accordion type="multiple" value={openAccordionItems} onValueChange={setOpenAccordionItems} className="w-full">

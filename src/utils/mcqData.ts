@@ -8,6 +8,23 @@ import {
   getOfflineSubjectById,
   getOfflineSubjects,
 } from '@/utils/offlineChapters';
+import {
+  cacheChapterMCQs,
+  cacheChapters,
+  getCachedChapterMCQs,
+  readCachedChapters,
+} from '@/utils/mcqContentCache';
+import { logMCQDiagnostic } from '@/utils/mcqDiagnostics';
+
+const backgroundRefreshAt = new Map<string, number>();
+const BACKGROUND_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
+const shouldRefreshInBackground = (key: string) => {
+  const now = Date.now();
+  const lastRefresh = backgroundRefreshAt.get(key) || 0;
+  if (now - lastRefresh < BACKGROUND_REFRESH_INTERVAL_MS) return false;
+  backgroundRefreshAt.set(key, now);
+  return true;
+};
 
 export interface Subject {
   id: string;
@@ -28,6 +45,9 @@ export interface Chapter {
   subject_id: string;
   mcq_count?: number;
   content_type?: 'question_bank' | 'past_paper' | null;
+  is_locked?: boolean;
+  lock_message?: string | null;
+  lock_updated_at?: string | null;
 }
 
 export interface MCQ {
@@ -82,7 +102,9 @@ const mergeById = <T extends { id: string }>(primary: T[], fallback: T[]) => {
 };
 
 const SUBJECTS_CACHE_KEY = 'medmacs_mcq_subjects_cache';
-const OPTIONAL_QUERY_TIMEOUT_MS = 4000;
+// This query only decorates already-usable subject data, so fail fast instead
+// of making the subject and chapter flows feel like the API is down.
+const OPTIONAL_QUERY_TIMEOUT_MS = 1500;
 
 export const readCachedSubjects = (): Subject[] => {
   if (typeof window === 'undefined') return [];
@@ -138,6 +160,19 @@ const applySubjectFreeUnlimitedFlags = async (subjects: Subject[]) => {
 };
 
 export const fetchSubjects = async (): Promise<Subject[]> => {
+  const cachedSubjects = readCachedSubjects();
+  if (cachedSubjects.length > 0) {
+    if (shouldRefreshInBackground('subjects')) {
+      void fetchCloudContent<Subject[]>('mcq-subjects')
+        .then(async subjects => {
+          if (!subjects?.length) return;
+          cacheSubjects(await applySubjectFreeUnlimitedFlags(subjects));
+        })
+        .catch(() => undefined);
+    }
+    return cachedSubjects;
+  }
+
   const [cloudResult, offlineSubjects] = await Promise.all([
     fetchCloudContent<Subject[]>('mcq-subjects', {}, { throwOnFailure: true })
       .then(data => ({ data, error: null }))
@@ -145,7 +180,6 @@ export const fetchSubjects = async (): Promise<Subject[]> => {
     getOfflineSubjects().catch(() => []),
   ]);
 
-  const cachedSubjects = readCachedSubjects();
   const availableSubjects = mergeById(
     cloudResult.data?.length ? cloudResult.data : cachedSubjects,
     offlineSubjects as Subject[],
@@ -166,6 +200,20 @@ export const fetchSubjectById = async (subjectId: string): Promise<Subject | nul
     };
   };
 
+  const cachedSubject = readCachedSubjects().find(item => item.id === subjectId) ?? null;
+  if (cachedSubject) {
+    if (shouldRefreshInBackground(`subject:${subjectId}`)) {
+      void fetchCloudContent<Subject>('mcq-subject', { subjectId })
+        .then(subject => {
+          if (!subject) return;
+          const subjects = mergeById([subject], readCachedSubjects());
+          cacheSubjects(subjects);
+        })
+        .catch(() => undefined);
+    }
+    return withFreeUnlimitedFlag(cachedSubject);
+  }
+
   let cloudError: unknown = null;
   const subject = await fetchCloudContent<Subject>('mcq-subject', { subjectId }, { throwOnFailure: true })
     .catch(error => {
@@ -178,12 +226,24 @@ export const fetchSubjectById = async (subjectId: string): Promise<Subject | nul
   if (offlineSubject) return withFreeUnlimitedFlag(offlineSubject as Subject);
 
   const subjects = await fetchSubjects();
-  const cachedSubject = subjects.find(item => item.id === subjectId) ?? null;
-  if (!cachedSubject && cloudError) throw cloudError;
-  return cachedSubject;
+  const fallbackSubject = subjects.find(item => item.id === subjectId) ?? null;
+  if (!fallbackSubject && cloudError) throw cloudError;
+  return fallbackSubject;
 };
 
 export const fetchChaptersBySubject = async (subjectId: string): Promise<Chapter[]> => {
+  const cachedChapters = readCachedChapters(subjectId);
+  if (cachedChapters.length > 0) {
+    if (shouldRefreshInBackground(`chapters:${subjectId}`)) {
+      void fetchCloudContent<Chapter[]>('mcq-chapters', { subjectId })
+        .then(chapters => {
+          if (chapters?.length) cacheChapters(subjectId, chapters);
+        })
+        .catch(() => undefined);
+    }
+    return cachedChapters.sort((a, b) => a.chapter_number - b.chapter_number);
+  }
+
   const [cloudResult, offlineChapters] = await Promise.all([
     fetchCloudContent<Chapter[]>('mcq-chapters', { subjectId }, { throwOnFailure: true })
       .then(data => ({ data, error: null }))
@@ -192,11 +252,18 @@ export const fetchChaptersBySubject = async (subjectId: string): Promise<Chapter
   ]);
 
   if (cloudResult.error && offlineChapters.length === 0) throw cloudResult.error;
-  return mergeById(cloudResult.data ?? [], offlineChapters as Chapter[])
+  const chapters = mergeById(cloudResult.data ?? [], offlineChapters as Chapter[])
     .sort((a, b) => a.chapter_number - b.chapter_number);
+  cacheChapters(subjectId, chapters);
+  return chapters;
 };
 
 export const fetchChapterById = async (chapterId: string, subjectId?: string): Promise<Chapter | null> => {
+  if (subjectId) {
+    const cachedChapter = readCachedChapters(subjectId).find(chapter => chapter.id === chapterId);
+    if (cachedChapter) return cachedChapter;
+  }
+
   const chapter = await fetchCloudContent<Chapter>('mcq-chapter', { chapterId, subjectId });
   if (chapter) return chapter;
 
@@ -209,9 +276,72 @@ export const fetchChapterById = async (chapterId: string, subjectId?: string): P
 };
 
 export const fetchMCQsByChapter = async (chapterId: string): Promise<MCQ[]> => {
+  const startedAt = performance.now();
+  const cachedMcqs = await getCachedChapterMCQs(chapterId);
+  if (cachedMcqs.length > 0) {
+    logMCQDiagnostic('content_cache_hit', {
+      chapterId,
+      durationMs: Math.round(performance.now() - startedAt),
+      questionCount: cachedMcqs.length,
+    });
+    if (shouldRefreshInBackground(`mcqs:${chapterId}`)) {
+      void fetchCloudContent<MCQ[]>('mcqs', { chapterId })
+        .then(mcqs => mcqs?.length ? cacheChapterMCQs(chapterId, mcqs) : undefined)
+        .catch(() => undefined);
+    }
+    return cachedMcqs;
+  }
+
+  // A downloaded chapter is a complete local snapshot. Prefer it before
+  // consulting navigator.onLine or waiting for the content API because
+  // Android WebView can report "online" without usable internet access.
+  const downloadedMcqs = await getOfflineMCQsByChapter(chapterId) as MCQ[];
+  if (downloadedMcqs.length > 0) {
+    logMCQDiagnostic('content_downloaded_hit', {
+      chapterId,
+      durationMs: Math.round(performance.now() - startedAt),
+      questionCount: downloadedMcqs.length,
+    });
+    await cacheChapterMCQs(chapterId, downloadedMcqs);
+    return downloadedMcqs;
+  }
+
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    logMCQDiagnostic('content_unavailable', {
+      chapterId,
+      durationMs: Math.round(performance.now() - startedAt),
+      questionCount: 0,
+    }, 'error');
+    return [];
+  }
+
+  logMCQDiagnostic('content_cache_miss', {
+    chapterId,
+    durationMs: Math.round(performance.now() - startedAt),
+  });
+  const networkStartedAt = performance.now();
   const cloudMcqs = await fetchCloudContent<MCQ[]>('mcqs', { chapterId });
-  if (cloudMcqs?.length) return cloudMcqs;
-  return await getOfflineMCQsByChapter(chapterId) as MCQ[];
+  if (cloudMcqs?.length) {
+    await cacheChapterMCQs(chapterId, cloudMcqs);
+    logMCQDiagnostic('content_network_complete', {
+      chapterId,
+      durationMs: Math.round(performance.now() - networkStartedAt),
+      questionCount: cloudMcqs.length,
+    });
+    return cloudMcqs;
+  }
+  const offlineMcqs = await getOfflineMCQsByChapter(chapterId) as MCQ[];
+  logMCQDiagnostic(
+    offlineMcqs.length > 0 ? 'content_offline_fallback' : 'content_unavailable',
+    {
+      chapterId,
+      durationMs: Math.round(performance.now() - networkStartedAt),
+      questionCount: offlineMcqs.length,
+    },
+    offlineMcqs.length > 0 ? 'warn' : 'error',
+  );
+  if (offlineMcqs.length) await cacheChapterMCQs(chapterId, offlineMcqs);
+  return offlineMcqs;
 };
 
 export const fetchMCQsBySubject = async (subjectId: string): Promise<MCQ[]> => {

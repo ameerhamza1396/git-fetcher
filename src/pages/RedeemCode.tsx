@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -17,7 +16,7 @@ const RedeemCode = () => {
     const successModalRef = useRef(null);
     const [activatedPlan, setActivatedPlan] = useState("");
     const [days, setDays] = useState(0);
-    const headerRef = useRef<HTMLElement>(null);
+    const headerRef = useRef<HTMLDivElement>(null);
     const lastScrollY = useRef(0);
     const [headerVisible, setHeaderVisible] = useState(true);
 
@@ -64,86 +63,101 @@ const RedeemCode = () => {
     };
 
     return (
-        <div className="min-h-screen w-full bg-gradient-to-br from-[#0a2e2e] via-[#0f172a] to-[#020617] text-white relative overflow-x-hidden">
+        <div className="dashboard-modern-font min-h-screen w-full bg-background bg-mesh text-foreground relative overflow-x-hidden">
             <Seo title="Redeem Code" />
 
             <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-                <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#2dd4bf]/20 rounded-full blur-3xl animate-pulse" />
-                <div className="absolute top-1/2 -right-32 w-80 h-80 bg-[#0ea5e9]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-                <div className="absolute -bottom-24 left-1/3 w-72 h-72 bg-[#67e8f9]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
-                <div className="absolute inset-0 opacity-[0.03]" style={{
-                    backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.5) 20px, rgba(255,255,255,0.5) 21px)`
-                }} />
+                <div className="absolute -top-32 -left-32 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
+                <div className="absolute top-1/2 -right-32 w-80 h-80 bg-primary/5 rounded-full blur-3xl" />
             </div>
 
-            <dialog ref={successModalRef} className="rounded-[2rem] p-8 w-80 bg-gradient-to-br from-[#2dd4bf] to-[#0ea5e9] text-white shadow-2xl border-0 backdrop:bg-slate-950/70">
-                <h3 className="text-xl font-black uppercase">Congratulations</h3>
-                <p className="mt-3 text-sm text-white/80">
-                    Your <b className="text-white">{activatedPlan}</b> plan is activated for <b className="text-white">{days}</b> days!
+            <dialog ref={successModalRef} className="w-[calc(100vw-2rem)] max-w-sm rounded-3xl border border-border bg-card p-6 text-card-foreground shadow-2xl backdrop:bg-background/80 backdrop:backdrop-blur-sm">
+                <div className="mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-primary/10"><Sparkles className="h-6 w-6 text-primary" /></div>
+                <h3 className="text-xl font-black">Congratulations!</h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    Your <b className="text-foreground">{activatedPlan}</b> plan is activated for <b className="text-foreground">{days}</b> days.
                 </p>
                 <div className="mt-5">
-                    <Button onClick={() => successModalRef.current.close()} className="w-full bg-white text-[#0f766e] hover:bg-white/90 font-black uppercase tracking-widest rounded-xl h-11">OK</Button>
+                    <Button onClick={() => successModalRef.current.close()} className="w-full rounded-xl h-11 font-bold">Continue</Button>
                 </div>
             </dialog>
 
             <div
                 ref={headerRef}
-                className={`fixed top-0 left-0 right-0 z-50 bg-[#07171f]/75 backdrop-blur-2xl border-b border-white/10 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
+                className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-2xl border-b border-border/30 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
             >
-                <div className="container mx-auto px-5 h-14 flex justify-between items-center max-w-7xl">
-                    <Link to="/dashboard">
-                        <Button variant="ghost" size="sm" className="w-9 h-9 p-0 text-white/70 hover:text-white hover:bg-white/10">
-                            <ArrowLeft className="h-5 w-5" />
+                <div className="container mx-auto grid h-14 max-w-7xl grid-cols-[2.25rem_minmax(0,1fr)_2.25rem] items-center px-5">
+                    <Link to="/dashboard" className="justify-self-start">
+                        <Button variant="ghost" size="sm" className="w-9 h-9 p-0 text-muted-foreground hover:text-foreground hover:bg-accent">
+                            <ArrowLeft className="h-5 w-5 text-foreground" />
                         </Button>
                     </Link>
-                    <div className="flex items-center gap-2">
-                        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-7 h-7" />
-                        <span className="text-lg font-black text-white">Redeem Code</span>
+                    <div className="flex min-w-0 items-center justify-center gap-2 justify-self-center">
+                        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs" className="h-6 w-6 shrink-0 object-contain" />
+                        <span className="whitespace-nowrap text-base font-black leading-none text-foreground">Redeem Code</span>
                     </div>
-                    <div className="w-9" />
+                    <div className="h-9 w-9 justify-self-end" aria-hidden="true" />
                 </div>
             </div>
 
             <main className="relative z-10 container mx-auto px-5 py-8 max-w-md mt-[var(--header-height)]">
-                <div className="text-center mb-8">
-                    <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md rounded-full px-4 py-1.5 mb-4 border border-white/10">
-                        <Sparkles className="w-3.5 h-3.5 text-[#2dd4bf]" />
-                        <span className="text-[#2dd4bf] text-xs font-semibold uppercase tracking-widest">Premium gift</span>
+                <div className="mb-8 flex flex-col items-center text-center">
+                    <div className="inline-flex items-center space-x-2 bg-primary/10 rounded-full px-4 py-1.5 mb-4 border border-primary/15">
+                        <Sparkles className="w-3.5 h-3.5 text-primary" />
+                        <span className="text-primary text-[10px] font-bold uppercase tracking-widest">Access code</span>
                     </div>
                     <div className="relative inline-flex mb-5">
-                        <div className="absolute inset-0 bg-[#2dd4bf] blur-2xl opacity-30 rounded-full" />
-                        <div className="relative bg-gradient-to-br from-[#2dd4bf] to-[#0ea5e9] p-5 rounded-3xl shadow-2xl shadow-[#0ea5e9]/20">
-                            <Gift className="w-10 h-10 text-white" />
+                        <div className="absolute inset-0 bg-primary blur-2xl opacity-20 rounded-full" />
+                        <div className="relative bg-primary p-5 rounded-3xl shadow-xl shadow-primary/20">
+                            <Gift className="w-9 h-9 text-primary-foreground" />
                         </div>
                     </div>
-                    <h1 className="text-3xl font-black text-white tracking-tight">
-                        Redeem Your Gift Code
+                    <h1 className="text-3xl font-black text-foreground tracking-tight">
+                        Redeem Access Code
                     </h1>
-                    <p className="text-white/50 text-sm mt-2">Enter your code to unlock premium access.</p>
+                    <p className="text-muted-foreground text-sm mt-2">Enter your code to activate the associated offer.</p>
                 </div>
 
-                <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#2dd4bf] via-[#0ea5e9] to-[#155e75] text-white shadow-2xl shadow-[#0ea5e9]/20 p-1">
-                    <div className="absolute inset-0 opacity-10" style={{
-                        backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.4) 20px, rgba(255,255,255,0.4) 40px)`,
-                        maskImage: 'radial-gradient(circle at center, black 30%, transparent 80%)'
-                    }} />
-                    <div className="relative z-10 bg-white/10 backdrop-blur-xl rounded-[1.8rem] p-6 border border-white/10 space-y-5">
+                <div className="relative overflow-hidden rounded-3xl border border-border/50 bg-card/90 shadow-xl shadow-black/5 backdrop-blur-xl">
+                    <div className="h-1 w-full bg-gradient-to-r from-primary/30 via-primary to-primary/30" />
+                    <div className="relative z-10 p-6 space-y-5">
                         <div>
-                            <p className="text-xs font-bold uppercase tracking-widest text-white/60 mb-2">Enter Promo Code</p>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Enter promo code</p>
                             <Input
                                 placeholder="ABCD-1234"
                                 value={code}
                                 onChange={(e) => setCode(e.target.value)}
-                                className="bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-xl h-12 text-center text-lg font-mono tracking-widest"
+                                className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/60 rounded-xl h-12 text-center text-lg font-mono uppercase tracking-widest focus-visible:ring-primary"
                             />
                         </div>
-                        {errorMsg && <p className="text-red-300 text-sm text-center font-medium">{errorMsg}</p>}
+                        {errorMsg && <p className="rounded-xl border border-destructive/15 bg-destructive/10 px-3 py-2.5 text-destructive text-xs text-center font-medium">{errorMsg}</p>}
                         <Button onClick={handleRedeem} disabled={loading}
-                            className="w-full bg-white text-[#0f766e] hover:bg-white/90 hover:scale-[1.02] transition-all rounded-xl h-12 uppercase font-black text-xs tracking-widest shadow-2xl">
+                            className="w-full transition-all rounded-xl h-12 font-black text-xs tracking-wide shadow-lg shadow-primary/15">
                             {loading ? "Processing..." : "Redeem Code"}
                         </Button>
                     </div>
                 </div>
+
+                <section className="mt-5 rounded-2xl border border-border/40 bg-card/60 p-4 text-left shadow-sm backdrop-blur-sm">
+                    <h2 className="text-xs font-black text-foreground">Before you redeem</h2>
+                    <div className="mt-3 space-y-3">
+                        {[
+                            ['1', 'Enter the code exactly as it was shared with you.'],
+                            ['2', 'Redemption offers can only be applied while your current plan is Free.'],
+                            ['3', 'Eligible access is activated immediately after successful verification.'],
+                        ].map(([step, text]) => (
+                            <div key={step} className="flex items-start gap-3">
+                                <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-black text-primary">{step}</span>
+                                <p className="text-[11px] leading-5 text-muted-foreground">{text}</p>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
+                <footer className="pb-4 pt-8 text-center">
+                    <p className="text-[10px] font-medium text-muted-foreground">A Project by Hmacs Studios.</p>
+                    <p className="mt-1 text-[10px] text-muted-foreground">© 2026 Hmacs Studios. All rights reserved</p>
+                </footer>
             </main>
         </div>
     );
