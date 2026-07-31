@@ -245,8 +245,10 @@ const fetchScopedSubjects = async (client: any, table: string) => {
   const instituteScope = await getInstituteScope(client, profile.institute);
   const yearOptions = getInstituteYearOptions(instituteScope);
   const normalizedProfileYear = String(profile?.year || '').trim();
-  const effectiveYear = normalizedProfileYear || (yearOptions.length === 1 ? yearOptions[0] : null);
+  const effectiveYear = normalizedProfileYear || null;
 
+  // Specialized curricula must never infer a specialty for a profile whose
+  // year is null. Even a single available option must be selected explicitly.
   if (yearOptions.length > 0 && !effectiveYear) {
     return [];
   }
@@ -460,6 +462,21 @@ export default async function handler(req: ContentRequest, res: ContentResponse)
 
       case 'mcqs': {
         if (!chapterId) return res.status(400).json({ error: 'chapterId is required' });
+
+        // Resolve the parent subject before returning questions. This prevents
+        // callers from bypassing year/specialty visibility with a known chapter
+        // UUID, including FCPS-1 profiles whose year is null.
+        const { data: chapterScope, error: chapterScopeError } = await client
+          .from('chapters')
+          .select('subject_id')
+          .eq('id', chapterId)
+          .maybeSingle();
+        if (chapterScopeError) throw chapterScopeError;
+        if (!chapterScope?.subject_id) return res.status(404).json({ error: 'Chapter not found' });
+
+        const visibleSubject = await fetchVisibleSubject(client, chapterScope.subject_id);
+        if (!visibleSubject) return res.status(404).json({ error: 'Chapter not found' });
+
         const { data, error } = await client
           .from('mcqs')
           .select('*')

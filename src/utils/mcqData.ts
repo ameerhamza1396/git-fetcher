@@ -106,6 +106,20 @@ const SUBJECTS_CACHE_KEY = 'medmacs_mcq_subjects_cache';
 // of making the subject and chapter flows feel like the API is down.
 const OPTIONAL_QUERY_TIMEOUT_MS = 1500;
 
+const hasExplicitProfileYear = async (): Promise<boolean> => {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData.user) return false;
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('year')
+    .eq('id', authData.user.id)
+    .maybeSingle();
+
+  if (profileError) return false;
+  return String(profile?.year || '').trim().length > 0;
+};
+
 export const readCachedSubjects = (): Subject[] => {
   if (typeof window === 'undefined') return [];
   try {
@@ -160,6 +174,11 @@ const applySubjectFreeUnlimitedFlags = async (subjects: Subject[]) => {
 };
 
 export const fetchSubjects = async (): Promise<Subject[]> => {
+  if (!(await hasExplicitProfileYear())) {
+    if (typeof window !== 'undefined') localStorage.removeItem(SUBJECTS_CACHE_KEY);
+    return [];
+  }
+
   const cachedSubjects = readCachedSubjects();
   if (cachedSubjects.length > 0) {
     if (shouldRefreshInBackground('subjects')) {
@@ -191,6 +210,8 @@ export const fetchSubjects = async (): Promise<Subject[]> => {
 };
 
 export const fetchSubjectById = async (subjectId: string): Promise<Subject | null> => {
+  if (!(await hasExplicitProfileYear())) return null;
+
   const withFreeUnlimitedFlag = async (subject: Subject | null) => {
     if (!subject) return null;
     const flags = await fetchSubjectFreeUnlimitedFlags([subject.id]);
@@ -232,6 +253,8 @@ export const fetchSubjectById = async (subjectId: string): Promise<Subject | nul
 };
 
 export const fetchChaptersBySubject = async (subjectId: string): Promise<Chapter[]> => {
+  if (!(await hasExplicitProfileYear())) return [];
+
   const cachedChapters = readCachedChapters(subjectId);
   if (cachedChapters.length > 0) {
     if (shouldRefreshInBackground(`chapters:${subjectId}`)) {
@@ -259,6 +282,8 @@ export const fetchChaptersBySubject = async (subjectId: string): Promise<Chapter
 };
 
 export const fetchChapterById = async (chapterId: string, subjectId?: string): Promise<Chapter | null> => {
+  if (!(await hasExplicitProfileYear())) return null;
+
   if (subjectId) {
     const cachedChapter = readCachedChapters(subjectId).find(chapter => chapter.id === chapterId);
     if (cachedChapter) return cachedChapter;
@@ -276,6 +301,8 @@ export const fetchChapterById = async (chapterId: string, subjectId?: string): P
 };
 
 export const fetchMCQsByChapter = async (chapterId: string): Promise<MCQ[]> => {
+  if (!(await hasExplicitProfileYear())) return [];
+
   const startedAt = performance.now();
   const cachedMcqs = await getCachedChapterMCQs(chapterId);
   if (cachedMcqs.length > 0) {
@@ -345,6 +372,7 @@ export const fetchMCQsByChapter = async (chapterId: string): Promise<MCQ[]> => {
 };
 
 export const fetchMCQsBySubject = async (subjectId: string): Promise<MCQ[]> => {
+  if (!(await hasExplicitProfileYear())) return [];
   return await fetchCloudContent<MCQ[]>('mcqs-by-subject', { subjectId }) ?? [];
 };
 
