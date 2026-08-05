@@ -1,4 +1,4 @@
--- FCPS Part-1 directory seed: subjects and chapters only.
+-- FCPS Part-1 Medicine & Allied directory seed: subjects and chapters only.
 -- Safe to run before app v30 because it does not move users, progress, or MCQs.
 -- Re-runnable: existing subjects/chapters are reused by name + specialty/year.
 -- Paper labels are based on the Medicine & Allied and Surgery & Allied curriculum PDFs supplied on 2026-07-30.
@@ -28,14 +28,14 @@ begin
     'FCPS-1',
     false,
     'specialized_test',
-    array['medicine_allied', 'surgery_allied', 'gynea_obs', 'anesthesia', 'radiology']::text[],
+    array['medicine_allied']::text[],
     jsonb_build_object('mcqs', true, 'seqs', false, 'viva', false)
   where not exists (select 1 from public.institutes where lower(code) = 'fcps_part_1');
 
   update public.institutes
   set
     category = 'specialized_test',
-    years = array['medicine_allied', 'surgery_allied', 'gynea_obs', 'anesthesia', 'radiology']::text[],
+    years = array['medicine_allied']::text[],
     dashboard_components = jsonb_build_object('mcqs', true, 'seqs', false, 'viva', false)
   where lower(code) = 'fcps_part_1';
 
@@ -250,6 +250,23 @@ begin
     ('surgery_allied:pathology:paper_2', 'Infection Control', 6),
     ('surgery_allied:pathology:paper_2', 'Nutritional Diseases', 7);
 
+  -- This release intentionally exposes only Medicine & Allied. The additional
+  -- curriculum rows above are retained as future-ready source data but are not
+  -- inserted into the live subjects/chapters tables by this migration.
+  delete from fcps_chapter_seed
+  where subject_key not like 'medicine_allied:%';
+
+  delete from fcps_subject_seed
+  where specialty <> 'medicine_allied';
+
+  if (select count(*) from fcps_subject_seed) <> 12 then
+    raise exception 'FCPS Medicine & Allied subject seed must contain exactly 12 subjects';
+  end if;
+
+  if (select count(*) from fcps_chapter_seed) <> 117 then
+    raise exception 'FCPS Medicine & Allied chapter seed must contain exactly 117 chapters';
+  end if;
+
   for v_subject in select * from fcps_subject_seed order by specialty, display_order loop
     select s.id
     into v_subject_id
@@ -299,3 +316,12 @@ begin
     end loop;
   end loop;
 end $$;
+
+-- Post-run verification: expected result is 12 subjects and 117 chapters.
+select
+  count(distinct s.id) as subject_count,
+  count(c.id) as chapter_count
+from public.subjects s
+left join public.chapters c on c.subject_id = s.id
+where s.year = 'medicine_allied'
+  and s.institutes = to_jsonb(array['fcps_part_1']::text[]);
