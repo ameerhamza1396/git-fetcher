@@ -1486,8 +1486,6 @@ export const MCQDisplay = ({
       return;
     }
     const summaryCount = summaryGenerationCounts[currentMCQ.id] || 0;
-    if (summaryCount >= 3) return;
-
     setIsSummarizingReferences(true);
     setReferenceActionError('');
     try {
@@ -1543,11 +1541,6 @@ export const MCQDisplay = ({
       return;
     }
     const explainCount = explainGenerationCounts[currentMCQ.id] || 0;
-    if (explainCount >= 3) {
-      toast({ title: "AI explain limit reached", description: "Try again on another question." });
-      return;
-    }
-
     setIsExplainingOptions(true);
     setReferenceActionError('');
     try {

@@ -40,6 +40,12 @@ interface GroupedPlan {
     };
     contactOnly?: boolean;
 }
+interface AiFeaturePolicy {
+    plan: string;
+    feature: string;
+    enabled: boolean;
+    daily_requests: number | null;
+}
 
 // Fixed, saturated identity per plan — intentionally constant across light/dark,
 // the way a lab-result card keeps its color coding regardless of the room lighting.
@@ -127,6 +133,18 @@ const Pricing = () => {
         },
     });
 
+    const { data: quotaPolicies, isLoading: areQuotaPoliciesLoading } = useQuery<AiFeaturePolicy[]>({
+        queryKey: ['pricingQuotaPolicies'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('ai_feature_policies')
+                .select('plan, feature, enabled, daily_requests')
+                .in('feature', ['reference', 'reference-explain', 'reference-summary']);
+            if (error) throw new Error('Could not load plan limits.');
+            return data || [];
+        },
+    });
+
     const { data: profile, isLoading: isProfileLoading } = useQuery<{ plan: string } | null>({
         queryKey: ['profile', user?.id],
         queryFn: async () => {
@@ -146,6 +164,17 @@ const Pricing = () => {
 
     const plans: GroupedPlan[] = useMemo(() => {
         if (!fetchedPlans) return [];
+        const quotaLabel = (planName: string, feature: string, label: string) => {
+            const policy = quotaPolicies?.find((item) => item.plan === planName && item.feature === feature);
+            if (!policy || !policy.enabled || policy.daily_requests === 0) return null;
+            return `${policy.daily_requests === null ? 'Unlimited' : policy.daily_requests} ${label} daily`;
+        };
+        const cloudQuotaFeatures = (planName: string) => [
+            `${planName === 'free' ? 50 : 'Unlimited'} MCQ submissions${planName === 'free' ? ' daily' : ''}`,
+            quotaLabel(planName, 'reference', 'book references'),
+            quotaLabel(planName, 'reference-explain', 'option explains'),
+            quotaLabel(planName, 'reference-summary', 'AI summaries'),
+        ].filter((feature): feature is string => Boolean(feature));
         const grouped: { [key: string]: GroupedPlan } = {};
         fetchedPlans.forEach((p) => {
             if (!grouped[p.name]) {
@@ -167,7 +196,7 @@ const Pricing = () => {
             const priceDetails = {
                 price: p.name === 'free' ? '0' : p.price.toString(),
                 originalPrice: p.original_price ? p.original_price.toString() : null,
-                features: p.features,
+                features: [...p.features, ...cloudQuotaFeatures(p.name)],
             };
             if (p.type === 'monthly') {
                 grouped[p.name].monthly[p.currency as 'PKR' | 'USD'] = priceDetails;
@@ -223,7 +252,7 @@ const Pricing = () => {
             const orderB = fetchedPlans.find((p) => p.name === b.name)?.order || 99;
             return orderA - orderB;
         });
-    }, [fetchedPlans]);
+    }, [fetchedPlans, quotaPolicies]);
 
     // Horizontal scroll-spy: which card is centered in the swipe track.
     // Root is the track itself (not the viewport), since cards sit side by side.
@@ -249,7 +278,7 @@ const Pricing = () => {
         cardRefs.current[id]?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     };
 
-    if (isAuthLoading || isProfileLoading || arePlansLoading) {
+    if (isAuthLoading || isProfileLoading || arePlansLoading || areQuotaPoliciesLoading) {
         return <PageSkeleton />;
     }
 
