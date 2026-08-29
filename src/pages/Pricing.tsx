@@ -193,10 +193,13 @@ const Pricing = () => {
                     },
                 };
             }
+            const filteredFeatures = p.features.filter(
+                (f) => !f.toLowerCase().includes('ad')
+            );
             const priceDetails = {
                 price: p.name === 'free' ? '0' : p.price.toString(),
                 originalPrice: p.original_price ? p.original_price.toString() : null,
-                features: [...p.features, ...cloudQuotaFeatures(p.name)],
+                features: [...cloudQuotaFeatures(p.name), ...filteredFeatures],
             };
             if (p.type === 'monthly') {
                 grouped[p.name].monthly[p.currency as 'PKR' | 'USD'] = priceDetails;
