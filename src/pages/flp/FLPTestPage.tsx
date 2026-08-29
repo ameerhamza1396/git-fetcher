@@ -41,6 +41,7 @@ const FLPTestPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [mcqs, setMcqs] = useState<ShuffledMCQ[]>([]);
   const [subjectName, setSubjectName] = useState('');
+  const [sessionId, setSessionId] = useState<string | undefined>();
   const [initialIndex, setInitialIndex] = useState<number | undefined>();
   const [initialAnswers, setInitialAnswers] = useState<Record<string, string | null> | undefined>();
   const [initialTimeLeft, setInitialTimeLeft] = useState<number | undefined>();
@@ -56,11 +57,13 @@ const FLPTestPage = () => {
         mcqs?: ShuffledMCQ[];
         subjectName?: string;
         mcqCount?: number;
+        sessionId?: string;
       } | null;
 
       if (state?.mcqs && state.mcqs.length > 0) {
         setMcqs(state.mcqs);
         setSubjectName(state.subjectName || '');
+        setSessionId(state.sessionId);
         setIsLoading(false);
         return;
       }
@@ -168,6 +171,7 @@ const FLPTestPage = () => {
       initialIndex={initialIndex}
       initialAnswers={initialAnswers}
       initialTimeLeft={initialTimeLeft}
+      sessionId={sessionId}
     />
   );
 };

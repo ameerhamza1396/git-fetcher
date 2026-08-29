@@ -46,6 +46,7 @@ interface FLPQuizProps {
   initialIndex?: number;
   initialAnswers?: Record<string, string | null>;
   initialTimeLeft?: number;
+  sessionId?: string;
 }
 
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -68,7 +69,7 @@ interface FLPSessionData {
   savedAt: number;
 }
 
-export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, initialIndex, initialAnswers, initialTimeLeft }: FLPQuizProps) => {
+export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, initialIndex, initialAnswers, initialTimeLeft, sessionId }: FLPQuizProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -141,11 +142,27 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
       questionsAttemptDetails.push({ mcq_id: mcq.id, selectedAnswer: userAnswer, isCorrect, timeTaken: 0 });
     });
     const flpTestConfigId = 'flp_weekly_test_id';
-    const resultData = { user_id: user.id, username: user.email ? user.email.split('@')[0] : 'unknown', score: finalScore, total_questions: totalQuestions, completed_at: new Date().toISOString(), test_config_id: flpTestConfigId, question_attempts: questionsAttemptDetails };
+    const resultData = { user_id: user.id, username: user.email ? user.email.split('@')[0] : 'unknown', score: finalScore, total_questions: totalQuestions, completed_at: new Date().toISOString(), test_config_id: flpTestConfigId, question_attempts: questionsAttemptDetails, status: 'completed' };
     try {
-      await (supabase as any).from('flp_user_attempts').delete().eq('user_id', user.id).eq('test_config_id', flpTestConfigId);
-      const { data: insertedResult, error: insertError } = await (supabase as any).from('flp_user_attempts').insert([resultData]).select('id').single();
-      if (insertError) throw insertError;
+      let activeResultId = '';
+      if (sessionId) {
+        const { error: updateError } = await (supabase as any)
+          .from('flp_user_attempts')
+          .update({
+            score: finalScore,
+            completed_at: new Date().toISOString(),
+            question_attempts: questionsAttemptDetails,
+            status: 'completed'
+          })
+          .eq('id', sessionId);
+        if (updateError) throw updateError;
+        activeResultId = sessionId;
+      } else {
+        await (supabase as any).from('flp_user_attempts').delete().eq('user_id', user.id).eq('test_config_id', flpTestConfigId);
+        const { data: insertedResult, error: insertError } = await (supabase as any).from('flp_user_attempts').insert([resultData]).select('id').single();
+        if (insertError) throw insertError;
+        activeResultId = (insertedResult as any).id;
+      }
       const { data: profileBadges } = await (supabase as any).from('profiles').select('badges').eq('id', user.id).maybeSingle();
       const currentBadges = profileBadges?.badges || {};
       const currentStats = currentBadges.stats || {};
@@ -163,10 +180,10 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
         })
         .eq('id', user.id);
       notifyAchievementProgress('flp_completed');
-      setCurrentTestResultId((insertedResult as any).id);
+      setCurrentTestResultId(activeResultId);
       setIsQuizEnded(true);
       toast({ title: autoSubmit ? "Time's Up! Test Submitted." : "Test Submitted!", description: `You scored ${finalScore}/${totalQuestions}.`, duration: 3000 });
-      navigate(`/results/flp/${(insertedResult as any).id}`);
+      navigate(`/results/flp/${activeResultId}`);
     } catch (err: any) {
       toast({ title: "Submission Error", description: err.message, variant: "destructive" });
       setIsQuizEnded(false);
@@ -339,30 +356,31 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
   // Question map grid component
   const QuestionMapGrid = () => (
     <>
-      <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+      <div className="grid grid-cols-5 gap-2.5 justify-items-center">
         {shuffledMcqs.map((mcq, index) => (
-          <Button key={mcq.id} variant="outline" size="sm"
-            className={`w-full h-10 rounded-xl text-sm font-bold transition-all ${currentQuestionIndex === index
-              ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white border-transparent shadow-lg'
-              : isQuestionAnswered(mcq.id)
-                ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
-                : 'bg-muted text-muted-foreground'
-              }`}
+          <Button key={mcq.id} variant="outline"
+            className={`w-9 h-9 rounded-full p-0 text-xs font-black transition-all ${
+              currentQuestionIndex === index
+                ? 'bg-teal-500 text-white border-2 border-teal-500 shadow-md scale-105 hover:bg-teal-600'
+                : isQuestionAnswered(mcq.id)
+                  ? 'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 border-2 border-slate-800 dark:border-slate-200 shadow-sm'
+                  : 'bg-transparent border-2 border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-500'
+            }`}
             onClick={() => goToQuestion(index)}>
             {index + 1}
           </Button>
         ))}
       </div>
-      <div className="mt-4 text-xs text-muted-foreground space-y-1.5">
-        <p className="flex items-center"><span className="inline-block w-3 h-3 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 mr-2" />Current</p>
-        <p className="flex items-center"><span className="inline-block w-3 h-3 rounded-full bg-emerald-500 mr-2" />Answered</p>
-        <p className="flex items-center"><span className="inline-block w-3 h-3 rounded-full bg-muted mr-2" />Unanswered</p>
+      <div className="mt-6 text-xs text-muted-foreground space-y-2 border-t border-border/40 pt-4">
+        <p className="flex items-center"><span className="inline-block w-3.5 h-3.5 rounded-full bg-teal-500 mr-2" />Current</p>
+        <p className="flex items-center"><span className="inline-block w-3.5 h-3.5 rounded-full bg-slate-800 dark:bg-slate-200 mr-2" />Answered (OMR Shaded)</p>
+        <p className="flex items-center"><span className="inline-block w-3.5 h-3.5 rounded-full bg-transparent border-2 border-slate-300 dark:border-slate-700 mr-2" />Unanswered</p>
       </div>
     </>
   );
 
   return (
-    <div className="relative min-h-screen bg-background">
+    <div className="fixed inset-0 overflow-hidden overscroll-none bg-background flex flex-col h-screen">
       {/* Background decoration - fixed position so it doesn't scroll */}
       <div className="fixed top-[-20%] left-[-10%] w-[60%] h-[60%] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />
       <div className="fixed bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
@@ -406,7 +424,7 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
         </div>
       </div>
 
-      <div className="flex relative pt-[calc(env(safe-area-inset-top)+70px)] min-h-screen">
+      <div className="flex flex-1 relative pt-[calc(env(safe-area-inset-top)+70px)] overflow-hidden h-full">
         {/* Desktop Panel */}
         <AnimatePresence>
           {isPanelOpen && (
@@ -415,7 +433,7 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: -288, opacity: 0 }}
               transition={{ duration: 0.4, ease: "circOut" }}
-              className="hidden lg:flex flex-col w-72 bg-muted/5 backdrop-blur-xl border-r border-border/40 flex-shrink-0 fixed top-0 h-screen z-40"
+              className="hidden lg:flex flex-col w-72 bg-muted/5 backdrop-blur-xl border-r border-border/40 flex-shrink-0 absolute left-0 bottom-0 z-40"
               style={{ top: 'calc(env(safe-area-inset-top) + 70px)' }}
             >
               <div className="p-6 border-b border-border/40">
@@ -429,8 +447,8 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
         {/* Main Content - Scrollable */}
         <main
           ref={mainContentRef}
-          className={`flex-grow flex flex-col items-center px-4 py-8 pb-[env(safe-area-inset-bottom)] overflow-y-auto w-full transition-all duration-500 ease-in-out ${isPanelOpen ? 'lg:ml-72' : ''}`}
-          style={{ height: 'calc(100vh - calc(env(safe-area-inset-top) + 70px))' }}
+          className={`flex-grow flex flex-col items-center px-4 py-8 pb-[env(safe-area-inset-bottom)] overflow-y-auto w-full transition-all duration-500 ease-in-out ${isPanelOpen ? 'lg:pl-72' : ''}`}
+          style={{ height: '100%' }}
         >
           <div className="w-full max-w-2xl flex flex-col flex-1">
             <div className="mb-10 w-full">
