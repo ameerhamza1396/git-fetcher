@@ -4,10 +4,11 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Clock, Calendar, HelpCircle, ChevronDown, ChevronUp, BookOpen, Sparkles } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Clock, Calendar, HelpCircle, ChevronRight, BookOpen, Sparkles, Trophy } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
 import Seo from '@/components/Seo';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 
 interface MCQ {
     id: string;
@@ -39,7 +40,8 @@ interface FLPAttempt {
 const FLPResultDetail = () => {
     const { id: testResultId } = useParams<{ id: string }>();
     const [filterTab, setFilterTab] = useState<'all' | 'correct' | 'incorrect' | 'skipped'>('all');
-    const [expandedQuestions, setExpandedQuestions] = useState<Record<string, boolean>>({});
+    const [selectedMcqId, setSelectedMcqId] = useState<string | null>(null);
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
 
     const {
         data: flpResult,
@@ -61,18 +63,13 @@ const FLPResultDetail = () => {
             if (error) {
                 throw new Error(`Error fetching FLP result: ${error.message}`);
             }
-            console.log("FLP Result Loaded:", data);
             return data;
         },
         enabled: !!testResultId,
         staleTime: 5 * 60 * 1000,
     });
 
-    const mcqIds = flpResult?.question_attempts?.map(attempt => {
-        console.log("Mapping attempt:", attempt);
-        return attempt.mcq_id;
-    }) || [];
-    console.log("Extracted MCQ IDs:", mcqIds);
+    const mcqIds = flpResult?.question_attempts.map(attempt => attempt.mcq_id) || [];
 
     const {
         data: mcqsData,
@@ -99,19 +96,15 @@ const FLPResultDetail = () => {
         staleTime: Infinity,
     });
 
-    const toggleExpand = (id: string) => {
-        setExpandedQuestions(prev => ({ ...prev, [id]: !prev[id] }));
-    };
-
     const getScoreRemark = (percentage: number) => {
         if (percentage >= 90) {
-            return { text: "Outstanding Pass", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/20", border: "border-emerald-200 dark:border-emerald-800" };
+            return { text: "Outstanding Pass", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50/50 dark:bg-emerald-950/20", border: "border-emerald-200/40 dark:border-emerald-800/40" };
         } else if (percentage >= 75) {
-            return { text: "Excellent Pass", color: "text-cyan-600 dark:text-cyan-400", bg: "bg-cyan-50 dark:bg-cyan-950/20", border: "border-cyan-200 dark:border-cyan-800" };
+            return { text: "Excellent Pass", color: "text-cyan-600 dark:text-cyan-400", bg: "bg-cyan-50/50 dark:bg-cyan-950/20", border: "border-cyan-200/40 dark:border-cyan-800/40" };
         } else if (percentage >= 60) {
-            return { text: "Pass", color: "text-teal-600 dark:text-teal-400", bg: "bg-teal-50 dark:bg-teal-950/20", border: "border-teal-200 dark:border-teal-800" };
+            return { text: "Pass", color: "text-teal-600 dark:text-teal-400", bg: "bg-teal-50/50 dark:bg-teal-950/20", border: "border-teal-200/40 dark:border-teal-800/40" };
         } else {
-            return { text: "Needs Revision", color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-50 dark:bg-rose-950/20", border: "border-rose-200 dark:border-rose-800" };
+            return { text: "Needs Revision", color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-50/50 dark:bg-rose-950/20", border: "border-rose-200/40 dark:border-rose-800/40" };
         }
     };
 
@@ -120,12 +113,12 @@ const FLPResultDetail = () => {
         const isCorrect = correctAnswer === option;
         
         if (isCorrect) {
-            return "bg-emerald-50/75 dark:bg-emerald-950/30 border-emerald-500 text-emerald-900 dark:text-emerald-300 font-semibold shadow-sm";
+            return "bg-emerald-500/10 dark:bg-emerald-950/30 border-emerald-500 text-emerald-800 dark:text-emerald-300 font-bold shadow-sm";
         }
         if (isSelected && !isCorrect) {
-            return "bg-rose-50/75 dark:bg-rose-950/30 border-rose-500 text-rose-900 dark:text-rose-300 line-through font-medium";
+            return "bg-rose-500/10 dark:bg-rose-950/30 border-rose-500 text-rose-800 dark:text-rose-300 line-through font-bold";
         }
-        return "bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300";
+        return "bg-slate-100/50 dark:bg-slate-900/40 border-slate-200/40 dark:border-white/5 text-slate-700 dark:text-slate-300";
     };
 
     if (isLoadingResult || isLoadingMcqs) {
@@ -142,9 +135,9 @@ const FLPResultDetail = () => {
     if (isErrorResult) {
         return (
             <div className="min-h-screen w-full bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
-                <Card className="max-w-md border-rose-200 dark:border-rose-900">
+                <Card className="max-w-md border-rose-200/40 dark:border-rose-900/40 bg-white/10 dark:bg-white/[0.02] backdrop-blur-xl">
                     <CardHeader>
-                        <CardTitle className="text-rose-600 dark:text-rose-400">Error Loading Result</CardTitle>
+                        <CardTitle className="text-rose-600 dark:text-rose-400 font-black italic uppercase">Error Loading Result</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">{errorResult?.message}</p>
@@ -165,9 +158,9 @@ const FLPResultDetail = () => {
     if (!flpResult) {
         return (
             <div className="min-h-screen w-full bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
-                <Card className="max-w-md text-center border-slate-200 dark:border-slate-800">
+                <Card className="max-w-md text-center border-slate-200/40 dark:border-slate-800/40 bg-white/10 dark:bg-white/[0.02] backdrop-blur-xl">
                     <CardHeader>
-                        <CardTitle className="text-2xl font-black">Report Not Found</CardTitle>
+                        <CardTitle className="text-2xl font-black italic uppercase">Report Not Found</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">
@@ -205,47 +198,59 @@ const FLPResultDetail = () => {
         return true;
     });
 
+    const activeMcqAttempt = flpResult.question_attempts.find(a => a.mcq_id === selectedMcqId);
+    const activeMcq = selectedMcqId ? mcqMap.get(selectedMcqId) : null;
+
     const radius = 52;
     const strokeWidth = 10;
     const circumference = 2 * Math.PI * radius;
     const strokeDashoffset = circumference - (scorePercentage / 100) * circumference;
 
+    const handleOpenDetail = (id: string) => {
+        setSelectedMcqId(id);
+        setIsSheetOpen(true);
+    };
+
     return (
-        <div className="min-h-screen w-full bg-slate-50/50 dark:bg-slate-950 selection:bg-teal-500/20 text-slate-900 dark:text-white pb-12 transition-colors duration-300">
+        <div className="min-h-screen w-full bg-background text-foreground pb-12 transition-colors duration-300 relative overflow-x-hidden">
             <Seo title={`FLP Result - ${scorePercentage}%`} />
             
+            {/* Mesh Background Blurs */}
+            <div className="pointer-events-none absolute inset-0 bg-mesh opacity-90" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-52 bg-gradient-to-b from-primary/10 to-transparent dark:from-primary/15" />
+            
             {/* Header */}
-            <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-950/75 backdrop-blur-md border-b border-slate-200/60 dark:border-white/10 pt-[env(safe-area-inset-top)]">
+            <header className="sticky top-0 z-40 bg-background/88 backdrop-blur-2xl border-b border-border/60 pt-[env(safe-area-inset-top)]">
                 <div className="container mx-auto px-5 h-16 flex justify-between items-center max-w-4xl">
-                    <Link to="/flp-result" className="flex items-center space-x-2 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">
+                    <Link to="/flp-result" className="flex shrink-0 items-center justify-center bg-muted text-foreground transition active:scale-95 h-11 w-11 rounded-2xl border border-border/40">
                         <ArrowLeft className="w-5 h-5" />
                     </Link>
-                    <div className="flex items-center space-x-2">
-                        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-8 h-8 object-contain" />
-                        <span className="text-lg font-black tracking-tight italic uppercase">FLP Report</span>
+                    <div className="min-w-0 text-center">
+                        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary">FLP Report</p>
+                        <h1 className="truncate text-base font-black tracking-tight uppercase italic">Detailed Results</h1>
                     </div>
                     <ProfileDropdown />
                 </div>
             </header>
 
-            <main className="container mx-auto px-5 pt-8 max-w-4xl space-y-8">
-                {/* Score Dashboard Card */}
-                <Card className="overflow-hidden border-slate-200/70 dark:border-white/10 shadow-xl shadow-slate-100/50 dark:shadow-none bg-white dark:bg-slate-900 rounded-[2rem]">
-                    <CardContent className="p-8 flex flex-col md:flex-row items-center justify-between gap-8">
-                        {/* Left: Circular Graph */}
+            <main className="relative z-10 container mx-auto px-4 pt-8 max-w-4xl space-y-8">
+                {/* Score Dashboard Card (Glassmorphic) */}
+                <div className="overflow-hidden border border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl rounded-[2rem] shadow-sm">
+                    <div className="p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-8">
+                        {/* Circular Graph */}
                         <div className="relative flex items-center justify-center shrink-0">
-                            <svg className="w-36 h-36 transform -rotate-90">
+                            <svg className="w-32 h-32 transform -rotate-90">
                                 <circle
-                                    cx="72"
-                                    cy="72"
+                                    cx="64"
+                                    cy="64"
                                     r={radius}
-                                    className="stroke-slate-100 dark:stroke-slate-800"
+                                    className="stroke-slate-100/50 dark:stroke-slate-800/40"
                                     strokeWidth={strokeWidth}
                                     fill="transparent"
                                 />
                                 <circle
-                                    cx="72"
-                                    cy="72"
+                                    cx="64"
+                                    cy="64"
                                     r={radius}
                                     className={scorePercentage >= 60 ? "stroke-teal-500" : "stroke-rose-500"}
                                     strokeWidth={strokeWidth}
@@ -256,18 +261,18 @@ const FLPResultDetail = () => {
                                 />
                             </svg>
                             <div className="absolute text-center">
-                                <span className="text-4xl font-black tracking-tighter">{scorePercentage}%</span>
-                                <p className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500">Accuracy</p>
+                                <span className="text-3xl font-black tracking-tighter">{scorePercentage}%</span>
+                                <p className="text-[9px] uppercase font-bold text-muted-foreground">Accuracy</p>
                             </div>
                         </div>
 
-                        {/* Middle: Performance details */}
+                        {/* Performance details */}
                         <div className="flex-1 text-center md:text-left space-y-3">
                             <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-                                <Badge className={`uppercase text-[10px] tracking-wider font-extrabold px-3 py-1 border shadow-sm ${remarks.bg} ${remarks.color} ${remarks.border}`}>
+                                <Badge className={`uppercase text-[9px] tracking-wider font-extrabold px-2.5 py-1 border shadow-sm ${remarks.bg} ${remarks.color} ${remarks.border}`}>
                                     {remarks.text}
                                 </Badge>
-                                <span className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
                                     <Calendar className="w-3.5 h-3.5" />
                                     {new Date(flpResult.completed_at).toLocaleDateString('en-US', {
                                         month: 'short',
@@ -276,34 +281,34 @@ const FLPResultDetail = () => {
                                     })}
                                 </span>
                             </div>
-                            <h2 className="text-2xl font-black text-slate-900 dark:text-white leading-tight">
-                                Exam Score: {flpResult.score} <span className="text-slate-400 font-semibold">/ {flpResult.total_questions}</span>
+                            <h2 className="text-2xl font-black text-foreground leading-tight uppercase italic">
+                                Exam Score: {flpResult.score} <span className="text-muted-foreground font-semibold">/ {flpResult.total_questions}</span>
                             </h2>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-                                Review your breakdown below to target specific weak areas in subsequent mock exams.
+                            <p className="text-xs text-muted-foreground font-medium">
+                                Review your results breakdown below to identify concepts and subjects needing additional focus.
                             </p>
                         </div>
 
-                        {/* Right: Metrics Grid */}
+                        {/* Metrics Grid */}
                         <div className="grid grid-cols-3 gap-2 w-full md:w-auto shrink-0">
-                            <div className="flex flex-col items-center justify-center p-4 bg-emerald-50/50 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl">
-                                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{correctCount}</span>
-                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-500 mt-0.5">Correct</span>
+                            <div className="flex flex-col items-center justify-center p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl">
+                                <span className="text-xl font-black text-emerald-500">{correctCount}</span>
+                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-500/80 mt-0.5">Correct</span>
                             </div>
-                            <div className="flex flex-col items-center justify-center p-4 bg-rose-50/50 dark:bg-rose-950/10 border border-rose-100 dark:border-rose-900/30 rounded-2xl">
-                                <span className="text-2xl font-black text-rose-600 dark:text-rose-400">{incorrectCount}</span>
-                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-rose-500 mt-0.5">Wrong</span>
+                            <div className="flex flex-col items-center justify-center p-3 bg-rose-500/5 border border-rose-500/20 rounded-2xl">
+                                <span className="text-xl font-black text-rose-500">{incorrectCount}</span>
+                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-rose-500/80 mt-0.5">Wrong</span>
                             </div>
-                            <div className="flex flex-col items-center justify-center p-4 bg-slate-50/50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-2xl">
-                                <span className="text-2xl font-black text-slate-500 dark:text-slate-400">{unattemptedCount}</span>
-                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mt-0.5">Skipped</span>
+                            <div className="flex flex-col items-center justify-center p-3 bg-slate-500/5 border border-border/40 rounded-2xl">
+                                <span className="text-xl font-black text-muted-foreground">{unattemptedCount}</span>
+                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground mt-0.5">Skipped</span>
                             </div>
                         </div>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
 
                 {/* Filter Tabs */}
-                <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-white/5 rounded-2xl border border-slate-200/50 dark:border-white/5 max-w-md mx-auto md:mx-0">
+                <div className="flex items-center gap-1.5 p-1 bg-white/5 dark:bg-white/[0.02] backdrop-blur-md rounded-2xl border border-border/40 max-w-md mx-auto md:mx-0">
                     {(['all', 'correct', 'incorrect', 'skipped'] as const).map((tab) => {
                         const active = filterTab === tab;
                         const label = tab.charAt(0).toUpperCase() + tab.slice(1);
@@ -311,10 +316,10 @@ const FLPResultDetail = () => {
                             <button
                                 key={tab}
                                 onClick={() => setFilterTab(tab)}
-                                className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer ${
+                                className={`flex-1 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer ${
                                     active
-                                        ? "bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-sm"
-                                        : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                                        ? "bg-primary text-primary-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
                                 }`}
                             >
                                 {label}
@@ -323,115 +328,142 @@ const FLPResultDetail = () => {
                     })}
                 </div>
 
-                {/* Detailed Questions List */}
-                <div className="space-y-4">
+                {/* Detailed Questions List (Glassmorphic List) */}
+                <div className="overflow-hidden rounded-3xl border border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl divide-y divide-border/40 shadow-sm">
                     {filteredAttempts.length > 0 ? (
                         filteredAttempts.map(({ attempt, index }) => {
                             const mcq = mcqMap.get(attempt.mcq_id);
-                            const isExpanded = !!expandedQuestions[attempt.mcq_id];
-                            const options = mcq?.options || [];
 
                             return (
-                                <Card
+                                <div
                                     key={attempt.id || attempt.mcq_id}
-                                    className={`overflow-hidden border-slate-200/60 dark:border-white/5 shadow-sm bg-white dark:bg-slate-900 rounded-3xl transition-all duration-200 ${
-                                        isExpanded ? "ring-1 ring-teal-500/30" : ""
-                                    }`}
+                                    onClick={() => handleOpenDetail(attempt.mcq_id)}
+                                    className="group relative flex items-center justify-between gap-4 p-5 transition-all duration-200 hover:bg-primary/5 cursor-pointer"
                                 >
-                                    <div
-                                        onClick={() => toggleExpand(attempt.mcq_id)}
-                                        className="p-5 flex items-center justify-between gap-4 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors select-none"
-                                    >
-                                        <div className="flex items-center gap-3.5 min-w-0">
-                                            <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center ${
-                                                attempt.isCorrect
-                                                    ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400'
-                                                    : !attempt.selectedAnswer
-                                                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-400'
-                                                    : 'bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400'
-                                            }`}>
-                                                {attempt.isCorrect ? (
-                                                    <CheckCircle2 className="w-4 h-4" />
-                                                ) : !attempt.selectedAnswer ? (
-                                                    <HelpCircle className="w-4 h-4" />
-                                                ) : (
-                                                    <XCircle className="w-4 h-4" />
-                                                )}
-                                            </div>
-                                            <div className="min-w-0">
-                                                <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Question {index + 1}</span>
-                                                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate pr-4">
-                                                    {mcq?.question || 'Question Details Not Found'}
-                                                </p>
-                                            </div>
+                                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                                        <div className={`w-9 h-9 rounded-xl shrink-0 flex items-center justify-center border ${
+                                            attempt.isCorrect
+                                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500'
+                                                : !attempt.selectedAnswer
+                                                ? 'bg-slate-500/10 border-border/40 text-slate-400'
+                                                : 'bg-rose-500/10 border-rose-500/30 text-rose-500'
+                                        }`}>
+                                            {attempt.isCorrect ? (
+                                                <CheckCircle2 className="w-5 h-5" />
+                                            ) : !attempt.selectedAnswer ? (
+                                                <HelpCircle className="w-5 h-5" />
+                                            ) : (
+                                                <XCircle className="w-5 h-5" />
+                                            )}
                                         </div>
-                                        <button className="text-slate-400 dark:text-slate-600 shrink-0">
-                                            {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                                        </button>
+                                        <div className="min-w-0 flex-1">
+                                            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">Question {index + 1}</span>
+                                            <p className="text-sm font-bold text-foreground leading-snug group-hover:text-primary transition-colors truncate mt-0.5">
+                                                {mcq?.question || 'Question Details Not Found'}
+                                            </p>
+                                        </div>
                                     </div>
-
-                                    {isExpanded && mcq && (
-                                        <div className="border-t border-slate-100 dark:border-white/5 p-6 space-y-6 animate-fade-in bg-slate-50/10 dark:bg-slate-950/5">
-                                            {/* Question Body */}
-                                            <div className="space-y-2">
-                                                <span className="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest">Clinical Scenario</span>
-                                                <p className="text-sm font-bold leading-relaxed text-slate-900 dark:text-slate-100">
-                                                    {mcq.question}
-                                                </p>
-                                            </div>
-
-                                            {/* Options */}
-                                            <div className="grid gap-2.5">
-                                                {options.map((option, optIdx) => {
-                                                    const letter = String.fromCharCode(65 + optIdx);
-                                                    const optionStyle = getOptionStyle(attempt, option, mcq.correct_answer);
-                                                    const isCorrectAns = mcq.correct_answer === option;
-                                                    const isSelectedAns = attempt.selectedAnswer === option;
-
-                                                    return (
-                                                        <div
-                                                            key={optIdx}
-                                                            className={`p-4 rounded-2xl border transition-all flex items-center justify-between gap-4 ${optionStyle}`}
-                                                        >
-                                                            <div className="flex items-center gap-3">
-                                                                <span className="text-xs font-black uppercase text-slate-400 dark:text-slate-500">{letter}</span>
-                                                                <span className="text-sm">{option}</span>
-                                                            </div>
-                                                            {isCorrectAns && (
-                                                                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                                                            )}
-                                                            {isSelectedAns && !isCorrectAns && (
-                                                                <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-
-                                            {/* Explanation */}
-                                            <div className="p-5 bg-teal-50/30 dark:bg-teal-950/10 border border-teal-100/50 dark:border-teal-900/20 rounded-2xl space-y-2">
-                                                <div className="flex items-center gap-2 text-teal-600 dark:text-teal-400">
-                                                    <BookOpen className="w-4 h-4" />
-                                                    <span className="text-xs font-extrabold uppercase tracking-wider">Clinical Explanation</span>
-                                                </div>
-                                                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-                                                    {mcq.explanation || 'No explanation configured for this MCQ.'}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
-                                </Card>
+                                    <button className="h-8 w-8 rounded-full flex items-center justify-center bg-muted/50 text-foreground/75 transition-all group-hover:bg-primary group-hover:text-primary-foreground">
+                                        <ChevronRight className="w-5 h-5" />
+                                    </button>
+                                </div>
                             );
                         })
                     ) : (
-                        <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-white/5">
-                            <AlertCircle className="w-10 h-10 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
-                            <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">No matching questions</h3>
-                            <p className="text-xs text-slate-400 mt-1">There are no attempts that match your selected filter.</p>
+                        <div className="text-center py-16">
+                            <AlertCircle className="w-10 h-10 text-muted-foreground/50 mx-auto mb-3" />
+                            <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">No matching questions</h3>
+                            <p className="text-xs text-muted-foreground mt-1">There are no attempts matching the selected filter.</p>
                         </div>
                     )}
                 </div>
             </main>
+
+            {/* Bottom Pinned Sheet Modal for Question Details */}
+            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                <SheetContent side="bottom" className="h-[80vh] sm:h-[75vh] border-t border-border/60 bg-background/95 backdrop-blur-2xl rounded-t-[2.5rem] p-0 overflow-hidden shadow-2xl flex flex-col">
+                    {activeMcq && activeMcqAttempt && (
+                        <>
+                            <div className="px-6 pt-8 pb-4 border-b border-border/40 shrink-0">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Badge className={`uppercase text-[9px] tracking-wider font-extrabold border ${
+                                        activeMcqAttempt.isCorrect
+                                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500'
+                                            : !activeMcqAttempt.selectedAnswer
+                                            ? 'bg-slate-500/10 border-border/40 text-slate-400'
+                                            : 'bg-rose-500/10 border-rose-500/30 text-rose-500'
+                                    }`}>
+                                        {activeMcqAttempt.isCorrect ? 'Correct' : !activeMcqAttempt.selectedAnswer ? 'Skipped' : 'Incorrect'}
+                                    </Badge>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-primary">Detailed Review</span>
+                                </div>
+                                <SheetTitle className="text-lg font-black tracking-tight text-foreground leading-[1.3] text-left">
+                                    Clinical Scenario
+                                </SheetTitle>
+                                <SheetDescription className="text-xs font-semibold text-muted-foreground mt-1 text-left">
+                                    Review the clinical presentation, options, and explanations.
+                                </SheetDescription>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+                                {/* Question Scenario */}
+                                <p className="text-base font-bold leading-relaxed text-foreground text-left">
+                                    {activeMcq.question}
+                                </p>
+
+                                {/* Options */}
+                                <div className="grid gap-2.5">
+                                    {activeMcq.options.map((option, optIdx) => {
+                                        const letter = String.fromCharCode(65 + optIdx);
+                                        const optionStyle = getOptionStyle(activeMcqAttempt, option, activeMcq.correct_answer);
+                                        const isCorrectAns = activeMcq.correct_answer === option;
+                                        const isSelectedAns = activeMcqAttempt.selectedAnswer === option;
+
+                                        return (
+                                            <div
+                                                key={optIdx}
+                                                className={`p-4 rounded-2xl border transition-all flex items-center justify-between gap-4 ${optionStyle}`}
+                                            >
+                                                <div className="flex items-center gap-3 text-left">
+                                                    <span className="text-xs font-black uppercase text-slate-400 dark:text-slate-500">{letter}</span>
+                                                    <span className="text-sm font-medium leading-snug">{option}</span>
+                                                </div>
+                                                {isCorrectAns && (
+                                                    <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                                                )}
+                                                {isSelectedAns && !isCorrectAns && (
+                                                    <XCircle className="w-5 h-5 text-rose-500 shrink-0" />
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Explanation */}
+                                <div className="p-5 bg-primary/5 border border-primary/10 rounded-2xl space-y-2 text-left">
+                                    <div className="flex items-center gap-2 text-primary">
+                                        <BookOpen className="w-4.5 h-4.5" />
+                                        <span className="text-xs font-black uppercase tracking-wider">Clinical Explanation</span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground leading-relaxed font-semibold">
+                                        {activeMcq.explanation || 'No explanation configured for this MCQ.'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Sticky Sheet Footer */}
+                            <div className="p-4 bg-muted/20 border-t border-border/40 shrink-0 flex justify-end">
+                                <Button
+                                    onClick={() => setIsSheetOpen(false)}
+                                    className="rounded-2xl px-6 py-4 font-black uppercase text-xs tracking-widest bg-foreground text-background"
+                                >
+                                    Close Review
+                                </Button>
+                            </div>
+                        </>
+                    )}
+                </SheetContent>
+            </Sheet>
         </div>
     );
 };
