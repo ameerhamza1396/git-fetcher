@@ -207,11 +207,6 @@ const FLP = () => {
 
       const result = sessionResult as { allowed: boolean; error?: string; session_id?: string; resumed?: boolean } | null;
       if (result && !result.allowed) {
-        toast({
-          title: "Limit Reached",
-          description: result.error || "You have reached your daily/monthly limit for Full-Length Papers.",
-          variant: "destructive",
-        });
         setShowUpgradeModal(true);
         setIsFetchingMcqs(false);
         return;
