@@ -179,6 +179,11 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
           },
         })
         .eq('id', user.id);
+      try {
+        localStorage.removeItem(FLP_STORAGE_KEY);
+      } catch (e) {
+        console.error("Failed to clear FLP session", e);
+      }
       notifyAchievementProgress('flp_completed');
       setCurrentTestResultId(activeResultId);
       setIsQuizEnded(true);
