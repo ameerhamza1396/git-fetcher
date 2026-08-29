@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Crown, ArrowLeft, ArrowRight, ScrollText, Zap, Loader2, ChevronLeft, Sparkles, RotateCcw } from "lucide-react";
+import { Crown, ArrowLeft, ArrowRight, ScrollText, Zap, Loader2, ChevronLeft, Sparkles, RotateCcw, History } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import Seo from "@/components/Seo";
@@ -370,12 +370,20 @@ const FLP = () => {
                 </div>
 
                 {user ? (
-                  <button
-                    onClick={() => setWizardStep(1)}
-                    className="mt-auto w-full cursor-pointer rounded-2xl bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] px-10 py-4 text-base font-extrabold text-white shadow-[0_12px_32px_rgba(14,165,233,.25)] transition-transform hover:scale-[1.01] active:scale-95 focus-visible:outline-none"
-                  >
-                    Get Started
-                  </button>
+                  <div className="mt-auto w-full flex flex-col gap-3">
+                    <button
+                      onClick={() => navigate('/flp-result')}
+                      className="w-full cursor-pointer rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-4 text-sm font-bold text-slate-700 dark:text-slate-300 shadow-sm transition-transform active:scale-95 flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      <History className="w-4 h-4 text-slate-500" /> View Past Attempts
+                    </button>
+                    <button
+                      onClick={() => setWizardStep(1)}
+                      className="w-full cursor-pointer rounded-2xl bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] px-10 py-4 text-base font-extrabold text-white shadow-[0_12px_32px_rgba(14,165,233,.25)] transition-transform hover:scale-[1.01] active:scale-95 focus-visible:outline-none"
+                    >
+                      Get Started
+                    </button>
+                  </div>
                 ) : (
                   <div className="mt-auto w-full flex flex-col gap-3">
                     <button
