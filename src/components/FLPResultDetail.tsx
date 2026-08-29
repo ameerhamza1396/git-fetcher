@@ -12,10 +12,7 @@ import Seo from '@/components/Seo';
 interface MCQ {
     id: string;
     question: string;
-    option_a: string;
-    option_b: string;
-    option_c: string;
-    option_d: string;
+    options: string[];
     correct_answer: string;
     explanation: string;
 }
@@ -90,7 +87,7 @@ const FLPResultDetail = () => {
             }
             const { data, error } = await supabase
                 .from('mcqs')
-                .select('id, question, option_a, option_b, option_c, option_d, correct_answer, explanation')
+                .select('id, question, options, correct_answer, explanation')
                 .in('id', mcqIds);
 
             if (error) {
@@ -332,9 +329,7 @@ const FLPResultDetail = () => {
                         filteredAttempts.map(({ attempt, index }) => {
                             const mcq = mcqMap.get(attempt.mcq_id);
                             const isExpanded = !!expandedQuestions[attempt.mcq_id];
-                            const options = mcq
-                                ? [mcq.option_a, mcq.option_b, mcq.option_c, mcq.option_d]
-                                : [];
+                            const options = mcq?.options || [];
 
                             return (
                                 <Card
