@@ -69,7 +69,7 @@ const FLPResultDetail = () => {
         staleTime: 5 * 60 * 1000,
     });
 
-    const mcqIds = flpResult?.question_attempts.map(attempt => attempt.mcq_id) || [];
+    const mcqIds = flpResult?.question_attempts?.map(attempt => attempt.mcq_id) || [];
 
     const {
         data: mcqsData,
@@ -92,7 +92,7 @@ const FLPResultDetail = () => {
             }
             return data as MCQ[];
         },
-        enabled: !!flpResult && flpResult.question_attempts.length > 0 && mcqIds.length > 0,
+        enabled: !!flpResult && !!flpResult.question_attempts && flpResult.question_attempts.length > 0 && mcqIds.length > 0,
         staleTime: Infinity,
     });
 
@@ -186,19 +186,19 @@ const FLPResultDetail = () => {
         : 0;
     const remarks = getScoreRemark(scorePercentage);
 
-    const correctCount = flpResult.question_attempts.filter(a => a.isCorrect).length;
-    const incorrectCount = flpResult.question_attempts.filter(a => !a.isCorrect && a.selectedAnswer).length;
-    const unattemptedCount = flpResult.question_attempts.filter(a => !a.selectedAnswer).length;
+    const correctCount = flpResult?.question_attempts?.filter(a => a.isCorrect).length || 0;
+    const incorrectCount = flpResult?.question_attempts?.filter(a => !a.isCorrect && a.selectedAnswer).length || 0;
+    const unattemptedCount = flpResult?.question_attempts?.filter(a => !a.selectedAnswer).length || 0;
 
     // Filter attempts
-    const filteredAttempts = flpResult.question_attempts.map((attempt, index) => ({ attempt, index })).filter(({ attempt }) => {
+    const filteredAttempts = (flpResult?.question_attempts || []).map((attempt, index) => ({ attempt, index })).filter(({ attempt }) => {
         if (filterTab === 'correct') return attempt.isCorrect;
         if (filterTab === 'incorrect') return !attempt.isCorrect && attempt.selectedAnswer;
         if (filterTab === 'skipped') return !attempt.selectedAnswer;
         return true;
     });
 
-    const activeMcqAttempt = flpResult.question_attempts.find(a => a.mcq_id === selectedMcqId);
+    const activeMcqAttempt = flpResult?.question_attempts?.find(a => a.mcq_id === selectedMcqId);
     const activeMcq = selectedMcqId ? mcqMap.get(selectedMcqId) : null;
 
     const radius = 52;
