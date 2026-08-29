@@ -212,7 +212,7 @@ const FLPResultDetail = () => {
     };
 
     return (
-        <div className="min-h-screen w-full bg-background text-foreground pb-12 transition-colors duration-300 relative overflow-x-hidden">
+        <div className="fixed inset-0 flex flex-col bg-background text-foreground transition-colors duration-300 overflow-hidden">
             <Seo title={`FLP Result - ${scorePercentage}%`} />
             
             {/* Mesh Background Blurs */}
@@ -220,7 +220,7 @@ const FLPResultDetail = () => {
             <div className="pointer-events-none absolute inset-x-0 top-0 h-52 bg-gradient-to-b from-primary/10 to-transparent dark:from-primary/15" />
             
             {/* Header */}
-            <header className="sticky top-0 z-40 bg-background/88 backdrop-blur-2xl border-b border-border/60 pt-[env(safe-area-inset-top)]">
+            <header className="shrink-0 bg-background/88 backdrop-blur-2xl border-b border-border/60 pt-[env(safe-area-inset-top)] z-40">
                 <div className="container mx-auto px-5 h-16 flex justify-between items-center max-w-4xl">
                     <Link to="/flp-result" className="flex shrink-0 items-center justify-center bg-muted text-foreground transition active:scale-95 h-11 w-11 rounded-2xl border border-border/40">
                         <ArrowLeft className="w-5 h-5" />
@@ -233,7 +233,7 @@ const FLPResultDetail = () => {
                 </div>
             </header>
 
-            <main className="relative z-10 container mx-auto px-4 pt-8 max-w-4xl space-y-8">
+            <main className="relative z-10 flex-1 flex flex-col min-h-0 w-full max-w-4xl mx-auto px-4 pt-6 pb-6 overflow-hidden gap-5">
                 {/* Score Dashboard Card (Glassmorphic) */}
                 <div className="overflow-hidden border border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl rounded-[2rem] shadow-sm">
                     <div className="p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-8">
@@ -329,7 +329,7 @@ const FLPResultDetail = () => {
                 </div>
 
                 {/* Detailed Questions List (Glassmorphic List) */}
-                <div className="overflow-hidden rounded-3xl border border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl divide-y divide-border/40 shadow-sm">
+                <div className="flex-1 overflow-y-auto rounded-3xl border border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl divide-y divide-border/40 shadow-sm pr-1">
                     {filteredAttempts.length > 0 ? (
                         filteredAttempts.map(({ attempt, index }) => {
                             const mcq = mcqMap.get(attempt.mcq_id);
