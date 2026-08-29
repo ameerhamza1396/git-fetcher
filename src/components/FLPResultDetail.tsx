@@ -1,19 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, CheckCircle, XCircle, Trophy, Calendar, HelpCircle } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Clock, Calendar, HelpCircle, ChevronDown, ChevronUp, BookOpen, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import {
-    Accordion,
-    AccordionContent,
-    AccordionItem,
-    AccordionTrigger,
-} from "@/components/ui/accordion";
 import { ProfileDropdown } from '@/components/ProfileDropdown';
+import Seo from '@/components/Seo';
 
 interface MCQ {
     id: string;
@@ -47,6 +41,8 @@ interface FLPAttempt {
 
 const FLPResultDetail = () => {
     const { id: testResultId } = useParams<{ id: string }>();
+    const [filterTab, setFilterTab] = useState<'all' | 'correct' | 'incorrect' | 'skipped'>('all');
+    const [expandedQuestions, setExpandedQuestions] = useState<Record<string, boolean>>({});
 
     const {
         data: flpResult,
@@ -101,41 +97,41 @@ const FLPResultDetail = () => {
         staleTime: Infinity,
     });
 
+    const toggleExpand = (id: string) => {
+        setExpandedQuestions(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
     const getScoreRemark = (percentage: number) => {
         if (percentage >= 90) {
-            return { text: "Outstanding!", color: "text-green-600 dark:text-green-400", bg: "bg-green-100 dark:bg-green-900/30" };
+            return { text: "Outstanding Pass", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/20", border: "border-emerald-200 dark:border-emerald-800" };
         } else if (percentage >= 75) {
-            return { text: "Excellent!", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-100 dark:bg-blue-900/30" };
-        } else if (percentage >= 50) {
-            return { text: "Good effort!", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-100 dark:bg-amber-900/30" };
+            return { text: "Excellent Pass", color: "text-cyan-600 dark:text-cyan-400", bg: "bg-cyan-50 dark:bg-cyan-950/20", border: "border-cyan-200 dark:border-cyan-800" };
+        } else if (percentage >= 60) {
+            return { text: "Pass", color: "text-teal-600 dark:text-teal-400", bg: "bg-teal-50 dark:bg-teal-950/20", border: "border-teal-200 dark:border-teal-800" };
         } else {
-            return { text: "Keep practicing!", color: "text-red-600 dark:text-red-400", bg: "bg-red-100 dark:bg-red-900/30" };
+            return { text: "Needs Revision", color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-50 dark:bg-rose-950/20", border: "border-rose-200 dark:border-rose-800" };
         }
     };
 
-    const getOptionClass = (attempt: QuestionAttempt, option: string, correctAnswer: string) => {
+    const getOptionStyle = (attempt: QuestionAttempt, option: string, correctAnswer: string) => {
         const isSelected = attempt.selectedAnswer === option;
         const isCorrect = correctAnswer === option;
-        const isSkipped = !attempt.selectedAnswer || attempt.selectedAnswer === '';
-
+        
         if (isCorrect) {
-            return "bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700 text-green-800 dark:text-green-300";
+            return "bg-emerald-50/75 dark:bg-emerald-950/30 border-emerald-500 text-emerald-900 dark:text-emerald-300 font-semibold shadow-sm";
         }
         if (isSelected && !isCorrect) {
-            return "bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-800 dark:text-red-300 line-through";
+            return "bg-rose-50/75 dark:bg-rose-950/30 border-rose-500 text-rose-900 dark:text-rose-300 line-through font-medium";
         }
-        if (isSkipped && !isCorrect) {
-            return "bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400";
-        }
-        return "bg-transparent border-gray-200 dark:border-gray-700";
+        return "bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300";
     };
 
     if (isLoadingResult || isLoadingMcqs) {
         return (
-            <div className="min-h-screen w-full bg-background flex items-center justify-center">
+            <div className="min-h-screen w-full bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
-                    <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-16 h-16 object-contain animate-pulse" />
-                    <p className="text-muted-foreground">Loading detailed report...</p>
+                    <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-20 h-20 object-contain animate-pulse" />
+                    <p className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-xs animate-pulse">Loading Detailed Report...</p>
                 </div>
             </div>
         );
@@ -143,19 +139,19 @@ const FLPResultDetail = () => {
 
     if (isErrorResult) {
         return (
-            <div className="min-h-screen w-full bg-background flex flex-col items-center justify-center p-4">
-                <Card className="max-w-md">
+            <div className="min-h-screen w-full bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
+                <Card className="max-w-md border-rose-200 dark:border-rose-900">
                     <CardHeader>
-                        <CardTitle className="text-red-500">Error Loading Result</CardTitle>
+                        <CardTitle className="text-rose-600 dark:text-rose-400">Error Loading Result</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <p className="text-muted-foreground">{errorResult?.message}</p>
-                        <div className="flex gap-4">
+                        <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">{errorResult?.message}</p>
+                        <div className="flex gap-3">
                             <Link to="/flp-result">
-                                <Button>View All Results</Button>
+                                <Button className="bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl">View All Results</Button>
                             </Link>
                             <Link to="/dashboard">
-                                <Button variant="outline">Go to Dashboard</Button>
+                                <Button variant="outline" className="border-slate-200 dark:border-slate-800 rounded-xl">Dashboard</Button>
                             </Link>
                         </div>
                     </CardContent>
@@ -166,21 +162,21 @@ const FLPResultDetail = () => {
 
     if (!flpResult) {
         return (
-            <div className="min-h-screen w-full bg-background flex flex-col items-center justify-center p-4">
-                <Card className="max-w-md text-center">
+            <div className="min-h-screen w-full bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
+                <Card className="max-w-md text-center border-slate-200 dark:border-slate-800">
                     <CardHeader>
-                        <CardTitle className="text-2xl font-bold">Report Not Found</CardTitle>
+                        <CardTitle className="text-2xl font-black">Report Not Found</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <p className="text-muted-foreground">
-                            The Full-Length Paper result could not be found. The ID may be incorrect or the record was deleted.
+                        <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">
+                            The requested Full-Length Paper attempt record is missing or expired.
                         </p>
-                        <div className="flex gap-4 justify-center">
+                        <div className="flex gap-3 justify-center">
                             <Link to="/flp-result">
-                                <Button>View All Results</Button>
+                                <Button className="bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl">View All Results</Button>
                             </Link>
                             <Link to="/dashboard">
-                                <Button variant="outline">Go to Dashboard</Button>
+                                <Button variant="outline" className="border-slate-200 dark:border-slate-800 rounded-xl">Dashboard</Button>
                             </Link>
                         </div>
                     </CardContent>
@@ -191,7 +187,7 @@ const FLPResultDetail = () => {
 
     const mcqMap = new Map(mcqsData?.map(mcq => [mcq.id, mcq]) || []);
     const scorePercentage = flpResult.total_questions > 0
-        ? parseFloat(((flpResult.score / flpResult.total_questions) * 100).toFixed(2))
+        ? Math.round((flpResult.score / flpResult.total_questions) * 100)
         : 0;
     const remarks = getScoreRemark(scorePercentage);
 
@@ -199,147 +195,243 @@ const FLPResultDetail = () => {
     const incorrectCount = flpResult.question_attempts.filter(a => !a.isCorrect && a.selectedAnswer).length;
     const unattemptedCount = flpResult.question_attempts.filter(a => !a.selectedAnswer).length;
 
+    // Filter attempts
+    const filteredAttempts = flpResult.question_attempts.map((attempt, index) => ({ attempt, index })).filter(({ attempt }) => {
+        if (filterTab === 'correct') return attempt.isCorrect;
+        if (filterTab === 'incorrect') return !attempt.isCorrect && attempt.selectedAnswer;
+        if (filterTab === 'skipped') return !attempt.selectedAnswer;
+        return true;
+    });
+
+    const radius = 52;
+    const strokeWidth = 10;
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference - (scorePercentage / 100) * circumference;
+
     return (
-        <div className="min-h-screen w-full bg-background">
-            <div className="container mx-auto px-4 lg:px-8 py-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] max-w-7xl flex justify-between items-center">
-                <Link to="/flp-result" className="flex items-center space-x-2 text-primary hover:text-primary/80 transition-colors">
-                    <ArrowLeft className="w-4 h-4" />
-                </Link>
-
-                <div className="flex items-center space-x-3">
-                    <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs Logo" className="w-8 h-8 object-contain" />
-                    <span className="text-xl font-bold text-foreground">FLP Detailed Results</span>
-                </div>
-
-                <div className="flex items-center space-x-3">
+        <div className="min-h-screen w-full bg-slate-50/50 dark:bg-slate-950 selection:bg-teal-500/20 text-slate-900 dark:text-white pb-12 transition-colors duration-300">
+            <Seo title={`FLP Result - ${scorePercentage}%`} />
+            
+            {/* Header */}
+            <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-950/75 backdrop-blur-md border-b border-slate-200/60 dark:border-white/10 pt-[env(safe-area-inset-top)]">
+                <div className="container mx-auto px-5 h-16 flex justify-between items-center max-w-4xl">
+                    <Link to="/flp-result" className="flex items-center space-x-2 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">
+                        <ArrowLeft className="w-5 h-5" />
+                    </Link>
+                    <div className="flex items-center space-x-2">
+                        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-8 h-8 object-contain" />
+                        <span className="text-lg font-black tracking-tight italic uppercase">FLP Report</span>
+                    </div>
                     <ProfileDropdown />
                 </div>
-            </div>
+            </header>
 
-            <div className="container mx-auto px-4 lg:px-8 py-8 max-w-7xl">
-                <Card className="mb-8">
-                    <CardHeader className="text-center">
-                        <CardTitle className="text-2xl font-black italic">
-                            Your <span className="text-primary">Performance</span>
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="flex flex-col items-center">
-                            <div className={`w-32 h-32 rounded-full flex items-center justify-center ${remarks.bg} mb-4`}>
-                                <Trophy className={`w-16 h-16 ${remarks.color}`} />
+            <main className="container mx-auto px-5 pt-8 max-w-4xl space-y-8">
+                {/* Score Dashboard Card */}
+                <Card className="overflow-hidden border-slate-200/70 dark:border-white/10 shadow-xl shadow-slate-100/50 dark:shadow-none bg-white dark:bg-slate-900 rounded-[2rem]">
+                    <CardContent className="p-8 flex flex-col md:flex-row items-center justify-between gap-8">
+                        {/* Left: Circular Graph */}
+                        <div className="relative flex items-center justify-center shrink-0">
+                            <svg className="w-36 h-36 transform -rotate-90">
+                                <circle
+                                    cx="72"
+                                    cy="72"
+                                    r={radius}
+                                    className="stroke-slate-100 dark:stroke-slate-800"
+                                    strokeWidth={strokeWidth}
+                                    fill="transparent"
+                                />
+                                <circle
+                                    cx="72"
+                                    cy="72"
+                                    r={radius}
+                                    className={scorePercentage >= 60 ? "stroke-teal-500" : "stroke-rose-500"}
+                                    strokeWidth={strokeWidth}
+                                    fill="transparent"
+                                    strokeDasharray={circumference}
+                                    strokeDashoffset={strokeDashoffset}
+                                    strokeLinecap="round"
+                                />
+                            </svg>
+                            <div className="absolute text-center">
+                                <span className="text-4xl font-black tracking-tighter">{scorePercentage}%</span>
+                                <p className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500">Accuracy</p>
                             </div>
-                            <p className="text-5xl font-black text-foreground">
-                                {flpResult.score}
-                                <span className="text-2xl text-muted-foreground">/{flpResult.total_questions}</span>
+                        </div>
+
+                        {/* Middle: Performance details */}
+                        <div className="flex-1 text-center md:text-left space-y-3">
+                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+                                <Badge className={`uppercase text-[10px] tracking-wider font-extrabold px-3 py-1 border shadow-sm ${remarks.bg} ${remarks.color} ${remarks.border}`}>
+                                    {remarks.text}
+                                </Badge>
+                                <span className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    {new Date(flpResult.completed_at).toLocaleDateString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric'
+                                    })}
+                                </span>
+                            </div>
+                            <h2 className="text-2xl font-black text-slate-900 dark:text-white leading-tight">
+                                Exam Score: {flpResult.score} <span className="text-slate-400 font-semibold">/ {flpResult.total_questions}</span>
+                            </h2>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                                Review your breakdown below to target specific weak areas in subsequent mock exams.
                             </p>
-                            <Badge className={`mt-2 ${remarks.bg} ${remarks.color} border-0 text-lg`}>
-                                {scorePercentage}% - {remarks.text}
-                            </Badge>
                         </div>
 
-                        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                            <Calendar className="w-4 h-4" />
-                            <span>{new Date(flpResult.completed_at).toLocaleString()}</span>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-4 max-w-md mx-auto">
-                            <div className="text-center p-4 bg-green-100 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                                <CheckCircle className="w-6 h-6 mx-auto mb-2 text-green-600 dark:text-green-400" />
-                                <p className="text-2xl font-bold text-green-700 dark:text-green-300">{correctCount}</p>
-                                <p className="text-xs text-green-600 dark:text-green-400">Correct</p>
+                        {/* Right: Metrics Grid */}
+                        <div className="grid grid-cols-3 gap-2 w-full md:w-auto shrink-0">
+                            <div className="flex flex-col items-center justify-center p-4 bg-emerald-50/50 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl">
+                                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{correctCount}</span>
+                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-500 mt-0.5">Correct</span>
                             </div>
-                            <div className="text-center p-4 bg-red-100 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                                <XCircle className="w-6 h-6 mx-auto mb-2 text-red-600 dark:text-red-400" />
-                                <p className="text-2xl font-bold text-red-700 dark:text-red-300">{incorrectCount}</p>
-                                <p className="text-xs text-red-600 dark:text-red-400">Incorrect</p>
+                            <div className="flex flex-col items-center justify-center p-4 bg-rose-50/50 dark:bg-rose-950/10 border border-rose-100 dark:border-rose-900/30 rounded-2xl">
+                                <span className="text-2xl font-black text-rose-600 dark:text-rose-400">{incorrectCount}</span>
+                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-rose-500 mt-0.5">Wrong</span>
                             </div>
-                            <div className="text-center p-4 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                                <HelpCircle className="w-6 h-6 mx-auto mb-2 text-gray-600 dark:text-gray-400" />
-                                <p className="text-2xl font-bold text-gray-700 dark:text-gray-300">{unattemptedCount}</p>
-                                <p className="text-xs text-gray-600 dark:text-gray-400">Skipped</p>
+                            <div className="flex flex-col items-center justify-center p-4 bg-slate-50/50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-2xl">
+                                <span className="text-2xl font-black text-slate-500 dark:text-slate-400">{unattemptedCount}</span>
+                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mt-0.5">Skipped</span>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
 
-                <div className="text-center mb-6">
-                    <h2 className="text-2xl font-bold text-foreground">
-                        Question-by-Question Breakdown
-                    </h2>
-                    <p className="text-muted-foreground">Tap on any question to view details</p>
+                {/* Filter Tabs */}
+                <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-white/5 rounded-2xl border border-slate-200/50 dark:border-white/5 max-w-md mx-auto md:mx-0">
+                    {(['all', 'correct', 'incorrect', 'skipped'] as const).map((tab) => {
+                        const active = filterTab === tab;
+                        const label = tab.charAt(0).toUpperCase() + tab.slice(1);
+                        return (
+                            <button
+                                key={tab}
+                                onClick={() => setFilterTab(tab)}
+                                className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer ${
+                                    active
+                                        ? "bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-sm"
+                                        : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                                }`}
+                            >
+                                {label}
+                            </button>
+                        );
+                    })}
                 </div>
 
-                <ScrollArea className="h-[calc(100vh-450px)]">
-                    <Accordion type="multiple" className="space-y-2">
-                        {flpResult.question_attempts.map((attempt, index) => {
-                            const originalMcq = mcqMap.get(attempt.mcq_id);
-                            const options = originalMcq
-                                ? [originalMcq.option_a, originalMcq.option_b, originalMcq.option_c, originalMcq.option_d]
+                {/* Detailed Questions List */}
+                <div className="space-y-4">
+                    {filteredAttempts.length > 0 ? (
+                        filteredAttempts.map(({ attempt, index }) => {
+                            const mcq = mcqMap.get(attempt.mcq_id);
+                            const isExpanded = !!expandedQuestions[attempt.mcq_id];
+                            const options = mcq
+                                ? [mcq.option_a, mcq.option_b, mcq.option_c, mcq.option_d]
                                 : [];
 
                             return (
-                                <AccordionItem key={attempt.id || attempt.mcq_id} value={attempt.id || attempt.mcq_id} className="border rounded-lg px-4">
-                                    <AccordionTrigger className="hover:no-underline">
-                                        <div className="flex items-center gap-3 text-left">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${attempt.isCorrect ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+                                <Card
+                                    key={attempt.id || attempt.mcq_id}
+                                    className={`overflow-hidden border-slate-200/60 dark:border-white/5 shadow-sm bg-white dark:bg-slate-900 rounded-3xl transition-all duration-200 ${
+                                        isExpanded ? "ring-1 ring-teal-500/30" : ""
+                                    }`}
+                                >
+                                    <div
+                                        onClick={() => toggleExpand(attempt.mcq_id)}
+                                        className="p-5 flex items-center justify-between gap-4 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors select-none"
+                                    >
+                                        <div className="flex items-center gap-3.5 min-w-0">
+                                            <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center ${
+                                                attempt.isCorrect
+                                                    ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400'
+                                                    : !attempt.selectedAnswer
+                                                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                                                    : 'bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400'
+                                            }`}>
                                                 {attempt.isCorrect ? (
-                                                    <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                                    <CheckCircle2 className="w-4 h-4" />
+                                                ) : !attempt.selectedAnswer ? (
+                                                    <HelpCircle className="w-4 h-4" />
                                                 ) : (
-                                                    <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                                                    <XCircle className="w-4 h-4" />
                                                 )}
                                             </div>
-                                            <div>
-                                                <span className="font-medium">Question {index + 1}</span>
-                                                <p className="text-xs text-muted-foreground line-clamp-1">
-                                                    {originalMcq?.question || 'Question details not found'}
+                                            <div className="min-w-0">
+                                                <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Question {index + 1}</span>
+                                                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate pr-4">
+                                                    {mcq?.question || 'Question Details Not Found'}
                                                 </p>
                                             </div>
                                         </div>
-                                    </AccordionTrigger>
-                                    <AccordionContent>
-                                        <div className="space-y-4 pt-2">
-                                            <div>
-                                                <h4 className="font-semibold text-foreground mb-2">Question:</h4>
-                                                <p className="text-sm text-muted-foreground">{originalMcq?.question || 'Question not found'}</p>
+                                        <button className="text-slate-400 dark:text-slate-600 shrink-0">
+                                            {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                                        </button>
+                                    </div>
+
+                                    {isExpanded && mcq && (
+                                        <div className="border-t border-slate-100 dark:border-white/5 p-6 space-y-6 animate-fade-in bg-slate-50/10 dark:bg-slate-950/5">
+                                            {/* Question Body */}
+                                            <div className="space-y-2">
+                                                <span className="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest">Clinical Scenario</span>
+                                                <p className="text-sm font-bold leading-relaxed text-slate-900 dark:text-slate-100">
+                                                    {mcq.question}
+                                                </p>
                                             </div>
 
-                                            <div className="space-y-2">
+                                            {/* Options */}
+                                            <div className="grid gap-2.5">
                                                 {options.map((option, optIdx) => {
                                                     const letter = String.fromCharCode(65 + optIdx);
+                                                    const optionStyle = getOptionStyle(attempt, option, mcq.correct_answer);
+                                                    const isCorrectAns = mcq.correct_answer === option;
+                                                    const isSelectedAns = attempt.selectedAnswer === option;
+
                                                     return (
                                                         <div
                                                             key={optIdx}
-                                                            className={`p-3 rounded-lg border-2 transition-colors ${getOptionClass(attempt, option, originalMcq?.correct_answer || '')}`}
+                                                            className={`p-4 rounded-2xl border transition-all flex items-center justify-between gap-4 ${optionStyle}`}
                                                         >
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-bold">{letter}.</span>
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="text-xs font-black uppercase text-slate-400 dark:text-slate-500">{letter}</span>
                                                                 <span className="text-sm">{option}</span>
-                                                                {originalMcq?.correct_answer === option && (
-                                                                    <CheckCircle className="w-4 h-4 ml-auto text-green-600" />
-                                                                )}
-                                                                {attempt.selectedAnswer === option && attempt.selectedAnswer !== originalMcq?.correct_answer && (
-                                                                    <XCircle className="w-4 h-4 ml-auto text-red-600" />
-                                                                )}
                                                             </div>
+                                                            {isCorrectAns && (
+                                                                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                                            )}
+                                                            {isSelectedAns && !isCorrectAns && (
+                                                                <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                                                            )}
                                                         </div>
                                                     );
                                                 })}
                                             </div>
 
-                                            {originalMcq?.explanation && (
-                                                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                                                    <h4 className="font-semibold text-blue-900 dark:text-blue-200 text-sm mb-1">Explanation:</h4>
-                                                    <p className="text-sm text-blue-800 dark:text-blue-300">{originalMcq.explanation}</p>
+                                            {/* Explanation */}
+                                            <div className="p-5 bg-teal-50/30 dark:bg-teal-950/10 border border-teal-100/50 dark:border-teal-900/20 rounded-2xl space-y-2">
+                                                <div className="flex items-center gap-2 text-teal-600 dark:text-teal-400">
+                                                    <BookOpen className="w-4 h-4" />
+                                                    <span className="text-xs font-extrabold uppercase tracking-wider">Clinical Explanation</span>
                                                 </div>
-                                            )}
+                                                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                                                    {mcq.explanation || 'No explanation configured for this MCQ.'}
+                                                </p>
+                                            </div>
                                         </div>
-                                    </AccordionContent>
-                                </AccordionItem>
+                                    )}
+                                </Card>
                             );
-                        })}
-                    </Accordion>
-                </ScrollArea>
-            </div>
+                        })
+                    ) : (
+                        <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-white/5">
+                            <AlertCircle className="w-10 h-10 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
+                            <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">No matching questions</h3>
+                            <p className="text-xs text-slate-400 mt-1">There are no attempts that match your selected filter.</p>
+                        </div>
+                    )}
+                </div>
+            </main>
         </div>
     );
 };
