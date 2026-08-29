@@ -64,13 +64,18 @@ const FLPResultDetail = () => {
             if (error) {
                 throw new Error(`Error fetching FLP result: ${error.message}`);
             }
+            console.log("FLP Result Loaded:", data);
             return data;
         },
         enabled: !!testResultId,
         staleTime: 5 * 60 * 1000,
     });
 
-    const mcqIds = flpResult?.question_attempts.map(attempt => attempt.mcq_id) || [];
+    const mcqIds = flpResult?.question_attempts?.map(attempt => {
+        console.log("Mapping attempt:", attempt);
+        return attempt.mcq_id;
+    }) || [];
+    console.log("Extracted MCQ IDs:", mcqIds);
 
     const {
         data: mcqsData,
