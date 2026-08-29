@@ -281,7 +281,7 @@ const Pricing = () => {
         cardRefs.current[id]?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     };
 
-    if (isAuthLoading || isProfileLoading || arePlansLoading || areQuotaPoliciesLoading) {
+    if (isAuthLoading || arePlansLoading) {
         return <PageSkeleton />;
     }
 
