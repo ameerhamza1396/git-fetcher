@@ -34,6 +34,15 @@ interface MCQ {
     explanation: string;
 }
 
+const normalizeAttempts = (attempts: any[]): MCQAttempt[] => {
+  return (attempts || []).map(attempt => ({
+    mcq_id: attempt.mcq_id || attempt.question_id || '',
+    selectedAnswer: attempt.selectedAnswer !== undefined ? attempt.selectedAnswer : (attempt.user_answer !== undefined ? attempt.user_answer : null),
+    isCorrect: attempt.isCorrect !== undefined ? attempt.isCorrect : (attempt.is_correct !== undefined ? attempt.is_correct : false),
+    timeTaken: attempt.timeTaken || attempt.time_taken || 0
+  }));
+};
+
 export const FLPResults = () => {
   const { testResultId } = useParams<{ testResultId: string }>();
   const navigate = useNavigate();
@@ -71,6 +80,10 @@ export const FLPResults = () => {
           setError("Test result not found.");
           setLoading(false);
           return;
+        }
+
+        if (resultData && Array.isArray(resultData.question_attempts)) {
+          resultData.question_attempts = normalizeAttempts(resultData.question_attempts);
         }
 
         setTestResult(resultData as unknown as TestResult);

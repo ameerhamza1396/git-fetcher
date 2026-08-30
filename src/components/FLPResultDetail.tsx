@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Clock, Calendar, HelpCircle, ChevronRight, BookOpen, Sparkles, Trophy } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Calendar, HelpCircle, ChevronRight, BookOpen } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
 import Seo from '@/components/Seo';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 
 interface MCQ {
     id: string;
@@ -37,6 +37,15 @@ interface FLPAttempt {
     test_config_id: string;
 }
 
+const normalizeAttempts = (attempts: any[]): QuestionAttempt[] => {
+    return (attempts || []).map(attempt => ({
+        mcq_id: attempt.mcq_id || attempt.question_id || '',
+        selectedAnswer: attempt.selectedAnswer !== undefined ? attempt.selectedAnswer : (attempt.user_answer !== undefined ? attempt.user_answer : null),
+        isCorrect: attempt.isCorrect !== undefined ? attempt.isCorrect : (attempt.is_correct !== undefined ? attempt.is_correct : false),
+        timeTaken: attempt.timeTaken || attempt.time_taken || 0
+    }));
+};
+
 const FLPResultDetail = () => {
     const { id: testResultId } = useParams<{ id: string }>();
     const [filterTab, setFilterTab] = useState<'all' | 'correct' | 'incorrect' | 'skipped'>('all');
@@ -63,6 +72,11 @@ const FLPResultDetail = () => {
             if (error) {
                 throw new Error(`Error fetching FLP result: ${error.message}`);
             }
+
+            if (data && Array.isArray(data.question_attempts)) {
+                data.question_attempts = normalizeAttempts(data.question_attempts);
+            }
+
             return data;
         },
         enabled: !!testResultId,
@@ -201,8 +215,8 @@ const FLPResultDetail = () => {
     const activeMcqAttempt = flpResult?.question_attempts?.find(a => a.mcq_id === selectedMcqId);
     const activeMcq = selectedMcqId ? mcqMap.get(selectedMcqId) : null;
 
-    const radius = 52;
-    const strokeWidth = 10;
+    const radius = 38;
+    const strokeWidth = 8;
     const circumference = 2 * Math.PI * radius;
     const strokeDashoffset = circumference - (scorePercentage / 100) * circumference;
 
@@ -233,96 +247,113 @@ const FLPResultDetail = () => {
                 </div>
             </header>
 
-            <main className="relative z-10 flex-1 flex flex-col min-h-0 w-full max-w-4xl mx-auto px-4 pt-6 pb-6 overflow-hidden gap-5">
+            <main className="relative z-10 flex-1 flex flex-col min-h-0 w-full max-w-4xl mx-auto px-4 pt-4 pb-4 overflow-hidden gap-4">
                 {/* Score Dashboard Card (Glassmorphic) */}
-                <div className="overflow-hidden border border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl rounded-[2rem] shadow-sm">
-                    <div className="p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-8">
-                        {/* Circular Graph */}
-                        <div className="relative flex items-center justify-center shrink-0">
-                            <svg className="w-32 h-32 transform -rotate-90">
-                                <circle
-                                    cx="64"
-                                    cy="64"
-                                    r={radius}
-                                    className="stroke-slate-100/50 dark:stroke-slate-800/40"
-                                    strokeWidth={strokeWidth}
-                                    fill="transparent"
-                                />
-                                <circle
-                                    cx="64"
-                                    cy="64"
-                                    r={radius}
-                                    className={scorePercentage >= 60 ? "stroke-teal-500" : "stroke-rose-500"}
-                                    strokeWidth={strokeWidth}
-                                    fill="transparent"
-                                    strokeDasharray={circumference}
-                                    strokeDashoffset={strokeDashoffset}
-                                    strokeLinecap="round"
-                                />
-                            </svg>
-                            <div className="absolute text-center">
-                                <span className="text-3xl font-black tracking-tighter">{scorePercentage}%</span>
-                                <p className="text-[9px] uppercase font-bold text-muted-foreground">Accuracy</p>
+                <div className="overflow-hidden border border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl rounded-[1.5rem] shadow-sm">
+                    <div className="p-4 md:p-5 flex flex-col gap-4">
+                        {/* Upper row: Donut chart on left, Exam Score details on right */}
+                        <div className="flex items-center gap-4">
+                            {/* Circular Graph (Left) */}
+                            <div className="relative flex items-center justify-center shrink-0">
+                                <svg className="w-24 h-24 transform -rotate-90">
+                                    <circle
+                                        cx="48"
+                                        cy="48"
+                                        r={radius}
+                                        className="stroke-slate-100/50 dark:stroke-slate-800/40"
+                                        strokeWidth={strokeWidth}
+                                        fill="transparent"
+                                    />
+                                    <circle
+                                        cx="48"
+                                        cy="48"
+                                        r={radius}
+                                        className={scorePercentage >= 60 ? "stroke-teal-500" : "stroke-rose-500"}
+                                        strokeWidth={strokeWidth}
+                                        fill="transparent"
+                                        strokeDasharray={circumference}
+                                        strokeDashoffset={strokeDashoffset}
+                                        strokeLinecap="round"
+                                    />
+                                </svg>
+                                <div className="absolute text-center">
+                                    <span className="text-xl font-black tracking-tighter">{scorePercentage}%</span>
+                                    <p className="text-[8px] uppercase font-bold text-muted-foreground">Accuracy</p>
+                                </div>
+                            </div>
+
+                            {/* Performance details (Right) */}
+                            <div className="flex-1 min-w-0 space-y-1">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    <Badge className={`uppercase text-[8px] tracking-wider font-extrabold px-1.5 py-0.5 border shadow-sm ${remarks.bg} ${remarks.color} ${remarks.border}`}>
+                                        {remarks.text}
+                                    </Badge>
+                                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                        <Calendar className="w-3 h-3" />
+                                        {new Date(flpResult.completed_at).toLocaleDateString('en-US', {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            year: 'numeric'
+                                        })}
+                                    </span>
+                                </div>
+                                <h2 className="text-lg font-black text-foreground leading-none uppercase italic">
+                                    Exam Score: {flpResult.score} <span className="text-muted-foreground font-semibold text-sm">/ {flpResult.total_questions}</span>
+                                </h2>
+                                <p className="text-[11px] text-muted-foreground font-medium leading-tight">
+                                    Review your results breakdown below to identify concepts and subjects needing additional focus.
+                                </p>
                             </div>
                         </div>
 
-                        {/* Performance details */}
-                        <div className="flex-1 text-center md:text-left space-y-3">
-                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-                                <Badge className={`uppercase text-[9px] tracking-wider font-extrabold px-2.5 py-1 border shadow-sm ${remarks.bg} ${remarks.color} ${remarks.border}`}>
-                                    {remarks.text}
-                                </Badge>
-                                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                    <Calendar className="w-3.5 h-3.5" />
-                                    {new Date(flpResult.completed_at).toLocaleDateString('en-US', {
-                                        month: 'short',
-                                        day: 'numeric',
-                                        year: 'numeric'
-                                    })}
-                                </span>
+                        {/* Lower row: Correct, Incorrect, Skipped Stats under the layout */}
+                        <div className="grid grid-cols-3 gap-2 border-t border-border/20 pt-3">
+                            <div className="flex items-center justify-center gap-2 py-1.5 bg-emerald-500/5 border border-emerald-500/10 rounded-xl">
+                                <span className="text-sm font-black text-emerald-500">{correctCount}</span>
+                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-500/80">Correct</span>
                             </div>
-                            <h2 className="text-2xl font-black text-foreground leading-tight uppercase italic">
-                                Exam Score: {flpResult.score} <span className="text-muted-foreground font-semibold">/ {flpResult.total_questions}</span>
-                            </h2>
-                            <p className="text-xs text-muted-foreground font-medium">
-                                Review your results breakdown below to identify concepts and subjects needing additional focus.
-                            </p>
-                        </div>
-
-                        {/* Metrics Grid */}
-                        <div className="grid grid-cols-3 gap-2 w-full md:w-auto shrink-0">
-                            <div className="flex flex-col items-center justify-center p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl">
-                                <span className="text-xl font-black text-emerald-500">{correctCount}</span>
-                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-500/80 mt-0.5">Correct</span>
+                            <div className="flex items-center justify-center gap-2 py-1.5 bg-rose-500/5 border border-rose-500/10 rounded-xl">
+                                <span className="text-sm font-black text-rose-500">{incorrectCount}</span>
+                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-rose-500/80">Incorrect</span>
                             </div>
-                            <div className="flex flex-col items-center justify-center p-3 bg-rose-500/5 border border-rose-500/20 rounded-2xl">
-                                <span className="text-xl font-black text-rose-500">{incorrectCount}</span>
-                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-rose-500/80 mt-0.5">Wrong</span>
-                            </div>
-                            <div className="flex flex-col items-center justify-center p-3 bg-slate-500/5 border border-border/40 rounded-2xl">
-                                <span className="text-xl font-black text-muted-foreground">{unattemptedCount}</span>
-                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground mt-0.5">Skipped</span>
+                            <div className="flex items-center justify-center gap-2 py-1.5 bg-slate-500/5 border border-border/20 rounded-xl">
+                                <span className="text-sm font-black text-muted-foreground">{unattemptedCount}</span>
+                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground">Skipped</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Filter Tabs */}
-                <div className="flex items-center gap-1.5 p-1 bg-white/5 dark:bg-white/[0.02] backdrop-blur-md rounded-2xl border border-border/40 max-w-md mx-auto md:mx-0">
-                    {(['all', 'correct', 'incorrect', 'skipped'] as const).map((tab) => {
-                        const active = filterTab === tab;
-                        const label = tab.charAt(0).toUpperCase() + tab.slice(1);
+                {/* Filter Tabs (Horizontal Underline styling, scrollable on mobile) */}
+                <div className="flex gap-6 border-b border-border/50 overflow-x-auto no-scrollbar scroll-smooth shrink-0" aria-label="Filter results">
+                    {([
+                        { id: 'all' as const, label: 'All', icon: BookOpen, count: flpResult?.question_attempts?.length || 0 },
+                        { id: 'correct' as const, label: 'Correct', icon: CheckCircle2, count: correctCount },
+                        { id: 'incorrect' as const, label: 'Incorrect', icon: XCircle, count: incorrectCount },
+                        { id: 'skipped' as const, label: 'Skipped', icon: HelpCircle, count: unattemptedCount },
+                    ]).map((tab) => {
+                        const isActive = filterTab === tab.id;
                         return (
                             <button
-                                key={tab}
-                                onClick={() => setFilterTab(tab)}
-                                className={`flex-1 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer ${
-                                    active
-                                        ? "bg-primary text-primary-foreground shadow-sm"
-                                        : "text-muted-foreground hover:text-foreground"
+                                key={tab.id}
+                                type="button"
+                                onClick={() => setFilterTab(tab.id)}
+                                className={`group relative flex items-center gap-2 pb-3 pt-1 text-[11px] font-bold uppercase tracking-[0.14em] transition-colors cursor-pointer shrink-0 ${
+                                    isActive ? 'text-primary' : 'text-muted-foreground/70'
                                 }`}
                             >
-                                {label}
+                                <tab.icon className={`h-3.5 w-3.5 transition-transform duration-300 ${isActive ? 'scale-110' : ''}`} />
+                                <span>{tab.label}</span>
+                                <span
+                                    className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums transition-colors ${
+                                        isActive ? 'bg-primary/10 text-primary' : 'bg-foreground/[0.05] text-muted-foreground/50'
+                                    }`}
+                                >
+                                    {tab.count}
+                                </span>
+                                {isActive && (
+                                    <span className="absolute -bottom-px left-0 right-0 h-[2px] bg-primary" />
+                                )}
                             </button>
                         );
                     })}
@@ -452,7 +483,7 @@ const FLPResultDetail = () => {
                             </div>
 
                             {/* Sticky Sheet Footer */}
-                            <div className="p-4 bg-muted/20 border-t border-border/40 shrink-0 flex justify-end">
+                            <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] bg-muted/20 border-t border-border/40 shrink-0 flex justify-end">
                                 <Button
                                     onClick={() => setIsSheetOpen(false)}
                                     className="rounded-2xl px-6 py-4 font-black uppercase text-xs tracking-widest bg-foreground text-background"
