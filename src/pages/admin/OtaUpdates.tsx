@@ -38,7 +38,7 @@ type AdminResponse = {
   error?: string;
 };
 
-const MEDMACS_API_BASE_URL = (import.meta.env.VITE_MEDMACS_API_BASE_URL || 'https://medmacs.ameerhamza1396.workers.dev').replace(/\/+$/, '');
+const MEDMACS_API_BASE_URL = (import.meta.env.VITE_MEDMACS_API_BASE_URL || 'https://admin.medmacs.app').replace(/\/+$/, '');
 
 const initialSteps: UploadStep[] = [
   { label: 'Validate web bundle zip', state: 'waiting' },

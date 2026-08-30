@@ -10,6 +10,8 @@ export type OtaUpdateState = {
   version?: string;
   notes?: string;
   message?: string;
+  mandatory?: boolean;
+  size?: number | null;
 };
 
 type OtaLatestResponse =
@@ -27,7 +29,7 @@ type OtaLatestResponse =
     };
 
 const OTA_CHANNEL = import.meta.env.VITE_OTA_CHANNEL || 'production';
-const MEDMACS_API_BASE_URL = (import.meta.env.VITE_MEDMACS_API_BASE_URL || 'https://medmacs.ameerhamza1396.workers.dev').replace(/\/+$/, '');
+const MEDMACS_API_BASE_URL = (import.meta.env.VITE_MEDMACS_API_BASE_URL || 'https://admin.medmacs.app').replace(/\/+$/, '');
 const INSTALL_ID_KEY = 'medmacs_ota_install_id';
 const FAILED_VERSIONS_KEY = 'medmacs_ota_failed_versions';
 const INSTALLING_VERSION_KEY = 'medmacs_ota_installing_version';
@@ -270,6 +272,18 @@ export const initializeOtaUpdates = async () => {
       return;
     }
 
+    // Fetch bundle size via HEAD request
+    let updateSize: number | null = null;
+    try {
+      const headResponse = await fetch(data.url, { method: 'HEAD' });
+      const contentLength = headResponse.headers.get('content-length');
+      if (contentLength) {
+        updateSize = parseInt(contentLength, 10);
+      }
+    } catch {
+      // Size unavailable
+    }
+
     const removeDownloadListener = await subscribeToDownloadProgress();
 
     try {
@@ -282,6 +296,8 @@ export const initializeOtaUpdates = async () => {
         progress: 0,
         version: data.version,
         notes: data.notes ?? undefined,
+        mandatory: data.mandatory ?? false,
+        size: updateSize,
         message: 'Getting new features ready...',
       });
 
@@ -297,6 +313,8 @@ export const initializeOtaUpdates = async () => {
         progress: 100,
         version: data.version,
         notes: data.notes ?? undefined,
+        mandatory: data.mandatory ?? false,
+        size: updateSize,
         message: 'Preparing your update...',
       });
 
@@ -305,6 +323,8 @@ export const initializeOtaUpdates = async () => {
         progress: 100,
         version: data.version,
         notes: data.notes ?? undefined,
+        mandatory: data.mandatory ?? false,
+        size: updateSize,
         message: 'Installing update. The app will reopen automatically.',
       });
 
