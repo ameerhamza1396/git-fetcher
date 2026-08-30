@@ -1,22 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 // Define types for fetched data (should match your Supabase schema)
 interface MCQAttempt {
-  question_id: string;
-  user_answer: string | null;
-  correct_answer: string;
-  is_correct: boolean;
-  is_skipped: boolean;
-  // You might need to extend this to include the question and explanation directly
-  // For simplicity, we'll assume the question text and explanation are also available
-  // either in this table or can be joined.
-  // For now, let's assume `mcqs` table provides `question` and `explanation`
+  mcq_id: string;
+  selectedAnswer: string | null;
+  isCorrect: boolean;
+  timeTaken?: number;
 }
 
 interface TestResult {
@@ -27,7 +22,6 @@ interface TestResult {
   total_questions: number;
   completed_at: string;
   test_config_id: string;
-  // This will hold the detailed attempts joined or fetched separately
   question_attempts: MCQAttempt[];
 }
 
@@ -81,7 +75,7 @@ export const FLPResults = () => {
 
         setTestResult(resultData as unknown as TestResult);
 
-        const mcqIds = ((resultData as any).question_attempts as MCQAttempt[]).map(attempt => attempt.question_id);
+        const mcqIds = ((resultData as any).question_attempts as MCQAttempt[]).map(attempt => attempt.mcq_id);
 
         if (mcqIds.length > 0) {
             const { data: fetchedMcqs, error: mcqError } = await supabase
@@ -164,10 +158,10 @@ export const FLPResults = () => {
         </CardHeader>
         <CardContent className="space-y-6">
           {question_attempts.map((attempt, idx) => {
-            const originalMCQ = mcqDetails[attempt.question_id];
+            const originalMCQ = mcqDetails[attempt.mcq_id];
             if (!originalMCQ) {
                 // This case should ideally not happen if data is consistent
-                return <div key={idx} className="text-red-500">Error: MCQ details not found for question ID {attempt.question_id}</div>;
+                return <div key={idx} className="text-red-500">Error: MCQ details not found for question ID {attempt.mcq_id}</div>;
             }
 
             // Shuffle options for consistent display if they were shuffled in quiz
@@ -180,7 +174,7 @@ export const FLPResults = () => {
                 </h3>
                 <ul className="space-y-1 mb-2">
                   {shuffledOptionsForDisplay.map((option, optIdx) => {
-                    const isSelected = attempt.user_answer === option;
+                    const isSelected = attempt.selectedAnswer === option;
                     const isCorrectOption = originalMCQ.correct_answer === option;
                     let optionClass = "p-2 rounded-md text-sm ";
 
