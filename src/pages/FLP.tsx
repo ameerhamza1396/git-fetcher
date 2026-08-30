@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Crown, ArrowLeft, ArrowRight, ScrollText, Zap, Loader2, ChevronLeft, Sparkles, RotateCcw, History } from "lucide-react";
+import { ArrowRight, Loader2, ChevronLeft, RotateCcw, History } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import Seo from "@/components/Seo";
 import UpgradeAccountModal from "@/components/UpgradeAccountModal";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { fetchMCQsBySubject, fetchSubjects } from "@/utils/mcqData";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { fetchMCQsBySubject, fetchMCQsBySubjects, fetchSubjects } from "@/utils/mcqData";
 import { CollaborateModal } from "@/components/CollaborateModal";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -188,6 +188,53 @@ const FLP = () => {
     setWizardStep(1);
   };
 
+  const selectBalancedMcqs = (mcqs: MCQ[], targetCount: number): MCQ[] => {
+    if (mcqs.length <= targetCount) return shuffleArray(mcqs);
+
+    const mcqsByChapter = new Map<string, MCQ[]>();
+    for (const mcq of mcqs) {
+      if (!mcq.chapter_id) continue;
+      const list = mcqsByChapter.get(mcq.chapter_id) || [];
+      list.push(mcq);
+      mcqsByChapter.set(mcq.chapter_id, list);
+    }
+
+    for (const [chapterId, list] of mcqsByChapter.entries()) {
+      mcqsByChapter.set(chapterId, shuffleArray(list));
+    }
+
+    const chapterIds = shuffleArray(Array.from(mcqsByChapter.keys()));
+    const selected: MCQ[] = [];
+    const chapterIndices = new Map<string, number>();
+
+    for (const cid of chapterIds) {
+      chapterIndices.set(cid, 0);
+    }
+
+    let attempts = 0;
+    const maxAttempts = mcqs.length * 2;
+
+    while (selected.length < targetCount && attempts < maxAttempts) {
+      let addedInRound = false;
+      for (const cid of chapterIds) {
+        if (selected.length >= targetCount) break;
+
+        const list = mcqsByChapter.get(cid) || [];
+        const index = chapterIndices.get(cid) || 0;
+
+        if (index < list.length) {
+          selected.push(list[index]);
+          chapterIndices.set(cid, index + 1);
+          addedInRound = true;
+        }
+      }
+      attempts++;
+      if (!addedInRound) break;
+    }
+
+    return shuffleArray(selected);
+  };
+
   const handleStartTest = async () => {
     if (!user || selectedMcqCount === null) return;
     if (!bypassSubject && !selectedSubject) return;
@@ -219,9 +266,7 @@ const FLP = () => {
         subjectName = 'All Subjects';
         const subjectsList = await fetchSubjects();
         if (subjectsList && subjectsList.length > 0) {
-          const allMcqsPromises = subjectsList.map(subj => fetchMCQsBySubject(subj.id));
-          const mcqsBySubjectArrays = await Promise.all(allMcqsPromises);
-          mcqsData = mcqsBySubjectArrays.flat();
+          mcqsData = await fetchMCQsBySubjects(subjectsList.map(subj => subj.id));
         }
       } else {
         const selectedSubjectRecord = subjects.find(subject => subject.id === selectedSubject);
@@ -230,9 +275,12 @@ const FLP = () => {
       }
 
       if (!mcqsData || mcqsData.length === 0) { toast({ title: "No MCQs Found" }); setIsFetchingMcqs(false); return; }
-      const shuffled = shuffleArray(mcqsData as MCQ[]);
-      if (shuffled.length < selectedMcqCount) { toast({ title: "Not Enough Questions", description: `Only ${shuffled.length} available.` }); setIsFetchingMcqs(false); return; }
-      const selectedMcqs = shuffled.slice(0, selectedMcqCount);
+      if (mcqsData.length < selectedMcqCount) { toast({ title: "Not Enough Questions", description: `Only ${mcqsData.length} available.` }); setIsFetchingMcqs(false); return; }
+      
+      const selectedMcqs = bypassSubject
+        ? selectBalancedMcqs(mcqsData as MCQ[], selectedMcqCount)
+        : shuffleArray(mcqsData as MCQ[]).slice(0, selectedMcqCount);
+
       navigate('/flp/test', { state: { mcqs: selectedMcqs, subjectName, sessionId: result?.session_id } });
     } catch (err) {
       toast({ title: "Error", description: (err as any)?.message || "Failed to prepare test.", variant: "destructive" });
@@ -254,13 +302,13 @@ const FLP = () => {
       <Seo title="Full-Length Papers (FLP)" description="Attempt full-length papers on Medmacs App." canonical="https://medmacs.app/flp" />
       <UpgradeAccountModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} onUpgradeClick={() => { setShowUpgradeModal(false); navigate("/pricing"); }} />
 
-      <AlertDialog open={showResumeDialog} onOpenChange={setShowResumeDialog}>
-        <AlertDialogContent className="rounded-[2.5rem] p-8 border-border/40 bg-background/80 dark:bg-slate-900/90 backdrop-blur-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-black italic tracking-tight text-slate-950 dark:text-white">Resume <span className="text-teal-500">Session?</span></AlertDialogTitle>
-            <AlertDialogDescription className="text-muted-foreground font-medium py-2">
+      <Sheet open={showResumeDialog} onOpenChange={setShowResumeDialog}>
+        <SheetContent side="bottom" className="mx-auto max-h-[88dvh] overflow-y-auto rounded-t-[2.5rem] border-x border-t border-border/40 bg-background/95 p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] backdrop-blur-2xl sm:max-w-lg z-[300]" overlayClassName="z-[300]">
+          <SheetHeader className="text-left">
+            <SheetTitle className="text-2xl font-black italic tracking-tight text-slate-950 dark:text-white">Resume <span className="text-teal-500">Session?</span></SheetTitle>
+            <SheetDescription className="text-muted-foreground font-medium py-2">
               You have an unfinished test session. Would you like to continue where you left off?
-            </AlertDialogDescription>
+            </SheetDescription>
             {savedSession && (
               <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
                 <p className="text-sm font-medium text-slate-900 dark:text-white">
@@ -272,17 +320,17 @@ const FLP = () => {
                 </p>
               </div>
             )}
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex gap-3 sm:gap-3 mt-4">
-            <AlertDialogCancel onClick={handleStartFresh} className="flex-1 rounded-2xl h-12 font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white border-transparent uppercase text-xs tracking-widest">
+          </SheetHeader>
+          <div className="flex gap-3 mt-6">
+            <Button onClick={handleStartFresh} variant="outline" className="flex-1 rounded-2xl h-12 font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white border-transparent uppercase text-xs tracking-widest">
               <RotateCcw className="w-4 h-4 mr-2" /> Start Fresh
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleResumeSession} className="flex-1 rounded-2xl h-12 font-black bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] text-white shadow-lg shadow-[#0ea5e9]/20 uppercase text-xs tracking-widest">
+            </Button>
+            <Button onClick={handleResumeSession} className="flex-1 rounded-2xl h-12 font-black bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] text-white shadow-lg shadow-[#0ea5e9]/20 uppercase text-xs tracking-widest">
               <ArrowRight className="w-4 h-4 mr-2" /> Resume
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Fetching overlay */}
       <AnimatePresence>
@@ -314,17 +362,14 @@ const FLP = () => {
               <span className="text-slate-950 dark:text-white">.app</span>
             </span>
           </div>
-          {wizardStep > 0 && (
-            <button
-              onClick={() => {
-                setWizardStep(w => w - 1);
-                setSelectedSubject(null);
-              }}
-              className="cursor-pointer rounded-full px-3 py-2 text-xs font-bold text-slate-400 dark:text-slate-500 transition-colors hover:text-slate-950 dark:hover:text-white flex items-center gap-0.5"
-            >
-              <ChevronLeft className="w-4 h-4" /> Back
-            </button>
-          )}
+          <button
+            onClick={() => {
+              navigate('/dashboard');
+            }}
+            className="cursor-pointer rounded-full px-3 py-2 text-xs font-bold text-slate-400 dark:text-slate-500 transition-colors hover:text-slate-950 dark:hover:text-white flex items-center gap-0.5"
+          >
+            <ChevronLeft className="w-4 h-4" /> Back
+          </button>
         </header>
 
         <AnimatePresence mode="wait">

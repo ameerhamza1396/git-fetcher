@@ -376,6 +376,12 @@ export const fetchMCQsBySubject = async (subjectId: string): Promise<MCQ[]> => {
   return await fetchCloudContent<MCQ[]>('mcqs-by-subject', { subjectId }) ?? [];
 };
 
+export const fetchMCQsBySubjects = async (subjectIds: string[]): Promise<MCQ[]> => {
+  if (subjectIds.length === 0) return [];
+  if (!(await hasExplicitProfileYear())) return [];
+  return await fetchCloudContent<MCQ[]>('mcqs-by-subjects', { subjectIds: subjectIds.join(',') }) ?? [];
+};
+
 export const getUserStats = async (userId: string) => {
   try {
     const { data: compactSummary, error: compactSummaryError } = await supabase
@@ -534,7 +540,7 @@ export const evaluateSEQAnswer = async (
       userAnswer,
       question,
       bookReferences
-    });
+    }, {});
     return {
       is_correct: data.is_correct ?? false,
       satisfaction_index: data.satisfaction_index ?? 0,
