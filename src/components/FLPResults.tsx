@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // Define types for fetched data (should match your Supabase schema)
 interface MCQAttempt {
@@ -33,6 +34,36 @@ interface MCQ {
     correct_answer: string;
     explanation: string;
 }
+
+const FLPResultsSkeleton = () => {
+  return (
+    <div className="max-w-4xl mx-auto px-2 sm:px-0 py-8 animate-pulse">
+      <Card className="border-purple-200 dark:border-purple-800 bg-white/50 dark:bg-slate-900/40 backdrop-blur-sm shadow-xl">
+        <CardHeader className="text-center pb-6 flex flex-col items-center gap-2">
+          <Skeleton className="h-8 w-48 rounded-lg" />
+          <Skeleton className="h-5 w-36 rounded-md mt-1" />
+          <Skeleton className="h-5 w-24 rounded-md" />
+        </CardHeader>
+        <CardContent className="space-y-8">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="border-b border-gray-200 dark:border-gray-700 pb-6 last:border-b-0 space-y-3">
+              <div className="flex gap-2 items-center">
+                <Skeleton className="h-6 w-24 rounded-md" />
+                <Skeleton className="h-6 w-3/4 rounded-md" />
+              </div>
+              <div className="space-y-2 mt-3">
+                {[1, 2, 3, 4].map((o) => (
+                  <Skeleton key={o} className="h-10 w-full rounded-lg" />
+                ))}
+              </div>
+              <Skeleton className="h-16 w-full rounded-lg mt-3" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
 
 const normalizeAttempts = (attempts: any[]): MCQAttempt[] => {
   return (attempts || []).map(attempt => ({
@@ -124,15 +155,7 @@ export const FLPResults = () => {
   }, [testResultId, toast]);
 
   if (loading) {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <img
-        src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png"
-        alt="Loading Medistics"
-        className="w-32 h-32 object-contain"
-      />
-    </div>
-  );
+  return <FLPResultsSkeleton />;
 }
 
   if (error) {
