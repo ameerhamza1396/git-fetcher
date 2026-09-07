@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { XCircle, RefreshCcw, MessageCircle, AlertCircle, ArrowLeft, ReceiptText } from 'lucide-react';
+import { XCircle, RefreshCcw, MessageCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Seo from '@/components/Seo';
 

@@ -90,7 +90,7 @@ export function CaseOfDayCard({
   ) : highlightWords(currentIndex === 0 ? caseOfDay.details : caseOfDay.answer, currentSection.accent);
 
   return (
-    <div className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-slate-950/82 p-5 pb-0 text-white shadow-2xl shadow-blue-950/40 backdrop-blur-2xl">
+    <div className="relative overflow-hidden rounded-t-[2rem] border border-white/15 bg-slate-950/82 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] text-white shadow-2xl shadow-blue-950/40 backdrop-blur-2xl">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(56,189,248,0.24),transparent_32%),radial-gradient(circle_at_88%_20%,rgba(168,85,247,0.20),transparent_30%),linear-gradient(135deg,rgba(15,23,42,0.94),rgba(15,23,42,0.76))]" />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
 

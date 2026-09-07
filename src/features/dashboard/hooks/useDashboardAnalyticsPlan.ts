@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { aiApiJson } from '@/utils/aiApi';
+import { aiApiJson, AiApiError } from '@/utils/aiApi';
 import type { AnalyticsPlan, AiUsageSummary, DashboardProfile } from '../types';
 
 type ToastInput = {
@@ -264,7 +264,7 @@ export function useDashboardAnalyticsPlan({
     try {
       const analytics = await buildAnalyticsPayload();
       if (!analytics) return;
-      const plan = await aiApiJson<AnalyticsPlan>('analytics-plan', { analytics });
+      const plan = await aiApiJson<AnalyticsPlan>('analytics-plan', { analytics }, {});
       const nextPlan = { ...plan, generatedAt: new Date().toISOString() };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (supabase.from('user_analytics_ai_plans') as any)
@@ -280,11 +280,13 @@ export function useDashboardAnalyticsPlan({
       queryClient.invalidateQueries({ queryKey: ['analytics-ai-plan', userId] });
       toast({ title: 'AI analysis ready', description: 'Dr Ahroid updated your study strategy.' });
     } catch (error) {
-      toast({
-        title: 'AI analysis unavailable',
-        description: error instanceof Error ? error.message : 'Dr Ahroid could not analyze your stats right now.',
-        variant: 'destructive',
-      });
+      if (!(error instanceof AiApiError && (error.status === 403 || error.status === 429))) {
+        toast({
+          title: 'AI analysis unavailable',
+          description: error instanceof Error ? error.message : 'Dr Ahroid could not analyze your stats right now.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setAnalyticsPlanLoading(false);
     }

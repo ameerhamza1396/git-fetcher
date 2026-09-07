@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export const aiApiOrigin = (import.meta.env.VITE_AI_API_ORIGIN || 'https://ai.medistics.app').replace(/\/$/, '');
+export const aiApiOrigin = (import.meta.env.VITE_AI_API_ORIGIN || 'https://ai.medmacs.app').replace(/\/$/, '');
 
 export const aiApiUrl = (path: string) => `${aiApiOrigin}/api/${path.replace(/^\/+/, '')}`;
 
@@ -8,6 +8,13 @@ export class AiApiError extends Error {
   status: number;
   code?: string;
   payload?: Record<string, any>;
+  feature?: string;
+  limitPeriod?: 'daily' | 'weekly' | 'monthly' | 'cooldown';
+  resetAt?: string;
+  appCode?: number;
+  limit?: number | null;
+  used?: number | null;
+  remaining?: number;
 
   constructor(message: string, status: number, code?: string, payload?: Record<string, any>) {
     super(message);
@@ -15,12 +22,27 @@ export class AiApiError extends Error {
     this.status = status;
     this.code = code;
     this.payload = payload;
+    this.feature = payload?.feature || payload?.limit_type || undefined;
+    this.limitPeriod = payload?.window || payload?.period || payload?.limit_period || undefined;
+    this.resetAt = payload?.reset_at || payload?.resetAt || undefined;
+    this.appCode = payload?.app_code || undefined;
+    this.limit = payload?.limit ?? null;
+    this.used = payload?.used ?? null;
+    this.remaining = payload?.remaining ?? undefined;
   }
 }
 
 export type AiStreamStatus = {
   phase?: string;
   text?: string;
+};
+
+type AiLimitErrorCallback = (error: AiApiError) => void;
+
+let _onAiLimitError: AiLimitErrorCallback | null = null;
+
+export const setOnAiLimitError = (callback: AiLimitErrorCallback | null) => {
+  _onAiLimitError = callback;
 };
 
 const aiStatusMessages: Record<number, string> = {
@@ -41,24 +63,30 @@ export const aiApiFetch = async (path: string, init: RequestInit = {}) => {
   const response = await fetch(aiApiUrl(path), { ...init, headers });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    throw new AiApiError(
+    const error = new AiApiError(
       payload.error || payload.message || aiStatusMessages[response.status] || `AI request failed with status ${response.status}`,
       response.status,
       payload.code,
       payload,
     );
+    if (error.status === 403 || error.status === 429) {
+      _onAiLimitError?.(error);
+    }
+    throw error;
   }
 
   return response;
 };
 
 export const aiApiJson = async <T = any>(path: string, body: unknown, init: RequestInit = {}): Promise<T> => {
+  const bodyStr = JSON.stringify(body);
   const response = await aiApiFetch(path, {
     ...init,
     method: init.method || 'POST',
-    body: JSON.stringify(body),
+    body: bodyStr,
   });
-  return response.json() as Promise<T>;
+  const result = await response.json() as Promise<T>;
+  return result;
 };
 
 export const aiApiStream = async (
@@ -67,10 +95,11 @@ export const aiApiStream = async (
   handlers: { onStatus?: (status: AiStreamStatus) => void; onDelta?: (text: string) => void },
   init: RequestInit = {},
 ) => {
+  const bodyStr = JSON.stringify(body);
   const response = await aiApiFetch(path, {
     ...init,
     method: init.method || 'POST',
-    body: JSON.stringify(body),
+    body: bodyStr,
     headers: { Accept: 'text/event-stream', ...(init.headers || {}) },
   });
   if (!response.body) throw new AiApiError('Streaming is unavailable in this browser.', response.status);
@@ -89,7 +118,11 @@ export const aiApiStream = async (
       if (event === 'status') handlers.onStatus?.({ phase: data.phase, text: data.text || '' });
       if (event === 'delta') handlers.onDelta?.(data.text || '');
       if (event === 'done') result = data;
-      if (event === 'error') throw new AiApiError(data.error || 'AI request failed.', response.status, data.code, data);
+      if (event === 'error') {
+        const err = new AiApiError(data.error || 'AI request failed.', response.status, data.code, data);
+        if (err.status === 403 || err.status === 429) _onAiLimitError?.(err);
+        throw err;
+      }
     }
   };
   while (true) {

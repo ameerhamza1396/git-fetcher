@@ -1,11 +1,9 @@
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { BookOpen, ChevronRight, FlaskConical, Target, ArrowLeft } from 'lucide-react';
 import Seo from '@/components/Seo';
 import { Card, CardContent } from '@/components/ui/card';
 import { SmartDeck } from '@/components/dashboard/personalization/SmartDeck';
 import { usePersonalizationData } from '@/components/dashboard/personalization/usePersonalizationData';
-import { ProfileDropdown } from '@/components/ProfileDropdown';
 
 const SmartDeckPage = () => {
   const { groupedSubjects, weakestChapter, wrongAttempts, isLoading } = usePersonalizationData();

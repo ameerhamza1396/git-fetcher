@@ -1,6 +1,3 @@
-import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
-import { ProfileDropdown } from '@/components/ProfileDropdown';
 import type { Ref, UIEventHandler } from 'react';
 import { useEffect } from 'react';
 

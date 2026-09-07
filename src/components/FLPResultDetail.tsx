@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
 import Seo from '@/components/Seo';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { readAttemptData } from '@/utils/flpStorage';
+import { FLPResultSkeleton } from '@/components/FLPs/FLPResultSkeleton';
 
 interface MCQ {
     id: string;
@@ -35,6 +37,7 @@ interface FLPAttempt {
     completed_at: string;
     question_attempts: QuestionAttempt[];
     test_config_id: string;
+    r2_key?: string;
 }
 
 const normalizeAttempts = (attempts: any[]): QuestionAttempt[] => {
@@ -73,17 +76,40 @@ const FLPResultDetail = () => {
                 throw new Error(`Error fetching FLP result: ${error.message}`);
             }
 
-            if (data && Array.isArray(data.question_attempts)) {
-                data.question_attempts = normalizeAttempts(data.question_attempts);
+            if (data) {
+                let attempts = data.question_attempts;
+                if (typeof attempts === 'string') {
+                    try { attempts = JSON.parse(attempts); } catch { attempts = []; }
+                }
+                if (Array.isArray(attempts)) {
+                    data.question_attempts = normalizeAttempts(attempts);
+                }
+            }
+
+            // R2 storage: store full MCQ data for later use
+            if (data?.r2_key) {
+                try {
+                    const r2Data = await readAttemptData(data.r2_key);
+                    if (r2Data?.mcqs) {
+                        (data as any)._r2_mcqs = r2Data.mcqs;
+                    }
+                } catch {
+                    // R2 failed, will fall back to mcqs table
+                }
             }
 
             return data;
         },
         enabled: !!testResultId,
-        staleTime: 5 * 60 * 1000,
+        staleTime: 0,
+        refetchOnMount: 'always',
+        refetchOnWindowFocus: false,
     });
 
-    const mcqIds = flpResult?.question_attempts?.map(attempt => attempt.mcq_id) || [];
+    const mcqIds = useMemo(
+        () => flpResult?.question_attempts?.map(attempt => attempt.mcq_id) || [],
+        [flpResult?.question_attempts]
+    );
 
     const {
         data: mcqsData,
@@ -91,8 +117,16 @@ const FLPResultDetail = () => {
         isError: isErrorMcqs,
         error: errorMcqs
     } = useQuery<MCQ[], Error>({
-        queryKey: ['flpMcqsDetail', mcqIds],
+        queryKey: ['flpMcqsDetail', mcqIds, (flpResult as any)?._r2_mcqs?.length],
         queryFn: async () => {
+            // R2 storage: use pre-fetched MCQ data when available
+            // Validate that MCQs have options arrays — older submissions may have undefined options
+            const r2Mcqs = (flpResult as any)?._r2_mcqs;
+            if (r2Mcqs && Array.isArray(r2Mcqs) && r2Mcqs.length > 0 && r2Mcqs.every((m: any) => Array.isArray(m.options) && m.options.length > 0)) {
+                return r2Mcqs as MCQ[];
+            }
+
+            // Legacy fallback: fetch from mcqs table
             if (mcqIds.length === 0) {
                 return [];
             }
@@ -104,7 +138,10 @@ const FLPResultDetail = () => {
             if (error) {
                 throw new Error(`Error fetching MCQs: ${error.message}`);
             }
-            return data as MCQ[];
+            return (data || []).map((mcq: any) => ({
+                ...mcq,
+                options: Array.isArray(mcq.options) ? mcq.options : JSON.parse(mcq.options || '[]'),
+            })) as MCQ[];
         },
         enabled: !!flpResult && !!flpResult.question_attempts && flpResult.question_attempts.length > 0 && mcqIds.length > 0,
         staleTime: Infinity,
@@ -136,14 +173,7 @@ const FLPResultDetail = () => {
     };
 
     if (isLoadingResult || isLoadingMcqs) {
-        return (
-            <div className="min-h-screen w-full bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-4">
-                    <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-20 h-20 object-contain animate-pulse" />
-                    <p className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-xs animate-pulse">Loading Detailed Report...</p>
-                </div>
-            </div>
-        );
+        return <FLPResultSkeleton />;
     }
 
     if (isErrorResult) {

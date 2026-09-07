@@ -1,9 +1,7 @@
 import { useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Bot, Zap, Brain, FileText, Moon, Sun, MessageSquare, User, Mail, Phone, GraduationCap, University, Image, IdCard, FileCheck, CheckCircle, XCircle } from 'lucide-react';
+import { Bot, Zap, Brain, FileText, MessageSquare, User, Mail, Phone, GraduationCap, University, Image, IdCard, FileCheck, CheckCircle, XCircle } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
@@ -12,10 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ReCAPTCHA from 'react-google-recaptcha';
-import { ProfileDropdown } from '@/components/ProfileDropdown'; // NEW: Import ProfileDropdown
 
 import Seo from '@/components/Seo'; // Import the Seo component
-import PlanBadge from '@/components/PlanBadge';
 
 const CareerAmbassador = () => {
     const { theme, setTheme } = useTheme();

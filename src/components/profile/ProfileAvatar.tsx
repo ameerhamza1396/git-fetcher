@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,7 +19,6 @@ import {
     RotateCw,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useAuth } from '@/hooks/useAuth';
 import {
     Dialog,
     DialogContent,

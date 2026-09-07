@@ -1,17 +1,12 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Bot, Zap, Brain, FileText, Moon, Sun, MessageSquare } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { Bot, Zap, Brain, FileText, MessageSquare } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { ProfileDropdown } from '@/components/ProfileDropdown';
 
 import Seo from '@/components/Seo'; // Import the Seo component
-import PlanBadge from '@/components/PlanBadge';
 
 const AI = () => {
   const { user } = useAuth();

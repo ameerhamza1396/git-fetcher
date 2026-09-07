@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CheckCircle2, ChevronRight, Loader2, RotateCcw, XCircle } from 'lucide-react';
 import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
 import { useAuth } from '@/hooks/useAuth';

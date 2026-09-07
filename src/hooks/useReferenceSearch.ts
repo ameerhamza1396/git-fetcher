@@ -12,7 +12,7 @@ export function useReferenceSearch() {
         setLoading(true);
         setError(null);
         try {
-            const result = await aiApiJson<ReferenceResponse>('reference', { query, top_k: topK });
+            const result = await aiApiJson<ReferenceResponse>('reference', { query, top_k: topK }, {});
             setData(result);
             return result;
         } catch (err: any) {

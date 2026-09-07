@@ -1,21 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
-import { ChevronLeft, PanelLeft, Clock, Menu, Zap } from 'lucide-react';
+import { ChevronLeft, PanelLeft, Clock, Menu, Zap, Loader2 } from 'lucide-react';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from '@/components/ui/sheet';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
+import { writeAttemptData } from '@/utils/flpStorage';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { FLPResults } from '@/components/FLPResults';
+
 
 interface MCQ {
   id: string;
@@ -66,6 +65,7 @@ interface FLPSessionData {
   userAnswers: Record<string, string | null>;
   totalTimeLeft: number;
   subjectName?: string;
+  sessionId?: string;
   savedAt: number;
 }
 
@@ -90,6 +90,9 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
   const mainContentRef = useRef<HTMLDivElement>(null);
   const [isRestored, setIsRestored] = useState(false);
   const [isNewSession, setIsNewSession] = useState(false);
+  const isSubmittingRef = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isInitializedRef = useRef(false);
 
   const totalQuestions = shuffledMcqs.length;
   const totalTestTime = totalQuestions * timePerQuestion;
@@ -131,8 +134,18 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
   const countUnattempted = () => shuffledMcqs ? shuffledMcqs.filter(mcq => !isQuestionAnswered(mcq.id)).length : 0;
 
   const submitTestToSupabase = async (autoSubmit: boolean = false) => {
-    if (!user || !shuffledMcqs || isQuizEnded) return;
+    if (!user || !shuffledMcqs || isQuizEnded || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
     if (timerRef.current) clearInterval(timerRef.current);
+
+    // Clear localStorage immediately to prevent the save effect from re-writing it
+    try {
+      localStorage.removeItem(FLP_STORAGE_KEY);
+    } catch (e) {
+      console.error("Failed to clear FLP session", e);
+    }
+
     let finalScore = 0;
     const questionsAttemptDetails: QuizResultForDb[] = [];
     shuffledMcqs.forEach(mcq => {
@@ -146,7 +159,7 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
     try {
       let activeResultId = '';
       if (sessionId) {
-        const { error: updateError } = await (supabase as any)
+        const { data: updatedRows, error: updateError } = await (supabase as any)
           .from('flp_user_attempts')
           .update({
             score: finalScore,
@@ -154,15 +167,34 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
             question_attempts: questionsAttemptDetails,
             status: 'completed'
           })
-          .eq('id', sessionId);
+          .eq('id', sessionId)
+          .select('id');
         if (updateError) throw updateError;
+        if (!updatedRows || updatedRows.length === 0) {
+          throw new Error('Failed to update test result: no rows affected.');
+        }
         activeResultId = sessionId;
       } else {
-        await (supabase as any).from('flp_user_attempts').delete().eq('user_id', user.id).eq('test_config_id', flpTestConfigId);
         const { data: insertedResult, error: insertError } = await (supabase as any).from('flp_user_attempts').insert([resultData]).select('id').single();
         if (insertError) throw insertError;
         activeResultId = (insertedResult as any).id;
+
+        const { data: attempts } = await (supabase as any)
+          .from('flp_user_attempts')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('test_config_id', flpTestConfigId)
+          .order('completed_at', { ascending: false });
+
+        if (attempts && attempts.length > 10) {
+          const idsToDelete = attempts.slice(10).map((a: any) => a.id);
+          await (supabase as any)
+            .from('flp_user_attempts')
+            .delete()
+            .in('id', idsToDelete);
+        }
       }
+
       const { data: profileBadges } = await (supabase as any).from('profiles').select('badges').eq('id', user.id).maybeSingle();
       const currentBadges = profileBadges?.badges || {};
       const currentStats = currentBadges.stats || {};
@@ -179,19 +211,50 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
           },
         })
         .eq('id', user.id);
-      try {
-        localStorage.removeItem(FLP_STORAGE_KEY);
-      } catch (e) {
-        console.error("Failed to clear FLP session", e);
-      }
       notifyAchievementProgress('flp_completed');
+
+      // Build an options lookup from the original mcqs prop (which has the `options` field)
+      // ShuffledMCQ omits `options` and uses `shuffledOptions` instead, so we need the originals
+      const originalMcqMap = new Map(mcqs.map(m => [m.id, m]));
+
+      // Write full MCQ data to R2 for result detail page
+      try {
+        const r2Key = await writeAttemptData({
+          attempt_id: activeResultId,
+          mcqs: shuffledMcqs.map(mcq => {
+            const originalMcq = originalMcqMap.get(mcq.id);
+            return {
+              id: mcq.id,
+              question: mcq.question,
+              options: originalMcq?.options || mcq.shuffledOptions,
+              correct_answer: mcq.correct_answer,
+              explanation: mcq.explanation,
+              chapter_id: mcq.chapter_id,
+            };
+          }),
+          question_attempts: questionsAttemptDetails,
+          score: finalScore,
+          total_questions: totalQuestions,
+          completed_at: new Date().toISOString(),
+        });
+
+        // Update Supabase with r2_key
+        await (supabase as any)
+          .from('flp_user_attempts')
+          .update({ r2_key: r2Key })
+          .eq('id', activeResultId);
+      } catch (r2Err) {
+        console.error('R2 write failed (non-blocking):', r2Err);
+      }
+
       setCurrentTestResultId(activeResultId);
       setIsQuizEnded(true);
       toast({ title: autoSubmit ? "Time's Up! Test Submitted." : "Test Submitted!", description: `You scored ${finalScore}/${totalQuestions}.`, duration: 3000 });
       navigate(`/results/flp/${activeResultId}`);
     } catch (err: any) {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
       toast({ title: "Submission Error", description: err.message, variant: "destructive" });
-      setIsQuizEnded(false);
     }
   };
 
@@ -280,7 +343,8 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
   }, [isQuizEnded]);
 
   useEffect(() => {
-    if (mcqs && mcqs.length > 0) {
+    if (mcqs && mcqs.length > 0 && !isInitializedRef.current) {
+      isInitializedRef.current = true;
       const initialShuffled = mcqs.map(mcq => {
         const shuffledOptions = shuffleArray(mcq.options);
         const newCorrectIndex = shuffledOptions.indexOf(mcq.correct_answer);
@@ -300,12 +364,14 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
         initialShuffled.forEach(mcq => { initialUserAnswers[mcq.id] = null; });
         setUserAnswers(initialUserAnswers);
         setCurrentQuestionIndex(0);
-        setTotalTimeLeft(totalTestTime);
+        const freshTotalTime = initialShuffled.length * timePerQuestion;
+        setTotalTimeLeft(freshTotalTime);
       }
     }
-  }, [mcqs, timePerQuestion, totalTestTime]);
+  }, [mcqs, timePerQuestion]);
 
   useEffect(() => {
+    if (!isInitializedRef.current) return;
     if (totalTimeLeft <= 0 && !isQuizEnded && totalQuestions > 0) {
       if (timerRef.current) clearInterval(timerRef.current);
       submitTestToSupabase(true);
@@ -320,13 +386,14 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
   }, [totalTimeLeft, isQuizEnded, totalQuestions]);
 
   useEffect(() => {
-    if (shuffledMcqs.length > 0 && !isQuizEnded && user) {
+    if (shuffledMcqs.length > 0 && !isQuizEnded && !isSubmittingRef.current && user) {
       const sessionData: FLPSessionData = {
         shuffledMcqs,
         currentQuestionIndex,
         userAnswers,
         totalTimeLeft,
         subjectName,
+        sessionId,
         savedAt: Date.now(),
       };
       try {
@@ -342,8 +409,6 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
       } catch (e) { console.error("Failed to clear FLP session", e); }
     }
   }, [isRestored, shuffledMcqs.length]);
-
-  if (isQuizEnded && currentTestResultId) return <FLPResults />;
 
   if (shuffledMcqs.length === 0) {
     return (
@@ -449,15 +514,16 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
           )}
         </AnimatePresence>
 
-        {/* Main Content - Scrollable */}
+        {/* Main Content - Questions scrollable, header/footer fixed */}
         <main
           ref={mainContentRef}
-          className={`flex-grow flex flex-col items-center px-4 py-8 pb-[env(safe-area-inset-bottom)] overflow-y-auto w-full transition-all duration-500 ease-in-out ${isPanelOpen ? 'lg:pl-72' : ''}`}
+          className={`flex-grow flex flex-col items-center px-4 pt-6 pb-[calc(env(safe-area-inset-bottom)+8px)] overflow-hidden w-full transition-all duration-500 ease-in-out ${isPanelOpen ? 'lg:pl-72' : ''}`}
           style={{ height: '100%' }}
         >
-          <div className="w-full max-w-2xl flex flex-col flex-1">
-            <div className="mb-10 w-full">
-              <div className="flex items-center justify-between mb-4">
+          <div className="w-full max-w-2xl flex flex-col h-full overflow-hidden">
+            {/* Fixed Top Progress Header */}
+            <div className="mb-6 w-full shrink-0">
+              <div className="flex items-center justify-between mb-3">
                 <div className="flex flex-col">
                   <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">Progress</span>
                   <p className="text-sm font-black text-foreground mt-0.5">Question {currentQuestionIndex + 1} of {totalQuestions}</p>
@@ -478,85 +544,97 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
               </div>
             </div>
 
-            <AnimatePresence mode="wait">
-              {currentMCQ && (
-                <motion.div
-                  key={currentMCQ.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.3 }}
-                  className="flex flex-col flex-1"
+            {/* Scrollable Questions & Options container */}
+            <div className="flex-1 overflow-y-auto pr-1 w-full min-h-0 mb-4">
+              <AnimatePresence mode="wait">
+                {currentMCQ && (
+                  <motion.div
+                    key={currentMCQ.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                    className="flex flex-col w-full"
+                  >
+                    <h2 className="text-xl sm:text-2xl font-black text-foreground leading-[1.3] tracking-tight mb-8">
+                      {currentMCQ.question}
+                    </h2>
+
+                    <div className="space-y-4 mb-4">
+                      {currentMCQ.shuffledOptions.map((option, idx) => {
+                        const isSelected = userAnswers[currentMCQ.id] === option;
+                        return (
+                          <motion.button
+                            key={idx}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => handleOptionSelect(currentMCQ.id, option)}
+                            className={`group relative w-full p-5 rounded-3xl text-left border-2 transition-all duration-300 ${isSelected
+                                ? 'bg-blue-500/10 border-blue-500 shadow-[0_10px_30px_rgba(59,130,246,0.1)]'
+                                : 'bg-muted/10 border-transparent hover:bg-muted/20 hover:border-muted'
+                              }`}
+                          >
+                            <div className="flex items-center gap-4">
+                              <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black transition-colors shrink-0 ${isSelected ? 'bg-blue-500 text-white' : 'bg-muted/20 text-muted-foreground'
+                                }`}>
+                                {String.fromCharCode(65 + idx)}
+                              </span>
+                              <span className={`text-base font-bold leading-snug transition-colors ${isSelected ? 'text-blue-600' : 'text-foreground/80'
+                                }`}>
+                                {option}
+                              </span>
+                            </div>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Fixed Bottom Footer */}
+            <div className="w-full shrink-0 border-t border-border/20 pt-4 pb-2 bg-background z-10">
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="ghost"
+                  onClick={goToPreviousQuestion}
+                  disabled={currentQuestionIndex === 0}
+                  className="flex-1 max-w-[120px] rounded-2xl h-14 bg-muted/40 backdrop-blur-sm text-foreground font-bold hover:bg-muted/60 disabled:opacity-20 transition-all"
                 >
-                  <h2 className="text-xl sm:text-2xl font-black text-foreground leading-[1.3] tracking-tight mb-8">
-                    {currentMCQ.question}
-                  </h2>
+                  <ChevronLeft className="w-5 h-5 mr-1" /> Back
+                </Button>
 
-                  <div className="space-y-4 mb-10">
-                    {currentMCQ.shuffledOptions.map((option, idx) => {
-                      const isSelected = userAnswers[currentMCQ.id] === option;
-                      return (
-                        <motion.button
-                          key={idx}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => handleOptionSelect(currentMCQ.id, option)}
-                          className={`group relative w-full p-5 rounded-3xl text-left border-2 transition-all duration-300 ${isSelected
-                              ? 'bg-blue-500/10 border-blue-500 shadow-[0_10px_30px_rgba(59,130,246,0.1)]'
-                              : 'bg-muted/10 border-transparent hover:bg-muted/20 hover:border-muted'
-                            }`}
-                        >
-                          <div className="flex items-center gap-4">
-                            <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black transition-colors shrink-0 ${isSelected ? 'bg-blue-500 text-white' : 'bg-muted/20 text-muted-foreground'
-                              }`}>
-                              {String.fromCharCode(65 + idx)}
-                            </span>
-                            <span className={`text-base font-bold leading-snug transition-colors ${isSelected ? 'text-blue-600' : 'text-foreground/80'
-                              }`}>
-                              {option}
-                            </span>
-                          </div>
-                        </motion.button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Navigation Footer */}
-                  <div className="flex items-center gap-4 mt-auto pt-8 pb-4 border-t border-border/20">
-                    <Button
-                      variant="ghost"
-                      onClick={goToPreviousQuestion}
-                      disabled={currentQuestionIndex === 0}
-                      className="flex-1 max-w-[120px] rounded-2xl h-14 bg-muted/40 backdrop-blur-sm text-foreground font-bold hover:bg-muted/60 disabled:opacity-20 transition-all"
-                    >
-                      <ChevronLeft className="w-5 h-5 mr-1" /> Back
-                    </Button>
-
-                    {currentQuestionIndex < totalQuestions - 1 ? (
-                      <Button
-                        onClick={goToNextQuestion}
-                        className="flex-1 rounded-2xl h-14 bg-foreground text-background font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
-                      >
-                        Next Question <ChevronLeft className="w-5 h-5 ml-1 rotate-180" />
-                      </Button>
+                {currentQuestionIndex < totalQuestions - 1 ? (
+                  <Button
+                    onClick={goToNextQuestion}
+                    className="flex-1 rounded-2xl h-14 bg-foreground text-background font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+                  >
+                    Next Question <ChevronLeft className="w-5 h-5 ml-1 rotate-180" />
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleSubmitTest}
+                    disabled={isSubmitting}
+                    className="flex-1 rounded-2xl h-14 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-60 disabled:pointer-events-none"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Submitting...
+                      </>
                     ) : (
-                      <Button
-                        onClick={handleSubmitTest}
-                        className="flex-1 rounded-2xl h-14 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
-                      >
-                        Finish & Submit
-                      </Button>
+                      "Finish & Submit"
                     )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  </Button>
+                )}
+              </div>
 
-            <div className="mt-8 text-center space-y-2 opacity-30 pb-8">
-              <p className="text-[10px] uppercase font-black tracking-[0.5em] text-muted-foreground">Certified Exam Environment</p>
-              <div className="flex items-center justify-center gap-2">
-                <div className="h-px w-8 bg-muted-foreground/30" />
-                <p className="text-[10px] font-bold text-foreground uppercase tracking-widest">{displayUsername}</p>
-                <div className="h-px w-8 bg-muted-foreground/30" />
+              <div className="mt-4 text-center opacity-30">
+                <div className="flex items-center justify-center gap-2">
+                  <div className="h-px w-8 bg-muted-foreground/30" />
+                  <p className="text-[10px] font-bold text-foreground uppercase tracking-widest">{displayUsername}</p>
+                  <div className="h-px w-8 bg-muted-foreground/30" />
+                </div>
               </div>
             </div>
           </div>
@@ -578,20 +656,24 @@ export const FLPQuiz = ({ mcqs, onFinish, timePerQuestion = 60, subjectName, ini
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={showExitConfirm} onOpenChange={setShowExitConfirm}>
-        <AlertDialogContent className="rounded-[2.5rem] p-8 border-border/40 bg-background/80 backdrop-blur-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-black italic tracking-tight">Leave <span className="text-blue-500">Test?</span></AlertDialogTitle>
-            <AlertDialogDescription className="text-muted-foreground font-medium py-2">
+      <Sheet open={showExitConfirm} onOpenChange={setShowExitConfirm}>
+        <SheetContent side="bottom" className="mx-auto max-h-[88dvh] overflow-y-auto rounded-t-[2.5rem] border-x border-t border-border/40 bg-background/95 p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] backdrop-blur-2xl sm:max-w-lg z-[300]" overlayClassName="z-[300]">
+          <SheetHeader className="text-left">
+            <SheetTitle className="text-2xl font-black italic tracking-tight text-slate-950 dark:text-white">Leave <span className="text-red-500">Test?</span></SheetTitle>
+            <SheetDescription className="text-muted-foreground font-medium py-2">
               Are you sure you want to leave the test? Your current progress will not be saved for this session.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex gap-3 sm:gap-3 mt-4">
-            <AlertDialogCancel className="flex-1 rounded-2xl h-12 font-bold bg-muted/20 border-transparent hover:bg-muted/40 uppercase text-xs tracking-widest">Continue Test</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setShowExitConfirm(false); onFinish(0, 0); }} className="flex-1 rounded-2xl h-12 font-black bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-900/20 uppercase text-xs tracking-widest">Leave Paper</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex gap-3 mt-6">
+            <Button onClick={() => setShowExitConfirm(false)} variant="outline" className="flex-1 rounded-2xl h-12 font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white border-transparent uppercase text-xs tracking-widest">
+              Continue Test
+            </Button>
+            <Button onClick={() => { setShowExitConfirm(false); navigate('/dashboard'); }} className="flex-1 rounded-2xl h-12 font-black bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-lg shadow-rose-900/20 uppercase text-xs tracking-widest">
+              Leave Paper
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

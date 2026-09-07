@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import {
@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { Link, useLocation, Navigate } from 'react-router-dom';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import Seo from '@/components/Seo';

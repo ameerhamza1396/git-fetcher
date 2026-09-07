@@ -20,6 +20,8 @@ import { useQuery } from '@tanstack/react-query';
 import OtaUpdateScreen from '@/components/OtaUpdateScreen';
 import OtaDiagnosticsPanel from '@/components/OtaDiagnosticsPanel';
 import DeviceActivityTracker from '@/components/auth/DeviceActivityTracker';
+import UpgradeAccountModal from '@/components/UpgradeAccountModal';
+import { setOnAiLimitError, type AiApiError } from '@/utils/aiApi';
 
 type InstallStatePluginApi = {
   consumeFreshInstall: () => Promise<{ freshInstall: boolean }>;
@@ -44,6 +46,7 @@ const AIChatbotPage = lazy(() => import('@/pages/AIChatbot'));
 const Leaderboard = lazy(() => import('@/pages/Leaderboard'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const Devices = lazy(() => import('@/pages/Devices'));
+const BadgesPage = lazy(() => import('@/pages/BadgesPage'));
 const Pricing = lazy(() => import('@/pages/Pricing'));
 const TermsAndConditions = lazy(() => import('@/pages/TermsAndConditions'));
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
@@ -179,6 +182,23 @@ const AchievementNotifierHandler = () => {
   );
 };
 
+const AiLimitHandler = () => {
+  const [error, setError] = useState<AiApiError | null>(null);
+
+  useEffect(() => {
+    setOnAiLimitError((err: AiApiError) => setError(err));
+    return () => setOnAiLimitError(null);
+  }, []);
+
+  return (
+    <UpgradeAccountModal
+      isOpen={!!error}
+      onClose={() => setError(null)}
+      limitError={error}
+    />
+  );
+};
+
 function App() {
   const [themeRestoreChecked, setThemeRestoreChecked] = useState(
     () => !Capacitor.isNativePlatform(),
@@ -236,7 +256,8 @@ function App() {
               <DeviceActivityTracker />
               <UserRestrictionHandler />
               <AchievementNotifierHandler />
-              <Suspense fallback={<AppTransitionScreen label="Loading page" />}>
+              <AiLimitHandler />
+              <Suspense fallback={<AppTransitionScreen />}>
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
@@ -255,6 +276,7 @@ function App() {
                 <Route path="/leaderboard" element={<Leaderboard />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/profile/devices" element={<Devices />} />
+                <Route path="/profile/badges" element={<BadgesPage />} />
                 <Route path="/profile/password" element={<ChangePassword />} />
                 <Route path="/profile/upgrade" element={<Profile />} />
                 <Route path="/pricing" element={<Pricing />} />

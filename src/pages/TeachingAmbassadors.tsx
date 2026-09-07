@@ -1,9 +1,7 @@
 import { useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Bot, Zap, Brain, FileText, Moon, Sun, MessageSquare, User, Mail, Phone, BookOpen, UserCheck, Shield, ClipboardList, PenTool, Image as ImageIcon, CheckCircle, XCircle } from 'lucide-react'; // Added XCircle to import
+import { Bot, Zap, Brain, FileText, MessageSquare, User, Mail, Phone, BookOpen, UserCheck, Shield, ClipboardList, PenTool, Image as ImageIcon, CheckCircle, XCircle } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
@@ -13,7 +11,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea'; // Assuming you have this
 import ReCAPTCHA from 'react-google-recaptcha';
-import { ProfileDropdown } from '@/components/ProfileDropdown'; // NEW: Import ProfileDropdown
 import Seo from '@/components/Seo'; // Import the Seo component
 
 const TeachingAmbassadors = () => {

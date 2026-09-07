@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/hooks/useAuth';
 import { MCQPageLayout } from '@/pages/mcq/MCQPageLayout';
-import PageSkeleton from '@/components/skeletons/PageSkeleton';
 import { Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';

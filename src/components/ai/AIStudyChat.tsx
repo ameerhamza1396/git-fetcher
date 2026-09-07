@@ -14,7 +14,6 @@ import { aiApiStream, type AiStreamStatus } from '@/utils/aiApi';
 import { renderAiMessageText } from '@/utils/format';
 import { InstagramCreatorCta, shouldShowCreatorInstagramCta } from '@/components/ai/InstagramCreatorCta';
 import { isAiPolicyNotice } from '@/utils/aiPolicyNotice';
-import { FlashcardLimitModal, getAiLimitDetails, isAiLimitError } from '@/components/dashboard/personalization/FlashcardLimitModal';
 import { useNavigate } from 'react-router-dom';
 
 export const AIStudyChat = () => {
@@ -25,8 +24,6 @@ export const AIStudyChat = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const [loadingStatus, setLoadingStatus] = useState<AiStreamStatus | null>(null);
-  const [limitModalOpen, setLimitModalOpen] = useState(false);
-  const [limitDetails, setLimitDetails] = useState(getAiLimitDetails(null));
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -144,7 +141,7 @@ export const AIStudyChat = () => {
           streamedAnswer += text;
           setMessages([...newMsgs, { role: 'assistant', content: streamedAnswer, timestamp: new Date().toISOString() }]);
         },
-      });
+      }, {});
 
       const answer = data.answer || streamedAnswer;
       const aiMsg: Message = { role: 'assistant', content: answer, timestamp: new Date().toISOString() };
@@ -153,12 +150,6 @@ export const AIStudyChat = () => {
       await saveSession(final);
     } catch (e: any) {
       console.error('Error sending message:', e);
-      if (isAiLimitError(e)) {
-        setLimitDetails(getAiLimitDetails(e, 'free', 2));
-        setLimitModalOpen(true);
-        setMessages(newMsgs);
-        return;
-      }
       setMessages([...newMsgs, {
         role: 'assistant',
         content: e.message || 'Failed to send message',
@@ -305,19 +296,6 @@ export const AIStudyChat = () => {
         </CardContent>
       </Card>
     </div>
-    <FlashcardLimitModal
-      open={limitModalOpen}
-      onOpenChange={setLimitModalOpen}
-      plan={limitDetails.plan}
-      limit={limitDetails.limit}
-      period={limitDetails.period}
-      limitKind={limitDetails.limitKind}
-      featureLabel="AI Study Chat"
-      onUpgrade={() => {
-        setLimitModalOpen(false);
-        navigate('/pricing');
-      }}
-    />
     </>
   );
 };

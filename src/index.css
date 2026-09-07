@@ -812,7 +812,7 @@ body,
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: text-shimmer-move 4s ease-in-out infinite;
+  animation: text-shimmer-move 6s ease-in-out infinite;
 }
 
 @keyframes text-shimmer-move {

@@ -9,6 +9,7 @@ import Seo from '@/components/Seo';
 import AppTransitionScreen from '@/components/AppTransitionScreen';
 
 import VersionGuard from '@/components/VersionControl';
+import { initializeOtaUpdates } from '@/services/otaUpdateService';
 import { isSpecializedTestCode } from '@/utils/institutes';
 import { getProfileCompletion } from '@/utils/profileCompletion';
 import { useCachedImage } from '@/hooks/useCachedImage';
@@ -19,7 +20,7 @@ import {
   getPremiumActions,
   getQuickActions,
 } from '@/features/dashboard/dashboardActions';
-import { DASHBOARD_APP_VERSION, DASHBOARD_REVIEW_STORAGE_KEY } from '@/features/dashboard/constants';
+import { DASHBOARD_APP_VERSION } from '@/features/dashboard/constants';
 import { getDashboardGreeting } from '@/features/dashboard/dashboardService';
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData';
 import { useDashboardAnalyticsPlan } from '@/features/dashboard/hooks/useDashboardAnalyticsPlan';
@@ -29,6 +30,7 @@ import {
   DashboardBottomNavigation,
   type DashboardNavigationItem,
 } from '@/features/dashboard/components/DashboardBottomNavigation';
+import { UsageLimitsSheet } from '@/features/dashboard/components/UsageLimitsSheet';
 import type { DashboardAnnouncement, DashboardTabId } from '@/features/dashboard/types';
 import { prepareMCQQuiz } from '@/features/mcq/quizBootstrap';
 import { fetchSubjects } from '@/utils/mcqData';
@@ -90,15 +92,10 @@ const Dashboard = () => {
   const [showTermOfDay, setShowTermOfDay] = useState(false);
   const [showCaseOfDay, setShowCaseOfDay] = useState(false);
   const [showCollaborateModal, setShowCollaborateModal] = useState(false);
+  const [showUsageLimits, setShowUsageLimits] = useState(false);
   const [selectedDashboardAnnouncement, setSelectedDashboardAnnouncement] = useState<DashboardAnnouncement | null>(null);
   const dashboardModalOpen = showWhatsNew || showTermOfDay || showCaseOfDay || showCollaborateModal || !!selectedDashboardAnnouncement;
   const appVersion = DASHBOARD_APP_VERSION;
-  const [reviewCompleted, setReviewCompleted] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(DASHBOARD_REVIEW_STORAGE_KEY) === 'true';
-    }
-    return false;
-  });
   const [isOfflineMode, setIsOfflineMode] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
   const [loadSecondaryData, setLoadSecondaryData] = useState(false);
 
@@ -273,13 +270,17 @@ const Dashboard = () => {
   const dashboardAnnouncement = dashboardAnnouncements[0] || null;
   const cachedAvatarUrl = useCachedImage(profile?.avatar_url);
 
+  useEffect(() => {
+    initializeOtaUpdates();
+  }, []);
+
   if (isNavigating || authLoading || waitingForLiveProfileConfirmation) {
-    return <AppTransitionScreen label="Loading dashboard" />;
+    return <AppTransitionScreen />;
   }
 
 
   if (!user) {
-    return <AppTransitionScreen label="Redirecting" />;
+    return <AppTransitionScreen />;
   }
 
 
@@ -353,6 +354,7 @@ const Dashboard = () => {
               theme={theme}
               onThemeChange={setTheme}
               onShowWhatsNew={() => setShowWhatsNew(true)}
+              onOpenUsageLimits={() => setShowUsageLimits(true)}
               onLogout={handleLogout}
             />
           </Suspense>
@@ -376,17 +378,13 @@ const Dashboard = () => {
             termOfDay={termOfDay}
             termLoading={termLoading}
             onOpenTerm={() => setShowTermOfDay(true)}
+            onOpenUsageLimits={() => setShowUsageLimits(true)}
             caseOfDay={caseOfDay}
             caseLoading={caseLoading}
             onOpenCase={() => setShowCaseOfDay(true)}
             instituteModules={instituteModules}
             dashboardAnnouncement={dashboardAnnouncement}
             onOpenAnnouncement={setSelectedDashboardAnnouncement}
-            reviewCompleted={reviewCompleted}
-            onReviewComplete={() => {
-              setReviewCompleted(true);
-              localStorage.setItem(DASHBOARD_REVIEW_STORAGE_KEY, 'true');
-            }}
             instituteData={instituteData}
             personalizationActions={personalizationActions}
             premiumPerks={premiumPerks}
@@ -444,6 +442,14 @@ const Dashboard = () => {
         activeTab={activeTab}
         items={tabs}
         onTabChange={setActiveTab}
+      />
+
+      <UsageLimitsSheet
+        open={showUsageLimits}
+        onOpenChange={setShowUsageLimits}
+        userId={user?.id}
+        rawUserPlan={rawUserPlan}
+        userPlanDisplayName={userPlanDisplayName}
       />
 
     </div>

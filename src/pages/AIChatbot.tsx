@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from 'next-themes';
-import { Moon, Sun, Send, Mic, MessageSquare, Menu, Copy, Clock, Plus, PlusCircle, Trash2, AlertTriangle } from 'lucide-react';
+import { Send, Mic, MessageSquare, Menu, Copy, Clock, Plus, PlusCircle, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { CardTitle } from '@/components/ui/card';
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Seo from '@/components/Seo';
 import { notifyAchievementProgress } from '@/components/profile/AchievementBadges';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { aiApiStream, type AiStreamStatus } from '@/utils/aiApi';
 import { isAiPolicyNotice } from '@/utils/aiPolicyNotice';
 import BrandedLoader from '@/components/BrandedLoader';
@@ -287,24 +287,17 @@ const DrSultanChat: React.FC = () => {
     setApiLoading(true);
     setLoadingStatus(null);
 
-    const recentMessages = messages.slice(-6);
-    const context = recentMessages.map((m) => {
-      const prefix = m.sender === 'user' ? 'User' : 'Assistant';
-      return `${prefix}: ${m.text}`;
-    }).join('\n');
-    const questionWithContext = context ? `${context}\n\nUser: ${trimmedInput}` : trimmedInput;
-
     try {
       let streamedAnswer = '';
       const payload = await aiApiStream('ai/study-chat', {
-        question: questionWithContext,
+        question: trimmedInput,
       }, {
         onStatus: (status) => { setLoadingStatus(status); },
         onDelta: (text) => {
           streamedAnswer += text;
           setMessages([...messagesWithUser, { sender: 'ai', text: streamedAnswer, time: ts }]);
         },
-      });
+      }, {});
 
       const aiResponseText = typeof payload.answer === 'object'
         ? JSON.stringify(payload.answer, null, 2)
@@ -366,7 +359,7 @@ const DrSultanChat: React.FC = () => {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  if (authLoading) return <BrandedLoader label="Opening Dr. Ahroid" fullscreen />;
+  if (authLoading) return <BrandedLoader fullscreen />;
 
   return (
     <div

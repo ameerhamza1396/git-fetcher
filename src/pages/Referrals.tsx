@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Gift, Copy, Users, Loader2, Share2, CheckCircle2, ChevronLeft, UserPlus, Sparkles, HeartHandshake } from 'lucide-react';
+import { Gift, Copy, Users, Share2, CheckCircle2, ChevronLeft, UserPlus, Sparkles, HeartHandshake } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';

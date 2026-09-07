@@ -250,21 +250,14 @@ begin
     ('surgery_allied:pathology:paper_2', 'Infection Control', 6),
     ('surgery_allied:pathology:paper_2', 'Nutritional Diseases', 7);
 
-  -- This release intentionally exposes only Medicine & Allied. The additional
-  -- curriculum rows above are retained as future-ready source data but are not
-  -- inserted into the live subjects/chapters tables by this migration.
-  delete from fcps_chapter_seed
-  where subject_key not like 'medicine_allied:%';
+  -- Expose both Medicine & Allied and Surgery & Allied.
 
-  delete from fcps_subject_seed
-  where specialty <> 'medicine_allied';
-
-  if (select count(*) from fcps_subject_seed) <> 12 then
-    raise exception 'FCPS Medicine & Allied subject seed must contain exactly 12 subjects';
+  if (select count(*) from fcps_subject_seed) <> 24 then
+    raise exception 'FCPS subject seed must contain exactly 24 subjects';
   end if;
 
-  if (select count(*) from fcps_chapter_seed) <> 117 then
-    raise exception 'FCPS Medicine & Allied chapter seed must contain exactly 117 chapters';
+  if (select count(*) from fcps_chapter_seed) <> 167 then
+    raise exception 'FCPS chapter seed must contain exactly 167 chapters';
   end if;
 
   for v_subject in select * from fcps_subject_seed order by specialty, display_order loop
@@ -323,5 +316,5 @@ select
   count(c.id) as chapter_count
 from public.subjects s
 left join public.chapters c on c.subject_id = s.id
-where s.year = 'medicine_allied'
+where s.year in ('medicine_allied', 'surgery_allied')
   and s.institutes = to_jsonb(array['fcps_part_1']::text[]);

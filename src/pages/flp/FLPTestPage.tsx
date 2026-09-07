@@ -27,6 +27,7 @@ interface FLPSessionData {
   userAnswers: Record<string, string | null>;
   totalTimeLeft: number;
   subjectName?: string;
+  sessionId?: string;
   savedAt: number;
 }
 
@@ -76,6 +77,7 @@ const FLPTestPage = () => {
           if (hoursSinceSaved < 24 && sessionData.shuffledMcqs.length > 0) {
             setMcqs(sessionData.shuffledMcqs);
             setSubjectName(sessionData.subjectName || '');
+            setSessionId(sessionData.sessionId);
             setInitialIndex(sessionData.currentQuestionIndex);
             setInitialAnswers(sessionData.userAnswers);
             setInitialTimeLeft(sessionData.totalTimeLeft);
@@ -105,7 +107,7 @@ const FLPTestPage = () => {
       navigate('/flp');
     } else {
       setMcqs([]);
-      navigate('/flp');
+      navigate('/flp-result', { replace: true });
     }
   };
 

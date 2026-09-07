@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-const DEFAULT_CONTENT_API_URL = 'https://medmacs.app/api/content';
+const DEFAULT_CONTENT_API_URL = 'https://contents.medmacs.app/api/content';
 const CONTENT_API_URL = import.meta.env.VITE_CONTENT_API_URL || DEFAULT_CONTENT_API_URL;
 // Mobile networks frequently need several seconds for their first DNS/TLS handshake.
 // Four seconds caused healthy cold connections to be aborted during page transitions.

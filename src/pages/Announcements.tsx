@@ -1,23 +1,11 @@
-import { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Bot, Zap, Brain, FileText, Moon, Sun, MessageSquare, User, Mail, Phone, BookOpen, UserCheck, Shield, ClipboardList, PenTool, ImageIcon, CheckCircle, XCircle, Lightbulb, Laptop, Share2, Palette, BellRing, Calendar, ScrollText } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { XCircle, BellRing, Calendar, ScrollText } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'; // Import useMutation and useQueryClient
 import { supabase } from '@/integrations/supabase/client';
 
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import ReCAPTCHA from 'react-google-recaptcha';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { ProfileDropdown } from '@/components/ProfileDropdown';
 import Seo from '@/components/Seo'; // Import the Seo component
-import PlanBadge from '@/components/PlanBadge';
 
 
 const AnnouncementsPage = () => {

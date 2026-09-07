@@ -5,6 +5,7 @@ import {
   ChevronRight,
   CreditCard,
   FileText,
+  Gauge,
   Info,
   Lock,
   LogOut,
@@ -23,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { AchievementBadgesSkeleton } from '@/components/profile/AchievementBadgesSkeleton';
 import type { AiUsageSummary } from '../types';
 
 const LazyAchievementBadges = lazy(() =>
@@ -41,12 +43,16 @@ type ProfileDashboardTabProps = {
   theme?: string;
   onThemeChange: (theme: string) => void;
   onShowWhatsNew: () => void;
+  onOpenUsageLimits: () => void;
   onLogout: () => void;
 };
 
 const mainSettings = [
   { label: 'Edit Profile', icon: User, link: '/profile' },
   { label: 'Devices & Sessions', icon: MonitorSmartphone, link: '/profile/devices' },
+] as const;
+
+const mainSettingsAfterUsage = [
   { label: 'Change Password', icon: Lock, link: '/profile/password' },
   { label: 'Subscription', icon: CreditCard, link: '/pricing' },
   { label: 'Redeem Code', icon: Award, link: '/redeem' },
@@ -73,6 +79,7 @@ export function ProfileDashboardTab({
   theme,
   onThemeChange,
   onShowWhatsNew,
+  onOpenUsageLimits,
   onLogout,
 }: ProfileDashboardTabProps) {
   return (
@@ -102,7 +109,7 @@ export function ProfileDashboardTab({
           <Trophy className="w-5 h-5 text-amber-500 fill-amber-500" />
           <h2 className="text-base font-bold text-foreground">Achievements</h2>
         </div>
-        <Suspense fallback={<div className="h-48 animate-pulse rounded-2xl bg-muted/30" />}>
+        <Suspense fallback={<AchievementBadgesSkeleton />}>
           <LazyAchievementBadges userId={userId} />
         </Suspense>
       </div>
@@ -125,6 +132,26 @@ export function ProfileDashboardTab({
       <Card className="border border-border/40 shadow-sm overflow-hidden bg-card/80">
         <CardContent className="p-0 divide-y divide-border/30">
           {mainSettings.map((item) => (
+            <Link key={item.link} to={item.link} className="flex items-center justify-between p-4 hover:bg-accent/50 active:bg-accent transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center">
+                  <item.icon className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <span className="text-sm font-medium text-foreground">{item.label}</span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </Link>
+          ))}
+          <button type="button" onClick={onOpenUsageLimits} className="flex items-center justify-between p-4 hover:bg-accent/50 active:bg-accent transition-colors w-full">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Gauge className="w-4 h-4 text-primary" />
+              </div>
+              <span className="text-sm font-medium text-foreground">Usage Limits</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </button>
+          {mainSettingsAfterUsage.map((item) => (
             <Link key={item.link} to={item.link} className="flex items-center justify-between p-4 hover:bg-accent/50 active:bg-accent transition-colors">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center">

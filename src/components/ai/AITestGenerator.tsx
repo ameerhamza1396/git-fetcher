@@ -6,16 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Brain, Wand2, BookOpen, Sparkles, CheckCircle, XCircle, Timer } from 'lucide-react';
+import { Brain, Sparkles, CheckCircle, XCircle, Timer } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { aiApiJson } from '@/utils/aiApi';
-import { FlashcardLimitModal, getAiLimitDetails, isAiLimitError } from '@/components/dashboard/personalization/FlashcardLimitModal';
+import { isAiLimitError } from '@/components/dashboard/personalization/FlashcardLimitModal';
 import { useNavigate } from 'react-router-dom';
 
 interface Question {
@@ -35,8 +34,6 @@ export const AITestGenerator: React.FC = () => {
   const [customPrompt, setCustomPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [savedTestId, setSavedTestId] = useState<string | null>(null);
-  const [limitModalOpen, setLimitModalOpen] = useState(false);
-  const [limitDetails, setLimitDetails] = useState(getAiLimitDetails(null));
 
   const [questions, setQuestions] = useState<Question[] | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -90,7 +87,7 @@ export const AITestGenerator: React.FC = () => {
         difficulty,
         count: questionCount,
         prompt: customPrompt.trim(),
-      });
+      }, {});
       const { data: savedTest, error: saveError } = await supabase
         .from('ai_generated_tests')
         .insert({ user_id: user.id, topic, difficulty, questions: data.questions, total_questions: data.questions.length })
@@ -109,8 +106,6 @@ export const AITestGenerator: React.FC = () => {
       toast.success(`Generated ${data.questions.length} questions!`);
     } catch (e: any) {
       if (isAiLimitError(e)) {
-        setLimitDetails(getAiLimitDetails(e, 'free', questionCount));
-        setLimitModalOpen(true);
         return;
       }
       toast.error(`Failed to generate: ${e.message}`);
@@ -213,19 +208,6 @@ export const AITestGenerator: React.FC = () => {
             </Button>
           </div>
         </div>
-        <FlashcardLimitModal
-          open={limitModalOpen}
-          onOpenChange={setLimitModalOpen}
-          plan={limitDetails.plan}
-          limit={limitDetails.limit}
-          period={limitDetails.period}
-          limitKind={limitDetails.limitKind}
-          featureLabel="AI Test Generator"
-          onUpgrade={() => {
-            setLimitModalOpen(false);
-            navigate('/pricing');
-          }}
-        />
       </div>
     );
   }

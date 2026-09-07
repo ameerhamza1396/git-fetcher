@@ -1,20 +1,24 @@
-import { useState, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, BookOpen, CheckCircle2, FileClock, Target, WifiOff } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, FileClock, Target, WifiOff } from 'lucide-react';
 import { fetchChaptersBySubject, fetchSubjectById, Subject, Chapter } from '@/utils/mcqData';
 import { MCQPageLayout } from './MCQPageLayout';
+import { SelectionBackdrop } from '@/components/selection/SelectionBackdrop';
+import { SelectionRow } from '@/components/selection/SelectionRow';
+import { rowEntrance, titleSlide, iconBounce, floatDecor } from '@/components/selection/motion';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { CollaborateModal } from '@/components/CollaborateModal';
 import { ChapterDownloadButton } from '@/components/mcq/ChapterDownloadButton';
 import { getOfflineChapterSummaries, subscribeOfflineChapterChanges } from '@/utils/offlineChapters';
 import { useAuth } from '@/hooks/useAuth';
+import { cn } from '@/lib/utils';
 import { prepareMCQQuiz } from '@/features/mcq/quizBootstrap';
 import { isConstrainedConnection } from '@/utils/networkQuality';
 
-const ChapterProgressDonut = ({
+const ChapterProgressRing = ({
   attempted,
   total,
   isSelected,
@@ -27,58 +31,53 @@ const ChapterProgressDonut = ({
 }) => {
   const clampedAttempted = Math.min(attempted, total);
   const percentage = total > 0 ? Math.round((clampedAttempted / total) * 100) : 0;
-  const radius = 18;
+  const radius = 15;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference - (percentage / 100) * circumference;
 
   return (
-    <div className="flex shrink-0 flex-col items-center justify-center">
-      <div className="relative h-12 w-12">
-        <svg className="-rotate-90 h-12 w-12" viewBox="0 0 48 48" aria-hidden="true">
-          <circle
-            cx="24"
-            cy="24"
-            r={radius}
-            fill="none"
-            strokeWidth="5"
-            className="stroke-muted"
-          />
-          <circle
-            cx="24"
-            cy="24"
-            r={radius}
-            fill="none"
-            strokeWidth="5"
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={dashOffset}
-            className={`transition-all duration-500 ${isSelected ? 'stroke-primary' : 'stroke-emerald-500'}`}
-          />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className={`text-[10px] font-black ${isSelected ? 'text-primary' : 'text-foreground'}`}>
-            {isLoading ? '--' : `${percentage}%`}
-          </span>
-        </div>
+    <div className="relative h-9 w-9 shrink-0">
+      <svg className="-rotate-90 h-9 w-9" viewBox="0 0 36 36" aria-hidden="true">
+        <circle cx="18" cy="18" r={radius} fill="none" strokeWidth="3" className="stroke-border" />
+        <motion.circle
+          cx="18"
+          cy="18"
+          r={radius}
+          fill="none"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          initial={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset: dashOffset }}
+          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+          className={`transition-colors duration-300 ${isSelected ? 'stroke-primary' : 'stroke-muted-foreground/50'}`}
+        />
+      </svg>
+      {percentage === 100 && (
+        <motion.div
+          className="absolute inset-0 rounded-full"
+          initial={{ boxShadow: '0 0 0 0 rgba(16,185,129,0)' }}
+          animate={{ boxShadow: ['0 0 0 0 rgba(16,185,129,0)', '0 0 8px 2px rgba(16,185,129,0.2)', '0 0 0 0 rgba(16,185,129,0)'] }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+        />
+      )}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className={`text-[9px] font-bold transition-colors duration-300 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
+          {isLoading ? '--' : `${percentage}`}
+        </span>
       </div>
     </div>
   );
 };
 
-const ChapterCardSkeleton = () => (
-  <div className="relative min-h-[112px] animate-pulse overflow-hidden rounded-2xl border-2 border-border/40 bg-white/5 p-4 backdrop-blur-xl dark:bg-white/[0.035]">
-    <div className="flex items-center gap-3">
-      <div className="h-12 w-12 shrink-0 rounded-xl bg-muted" />
-      <div className="min-w-0 flex-1 pr-1">
-        <div className="h-3.5 w-1/3 rounded-full bg-muted" />
-        <div className="mt-2 min-h-10 space-y-1.5">
-          <div className="h-3.5 w-full rounded-full bg-muted" />
-          <div className="h-3.5 w-2/3 rounded-full bg-muted" />
-        </div>
-        <div className="mt-1 h-2.5 w-1/2 rounded-full bg-muted" />
-      </div>
-      <div className="h-12 w-12 shrink-0 rounded-full bg-muted" />
+const ChapterRowSkeleton = () => (
+  <div className="flex animate-pulse items-center gap-4 py-4 pl-4 pr-3">
+    <div className="min-w-0 flex-1 space-y-2">
+      <div className="h-2.5 w-1/5 rounded-full bg-muted" />
+      <div className="h-3.5 w-2/3 rounded-full bg-muted" />
     </div>
+    <div className="h-9 w-9 shrink-0 rounded-full bg-muted" />
+    <div className="h-8 w-8 shrink-0 rounded-full bg-muted" />
   </div>
 );
 
@@ -100,6 +99,7 @@ const MCQChapterSelectionPage = () => {
   const { subjectId } = useParams<{ subjectId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const reduceMotion = useReducedMotion();
   const [allChapters, setAllChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -116,7 +116,7 @@ const MCQChapterSelectionPage = () => {
   }), [allChapters]);
   const visibleChapters = chaptersByType[activeTab];
 
-  const { data: profile, isLoading: profileLoading } = useQuery({
+  const { data: profile } = useQuery({
     queryKey: ['mcq-profile-plan', user?.id],
     queryFn: async () => {
       if (!user) return null;
@@ -258,13 +258,30 @@ const MCQChapterSelectionPage = () => {
     }
   };
 
-  const prefetchChapter = (chapterId: string, speculative = false) => {
+  // Throttle speculative prefetches to avoid spawning dozens of concurrent
+  // CapacitorHttp threads when the user scrolls through the chapter list.
+  const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup pending prefetch timer on unmount
+  useEffect(() => {
+    return () => {
+      if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+    };
+  }, []);
+
+  const prefetchChapter = useCallback((chapterId: string, speculative = false) => {
     if (!user?.id || isOfflineMode || (speculative && isConstrainedConnection())) return;
-    void prepareMCQQuiz({
-      chapterId,
-      userId: user.id,
-    }).catch(() => undefined);
-  };
+
+    if (speculative) {
+      if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+      prefetchTimerRef.current = setTimeout(() => {
+        void prepareMCQQuiz({ chapterId, userId: user.id }).catch(() => undefined);
+      }, 120);
+      return;
+    }
+
+    void prepareMCQQuiz({ chapterId, userId: user.id }).catch(() => undefined);
+  }, [user?.id, isOfflineMode]);
 
   const selectTab = (tab: ChapterTab) => {
     setActiveTab(tab);
@@ -274,7 +291,8 @@ const MCQChapterSelectionPage = () => {
   if (!subject && !loading) {
     return (
       <MCQPageLayout backTo="/mcqs">
-        <div className="text-center py-20">
+        <SelectionBackdrop />
+        <div className="relative z-10 py-20 text-center">
           <p className="font-semibold text-foreground">We are not fully available in your institute yet.</p>
           <p className="mt-2 text-sm text-muted-foreground">Help us bring Medmacs to your campus.</p>
           <div className="mt-5 flex flex-col sm:flex-row justify-center gap-3">
@@ -288,97 +306,163 @@ const MCQChapterSelectionPage = () => {
     );
   }
 
+  const planLabel = isOfflineMode
+    ? 'Offline · downloaded only'
+    : subject?.free_unlimited_access
+      ? 'Free · no limits'
+      : profile?.plan === 'free'
+        ? 'Free daily limits apply'
+        : 'Unlimited premium access';
+
   return (
-    <MCQPageLayout backTo="/mcqs" scrollable>
-      <div className="z-50 -mx-3 shrink-0 bg-gradient-to-b from-background via-background to-background/95 px-3 sm:mx-0 sm:px-0">
-        <div className="max-w-4xl mx-auto px-4 sm:px-0">
-          <div className="py-3">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="font-['Syne'] text-2xl font-extrabold leading-tight tracking-[-0.035em] text-foreground sm:text-3xl">
-                Select <span className="live-gradient-text">Chapter</span>
-              </h2>
-              <Button asChild variant="outline" className="h-9 shrink-0 rounded-full px-3">
-                <Link to="/detailed-analytics"><Target className="mr-2 h-4 w-4 text-primary" /><span className="hidden text-[11px] sm:inline">Practice Analytics</span><span className="text-[11px] sm:hidden">Analyze</span></Link>
-              </Button>
-            </div>
-            <div className="mt-1 flex flex-col items-center gap-1">
-              <p className="text-muted-foreground text-sm font-bold uppercase tracking-widest">{subject?.name}</p>
-              <p className="text-muted-foreground/60 text-[10px] font-medium uppercase tracking-[0.2em]">
-                {isOfflineMode
-                  ? 'Offline mode - downloaded MCQs only'
-                  : subject?.free_unlimited_access
-                  ? 'Free · No limits'
-                  : profile?.plan === 'free'
-                  ? 'Free daily limits apply'
-                  : 'Unlimited Premium Access'}
-              </p>
-            </div>
-          </div>
-          <nav className="no-scrollbar flex w-full gap-2 overflow-x-auto pb-3" aria-label="Chapter content type">
-            <button
-              type="button"
-              onClick={() => selectTab('question_bank')}
-              aria-pressed={activeTab === 'question_bank'}
-              className={`flex min-w-[170px] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-4 py-3 text-xs font-black uppercase tracking-wider transition-all ${
-                activeTab === 'question_bank'
-                  ? 'border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/20'
-                  : 'border-border/50 bg-muted/30 text-muted-foreground hover:border-primary/40 hover:text-foreground'
-              }`}
-            >
-              <BookOpen className="h-4 w-4" />
-              Question Bank
-              <span className="rounded-full bg-background/15 px-2 py-0.5 text-[9px]">{chaptersByType.question_bank.length}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => selectTab('past_paper')}
-              aria-pressed={activeTab === 'past_paper'}
-              className={`flex min-w-[150px] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-4 py-3 text-xs font-black uppercase tracking-wider transition-all ${
-                activeTab === 'past_paper'
-                  ? 'border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/20'
-                  : 'border-border/50 bg-muted/30 text-muted-foreground hover:border-primary/40 hover:text-foreground'
-              }`}
-            >
-              <FileClock className="h-4 w-4" />
-              Past Papers
-              <span className="rounded-full bg-background/15 px-2 py-0.5 text-[9px]">{chaptersByType.past_paper.length}</span>
-            </button>
-          </nav>
-        </div>
-        <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
+    <MCQPageLayout backTo="/mcqs" showHeader={false} showBackButton={false} scrollable>
+      <SelectionBackdrop active={Boolean(selectedChapter)} />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <motion.div
+          className="absolute -right-8 top-16 h-20 w-20 rounded-full bg-primary/[0.04] blur-2xl"
+          variants={reduceMotion ? undefined : floatDecor(0.2)}
+          initial="hidden"
+          animate="visible"
+        />
+        <motion.div
+          className="absolute -left-6 top-48 h-14 w-14 rounded-full bg-primary/[0.03] blur-xl"
+          variants={reduceMotion ? undefined : floatDecor(0.4)}
+          initial="hidden"
+          animate="visible"
+        />
       </div>
 
-      <div className="no-scrollbar mx-auto grid min-h-0 w-full max-w-4xl flex-1 grid-cols-1 gap-4 overflow-y-auto px-4 pb-32 sm:px-0 md:grid-cols-2">
-        {loading ? (
-          Array.from({ length: 6 }).map((_, i) => <ChapterCardSkeleton key={i} />)
-        ) : loadError ? (
-          <div className="col-span-full rounded-3xl border border-amber-500/20 bg-amber-500/10 p-8 text-center">
-            <WifiOff className="mx-auto h-9 w-9 text-amber-600 dark:text-amber-300" />
-            <h3 className="mt-4 text-sm font-black uppercase tracking-wider text-foreground">Connection failure</h3>
-            <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-muted-foreground">We could not connect to the content server. Check your connection and try again.</p>
-            <Button type="button" className="mt-5 rounded-xl" onClick={loadData}>Try again</Button>
+      {/* Glassmorphic Header */}
+      <header className="absolute inset-x-0 top-0 z-50 px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+10px)] backdrop-blur-2xl border-b border-border/60 bg-background/88">
+        <div className="mx-auto flex items-center justify-between gap-3 max-w-4xl">
+          <Link
+            to="/mcqs"
+            aria-label="Back to subjects"
+            className="flex shrink-0 items-center justify-center bg-muted text-foreground transition active:scale-95 active:bg-primary active:text-primary-foreground h-11 w-11 rounded-2xl"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+
+          <div className="min-w-0 text-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary">{subject?.name || 'MCQ Subject'}</p>
+            <h1 className="truncate text-lg font-black tracking-tight">Chapters</h1>
           </div>
-        ) : allChapters.length === 0 ? (
-          <div className="col-span-full text-center py-16">
-            <p className="font-semibold text-foreground">We are not fully available in your institute yet.</p>
-            <p className="mt-2 text-sm text-muted-foreground">Help us bring chapter-wise content to your campus.</p>
-            <div className="mt-5 flex flex-col sm:flex-row justify-center gap-3">
-              <Button asChild variant="outline"><Link to="/contact-us?subject=campus-collaboration">Request campus collaboration</Link></Button>
-              <Button onClick={() => setShowCollaborateModal(true)}>Become Medmacs Ambassador</Button>
+
+          <Link
+            to="/detailed-analytics"
+            className="flex shrink-0 items-center justify-center bg-primary/10 text-primary transition-all hover:bg-primary hover:text-white h-11 w-11 rounded-2xl active:scale-95"
+            aria-label="Open MCQ practice analytics"
+          >
+            <Target className="h-5 w-5" />
+          </Link>
+        </div>
+      </header>
+
+      <div className="relative z-20 -mx-3 shrink-0 bg-background/85 px-3 backdrop-blur-md sm:mx-0 sm:px-0 pt-[calc(env(safe-area-inset-top,0px)+84px)]">
+        <div className="mx-auto max-w-2xl px-4 sm:px-0">
+          <div className="flex items-end justify-between gap-4 py-5">
+            <div className="min-w-0">
+              <motion.p
+                className="truncate text-[10px] font-bold uppercase tracking-[0.25em] text-primary/80"
+                variants={reduceMotion ? undefined : titleSlide}
+                initial="hidden"
+                animate="visible"
+              >
+                {subject?.name}
+              </motion.p>
+              <motion.h2
+                className="font-['Syne'] mt-1.5 text-2xl font-bold leading-none tracking-[-0.03em] text-foreground sm:text-[1.75rem]"
+                variants={reduceMotion ? undefined : titleSlide}
+                initial="hidden"
+                animate="visible"
+                transition={{ delay: 0.15 }}
+              >
+                Select <span className="live-gradient-text">Chapter</span>
+              </motion.h2>
+              <motion.p
+                className="mt-2 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3, duration: 0.4 }}
+              >
+                {planLabel}
+              </motion.p>
             </div>
-            <CollaborateModal open={showCollaborateModal} onOpenChange={setShowCollaborateModal} />
           </div>
-        ) : visibleChapters.length === 0 && activeTab === 'past_paper' ? (
-          <div className="col-span-full py-10 text-center sm:py-16">
-            <div className="mx-auto max-w-lg rounded-3xl border border-primary/15 bg-primary/5 px-6 py-10 shadow-xl shadow-primary/5">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <FileClock className="h-7 w-7" />
+
+          {/* Minimal underline tabs */}
+          <div className="flex gap-6 border-b border-border/50" aria-label="Chapter content type">
+            {([
+              { id: 'question_bank' as ChapterTab, label: 'Question Bank', icon: BookOpen, count: chaptersByType.question_bank.length },
+              { id: 'past_paper' as ChapterTab, label: 'Past Papers', icon: FileClock, count: chaptersByType.past_paper.length },
+            ]).map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <motion.button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => selectTab(tab.id)}
+                  className={`group relative flex items-center gap-2 pb-3 pt-1 text-[11px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                    isActive ? 'text-primary' : 'text-muted-foreground/70'
+                  }`}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1, duration: 0.3 }}
+                >
+                  <tab.icon className={`h-3.5 w-3.5 transition-transform duration-300 ${isActive ? 'scale-110' : ''}`} />
+                  <span>{tab.label}</span>
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums transition-colors ${
+                      isActive ? 'bg-primary/10 text-primary' : 'bg-foreground/[0.05] text-muted-foreground/50'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                  {isActive && (
+                    <motion.span
+                      layoutId="activeChapterTab"
+                      className="absolute -bottom-px left-0 right-0 h-[2px] bg-primary"
+                      transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                    />
+                  )}
+                </motion.button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="no-scrollbar relative z-10 min-h-0 flex-1 overflow-y-auto pb-36">
+        <div className="mx-auto w-full max-w-2xl px-4 sm:px-0">
+          {loading ? (
+            <div className="divide-y divide-border/50 border-b border-border/50">
+              {Array.from({ length: 8 }).map((_, i) => <ChapterRowSkeleton key={i} />)}
+            </div>
+          ) : loadError ? (
+            <div className="px-4 py-14 text-center">
+              <WifiOff className="mx-auto h-7 w-7 text-muted-foreground/50" />
+              <h3 className="mt-4 text-sm font-bold text-foreground">Connection failure</h3>
+              <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-muted-foreground">We could not connect to the content server. Check your connection and try again.</p>
+              <Button type="button" variant="outline" className="mt-5 rounded-full" onClick={loadData}>Try again</Button>
+            </div>
+          ) : allChapters.length === 0 ? (
+            <div className="px-4 py-14 text-center">
+              <p className="font-semibold text-foreground">We are not fully available in your institute yet.</p>
+              <p className="mt-2 text-sm text-muted-foreground">Help us bring chapter-wise content to your campus.</p>
+              <div className="mt-5 flex flex-col sm:flex-row justify-center gap-3">
+                <Button asChild variant="outline"><Link to="/contact-us?subject=campus-collaboration">Request campus collaboration</Link></Button>
+                <Button onClick={() => setShowCollaborateModal(true)}>Become Medmacs Ambassador</Button>
               </div>
-              <h3 className="brand-syne mt-5 text-xl uppercase italic text-foreground">Past papers are not yet ready for your institute</h3>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+              <CollaborateModal open={showCollaborateModal} onOpenChange={setShowCollaborateModal} />
+            </div>
+          ) : visibleChapters.length === 0 && activeTab === 'past_paper' ? (
+            <div className="px-4 py-14 text-center">
+              <FileClock className="mx-auto h-7 w-7 text-muted-foreground/50" />
+              <h3 className="mt-4 text-sm font-bold text-foreground">Past papers are not ready for your institute</h3>
+              <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-muted-foreground">
                 Help us curate the papers students at your institute need most.
               </p>
-              <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+              <div className="mt-5 flex flex-col justify-center gap-3 sm:flex-row">
                 <Button asChild variant="outline">
                   <Link to="/contact-us?subject=campus-collaboration">Request campus collaboration</Link>
                 </Button>
@@ -386,159 +470,144 @@ const MCQChapterSelectionPage = () => {
               </div>
               <CollaborateModal open={showCollaborateModal} onOpenChange={setShowCollaborateModal} />
             </div>
-          </div>
-        ) : visibleChapters.length === 0 ? (
-          <div className="col-span-full py-16 text-center">
-            <p className="font-semibold text-foreground">Question Bank chapters are being prepared.</p>
-            <p className="mt-2 text-sm text-muted-foreground">Please check back soon.</p>
-          </div>
-        ) : (
-          visibleChapters.map((ch) => {
-            const isComingSoon = (ch.mcq_count || 0) === 0;
-            const isLocked = ch.is_locked === true;
-            const isSelected = selectedChapter?.id === ch.id;
-            const isOfflineUnavailable = isOfflineMode && !offlineChapterIds.has(ch.id);
-            const isDisabled = isComingSoon || isOfflineUnavailable || isLocked;
-            const attemptedCount = attemptedByChapter[ch.id] || 0;
-            const totalCount = ch.mcq_count || 0;
-            const isFreeUnlimited = subject?.free_unlimited_access === true;
+          ) : visibleChapters.length === 0 ? (
+            <div className="px-4 py-14 text-center">
+              <p className="font-semibold text-foreground">Question Bank chapters are being prepared.</p>
+              <p className="mt-2 text-sm text-muted-foreground">Please check back soon.</p>
+            </div>
+          ) : (
+            <div key={activeTab} className="divide-y divide-border/50 border-b border-border/50">
+              {visibleChapters.map((ch, idx) => {
+                const isComingSoon = (ch.mcq_count || 0) === 0;
+                const isLocked = ch.is_locked === true;
+                const isSelected = selectedChapter?.id === ch.id;
+                const isOfflineUnavailable = isOfflineMode && !offlineChapterIds.has(ch.id);
+                const isDisabled = isComingSoon || isOfflineUnavailable || isLocked;
+                const attemptedCount = attemptedByChapter[ch.id] || 0;
+                const totalCount = ch.mcq_count || 0;
 
-            return (
-              <div
-                key={ch.id}
-                onPointerEnter={() => !isDisabled && prefetchChapter(ch.id, true)}
-                onTouchStart={() => !isDisabled && prefetchChapter(ch.id, true)}
-                onClick={() => {
-                  if (isDisabled) return;
-                  prefetchChapter(ch.id);
-                  setSelectedChapter(ch);
-                }}
-                aria-disabled={isDisabled}
-                className={`group relative min-h-[128px] overflow-hidden rounded-2xl border-2 p-4 transition-all duration-300 ${
-                  isDisabled ? 'opacity-40 cursor-not-allowed grayscale' : 'cursor-pointer'
-                } ${
-                  isSelected
-                    ? 'border-primary bg-primary/10 shadow-2xl shadow-primary/20 ring-1 ring-primary/30'
-                    : 'border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl hover:border-primary/30 hover:bg-primary/5'
-                }`}
-              >
-                {isSelected && (
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/12 via-transparent to-primary/5" />
-                )}
-                {isComingSoon && (
-                  <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">
-                    Coming Soon
-                  </div>
-                )}
-                {isLocked && (
-                  <div className="absolute right-2 top-2 z-20 rounded-full bg-slate-800 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-white">
-                    Locked
-                  </div>
-                )}
-                {isOfflineUnavailable && (
-                  <div className="absolute top-2 right-2 z-20 flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-white">
-                    <WifiOff className="h-3 w-3" />
-                    Not downloaded
-                  </div>
-                )}
-
-                <div className="relative z-10 flex items-start gap-3">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center">
-                    {!isDisabled && subject ? (
-                      <ChapterDownloadButton
-                        subject={subject}
-                        chapter={ch}
-                        compact
-                        className={`h-12 w-12 rounded-xl ${
-                          isSelected ? 'border-primary/30 shadow-lg shadow-primary/20' : ''
-                        }`}
-                      />
-                    ) : (
-                      <div className={`flex h-12 w-12 items-center justify-center rounded-xl transition-all ${
-                        isSelected ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'bg-muted/50 text-foreground/70'
-                      }`}>
-                        <BookOpen className="h-5 w-5" />
-                      </div>
+                return (
+                  <motion.div
+                    key={ch.id}
+                    custom={idx}
+                    variants={reduceMotion ? undefined : rowEntrance}
+                    initial={reduceMotion ? false : 'hidden'}
+                    animate={reduceMotion ? false : 'visible'}
+                    className={cn(
+                      'relative transition-shadow duration-300',
+                      isSelected && !isDisabled && 'shadow-[0_0_20px_-4px_rgba(16,185,129,0.15)]'
                     )}
-                  </div>
-
-                  <div className="min-w-0 flex-1 self-stretch pr-1">
-                    <p className={`line-clamp-2 min-h-10 break-words text-base font-black leading-snug transition-colors sm:text-[1.05rem] ${
-                      isSelected ? 'text-primary' : 'text-foreground/90'
-                    }`}>
-                      {ch.name}
-                    </p>
-                    {isFreeUnlimited && (
-                      <span className="mt-2 inline-flex rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300">
-                        Free
-                      </span>
-                    )}
-                  </div>
-
-                  {!isDisabled && (
-                    <div className="ml-auto flex shrink-0 flex-col items-center justify-start text-center">
-                      {isOfflineMode ? (
-                        <div className="flex w-12 flex-col items-center justify-center">
-                          <WifiOff className="mb-1 h-4 w-4 text-amber-600 dark:text-amber-300" />
-                          <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/70">
-                            Offline
-                          </span>
-                        </div>
-                      ) : (
+                  >
+                    <SelectionRow
+                      asDiv
+                      eyebrow={
+                        <motion.span
+                          variants={reduceMotion ? undefined : iconBounce}
+                          custom={idx}
+                          initial="hidden"
+                          animate="visible"
+                          className="inline-block"
+                        >
+                          Chapter {ch.chapter_number || idx + 1}
+                        </motion.span>
+                      }
+                      title={ch.name}
+                      selected={isSelected}
+                      disabled={isDisabled}
+                      accentLayoutId="mcq-chapter-accent"
+                      progress={!isDisabled && !isOfflineMode && totalCount > 0 ? attemptedCount / totalCount : undefined}
+                      onSelect={() => {
+                        prefetchChapter(ch.id);
+                        setSelectedChapter(ch);
+                      }}
+                      onPointerEnter={() => !isDisabled && prefetchChapter(ch.id, true)}
+                      onTouchStart={() => !isDisabled && prefetchChapter(ch.id, true)}
+                      meta={
                         <>
-                          <ChapterProgressDonut
-                            attempted={attemptedCount}
-                            total={totalCount}
-                            isSelected={isSelected}
-                            isLoading={progressLoading}
-                          />
-                          <p className="mt-1 max-w-[4.5rem] text-[9px] font-black uppercase leading-tight tracking-wider text-muted-foreground/70">
-                            {progressLoading
-                              ? '--/-- questions'
-                              : `${Math.min(attemptedCount, totalCount)}/${totalCount} questions`}
-                          </p>
+                          {!isComingSoon && (
+                            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/60">
+                              {progressLoading || isOfflineMode
+                                ? `${totalCount} MCQs`
+                                : `${Math.min(attemptedCount, totalCount)}/${totalCount} done`}
+                            </span>
+                          )}
+                          {isComingSoon && (
+                            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/60">
+                              Coming soon
+                            </span>
+                          )}
+                          {isLocked && (
+                            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-600 dark:text-amber-400">
+                              {ch.lock_message || 'Locked'}
+                            </span>
+                          )}
+                          {isOfflineUnavailable && (
+                            <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.14em] text-amber-600 dark:text-amber-400">
+                              <WifiOff className="h-3 w-3" />
+                              Not downloaded
+                            </span>
+                          )}
+                          {offlineChapterIds.has(ch.id) && (
+                            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-600 dark:text-emerald-400">
+                              Offline ready
+                            </span>
+                          )}
                         </>
-                      )}
-                    </div>
-                  )}
-                </div>
-                {offlineChapterIds.has(ch.id) && (
-                  <div className="mt-3 flex w-full items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                    <CheckCircle2 className="h-3 w-3" />
-                    This chapter is available for offline use
-                  </div>
-                )}
-                {isLocked && (
-                  <p className="mt-3 line-clamp-2 text-xs font-semibold text-amber-600 dark:text-amber-400">
-                    {ch.lock_message || 'This chapter is temporarily unavailable.'}
-                  </p>
-                )}
-              </div>
-            );
-          })
-        )}
-      </div>
-      <footer className="shrink-0 py-2 text-center opacity-40">
-        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">© 2026 Medmacs App • MCQ Practice System</p>
-      </footer>
+                      }
+                      trailing={
+                        isDisabled ? undefined : (
+                          <span className="flex items-center gap-1.5">
+                            {!isOfflineMode && (
+                              <ChapterProgressRing
+                                attempted={attemptedCount}
+                                total={totalCount}
+                                isSelected={isSelected}
+                                isLoading={progressLoading}
+                              />
+                            )}
+                            {subject && (
+                              <ChapterDownloadButton subject={subject} chapter={ch} compact className="h-8 w-8 rounded-full" />
+                            )}
+                          </span>
+                        )
+                      }
+                    />
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
 
-      {selectedChapter && (
-          <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex justify-center px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-6">
-            <div className="w-full max-w-md pointer-events-auto">
+          <footer className="py-6 text-center">
+            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/40">
+              © 2026 Medmacs App
+            </p>
+          </footer>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {selectedChapter && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ type: 'spring', damping: 26, stiffness: 340 }}
+            className="pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex justify-center bg-gradient-to-t from-background via-background/95 to-transparent px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-8"
+          >
+            <div className="pointer-events-auto w-full max-w-2xl">
               <Button
                 onClick={handleContinue}
-                className="w-full bg-primary hover:bg-primary/90 text-white shadow-2xl shadow-primary/40 rounded-2xl h-16 uppercase font-black text-sm tracking-[0.2em] group transition-all"
+                className="group h-12 w-full rounded-full bg-primary text-xs font-bold uppercase tracking-[0.18em] text-primary-foreground transition-all duration-200 active:scale-[0.98]"
                 size="lg"
               >
-                Start Practice Test
-                <span>
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </span>
+                <span className="truncate">Start · {selectedChapter.name}</span>
+                <ArrowRight className="ml-2 h-4 w-4 shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
               </Button>
             </div>
-          </div>
-      )}
-
+          </motion.div>
+        )}
+      </AnimatePresence>
     </MCQPageLayout>
   );
 };

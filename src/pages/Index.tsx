@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -179,7 +179,7 @@ export default function Welcome() {
     setShowWizard(true);
   };
 
-  if (loading) return <AppTransitionScreen label="Preparing" />;
+  if (loading) return <AppTransitionScreen />;
 
   return (
     <AnimatePresence mode="wait">

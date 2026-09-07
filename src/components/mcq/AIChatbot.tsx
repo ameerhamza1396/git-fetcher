@@ -126,7 +126,7 @@ export const AIChatbot: React.FC<AIChatbotProps> = ({
       if (questionContext) {
         composedPrompt = `MCQ Question: ${questionContext}\nCorrect Answer: ${correctAnswer}\nUser Selected: ${currentAnswer || 'None'}\nExplanation Provided: ${explanationContext}\n\nUser Query: ${message.trim()}`;
       }
-      const data = await aiApiJson<{ answer?: string }>('ai/study-chat', { question: composedPrompt });
+      const data = await aiApiJson<{ answer?: string }>('ai/study-chat', { question: composedPrompt }, {});
       const answer = data.answer || 'Sorry, I could not generate a response.';
       setRevealingMessageIndex(responseIndex);
       setMessages(prev => [...prev, { role: 'assistant', content: answer, timestamp: new Date().toISOString() }]);

@@ -1,43 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, type UseQueryOptions } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Badge } from '@/components/ui/badge';
-import { Award, BookOpenCheck, CheckCircle2, Flame, HelpCircle, Library, MessageSquare, ScrollText, ShieldCheck, Swords, Target, Trophy, UserPlus } from 'lucide-react';
+import { ChevronRight, Trophy } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { BADGE_TONES, BadgeMedallion } from './BadgeMedallion';
+import { AchievementBadgesSkeleton } from './AchievementBadgesSkeleton';
+import { BadgeDetailSheet, BadgeGrid, useBadgeDetail } from './BadgeGrid';
+import { BADGE_DEFINITIONS, defaultStats, sortEarnedFirst, type AchievementStats, type BadgeDefinition } from './badgeDefinitions';
 
-export type AchievementStats = {
-  lifetimeMcqs: number;
-  correctMcqs: number;
-  flpCompletions: number;
-  aiChatSessions: number;
-  points: number;
-  accuracy: number;
-  aiQuestionHelpCount: number;
-  fastCorrectCount: number;
-  savedMcqs: number;
-  battleWins: number;
-  currentStreak: number;
-  correctedMcqs: number;
-  flashcardsGenerated: number;
-  referralCount: number;
-};
-
-type BadgeDefinition = {
-  id: string;
-  name: string;
-  details: string;
-  icon: any;
-  color: string;
-  isEarned: (stats: AchievementStats) => boolean;
-};
-
-const questionMilestones = [50, 100, 500, 1000, 5000, 10000, 25000];
-const aiChatMilestones = [5, 10, 50, 100, 200, 500];
-const accuracyMilestones = [95, 90, 85, 80, 75];
-const flpMilestones = [1, 5, 10, 20];
-const streakMilestones = [3, 7, 30, 60, 90, 120, 150];
-const correctedMcqMilestones = [5, 20, 50, 100, 250, 500];
-const flashcardMilestones = [20, 50, 100, 500, 1000, 5000];
+export type { AchievementStats, BadgeDefinition };
+export { BADGE_DEFINITIONS };
 
 const calculateCurrentStreak = (answers: any[]) => {
   const answerDates = answers.map((answer) => {
@@ -83,122 +56,6 @@ const calculateCurrentStreak = (answers: any[]) => {
   }
 
   return streak;
-};
-
-export const BADGE_DEFINITIONS: BadgeDefinition[] = [
-  ...questionMilestones.map((count) => ({
-    id: `mcqs_${count}`,
-    name: `${count.toLocaleString()} MCQs`,
-    details: `Attempt ${count.toLocaleString()} lifetime MCQs.`,
-    icon: Target,
-    color: 'from-blue-500 to-cyan-500',
-    isEarned: (stats) => stats.lifetimeMcqs >= count,
-  })),
-  ...aiChatMilestones.map((count) => ({
-    id: `ai_chats_${count}`,
-    name: `${count} AI Chats`,
-    details: `Start ${count} Dr Ahroid AI chat sessions.`,
-    icon: MessageSquare,
-    color: 'from-violet-500 to-fuchsia-500',
-    isEarned: (stats) => stats.aiChatSessions >= count,
-  })),
-  ...accuracyMilestones.map((accuracy) => ({
-    id: `accuracy_${accuracy}`,
-    name: `${accuracy}% Accuracy`,
-    details: `Maintain at least ${accuracy}% accuracy after 200 MCQs.`,
-    icon: ShieldCheck,
-    color: 'from-emerald-500 to-teal-500',
-    isEarned: (stats) => stats.lifetimeMcqs >= 200 && stats.accuracy >= accuracy,
-  })),
-  ...flpMilestones.map((count) => ({
-    id: `flp_completed_${count}`,
-    name: count === 1 ? 'Complete an FLP' : `${count} FLPs Complete`,
-    details: count === 1 ? 'Complete your first Full-Length Paper.' : `Complete ${count} Full-Length Papers.`,
-    icon: ScrollText,
-    color: 'from-fuchsia-500 to-rose-500',
-    isEarned: (stats) => stats.flpCompletions >= count,
-  })),
-  ...streakMilestones.map((days) => ({
-    id: `streak_${days}`,
-    name: `${days} Day Streak`,
-    details: `Maintain a ${days} day study streak.`,
-    icon: Flame,
-    color: 'from-orange-500 to-red-500',
-    isEarned: (stats) => stats.currentStreak >= days,
-  })),
-  ...correctedMcqMilestones.map((count) => ({
-    id: `corrected_mcqs_${count}`,
-    name: `${count} MCQs Corrected`,
-    details: `Correct ${count} MCQs in correction mode.`,
-    icon: BookOpenCheck,
-    color: 'from-rose-500 to-orange-500',
-    isEarned: (stats) => stats.correctedMcqs >= count,
-  })),
-  ...flashcardMilestones.map((count) => ({
-    id: `flashcards_generated_${count}`,
-    name: `${count.toLocaleString()} Flashcards`,
-    details: `Generate ${count.toLocaleString()} AI learning flashcards.`,
-    icon: Library,
-    color: 'from-cyan-500 to-blue-500',
-    isEarned: (stats) => stats.flashcardsGenerated >= count,
-  })),
-  {
-    id: 'dr_ahroid_question_help',
-    name: 'Guided By Dr Ahroid',
-    details: 'Use Help with current question while solving an MCQ.',
-    icon: HelpCircle,
-    color: 'from-amber-500 to-orange-500',
-    isEarned: (stats) => stats.aiQuestionHelpCount >= 1,
-  },
-  {
-    id: 'fast_correct_under_15',
-    name: '15 Second Strike',
-    details: 'Answer a question correctly in under 15 seconds.',
-    icon: Flame,
-    color: 'from-rose-500 to-red-500',
-    isEarned: (stats) => stats.fastCorrectCount >= 1,
-  },
-  {
-    id: 'saved_25_mcqs',
-    name: 'Question Collector',
-    details: 'Save 25 MCQs for revision.',
-    icon: Award,
-    color: 'from-indigo-500 to-blue-500',
-    isEarned: (stats) => stats.savedMcqs >= 25,
-  },
-  {
-    id: 'first_battle_win',
-    name: 'Battle Winner',
-    details: 'Win your first battle.',
-    icon: Swords,
-    color: 'from-purple-500 to-pink-500',
-    isEarned: (stats) => stats.battleWins >= 1,
-  },
-  {
-    id: 'invite_a_friend',
-    name: 'Social Butterfly',
-    details: 'Invite a friend to join Medmacs.',
-    icon: UserPlus,
-    color: 'from-pink-500 to-rose-500',
-    isEarned: (stats) => stats.referralCount >= 1,
-  },
-];
-
-const defaultStats: AchievementStats = {
-  lifetimeMcqs: 0,
-  correctMcqs: 0,
-  flpCompletions: 0,
-  aiChatSessions: 0,
-  points: 0,
-  accuracy: 0,
-  aiQuestionHelpCount: 0,
-  fastCorrectCount: 0,
-  savedMcqs: 0,
-  battleWins: 0,
-  currentStreak: 0,
-  correctedMcqs: 0,
-  flashcardsGenerated: 0,
-  referralCount: 0,
 };
 
 const arraysEqual = (a: string[], b: string[]) => a.length === b.length && a.every((value, index) => value === b[index]);
@@ -318,7 +175,7 @@ const AchievementUnlockToast = ({ badge, onDismiss }: { badge: BadgeDefinition |
         className="fixed left-3 right-3 z-[300] mx-auto max-w-md"
         style={{ top: 'calc(env(safe-area-inset-top) + 0.75rem)' }}
       >
-        <div className={`flex items-center gap-3 rounded-full bg-gradient-to-r ${badge.color} px-4 py-3 text-white shadow-2xl shadow-black/20 ring-1 ring-white/20`}>
+        <div className={`flex items-center gap-3 rounded-full bg-gradient-to-r ${BADGE_TONES[badge.tone].gradient} px-4 py-3 text-white shadow-2xl shadow-black/20 ring-1 ring-white/20`}>
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20">
             <Trophy className="h-5 w-5" />
           </div>
@@ -483,104 +340,77 @@ export const AchievementUnlockNotifier = ({ userId }: { userId?: string }) => {
   return <AchievementUnlockToast badge={unlockToast} onDismiss={() => setUnlockToast(null)} />;
 };
 
+const PREVIEW_BADGE_COUNT = 8;
+
+/** Profile-tab preview: progress summary plus a capped grid that links out to the full badges page. */
 export const AchievementBadges = ({ userId, compact = false }: { userId?: string; compact?: boolean }) => {
   const { data, isLoading } = useAchievementData(userId);
+  const { activeBadge, isOpen, openBadge, closeBadge } = useBadgeDetail();
   const stats = data?.stats || defaultStats;
   const earnedBadgeIds = data?.earnedBadgeIds || [];
   const earnedSet = useMemo(() => new Set(earnedBadgeIds), [earnedBadgeIds]);
+  const previewBadges = useMemo(() => sortEarnedFirst(BADGE_DEFINITIONS, earnedSet).slice(0, PREVIEW_BADGE_COUNT), [earnedSet]);
 
   if (isLoading) {
-    return (
-      <div className="py-2">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="h-12 w-12 animate-pulse rounded-2xl bg-gradient-to-br from-muted to-muted/50" />
-          <div className="flex-1">
-            <div className="h-5 w-32 animate-pulse rounded bg-muted mb-2" />
-            <div className="h-3 w-40 animate-pulse rounded bg-muted/70" />
-          </div>
-        </div>
-        <div className="flex gap-4 overflow-hidden">
-          {[1, 2, 3].map((item) => (
-            <div key={item} className="h-38 w-44 shrink-0 animate-pulse rounded-2xl bg-muted/40" />
-          ))}
-        </div>
-      </div>
-    );
+    return <AchievementBadgesSkeleton count={PREVIEW_BADGE_COUNT} compact={compact} />;
   }
+
+  const progress = Math.round((earnedBadgeIds.length / BADGE_DEFINITIONS.length) * 100);
 
   return (
     <div className="py-2">
-        <div className="mb-5 flex items-center justify-between gap-3 px-1">
-          <div className="flex items-center gap-3.5">
-            <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 shadow-lg shadow-amber-500/30">
-              <Trophy className="h-7 w-7 text-white" />
-            </div>
-            <div>
-              <h3 className="text-lg font-black uppercase tracking-tight text-foreground flex items-center gap-2">
-                Badges
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary">
-                  {earnedBadgeIds.length}
-                </span>
-              </h3>
-              <p className="text-xs text-muted-foreground font-semibold">{earnedBadgeIds.length}/{BADGE_DEFINITIONS.length} unlocked • {stats.points} pts</p>
-            </div>
+      <div className="mb-5 flex items-center gap-3.5 px-1">
+        <BadgeMedallion
+          shape="rosette"
+          tone="amber"
+          icon={Trophy}
+          earned={earnedBadgeIds.length > 0}
+          showLock={false}
+          className="h-14 w-14"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            <h3 className="text-lg font-black uppercase tracking-tight text-foreground">Badges</h3>
+            <span className="text-xs font-bold text-muted-foreground">
+              {earnedBadgeIds.length}/{BADGE_DEFINITIONS.length}
+            </span>
           </div>
-        </div>
-
-        <div className="relative -mx-4 overflow-hidden">
-          <div className="flex gap-4 overflow-x-auto px-4 pb-3 pt-1">
-            {BADGE_DEFINITIONS.map((badge) => {
-              const earned = earnedSet.has(badge.id);
-              const Icon = badge.icon;
-
-              return (
-                <motion.div
-                  key={badge.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className={`relative w-44 shrink-0 rounded-2xl border-2 p-4 transition-all duration-300 ${
-                    earned
-                      ? `border-transparent bg-gradient-to-br ${badge.color} text-white shadow-2xl shadow-primary/20 scale-[1.02] hover:scale-105`
-                      : 'border-border/50 bg-muted/30 text-muted-foreground hover:border-border hover:bg-muted/50 backdrop-blur-sm'
-                  } ${compact ? 'min-h-[132px]' : 'min-h-[154px]'}`}
-                >
-                  {/* Sparkle effect for earned badges */}
-                  {earned && (
-                    <div className="absolute top-2 right-2">
-                      <CheckCircle2 className="h-5 w-5 text-white drop-shadow-lg animate-bounce-gentle" />
-                    </div>
-                  )}
-
-                  <div className={`mb-3 flex h-12 w-12 items-center justify-center rounded-xl transition-all duration-300 ${
-                    earned
-                      ? 'bg-white/25 backdrop-blur-sm shadow-lg'
-                      : 'bg-background/80 border border-border/50'
-                  }`}>
-                    <Icon className={`h-6 w-6 transition-all ${earned ? 'text-white' : 'text-muted-foreground/60'}`} />
-                  </div>
-
-                  <p className={`text-sm font-black leading-tight mb-1.5 ${
-                    earned ? 'text-white drop-shadow-md' : 'text-foreground/70'
-                  }`}>
-                    {badge.name}
-                  </p>
-
-                  <p className={`text-[11px] leading-snug ${
-                    earned ? 'text-white/85' : 'text-muted-foreground/60'
-                  }`}>
-                    {badge.details}
-                  </p>
-
-                  {/* Shine effect for earned badges */}
-                  {earned && (
-                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-transparent via-white/10 to-transparent opacity-0 hover:opacity-100 transition-opacity pointer-events-none" />
-                  )}
-                </motion.div>
-              );
-            })}
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+              className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500"
+            />
           </div>
+          <p className="mt-1.5 text-[11px] font-semibold text-muted-foreground">
+            {progress}% unlocked • {stats.points.toLocaleString()} pts
+          </p>
         </div>
+      </div>
+
+      <BadgeGrid
+        badges={previewBadges}
+        earnedIds={earnedSet}
+        activeBadgeId={isOpen ? activeBadge?.id : null}
+        onSelect={openBadge}
+        size={compact ? 'sm' : 'md'}
+      />
+
+      <Link
+        to="/profile/badges"
+        className="mt-4 flex w-full items-center justify-center gap-1 rounded-2xl border border-border/40 bg-card/60 py-2.5 text-xs font-black uppercase tracking-wider text-primary transition-colors active:bg-muted/60"
+      >
+        See all {BADGE_DEFINITIONS.length} badges
+        <ChevronRight className="h-3.5 w-3.5" />
+      </Link>
+
+      <BadgeDetailSheet
+        badge={activeBadge}
+        earned={activeBadge ? earnedSet.has(activeBadge.id) : false}
+        open={isOpen}
+        onClose={closeBadge}
+      />
     </div>
   );
 };

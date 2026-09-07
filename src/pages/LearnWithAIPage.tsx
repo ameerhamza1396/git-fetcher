@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MCQPageLayout } from '@/pages/mcq/MCQPageLayout';
 import { fetchChaptersBySubject, fetchMCQsByChapter, fetchSubjects, Chapter, MCQ, Subject } from '@/utils/mcqData';
-import { FlashcardLimitModal, getAiLimitDetails, isAiLimitError } from '@/components/dashboard/personalization/FlashcardLimitModal';
+import { isAiLimitError } from '@/components/dashboard/personalization/FlashcardLimitModal';
 import { fetchReferenceSnippet } from '@/components/dashboard/personalization/personalizationUtils';
 import { recordGeneratedFlashcards } from '@/components/profile/AchievementBadges';
 import { useAuth } from '@/hooks/useAuth';
@@ -101,7 +101,7 @@ Explanation: ${mcq.explanation || 'None'}
 Reference: ${references[index] || 'No reference retrieved'}
 `).join('\n')}`;
 
-  const data = await aiApiJson<{ answer?: string }>('ai/study-chat', { question: prompt });
+  const data = await aiApiJson<{ answer?: string }>('ai/study-chat', { question: prompt }, {});
   const answer = data.answer || '';
   const jsonMatch = answer.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('AI response was not JSON');
@@ -146,8 +146,6 @@ const LearnWithAIPage = () => {
   const [batchIndex, setBatchIndex] = useState(0);
   const [cardsLoading, setCardsLoading] = useState(false);
   const [flashcardModalOpen, setFlashcardModalOpen] = useState(false);
-  const [limitModalOpen, setLimitModalOpen] = useState(false);
-  const [limitDetails, setLimitDetails] = useState(getAiLimitDetails(null));
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['profile', user?.id, 'learn-ai'],
@@ -238,8 +236,6 @@ const LearnWithAIPage = () => {
     } catch (error) {
       if (isAiLimitError(error)) {
         setFlashcardModalOpen(false);
-        setLimitDetails(getAiLimitDetails(error, userPlan, 2));
-        setLimitModalOpen(true);
         return;
       }
       const sourceMcqs = flashcardSourceMcqs.length ? flashcardSourceMcqs : await loadSourceMcqs(scope);
@@ -528,20 +524,6 @@ const LearnWithAIPage = () => {
           </div>
         </DialogContent>
       </Dialog>
-
-      <FlashcardLimitModal
-        open={limitModalOpen}
-        onOpenChange={setLimitModalOpen}
-        plan={limitDetails.plan}
-        limit={limitDetails.limit}
-        period={limitDetails.period}
-        limitKind={limitDetails.limitKind}
-        featureLabel="Dr Ahroid flashcards"
-        onUpgrade={() => {
-          setLimitModalOpen(false);
-          navigate('/pricing');
-        }}
-      />
     </MCQPageLayout>
   );
 };

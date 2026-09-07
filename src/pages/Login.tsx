@@ -39,7 +39,7 @@ const Login = () => {
   };
 
   if (!mounted || authLoading || user) {
-    return <AppTransitionScreen label="Opening" />;
+    return <AppTransitionScreen />;
   }
 
   return (

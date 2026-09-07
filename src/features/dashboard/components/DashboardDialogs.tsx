@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, Loader2, Sparkles, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -58,7 +58,6 @@ export function DashboardDialogs({
   onNavigateToChat,
   onNavigateToPricing,
 }: DashboardDialogsProps) {
-  const [dailyInsightDirection, setDailyInsightDirection] = useState(0);
   const dailyInsight = {
     key: 'term',
     label: 'Term of the Day',
@@ -67,7 +66,6 @@ export function DashboardDialogs({
   };
 
   const closeTerm = useCallback(() => {
-    setDailyInsightDirection(0);
     onShowTermOfDayChange(false);
   }, [onShowTermOfDayChange]);
 
@@ -105,13 +103,13 @@ export function DashboardDialogs({
       </Dialog>
 
       <Dialog open={showTermOfDay} onOpenChange={onShowTermOfDayChange}>
-        <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border-0 rounded-[2rem] bg-transparent shadow-2xl [&>button]:hidden">
+        <DialogContent className="w-full sm:max-w-[420px] p-0 overflow-hidden border-0 bg-transparent shadow-2xl [&>button]:hidden data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom !top-auto !bottom-0 !left-1/2 !-translate-x-1/2 !translate-y-0">
           <DialogHeader>
             <DialogTitle className="sr-only">Term of the Day</DialogTitle>
             <DialogDescription className="sr-only">{termOfDay?.term}</DialogDescription>
           </DialogHeader>
           {termOfDay && (
-            <div className="relative min-h-[430px] overflow-hidden rounded-[2rem] border border-white/15 bg-slate-950/82 p-6 text-white shadow-2xl shadow-emerald-950/40 backdrop-blur-2xl">
+            <div className="relative min-h-[430px] overflow-hidden rounded-t-[2rem] border border-white/15 bg-slate-950/82 p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] text-white shadow-2xl shadow-emerald-950/40 backdrop-blur-2xl">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_0%,rgba(16,185,129,0.30),transparent_34%),radial-gradient(circle_at_85%_20%,rgba(34,211,238,0.22),transparent_32%),linear-gradient(135deg,rgba(6,78,59,0.72),rgba(15,23,42,0.84))]" />
               <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/65 to-transparent" />
               <div className="relative z-10 flex h-full min-h-[382px] flex-col">
@@ -121,13 +119,12 @@ export function DashboardDialogs({
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                <AnimatePresence mode="wait" custom={dailyInsightDirection}>
+                <AnimatePresence mode="wait">
                   <motion.div
                     key={dailyInsight.key}
-                    custom={dailyInsightDirection}
-                    initial={{ opacity: 0, x: dailyInsightDirection > 0 ? 260 : -260 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: dailyInsightDirection < 0 ? 260 : -260 }}
+                    initial={{ opacity: 0, y: 260 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 260 }}
                     transition={{ duration: 0.28, ease: 'easeInOut' }}
                     className="flex flex-1 flex-col"
                   >
@@ -227,7 +224,7 @@ export function DashboardDialogs({
       </Dialog>
 
       <Dialog open={showCaseOfDay} onOpenChange={onShowCaseOfDayChange}>
-        <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-0 bg-transparent shadow-2xl [&>button]:hidden">
+        <DialogContent className="w-full sm:max-w-[450px] p-0 overflow-hidden border-0 bg-transparent shadow-2xl [&>button]:hidden data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom !top-auto !bottom-0 !left-1/2 !-translate-x-1/2 !translate-y-0">
           <DialogHeader>
             <DialogTitle className="sr-only">Case of the Day</DialogTitle>
             <DialogDescription className="sr-only">{caseOfDay?.case_name}</DialogDescription>

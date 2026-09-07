@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client'; // Reverted to relative path
 import { useAuth } from '@/hooks/useAuth'; // Reverted to relative path
@@ -19,9 +19,8 @@ import {
     AccordionItem,
     AccordionTrigger,
 } from "@/components/ui/accordion";
-import { CheckCircle, XCircle, MinusCircle, History, Trophy, ArrowLeft, Bot, Zap, Brain, FileText, Moon, Sun, MessageSquare } from 'lucide-react';
+import { History, ArrowLeft, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { useTheme } from 'next-themes';
 import { Link } from 'react-router-dom';
 import { ProfileDropdown } from '@/components/ProfileDropdown'; // NEW: Import ProfileDropdown
 

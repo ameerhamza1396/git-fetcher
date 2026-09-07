@@ -36,6 +36,7 @@ interface FLPSessionData {
   userAnswers: Record<string, string | null>;
   totalTimeLeft: number;
   subjectName?: string;
+  sessionId?: string;
   savedAt: number;
 }
 
@@ -451,7 +452,11 @@ const FLP = () => {
                     How Many MCQs?
                   </h1>
                   <p className="mx-auto mt-3 max-w-xs text-sm leading-6 text-slate-500 dark:text-slate-400">
-                    Choose the size of your mock test to configure duration.
+                    {selectedMcqCount ? (
+                      <>Your allotted time is <span className="font-bold text-teal-500">{formatTime(selectedMcqCount)}</span></>
+                    ) : (
+                      "Select your desired number of MCQs"
+                    )}
                   </p>
                 </div>
 
@@ -476,14 +481,6 @@ const FLP = () => {
                       );
                     })}
                   </div>
-
-                  <AnimatePresence>
-                    {selectedMcqCount && (
-                      <motion.p initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="text-slate-500 dark:text-slate-400 text-sm">
-                        Duration: <span className="font-bold text-teal-500">{formatTime(selectedMcqCount)}</span>
-                      </motion.p>
-                    )}
-                  </AnimatePresence>
                 </div>
 
                 <button

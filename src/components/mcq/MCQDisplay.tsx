@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
-import { Badge } from '@/components/ui/badge';
 import { useReferenceSearch } from '@/hooks/useReferenceSearch';
 import { aiApiJson } from '@/utils/aiApi';
 import { isAiPolicyNotice } from '@/utils/aiPolicyNotice';
@@ -32,6 +31,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { MCQTimer } from '@/features/mcq/components/MCQTimer';
 import { MCQAnswerOption } from '@/features/mcq/components/MCQAnswerOption';
 import {
@@ -293,8 +293,8 @@ const MCQSettingsModal = ({
               <LogOut className="w-4 h-4 mr-2" /> Leave Session
             </Button>
           </div>
+          </div>
         </div>
-      </div>
       </MenuModalContent>
     </DialogPrimitive.Root>
   );
@@ -329,23 +329,24 @@ const UpgradeAccountModal = ({ isOpen, onClose, onUpgradeClick, message }) => (
 );
 
 const LeaveTestModal = ({ isOpen, onClose, onConfirm }) => (
-  <DialogPrimitive.Root open={isOpen} onOpenChange={onClose}>
-    <ModalContent className="sm:max-w-[400px]">
-      <div className="bg-white dark:bg-zinc-900 border-2 border-red-200 dark:border-red-900 rounded-3xl overflow-hidden shadow-2xl">
-        <div className="flex flex-col items-center text-center p-6">
-          <div className="mb-4 w-16 h-16 rounded-full bg-red-100 dark:bg-red-950 flex items-center justify-center">
-            <AlertTriangle className="w-8 h-8 text-red-500" />
-          </div>
-          <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Leave Session?</h2>
-          <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6">Your progress will be saved so you can continue later.</p>
-          <div className="flex flex-col-reverse sm:flex-row gap-3 w-full">
-            <Button onClick={onClose} variant="outline" className="flex-1 rounded-xl h-12">Cancel</Button>
-            <Button onClick={onConfirm} className="flex-1 rounded-xl h-12 font-bold bg-red-600 hover:bg-red-700 text-white">Leave Test</Button>
-          </div>
+  <Sheet open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <SheetContent side="bottom" className="mx-auto max-h-[88dvh] overflow-y-auto rounded-t-[2rem] border-x border-t border-red-200 dark:border-red-900 bg-background/95 p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] backdrop-blur-2xl sm:max-w-lg z-[300]" overlayClassName="z-[300]">
+      <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-muted" aria-hidden="true" />
+      <div className="flex flex-col items-center text-center">
+        <div className="mb-4 w-16 h-16 rounded-full bg-red-100 dark:bg-red-950 flex items-center justify-center">
+          <AlertTriangle className="w-8 h-8 text-red-500" />
+        </div>
+        <SheetHeader className="text-center sm:text-center">
+          <SheetTitle className="text-xl font-bold">Leave Session?</SheetTitle>
+          <SheetDescription>Your progress will be saved so you can continue later.</SheetDescription>
+        </SheetHeader>
+        <div className="flex flex-col-reverse sm:flex-row gap-3 w-full mt-6">
+          <Button onClick={onClose} variant="outline" className="flex-1 rounded-xl h-12">Cancel</Button>
+          <Button onClick={onConfirm} className="flex-1 rounded-xl h-12 font-bold bg-red-600 hover:bg-red-700 text-white">Leave Test</Button>
         </div>
       </div>
-    </ModalContent>
-  </DialogPrimitive.Root>
+    </SheetContent>
+  </Sheet>
 );
 
 const ReportMCQModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
@@ -544,27 +545,20 @@ const ReferenceModal = ({
     : [];
 
   return (
-    <DialogPrimitive.Root open={isOpen} onOpenChange={onClose}>
-      <ModalContent className="max-w-[720px]">
-        <div className="bg-white dark:bg-zinc-900 border-2 border-primary/20 rounded-3xl shadow-2xl max-h-[86vh] overflow-hidden flex flex-col">
-          <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-            <div>
-              <DialogPrimitive.Title className="flex items-center gap-2 text-lg font-black text-zinc-900 dark:text-zinc-100">
-                <CheckCircle className="h-5 w-5 text-primary" />
-                Question Verification
-              </DialogPrimitive.Title>
-              <DialogPrimitive.Description className="mt-1 text-xs text-muted-foreground">
-                Dr Ahroid verifies the question first. Summary is optional.
-              </DialogPrimitive.Description>
-            </div>
-            <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="sm" className="h-9 w-9 shrink-0 rounded-full p-0">
-                <X className="h-4 w-4" />
-              </Button>
-            </DialogPrimitive.Close>
-          </div>
+    <Sheet open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <SheetContent side="bottom" className="mx-auto max-h-[88dvh] overflow-y-auto rounded-t-[2rem] border-x border-t border-primary/20 bg-background/95 p-0 pb-[calc(1.5rem+env(safe-area-inset-bottom))] backdrop-blur-2xl sm:max-w-lg z-[300]" overlayClassName="z-[300]">
+        <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-muted" aria-hidden="true" />
+        <SheetHeader className="px-5 py-4 text-left sm:text-left">
+          <SheetTitle className="flex items-center gap-2 text-lg font-black">
+            <CheckCircle className="h-5 w-5 text-primary" />
+            Question Verification
+          </SheetTitle>
+          <SheetDescription className="mt-1 text-xs">
+            Dr Ahroid verifies the question first. Summary is optional.
+          </SheetDescription>
+        </SheetHeader>
 
-          <motion.div layout className="flex-1 overflow-y-auto px-5 py-4">
+        <motion.div layout className="flex-1 overflow-y-auto px-5 py-4">
             {offlineMessage ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-center text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
                 <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/15">
@@ -826,9 +820,8 @@ const ReferenceModal = ({
               </Button>
             </div>
           </div>
-        </div>
-      </ModalContent>
-    </DialogPrimitive.Root>
+      </SheetContent>
+    </Sheet>
   );
 };
 
@@ -1407,7 +1400,7 @@ export const MCQDisplay = ({
         correctAnswer: currentMCQ.correct_answer,
         options: currentMCQ.shuffledOptions || currentMCQ.options || [],
         explanation: currentMCQ.explanation || '',
-      });
+      }, {});
       const explicitNoInternalReferences =
         parsed?.verdict === 'no_references' ||
         ['none', 'external', 'llm_knowledge'].includes(String(parsed?.sourceBasis || '').toLowerCase());
@@ -1492,7 +1485,7 @@ export const MCQDisplay = ({
       const data = await aiApiJson<any>('reference-summary', {
         question: currentMCQ.question,
         top_k: 5,
-      });
+      }, {});
 
       if (data.status === 'no_references' || !data.summary) {
         setReferenceSummary({
@@ -1550,7 +1543,7 @@ export const MCQDisplay = ({
         options: currentMCQ.shuffledOptions || currentMCQ.options || [],
         correctAnswer: currentMCQ.correct_answer,
         explanation: currentMCQ.explanation || '',
-      });
+      }, {});
       const optionList = currentMCQ.shuffledOptions || currentMCQ.options || [];
       const nextExplanations = Array.isArray(data.optionExplanations)
         ? data.optionExplanations.reduce((acc, item, fallbackIndex) => {

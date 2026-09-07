@@ -1,18 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom'; // Ensure useNavigate is imported
+import { useNavigate } from 'react-router-dom'; // Ensure useNavigate is imported
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Moon, Sun, User as UserIcon, CheckCircle, Edit } from 'lucide-react'; // Added CheckCircle and Edit icon
-import { useTheme } from 'next-themes';
+import { User as UserIcon, CheckCircle, Edit } from 'lucide-react'; // Added CheckCircle and Edit icon
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { ProfileDropdown } from '@/components/ProfileDropdown'; // NEW: Import ProfileDropdown
-import PlanBadge from '@/components/PlanBadge';
 import { getUsernameValidationError, isUsernameConflict, normalizeUsername } from '@/utils/username';
 
 

@@ -2,7 +2,7 @@ import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { CapacitorUpdater, type BundleInfo, type DownloadEvent } from '@capgo/capacitor-updater';
 
-export type OtaUpdatePhase = 'idle' | 'checking' | 'downloading' | 'preparing' | 'installing' | 'complete' | 'failed' | 'error';
+export type OtaUpdatePhase = 'idle' | 'checking' | 'available' | 'downloading' | 'preparing' | 'installing' | 'complete' | 'failed' | 'error';
 
 export type OtaUpdateState = {
   phase: OtaUpdatePhase;
@@ -14,6 +14,15 @@ export type OtaUpdateState = {
   size?: number | null;
 };
 
+type PendingUpdate = {
+  version: string;
+  url: string;
+  checksum: string | null;
+  mandatory: boolean;
+  notes: string | null;
+  size: number | null;
+};
+
 type OtaLatestResponse =
   | {
       available: true;
@@ -22,6 +31,7 @@ type OtaLatestResponse =
       checksum?: string | null;
       mandatory?: boolean;
       notes?: string | null;
+      fileSizeBytes?: number | null;
     }
   | {
       available: false;
@@ -39,6 +49,7 @@ const OTA_DIAGNOSTICS_KEY = 'medmacs_ota_diagnostics';
 let currentState: OtaUpdateState = { phase: 'idle', progress: 0 };
 let started = false;
 let appReadyPromise: Promise<void> | null = null;
+let pendingUpdate: PendingUpdate | null = null;
 const listeners = new Set<(state: OtaUpdateState) => void>();
 
 const emit = (state: OtaUpdateState) => {
@@ -100,18 +111,26 @@ const getBundleVersion = (bundle?: BundleInfo | null) => {
   return bundle.version || bundle.id || 'builtin';
 };
 
-const clearInstallingVersionIfCurrent = (currentBundleVersion: string) => {
-  const installingVersion = localStorage.getItem(INSTALLING_VERSION_KEY);
-  if (!installingVersion || installingVersion !== currentBundleVersion) return;
+const clearInstallingVersionIfCurrent = (currentBundleVersion: string, currentBundleId?: string): boolean => {
+  const installingValue = localStorage.getItem(INSTALLING_VERSION_KEY);
+  if (!installingValue) return false;
+
+  const matched = installingValue === currentBundleVersion || (currentBundleId != null && installingValue === currentBundleId);
 
   localStorage.removeItem(INSTALLING_VERSION_KEY);
-  localStorage.setItem(COMPLETED_VERSION_KEY, currentBundleVersion);
-  emit({
-    phase: 'complete',
-    progress: 100,
-    version: currentBundleVersion,
-    message: 'Update complete. You are now using the latest version.',
-  });
+
+  if (matched) {
+    localStorage.setItem(COMPLETED_VERSION_KEY, currentBundleVersion);
+    emit({
+      phase: 'complete',
+      progress: 100,
+      version: currentBundleVersion,
+      message: 'Update complete. You are now using the latest version.',
+    });
+    return true;
+  }
+
+  return false;
 };
 
 const subscribeToDownloadProgress = async () => {
@@ -138,7 +157,90 @@ export const subscribeToOtaUpdates = (listener: (state: OtaUpdateState) => void)
 };
 
 export const dismissOtaUpdateScreen = () => {
+  pendingUpdate = null;
   emit({ phase: 'idle', progress: 0 });
+};
+
+export const retryOtaDownload = () => {
+  const pending = pendingUpdate;
+  if (!pending) return;
+  void startOtaDownload();
+};
+
+export const startOtaDownload = async () => {
+  const pending = pendingUpdate;
+  if (!pending) return;
+
+  const removeDownloadListener = await subscribeToDownloadProgress();
+
+  try {
+    recordDiagnostic('download_start', {
+      version: pending.version,
+      checksum: pending.checksum,
+    });
+    emit({
+      phase: 'downloading',
+      progress: 0,
+      version: pending.version,
+      notes: pending.notes ?? undefined,
+      mandatory: pending.mandatory,
+      size: pending.size,
+      message: 'Getting new features ready...',
+    });
+
+    const bundle = await CapacitorUpdater.download({
+      version: pending.version,
+      url: pending.url,
+      checksum: pending.checksum ?? undefined,
+    });
+    recordDiagnostic('download_success', { bundle });
+
+    emit({
+      phase: 'preparing',
+      progress: 100,
+      version: pending.version,
+      notes: pending.notes ?? undefined,
+      mandatory: pending.mandatory,
+      size: pending.size,
+      message: 'Preparing your update...',
+    });
+
+    emit({
+      phase: 'installing',
+      progress: 100,
+      version: pending.version,
+      notes: pending.notes ?? undefined,
+      mandatory: pending.mandatory,
+      size: pending.size,
+      message: 'Installing update. The app will reopen automatically.',
+    });
+
+    localStorage.setItem(INSTALLING_VERSION_KEY, bundle.id);
+    recordDiagnostic('set_start', {
+      id: bundle.id,
+      version: pending.version,
+    });
+    await CapacitorUpdater.set({ id: bundle.id });
+  } catch (error) {
+    recordDiagnostic('ota_flow_error', {
+      phase: currentState.phase,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    console.error('OTA download failed:', error);
+    if (currentState.phase === 'downloading' || currentState.phase === 'preparing' || currentState.phase === 'installing') {
+      emit({
+        phase: 'error',
+        progress: 0,
+        version: pending.version,
+        mandatory: pending.mandatory,
+        message: "We couldn't prepare the update right now. We'll try again later.",
+      });
+      return;
+    }
+    emit({ phase: 'idle', progress: 0 });
+  } finally {
+    removeDownloadListener();
+  }
 };
 
 export const getOtaDiagnostics = () => {
@@ -189,11 +291,15 @@ export const initializeOtaUpdates = async () => {
     const nativeVersionCode = parseVersionCode(appInfo.build);
     const currentBundle = await CapacitorUpdater.current();
     const currentBundleVersion = getBundleVersion(currentBundle.bundle);
+
+    const completedVersion = localStorage.getItem(COMPLETED_VERSION_KEY);
+
     recordDiagnostic('current_bundle', {
       native: currentBundle.native,
       bundle: currentBundle.bundle,
       currentBundleVersion,
       nativeVersionCode,
+      completedVersion,
     });
 
     const failedUpdate = await CapacitorUpdater.getFailedUpdate().catch(error => {
@@ -212,6 +318,7 @@ export const initializeOtaUpdates = async () => {
       });
       rememberFailedVersion(failedVersion);
       localStorage.removeItem(INSTALLING_VERSION_KEY);
+      localStorage.removeItem(COMPLETED_VERSION_KEY);
       CapacitorUpdater.delete({ id: failedUpdate.bundle.id }).catch(error => {
         console.warn('OTA failed bundle cleanup skipped:', error);
       });
@@ -222,12 +329,20 @@ export const initializeOtaUpdates = async () => {
         message: 'Update failed and was rolled back. We will wait for a newer update before trying again.',
       });
     } else {
-      clearInstallingVersionIfCurrent(currentBundleVersion);
+      const completedBeforeCheck = clearInstallingVersionIfCurrent(currentBundleVersion, currentBundle.bundle?.id);
+      if (completedBeforeCheck) {
+        pendingUpdate = null;
+        return;
+      }
     }
 
+    const effectiveVersion = completedVersion || currentBundleVersion;
     const failedBundleVersions = readJsonArray(FAILED_VERSIONS_KEY);
+
     recordDiagnostic('server_check_request', {
+      effectiveVersion,
       currentBundleVersion,
+      completedVersion,
       failedBundleVersions,
       channel: OTA_CHANNEL,
       platform: Capacitor.getPlatform(),
@@ -241,7 +356,7 @@ export const initializeOtaUpdates = async () => {
       body: JSON.stringify({
         platform: Capacitor.getPlatform(),
         nativeVersionCode,
-        currentBundleVersion,
+        currentBundleVersion: effectiveVersion,
         failedBundleVersions,
         channel: OTA_CHANNEL,
         installId: getInstallId(),
@@ -251,6 +366,7 @@ export const initializeOtaUpdates = async () => {
     if (!response.ok) throw new Error(`OTA check failed with status ${response.status}`);
     const data = await response.json() as OtaLatestResponse;
     recordDiagnostic('server_check_response', { data });
+
     if (!data?.available) {
       if (currentState.phase === 'checking') {
         emit({ phase: 'idle', progress: 0 });
@@ -272,71 +388,47 @@ export const initializeOtaUpdates = async () => {
       return;
     }
 
-    // Fetch bundle size via HEAD request
-    let updateSize: number | null = null;
-    try {
-      const headResponse = await fetch(data.url, { method: 'HEAD' });
-      const contentLength = headResponse.headers.get('content-length');
-      if (contentLength) {
-        updateSize = parseInt(contentLength, 10);
-      }
-    } catch {
-      // Size unavailable
+    // Skip showing updates that were already successfully completed
+    if (completedVersion && data.version === completedVersion) {
+      recordDiagnostic('skip_already_completed_version', {
+        version: data.version,
+        completedVersion,
+      });
+      emit({ phase: 'idle', progress: 0 });
+      return;
     }
 
-    const removeDownloadListener = await subscribeToDownloadProgress();
+    // A genuinely new update is available — clear the old completed marker
+    localStorage.removeItem(COMPLETED_VERSION_KEY);
 
-    try {
-      recordDiagnostic('download_start', {
-        version: data.version,
-        checksum: data.checksum,
-      });
-      emit({
-        phase: 'downloading',
-        progress: 0,
-        version: data.version,
-        notes: data.notes ?? undefined,
-        mandatory: data.mandatory ?? false,
-        size: updateSize,
-        message: 'Getting new features ready...',
-      });
+    const updateSize = data.fileSizeBytes ?? null;
 
-      const bundle = await CapacitorUpdater.download({
-        version: data.version,
-        url: data.url,
-        checksum: data.checksum ?? undefined,
-      });
-      recordDiagnostic('download_success', { bundle });
+    pendingUpdate = {
+      version: data.version,
+      url: data.url,
+      checksum: data.checksum ?? null,
+      mandatory: data.mandatory ?? false,
+      notes: data.notes ?? null,
+      size: updateSize,
+    };
 
-      emit({
-        phase: 'preparing',
-        progress: 100,
-        version: data.version,
-        notes: data.notes ?? undefined,
-        mandatory: data.mandatory ?? false,
-        size: updateSize,
-        message: 'Preparing your update...',
-      });
+    recordDiagnostic('update_available', {
+      version: data.version,
+      mandatory: data.mandatory,
+      size: updateSize,
+    });
 
-      emit({
-        phase: 'installing',
-        progress: 100,
-        version: data.version,
-        notes: data.notes ?? undefined,
-        mandatory: data.mandatory ?? false,
-        size: updateSize,
-        message: 'Installing update. The app will reopen automatically.',
-      });
-
-      localStorage.setItem(INSTALLING_VERSION_KEY, data.version);
-      recordDiagnostic('set_start', {
-        id: bundle.id,
-        version: data.version,
-      });
-      await CapacitorUpdater.set({ id: bundle.id });
-    } finally {
-      removeDownloadListener();
-    }
+    emit({
+      phase: 'available',
+      progress: 0,
+      version: data.version,
+      notes: data.notes ?? undefined,
+      mandatory: data.mandatory ?? false,
+      size: updateSize,
+      message: data.mandatory
+        ? 'Medmacs is requiring an update.'
+        : 'A new version of Medmacs is available.',
+    });
   } catch (error) {
     recordDiagnostic('ota_flow_error', {
       phase: currentState.phase,
@@ -352,6 +444,7 @@ export const initializeOtaUpdates = async () => {
       return;
     }
 
+    pendingUpdate = null;
     emit({ phase: 'idle', progress: 0 });
   }
 };

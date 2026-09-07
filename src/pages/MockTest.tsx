@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
-import { useTheme } from 'next-themes';
-import { Moon, Sun, ChevronLeft, PanelLeft } from 'lucide-react';
+import { ChevronLeft, PanelLeft } from 'lucide-react';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useQuery } from '@tanstack/react-query';

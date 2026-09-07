@@ -13,7 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, BookmarkX, ChevronDown, Loader2, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, BookmarkX, ChevronDown, Loader2, Trash2, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';

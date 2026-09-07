@@ -39,6 +39,23 @@ export default function BackButtonHandler() {
                 return;
             }
 
+            // FLP Test Routes: let the FLPQuiz component handle the back button (shows leave modal)
+            if (pathname.startsWith("/flp/test")) {
+                return;
+            }
+
+            // FLP main wizard setup: go to dashboard
+            if (pathname === "/flp") {
+                nav("/dashboard");
+                return;
+            }
+
+            // FLP result pages: go to dashboard (not back to the finished test)
+            if (pathname === "/flp-result" || pathname.startsWith("/results/flp/")) {
+                nav("/dashboard");
+                return;
+            }
+
             // All other MCQ pages: hardcoded navigation based on page
             if (pathname.startsWith("/mcqs")) {
                 // /mcqs/chapter/:subjectId -> /mcqs (chapter selection -> subject selection)

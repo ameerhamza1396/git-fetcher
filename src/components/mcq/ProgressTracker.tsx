@@ -1,7 +1,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Target, Trophy, TrendingUp, Flame, Clock } from 'lucide-react';
+import { Target, TrendingUp, Flame, Clock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface ProgressTrackerProps {

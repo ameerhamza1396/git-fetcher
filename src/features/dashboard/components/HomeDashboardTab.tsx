@@ -1,10 +1,12 @@
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import {
   ArrowRight,
   BookOpen,
   Crown,
   Flame,
   FlaskConical,
+  Gauge,
   Sparkles,
   Star,
   Stethoscope,
@@ -18,7 +20,6 @@ import { Progress } from '@/components/ui/progress';
 import { MCQProgressWidget } from '@/components/dashboard/MCQProgressWidget';
 import { DashboardActionCard } from './DashboardActionCard';
 import { DashboardAnnouncementCard } from './DashboardAnnouncementCard';
-import { DashboardReviewCard } from './DashboardReviewCard';
 import { InstituteDetailCard } from './InstituteDetailCard';
 import type {
   AiUsageSummary,
@@ -47,14 +48,13 @@ type HomeDashboardTabProps = {
   termOfDay?: TermOfDay;
   termLoading: boolean;
   onOpenTerm: () => void;
+  onOpenUsageLimits: () => void;
   caseOfDay?: CaseOfDay;
   caseLoading: boolean;
   onOpenCase: () => void;
   instituteModules: DashboardAction[];
   dashboardAnnouncement?: DashboardAnnouncement | null;
   onOpenAnnouncement: (announcement: DashboardAnnouncement) => void;
-  reviewCompleted: boolean;
-  onReviewComplete: () => void;
   instituteData: DashboardInstitute;
   personalizationActions: DashboardAction[];
   premiumPerks: DashboardAction[];
@@ -77,25 +77,25 @@ export function HomeDashboardTab({
   termOfDay,
   termLoading,
   onOpenTerm,
+  onOpenUsageLimits,
   caseOfDay,
   caseLoading,
   onOpenCase,
   instituteModules,
   dashboardAnnouncement,
   onOpenAnnouncement,
-  reviewCompleted,
-  onReviewComplete,
   instituteData,
   personalizationActions,
   premiumPerks,
   promotions,
   onOpenCollaborate,
 }: HomeDashboardTabProps) {
+  const userPlanDisplayName = rawUserPlan.charAt(0).toUpperCase() + rawUserPlan.slice(1) + ' Plan';
   return (
     <div>
       <div className="mb-5">
-        <p className="mb-1 text-xs font-black uppercase tracking-widest text-muted-foreground">{greetingMessage}</p>
-        <h1 className="text-3xl sm:text-4xl font-black text-shimmer leading-[1.05] break-words">{displayName}</h1>
+        <p className="mb-1 text-xs font-bold text-muted-foreground brand-syne">{greetingMessage}</p>
+        <h1 className="text-3xl sm:text-4xl font-black text-shimmer leading-[1.05] break-words brand-syne">{displayName}</h1>
         {dashboardNoticeLine && (
           <div className="mt-3 rounded-xl border border-amber-200/70 bg-[#fff8db] px-3 py-2 text-xs font-bold leading-relaxed text-amber-900 shadow-sm dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100">
             {dashboardNoticeLine}
@@ -153,48 +153,25 @@ export function HomeDashboardTab({
       </h2>
       <div className="grid grid-cols-2 gap-3 mb-6">
         {quickActions.map((action) => (
-          <DashboardActionCard key={action.title} action={action} fixedHeight offlineMode={isOfflineMode} />
+          <DashboardActionCard key={action.title} action={action} fixedHeight flat offlineMode={isOfflineMode} />
         ))}
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-6">
-        <div className="rounded-2xl border border-border/40 bg-card/80 backdrop-blur-sm p-3 flex min-h-[120px] flex-col items-center justify-center overflow-hidden">
-          {isOfflineMode ? (
-            <div className="flex h-full flex-col items-center justify-center text-center">
-              <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/15">
-                <WifiOff className="h-6 w-6 text-amber-600 dark:text-amber-300" />
-              </div>
-              <p className="text-xs font-black uppercase text-foreground">Offline Mode</p>
-              <p className="mt-0.5 text-[10px] text-muted-foreground">MCQs only</p>
-            </div>
-          ) : rawUserPlan === 'free' ? (
-            <>
-              <div className="relative w-16 h-16 mb-1.5">
-                <svg viewBox="0 0 36 36" className="w-full h-full" aria-hidden="true">
-                  <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="hsl(var(--muted))" strokeWidth="3" />
-                  <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="hsl(var(--primary))" strokeWidth="3" strokeDasharray={`${Math.min(((profile?.daily_mcq_submissions || 0) / 50) * 100, 100)}, 100`} strokeLinecap="round" />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-sm font-black text-foreground">{Math.min(profile?.daily_mcq_submissions || 0, 50)}/50</span>
-                </div>
-              </div>
-              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider text-center leading-none">Free Plan</p>
-              <p className="mt-1 max-w-[8.5rem] truncate text-center text-[9px] font-bold leading-none text-muted-foreground">
-                {aiUsageSummaryLoading ? 'Checking AI...' : aiUsageSummary?.label}
-              </p>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <div className={`w-11 h-11 rounded-2xl flex items-center justify-center mb-1.5 ${rawUserPlan === 'iconic' ? 'bg-gradient-to-br from-rose-500 to-orange-500' : 'bg-gradient-to-br from-blue-500 to-violet-600'}`}>
-                {rawUserPlan === 'iconic' ? <Crown className="w-5 h-5 text-white" /> : <Star className="w-5 h-5 text-white" />}
-              </div>
-              <p className="text-xs font-black text-foreground uppercase leading-none">{rawUserPlan === 'iconic' ? 'Iconic' : 'Premium'}</p>
-              <p className="mt-1 max-w-[8.5rem] truncate text-center text-[9px] font-bold leading-none text-muted-foreground">
-                {aiUsageSummaryLoading ? 'Checking AI...' : aiUsageSummary?.label}
-              </p>
-            </div>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={onOpenUsageLimits}
+          className="rounded-2xl border border-border/40 bg-gradient-to-br from-primary/10 to-accent/40 backdrop-blur-sm p-4 text-left active:scale-[0.97] transition-all min-h-[120px] w-full dark:from-primary/15 dark:to-accent/20"
+        >
+          <div className="flex items-center gap-1.5 mb-2">
+            <Gauge className="w-3.5 h-3.5 text-primary" />
+            <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Usage Limits</span>
+          </div>
+          <p className="text-sm font-black text-foreground mb-1">{userPlanDisplayName || 'Free Plan'}</p>
+          <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+            {aiUsageSummaryLoading ? 'Checking AI...' : aiUsageSummary?.label || 'Tap to view usage details'}
+          </p>
+        </button>
 
         <div className="relative min-h-[120px]">
           <motion.button
@@ -245,7 +222,7 @@ export function HomeDashboardTab({
           </div>
           <div className="grid grid-cols-2 gap-3 mb-6">
             {instituteModules.map((action) => (
-              <DashboardActionCard key={action.title} action={action} offlineMode={isOfflineMode} />
+          <DashboardActionCard key={action.title} action={action} flat offlineMode={isOfflineMode} />
             ))}
           </div>
         </div>
@@ -253,10 +230,8 @@ export function HomeDashboardTab({
 
       {dashboardAnnouncement ? (
         <DashboardAnnouncementCard announcement={dashboardAnnouncement} onOpen={() => onOpenAnnouncement(dashboardAnnouncement)} />
-      ) : reviewCompleted ? (
-        <InstituteDetailCard institute={instituteData} />
       ) : (
-        <DashboardReviewCard onComplete={onReviewComplete} />
+        <InstituteDetailCard institute={instituteData} />
       )}
 
       <div className="flex items-center gap-2 mb-3 mt-6">
@@ -265,7 +240,7 @@ export function HomeDashboardTab({
       </div>
       <div className="grid grid-cols-2 gap-3 mb-6">
         {personalizationActions.map((action) => (
-          <DashboardActionCard key={action.title} action={action} offlineMode={isOfflineMode} />
+          <DashboardActionCard key={action.title} action={action} flat offlineMode={isOfflineMode} />
         ))}
       </div>
 
@@ -273,10 +248,27 @@ export function HomeDashboardTab({
         <Crown className="w-4 h-4 text-amber-500 animate-bounce-gentle" />
         <h2 className="text-sm font-bold text-foreground">Premium Perks</h2>
       </div>
-      <div className="grid grid-cols-1 gap-3 mb-8">
-        {premiumPerks.map((action) => (
-          <DashboardActionCard key={action.title} action={action} offlineMode={isOfflineMode} />
-        ))}
+      <div className="mb-8 divide-y divide-border/40 rounded-2xl">
+        {premiumPerks.map((action) => {
+          const isDisabled = action.disabled || (isOfflineMode && action.link !== '/mcqs');
+          const Icon = action.icon;
+          return (
+            <Link
+              key={action.title}
+              to={isDisabled ? '#' : action.link || '#'}
+              className={`flex items-center gap-3 px-4 py-3.5 transition-colors active:bg-muted/50 ${isDisabled ? 'pointer-events-none opacity-45 grayscale' : ''}`}
+            >
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${action.gradient} text-white shadow-sm`}>
+                <Icon className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-bold text-foreground leading-tight">{action.title}</h3>
+                <p className="text-[11px] text-muted-foreground font-medium mt-0.5">{action.description}</p>
+              </div>
+              <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+            </Link>
+          );
+        })}
       </div>
 
       {promotions.length > 0 && (

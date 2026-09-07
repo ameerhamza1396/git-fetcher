@@ -1,10 +1,7 @@
-import React from 'react';
 import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
-import { useTheme } from 'next-themes';
-import { Moon, Sun, Home, CheckCircle } from 'lucide-react'; // Added CheckCircle icon
+import { Home, CheckCircle } from 'lucide-react'; // Added CheckCircle icon
 import { ProfileDropdown } from '@/components/ProfileDropdown';
 
 const TestCompletionPage = () => {

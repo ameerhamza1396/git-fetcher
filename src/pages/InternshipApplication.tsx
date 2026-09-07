@@ -2,15 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/components/ui/use-toast'; // Assuming you have a toast system
-import { ArrowLeft, Moon, Sun, Upload, User, Mail, Phone, Briefcase, Lightbulb, FileImage, CreditCard, Loader2, RefreshCw, CheckCircle, Sparkles } from 'lucide-react'; // Added RefreshCw for CAPTCHA refresh, CheckCircle, Sparkles
-import { useTheme } from 'next-themes';
+import { ArrowLeft, Upload, User, Mail, Phone, Briefcase, Lightbulb, FileImage, CreditCard, Loader2, RefreshCw, CheckCircle, Sparkles } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';

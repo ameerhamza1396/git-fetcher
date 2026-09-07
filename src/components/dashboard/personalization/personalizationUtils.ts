@@ -52,7 +52,7 @@ export const buildFallbackCards = (attempts: WrongAttempt[], batchIndex: number,
 
 export const fetchReferenceSnippet = async (question: string) => {
   try {
-    const data = await aiApiJson<{ results?: any[] }>('reference', { query: question, top_k: 2 });
+    const data = await aiApiJson<{ results?: any[] }>('reference', { query: question, top_k: 2 }, {});
     return (data.results || [])
       .map((ref: any) => `${ref.book || 'Reference'} p.${ref.page || '-'}: ${ref.content || ''}`)
       .join('\n');
@@ -73,7 +73,7 @@ export const refineFlashcardsWithAI = async (attempts: WrongAttempt[], batchInde
       explanation: attempt.mcq.explanation || '',
       reference: references[index] || '',
     })),
-  });
+  }, {});
   const cards = Array.isArray(data.cards) ? data.cards : [];
 
   return cards

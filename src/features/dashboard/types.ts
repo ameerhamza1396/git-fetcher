@@ -96,6 +96,7 @@ export type DashboardAction = {
   onClick?: () => void;
   gradient: string;
   iconColor: string;
+  flatIconColor?: string;
   tag?: string;
   tagColor?: string;
   disabled?: boolean;

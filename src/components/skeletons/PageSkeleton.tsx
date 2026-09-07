@@ -1,10 +1,6 @@
 import BrandedLoader from '@/components/BrandedLoader';
 
-type PageSkeletonProps = {
-  timeoutMs?: number;
-};
-
-const PageSkeleton = ({ timeoutMs = 15000 }: PageSkeletonProps) => {
+const PageSkeleton = () => {
   return (
     <div className="relative min-h-screen overflow-hidden bg-background p-6">
       <div className="space-y-8 opacity-55 animate-pulse">
@@ -36,7 +32,7 @@ const PageSkeleton = ({ timeoutMs = 15000 }: PageSkeletonProps) => {
         </div>
       </div>
       <div className="absolute inset-0 z-10">
-        <BrandedLoader label="Preparing your workspace" timeoutMs={timeoutMs} fullscreen={false} />
+        <BrandedLoader fullscreen={false} />
       </div>
     </div>
   );

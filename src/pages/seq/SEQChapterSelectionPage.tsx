@@ -1,24 +1,25 @@
 import { useState, useEffect, useLayoutEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, BookOpen } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { fetchSEQChaptersBySubject, fetchSEQSubjectById, SEQChapter, SEQSubject } from '@/utils/mcqData';
-import { useAuth } from '@/hooks/useAuth';
 import { MCQPageLayout } from '@/pages/mcq/MCQPageLayout';
+import AppTransitionScreen from '@/components/AppTransitionScreen';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { CollaborateModal } from '@/components/CollaborateModal';
+import { SelectionBackdrop } from '@/components/selection/SelectionBackdrop';
+import { SelectionRow } from '@/components/selection/SelectionRow';
+import { rowEntrance } from '@/components/selection/motion';
 
-const ChapterCardSkeleton = () => (
-  <div className="relative overflow-hidden rounded-2xl bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl p-4 animate-pulse border border-border/30">
-    <div className="flex items-center gap-4">
-      <div className="w-12 h-12 rounded-xl bg-muted" />
-      <div className="flex-1 space-y-2">
-        <div className="h-4 w-1/4 bg-muted rounded-full" />
-        <div className="h-3 w-3/4 bg-muted rounded-full" />
-      </div>
+const ChapterRowSkeleton = () => (
+  <div className="flex animate-pulse items-center gap-4 py-4 pl-4 pr-3">
+    <div className="min-w-0 flex-1 space-y-2">
+      <div className="h-2.5 w-1/5 rounded-full bg-muted" />
+      <div className="h-3.5 w-2/3 rounded-full bg-muted" />
     </div>
+    <div className="h-3 w-10 shrink-0 rounded-full bg-muted" />
   </div>
 );
 
@@ -33,6 +34,7 @@ const SEQChapterSelectionPage = () => {
 
   const { subjectId } = useParams<{ subjectId: string }>();
   const navigate = useNavigate();
+  const reduceMotion = useReducedMotion();
   const [allChapters, setAllChapters] = useState<SEQChapter[]>([]);
   const [loadingChapters, setLoadingChapters] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -54,9 +56,9 @@ const SEQChapterSelectionPage = () => {
   useEffect(() => {
     const loadData = async () => {
       if (!subjectId || profileLoading) return;
-      
+
       setLoadingChapters(true);
-      
+
       const [subjectData, chapters] = await Promise.all([
         fetchSEQSubjectById(subjectId),
         fetchSEQChaptersBySubject(subjectId)
@@ -69,7 +71,7 @@ const SEQChapterSelectionPage = () => {
       setLoadingChapters(false);
       setLoading(false);
     };
-    
+
     if (!profileLoading) {
       loadData();
     }
@@ -82,19 +84,14 @@ const SEQChapterSelectionPage = () => {
   };
 
   if (profileLoading || loading) {
-    return (
-      <MCQPageLayout backTo="/seqs">
-        <div className="space-y-4">
-          {Array.from({ length: 6 }).map((_, i) => <ChapterCardSkeleton key={i} />)}
-        </div>
-      </MCQPageLayout>
-    );
+    return <AppTransitionScreen />;
   }
 
   if (!subject) {
     return (
       <MCQPageLayout backTo="/seqs">
-        <div className="text-center py-20">
+        <SelectionBackdrop />
+        <div className="relative z-10 text-center py-20">
           <p className="font-semibold text-foreground">We are not fully available in your institute yet.</p>
           <p className="mt-2 text-sm text-muted-foreground">Help us bring SEQ content to your campus.</p>
           <div className="mt-5 flex flex-col sm:flex-row justify-center gap-3">
@@ -110,136 +107,107 @@ const SEQChapterSelectionPage = () => {
 
   return (
     <MCQPageLayout backTo="/seqs">
-      <motion.div 
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-4 px-4"
-      >
-        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-orange-500 mb-3 block">Step 2 of 3</span>
-      </motion.div>
+      <SelectionBackdrop active={Boolean(selectedChapter)} accent="amber" />
 
-      <div className="sticky top-0 z-50 bg-background/45 dark:bg-background/20 backdrop-blur-xl pt-[env(safe-area-inset-top)] -mx-3 sm:mx-0 px-3 sm:px-0">
-        <div className="max-w-4xl mx-auto px-4 sm:px-0">
-          <div className="pt-4 pb-3">
-            <h2 className="px-1 text-3xl sm:text-5xl font-black tracking-normal text-foreground uppercase italic leading-[1.08] text-center">
-              Select <span className="heading-glyph-safe text-orange-500">Chapter&nbsp;</span>
-            </h2>
-            <div className="mt-2 flex flex-col items-center gap-1">
-              <p className="text-muted-foreground text-sm font-bold uppercase tracking-widest">{subject?.name}</p>
-              <p className="text-muted-foreground/60 text-[10px] font-medium uppercase tracking-[0.2em]">
-                {profile?.plan === 'free'
-                  ? 'Free daily limits apply'
-                  : 'Unlimited Premium Access'}
-              </p>
-            </div>
-          </div>
+      <div className="relative z-10 mx-auto w-full max-w-2xl px-4 sm:px-0">
+        <div className="py-5">
+          <p className="truncate text-[10px] font-bold uppercase tracking-[0.25em] text-amber-600/90 dark:text-amber-500/90">{subject?.name}</p>
+          <h2 className="font-['Syne'] mt-1.5 text-2xl font-bold leading-none tracking-[-0.03em] text-foreground sm:text-[1.75rem]">
+            Select <span className="live-gradient-text">Chapter</span>
+          </h2>
+          <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60">
+            {profile?.plan === 'free' ? 'Free daily limits apply' : 'Unlimited premium access'}
+          </p>
         </div>
-        <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
-      </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-0 pb-32 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {loadingChapters ? (
-          Array.from({ length: 6 }).map((_, i) => <ChapterCardSkeleton key={i} />)
-        ) : allChapters.length === 0 ? (
-          <div className="col-span-full text-center py-16">
-            <p className="font-semibold text-foreground">We are not fully available in your institute yet.</p>
-            <p className="mt-2 text-sm text-muted-foreground">Help us bring chapter-wise SEQ content to your campus.</p>
-            <div className="mt-5 flex flex-col sm:flex-row justify-center gap-3">
-              <Button asChild variant="outline"><Link to="/contact-us?subject=campus-collaboration">Request campus collaboration</Link></Button>
-              <Button onClick={() => setShowCollaborateModal(true)}>Become Medmacs Ambassador</Button>
+        <div className="pb-32">
+          {loadingChapters ? (
+            <div className="divide-y divide-border/50 border-y border-border/50">
+              {Array.from({ length: 8 }).map((_, i) => <ChapterRowSkeleton key={i} />)}
             </div>
-            <CollaborateModal open={showCollaborateModal} onOpenChange={setShowCollaborateModal} />
-          </div>
-        ) : (
-          allChapters.map((ch, idx) => {
-            const isComingSoon = (ch.seq_count || 0) === 0;
-            const isSelected = selectedChapter?.id === ch.id;
-            
-            return (
-              <motion.div
-                key={ch.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: idx * 0.03 }}
-                whileHover={!isComingSoon ? { scale: 1.02, x: 5 } : {}}
-                whileTap={isComingSoon ? {} : { scale: 0.98 }}
-                onClick={() => !isComingSoon && setSelectedChapter(ch)}
-                className={`group relative overflow-hidden rounded-2xl border-2 p-4 transition-all duration-300 ${
-                  isComingSoon ? 'opacity-40 cursor-not-allowed grayscale' : 'cursor-pointer'
-                } ${
-                  isSelected 
-                    ? 'border-orange-500 bg-orange-500/5 shadow-xl shadow-orange-500/10' 
-                    : 'border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl hover:border-orange-500/30 hover:bg-orange-500/5'
-                }`}
-              >
-                {isComingSoon && (
-                  <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">
-                    Coming Soon
-                  </div>
-                )}
+          ) : allChapters.length === 0 ? (
+            <div className="border-y border-border/50 px-4 py-14 text-center">
+              <p className="font-semibold text-foreground">We are not fully available in your institute yet.</p>
+              <p className="mt-2 text-sm text-muted-foreground">Help us bring chapter-wise SEQ content to your campus.</p>
+              <div className="mt-5 flex flex-col sm:flex-row justify-center gap-3">
+                <Button asChild variant="outline"><Link to="/contact-us?subject=campus-collaboration">Request campus collaboration</Link></Button>
+                <Button onClick={() => setShowCollaborateModal(true)}>Become Medmacs Ambassador</Button>
+              </div>
+              <CollaborateModal open={showCollaborateModal} onOpenChange={setShowCollaborateModal} />
+            </div>
+          ) : (
+            <div className="divide-y divide-border/50 border-y border-border/50">
+              {allChapters.map((ch, idx) => {
+                const isComingSoon = (ch.seq_count || 0) === 0;
+                const isSelected = selectedChapter?.id === ch.id;
 
-                <div className="flex items-center gap-4 relative z-10">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
-                    isSelected ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30' : 'bg-muted/50 text-foreground/70'
-                  }`}>
-                    <BookOpen className="w-5 h-5" />
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <h3 className={`text-sm font-black uppercase italic tracking-normal leading-snug transition-colors ${
-                      isSelected ? 'text-orange-500' : 'text-foreground'
-                    }`}>
-                      Chapter {ch.chapter_number}
-                    </h3>
-                    <p className="text-muted-foreground text-xs font-medium leading-snug break-words">
-                      {ch.name}
-                    </p>
-                  </div>
+                return (
+                  <motion.div
+                    key={ch.id}
+                    custom={idx}
+                    variants={reduceMotion ? undefined : rowEntrance}
+                    initial={reduceMotion ? false : 'hidden'}
+                    animate={reduceMotion ? false : 'visible'}
+                  >
+                    <SelectionRow
+                      accent="amber"
+                      eyebrow={`Chapter ${ch.chapter_number || idx + 1}`}
+                      title={ch.name}
+                      selected={isSelected}
+                      disabled={isComingSoon}
+                      accentLayoutId="seq-chapter-accent"
+                      onSelect={() => setSelectedChapter(ch)}
+                      meta={
+                        isComingSoon ? (
+                          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/60">
+                            Coming soon
+                          </span>
+                        ) : undefined
+                      }
+                      trailing={
+                        isComingSoon ? undefined : (
+                          <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground/60">
+                            {ch.seq_count} Qs
+                          </span>
+                        )
+                      }
+                    />
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
 
-                  {!isComingSoon && (
-                    <div className="flex flex-col items-end shrink-0">
-                      <span className={`text-[10px] font-black uppercase tracking-widest ${
-                        isSelected ? 'text-orange-500' : 'text-muted-foreground/60'
-                      }`}>{ch.seq_count} Qs</span>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            );
-          })
-        )}
+          <footer className="py-6 text-center">
+            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/40">
+              © 2026 Medmacs App
+            </p>
+          </footer>
+        </div>
       </div>
 
       <AnimatePresence>
         {selectedChapter && (
           <motion.div
-            initial={{ opacity: 0, y: 100 }}
+            initial={{ opacity: 0, y: 80 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 100 }}
-            className="fixed bottom-0 left-0 right-0 p-6 pb-[env(safe-area-inset-bottom)] z-50 flex justify-center pointer-events-none"
+            exit={{ opacity: 0, y: 80 }}
+            transition={{ type: 'spring', damping: 26, stiffness: 340 }}
+            className="pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex justify-center bg-gradient-to-t from-background via-background/95 to-transparent px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-8"
           >
-            <div className="w-full max-w-md pointer-events-auto">
+            <div className="pointer-events-auto w-full max-w-2xl">
               <Button
                 onClick={handleContinue}
-                className="w-full bg-orange-500 hover:bg-orange-600 text-white shadow-2xl shadow-orange-500/40 rounded-2xl h-16 uppercase font-black text-sm tracking-[0.2em] group transition-all"
+                className="group h-12 w-full rounded-full bg-amber-500 text-xs font-bold uppercase tracking-[0.18em] text-white transition-all duration-200 hover:bg-amber-600 active:scale-[0.98]"
                 size="lg"
               >
-                Start Practice
-                <motion.div
-                  animate={{ x: [0, 5, 0] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                >
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </motion.div>
+                <span className="truncate">Start · {selectedChapter.name}</span>
+                <ArrowRight className="ml-2 h-4 w-4 shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
               </Button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      <div className="text-center pt-20 pb-10 opacity-40">
-        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">© 2026 Medmacs App • SEQ Practice System</p>
-      </div>
     </MCQPageLayout>
   );
 };

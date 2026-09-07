@@ -10,6 +10,14 @@ const MEDMACS_NOTIFICATION_CHANNEL_ID = 'medmacs_updates';
 const PRODUCTION_ORIGIN = 'https://medmacs.app';
 const DASHBOARD_REDIRECT_URL = `${PRODUCTION_ORIGIN}/dashboard`;
 
+// Module-level guard: ensures push registration only happens once per user
+// session, regardless of how many useAuth() consumers are mounted.
+// Without this, every component calling useAuth() creates its own
+// onAuthStateChange subscription, and each independently calls
+// initializePushNotifications — spawning hundreds of native threads via
+// CapacitorHttp and crashing Android with an OutOfMemoryError.
+let pushRegistrationUserId: string | null = null;
+
 const getAuthRedirectUrl = (path = '/dashboard') => {
   const origin = window.location.origin;
   const isLocalWeb = origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1');
@@ -27,6 +35,8 @@ export const useAuth = () => {
   // 🎯 Helper to Register Push & Update Supabase
   const initializePushNotifications = useCallback(async (userId: string) => {
     if (Capacitor.getPlatform() === 'web') return;
+    if (pushRegistrationUserId === userId) return;
+    pushRegistrationUserId = userId;
 
     try {
       if (Capacitor.getPlatform() === 'android') {
@@ -99,16 +109,15 @@ export const useAuth = () => {
     );
 
     // 2. Check for existing session on mount
+    // Push registration is handled by onAuthStateChange above (INITIAL_SESSION),
+    // so we don't call initializePushNotifications here — that would duplicate
+    // the native thread storm when many useAuth() consumers are mounted.
     supabase.auth.getSession()
       .then(({ data: { session: currentSession } }) => {
         window.clearTimeout(authTimeoutId);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         setLoading(false);
-
-        if (currentSession?.user) {
-          initializePushNotifications(currentSession.user.id);
-        }
       })
       .catch(error => {
         window.clearTimeout(authTimeoutId);
