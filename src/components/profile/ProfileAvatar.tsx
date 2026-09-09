@@ -191,6 +191,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
 
     const handleOpenCamera = () => {
         if (cameraInputRef.current) {
+            cameraInputRef.current.value = '';
             cameraInputRef.current.click();
         }
     };
@@ -347,12 +348,12 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
 
     return (
         <>
-            {/* Hidden File Inputs */}
+            {/* Hidden File Inputs for Camera and Gallery */}
             <input
                 ref={cameraInputRef}
                 type="file"
                 accept="image/*"
-                capture="environment"
+                capture="user"
                 className="hidden"
                 onChange={handleNativeFileChange}
             />
