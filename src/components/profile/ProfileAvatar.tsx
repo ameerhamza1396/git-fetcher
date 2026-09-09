@@ -38,8 +38,6 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import Cropper from 'react-easy-crop';
 
-import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
-
 const CLOUDINARY_CLOUD_NAME = 'dsrzawwej';
 const CLOUDINARY_UPLOAD_PRESET = 'profiles_pictures';
 
@@ -193,6 +191,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
 
     const handleOpenCamera = async () => {
         try {
+            const { Camera: CapCamera, CameraResultType, CameraSource } = await import('@capacitor/camera');
             const photo = await CapCamera.getPhoto({
                 quality: 90,
                 allowEditing: true,
