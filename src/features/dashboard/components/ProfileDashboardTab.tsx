@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { AchievementBadgesSkeleton } from '@/components/profile/AchievementBadgesSkeleton';
+import { triggerHaptic } from '@/utils/haptics';
 import type { AiUsageSummary } from '../types';
 
 const LazyAchievementBadges = lazy(() =>
@@ -126,7 +127,13 @@ export function ProfileDashboardTab({
                 <p className="text-[11px] text-muted-foreground">Toggle app theme</p>
               </div>
             </div>
-            <Switch checked={theme === 'dark'} onCheckedChange={(checked) => onThemeChange(checked ? 'dark' : 'light')} />
+            <Switch
+              checked={theme === 'dark'}
+              onCheckedChange={(checked) => {
+                triggerHaptic(15);
+                onThemeChange(checked ? 'dark' : 'light');
+              }}
+            />
           </div>
         </CardContent>
       </Card>

@@ -403,9 +403,11 @@ export function HomeDashboardTab({
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2 mb-1">
                           <h3 className="truncate text-sm font-bold text-foreground">{product.project_name}</h3>
-                          <Badge variant="outline" className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${getStatusBadge(product.status)}`}>
-                            {product.status}
-                          </Badge>
+                          {product.status && product.status !== 'Available' && (
+                            <Badge variant="outline" className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${getStatusBadge(product.status)}`}>
+                              {product.status}
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-[11px] font-medium text-muted-foreground leading-relaxed line-clamp-2">{product.description}</p>
                       </div>

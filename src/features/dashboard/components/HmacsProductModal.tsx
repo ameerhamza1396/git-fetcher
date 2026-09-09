@@ -81,9 +81,11 @@ export function HmacsProductModal({ product, open, onOpenChange }: HmacsProductM
                 <SheetTitle className="text-2xl font-black tracking-tight text-foreground brand-syne leading-none">
                   {product.project_name}
                 </SheetTitle>
-                <Badge variant="outline" className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${getStatusBadge(product.status)}`}>
-                  {product.status}
-                </Badge>
+                {product.status && product.status !== 'Available' && (
+                  <Badge variant="outline" className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${getStatusBadge(product.status)}`}>
+                    {product.status}
+                  </Badge>
+                )}
               </div>
               <p className="text-[11px] font-bold text-muted-foreground flex items-center gap-1 mt-1">
                 <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />

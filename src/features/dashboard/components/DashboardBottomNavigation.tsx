@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { DashboardTabId } from '../types';
+import { triggerHaptic } from '@/utils/haptics';
 
 export type DashboardNavigationItem = {
   id: DashboardTabId;
@@ -29,7 +30,10 @@ export function DashboardBottomNavigation({ activeTab, items, onTabChange }: Das
               <button
                 key={item.id}
                 type="button"
-                onClick={() => onTabChange(item.id)}
+                onClick={() => {
+                  triggerHaptic(12);
+                  onTabChange(item.id);
+                }}
                 aria-current={isActive ? 'page' : undefined}
                 className="relative flex h-full min-w-0 items-center justify-center focus:outline-none focus-visible:outline-none"
               >

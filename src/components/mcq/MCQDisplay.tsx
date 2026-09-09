@@ -28,6 +28,8 @@ import {
   subscribeOfflineAnswerChanges,
 } from '@/utils/offlineAnswerSync';
 
+import { triggerHaptic } from '@/utils/haptics';
+
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
@@ -927,8 +929,8 @@ export const MCQDisplay = ({
     return false;
   });
   const [soundEnabled, setSoundEnabled] = useState(() => {
-    if (typeof window !== 'undefined') return localStorage.getItem('mcqSoundDisabled') !== 'true';
-    return true;
+    if (typeof window !== 'undefined') return localStorage.getItem('mcqSoundDisabled') === 'false';
+    return false;
   });
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [dailySubmissionsCount, setDailySubmissionsCount] = useState(0);
@@ -1097,6 +1099,7 @@ export const MCQDisplay = ({
 
   const handleAnswerSelect = (answer: string) => {
     if (showExplanation) return;
+    triggerHaptic(10);
     hasUserInteractedRef.current = true;
     setSelectedAnswer(answer);
     if (effectiveQuickSubmit) setTimeout(() => handleSubmitAnswer(false, answer), 150);
