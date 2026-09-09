@@ -16,7 +16,7 @@ import {
     ZoomOut,
     RotateCw,
     Camera,
-    FolderImage,
+    FileImage,
     Lock,
     Check,
     Grid,
@@ -478,7 +478,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                                     onClick={handleOpenCameraRoll}
                                     className="h-14 flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-primary/20 hover:border-primary hover:bg-primary/5 transition-all"
                                 >
-                                    <FolderImage className="h-5 w-5 text-primary" />
+                                    <FileImage className="h-5 w-5 text-primary" />
                                     <span className="text-xs font-semibold">Camera Roll</span>
                                 </Button>
                             </div>
