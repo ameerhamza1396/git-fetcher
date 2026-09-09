@@ -102,39 +102,7 @@ export function HomeDashboardTab({
 
   const userPlanDisplayName = rawUserPlan.charAt(0).toUpperCase() + rawUserPlan.slice(1) + ' Plan';
 
-  const defaultHmacsProducts: HmacsProduct[] = [
-    {
-      id: 'medistics-default',
-      sr_no: 1,
-      icon: medisticsLogo,
-      project_name: 'Medistics.App',
-      description: "Pakistan's Most Advanced AI Powered MDCAT Learning App",
-      long_description: `Medistics.App is Pakistan's premier AI-powered learning and prep platform built specifically for medical aspirants preparing for the MDCAT. Featuring thousands of high-yield questions, detailed explanations, instant AI tutoring support, smart analytics, and interactive mock tests designed to maximize your exam score and secure your medical college admission.`,
-      status: 'Available',
-      link: 'https://play.google.com/store/apps/details?id=com.hmacs.medistics',
-      buttons: [
-        { label: 'Visit Medistics Web', link: 'https://medistics.app' },
-        { label: 'Get from Playstore', link: 'https://play.google.com/store/apps/details?id=com.hmacs.medistics' }
-      ],
-      is_published: true,
-    },
-    {
-      id: 'medizen-default',
-      sr_no: 2,
-      icon: medizenLogo,
-      project_name: 'Medizen.App',
-      description: "Pakistan's Most Advanced AI Powered Clinic Management Tool - Coming Out Q4 2026",
-      long_description: `Medizen.App is a revolutionary AI-driven clinic management and digital health records (EHR) ecosystem designed for modern doctors, clinics, and medical centers in Pakistan. Streamline patient appointments, digital prescriptions, inventory, automated billing, and patient follow-ups with intelligent AI analytics.`,
-      status: 'Coming Soon',
-      link: null,
-      buttons: [
-        { label: 'Learn More & Register Interest', link: 'https://medmacs.app' }
-      ],
-      is_published: true,
-    },
-  ];
-
-  const displayProducts = hmacsProducts.length > 0 ? hmacsProducts : defaultHmacsProducts;
+  const displayProducts = hmacsProducts;
 
   const handleProductClick = (product: HmacsProduct) => {
     setSelectedProduct(product);
