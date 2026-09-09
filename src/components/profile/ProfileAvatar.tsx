@@ -128,8 +128,14 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
     // Modal Visibility states
     const [showAvatarEditDialog, setShowAvatarEditDialog] = useState(false);
     const [showMediaPickerModal, setShowMediaPickerModal] = useState(false);
-    const [permissionStatus, setPermissionStatus] = useState<'idle' | 'requesting' | 'granted'>('idle');
-    const [selectedAlbum, setSelectedAlbum] = useState('recent');
+    // Permission state persisted across sessions
+    const [permissionGranted, setPermissionGranted] = useState<boolean>(() => {
+        return localStorage.getItem('android_media_permission') === 'granted';
+    });
+    const [permissionStatus, setPermissionStatus] = useState<'idle' | 'requesting' | 'granted'>(() => {
+        return localStorage.getItem('android_media_permission') === 'granted' ? 'granted' : 'idle';
+    });
+    const [selectedAlbum, setSelectedAlbum] = useState('gallery');
 
     // Hidden file inputs for web/device fallbacks
     const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -190,15 +196,25 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
     };
 
     const handleOpenCameraRoll = () => {
-        setShowMediaPickerModal(true);
-        if (permissionStatus === 'idle') {
+        if (permissionGranted) {
+            // Permission already granted: trigger device media selection directly
+            customFileInputRef.current?.click();
+        } else {
+            // Permission not granted: open permission bottom sheet modal
+            setShowMediaPickerModal(true);
             setPermissionStatus('requesting');
         }
     };
 
     const handleGrantPermission = () => {
+        setPermissionGranted(true);
         setPermissionStatus('granted');
+        localStorage.setItem('android_media_permission', 'granted');
         toast.success('Android Media Permission Granted!');
+        // Trigger media file selection immediately
+        setTimeout(() => {
+            customFileInputRef.current?.click();
+        }, 300);
     };
 
     const handleSelectSamplePhoto = async (photoUrl: string) => {
@@ -539,7 +555,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                     </SheetHeader>
 
                     {/* Android Permission Prompt Screen */}
-                    {permissionStatus === 'requesting' && (
+                    {!permissionGranted ? (
                         <div className="flex flex-col items-center justify-center p-6 text-center space-y-4 bg-muted/30 rounded-2xl border border-border">
                             <div className="p-4 bg-primary/10 rounded-full text-primary">
                                 <Lock className="h-8 w-8" />
@@ -554,57 +570,24 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                                 <Check className="h-4 w-4" /> Allow Access
                             </Button>
                         </div>
-                    )}
-
-                    {/* Custom Media Gallery UI once Permission Granted */}
-                    {permissionStatus !== 'requesting' && (
-                        <div className="space-y-4 py-2">
-                            {/* Album Selector Tabs */}
-                            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-                                {SAMPLE_MEDIA_ALBUMS.map((album) => (
-                                    <button
-                                        key={album.id}
-                                        type="button"
-                                        onClick={() => setSelectedAlbum(album.id)}
-                                        className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                                            selectedAlbum === album.id
-                                                ? 'bg-primary text-primary-foreground font-semibold shadow-sm'
-                                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                                        }`}
-                                    >
-                                        <Folder className="h-3.5 w-3.5" />
-                                        {album.name}
-                                    </button>
-                                ))}
+                    ) : (
+                        <div className="space-y-4 py-4 text-center">
+                            <div className="p-5 bg-primary/10 rounded-full w-16 h-16 mx-auto flex items-center justify-center text-primary">
+                                <FileImage className="h-8 w-8" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-base font-syne">Permission Granted</h3>
+                                <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
+                                    Your Android media permission is active. Click below to select a picture from your device gallery.
+                                </p>
                             </div>
 
-                            {/* Photo Grid */}
-                            <div className="grid grid-cols-3 gap-2 max-h-[320px] overflow-y-auto p-1 bg-muted/20 rounded-2xl border border-border">
-                                {currentAlbumData.photos.map((url, idx) => (
-                                    <button
-                                        key={idx}
-                                        type="button"
-                                        onClick={() => handleSelectSamplePhoto(url)}
-                                        className="relative aspect-square rounded-xl overflow-hidden group hover:ring-2 hover:ring-primary transition-all border border-border/50"
-                                    >
-                                        <img src={url} alt={`Media ${idx}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
-                                        <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <Check className="h-5 w-5 text-white drop-shadow" />
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-
-                            {/* Option to browse native storage directly */}
-                            <div className="pt-2">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => customFileInputRef.current?.click()}
-                                    className="w-full text-xs gap-2 rounded-xl"
-                                >
-                                    <Grid className="h-4 w-4 text-primary" /> Browse Local Files
-                                </Button>
-                            </div>
+                            <Button
+                                onClick={() => customFileInputRef.current?.click()}
+                                className="w-full font-semibold gap-2 rounded-xl h-12"
+                            >
+                                <Folder className="h-4 w-4" /> Open Device Gallery
+                            </Button>
                         </div>
                     )}
 
