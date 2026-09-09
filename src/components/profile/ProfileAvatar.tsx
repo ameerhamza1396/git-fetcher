@@ -38,6 +38,8 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import Cropper from 'react-easy-crop';
 
+import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
+
 const CLOUDINARY_CLOUD_NAME = 'dsrzawwej';
 const CLOUDINARY_UPLOAD_PRESET = 'profiles_pictures';
 
@@ -189,7 +191,27 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
         }
     };
 
-    const handleOpenCamera = () => {
+    const handleOpenCamera = async () => {
+        try {
+            const photo = await CapCamera.getPhoto({
+                quality: 90,
+                allowEditing: true,
+                resultType: CameraResultType.DataUrl,
+                source: CameraSource.Camera,
+            });
+
+            if (photo.dataUrl) {
+                setImageSrc(photo.dataUrl);
+                setCrop({ x: 0, y: 0 });
+                setZoom(1);
+                setRotation(0);
+                setShowMediaPickerModal(false);
+                return;
+            }
+        } catch (err) {
+            console.warn('Capacitor camera error/cancellation, falling back to input:', err);
+        }
+
         if (cameraInputRef.current) {
             cameraInputRef.current.value = '';
             cameraInputRef.current.click();
