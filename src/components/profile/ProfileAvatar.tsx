@@ -20,14 +20,14 @@ import {
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-    DialogFooter,
-    DialogClose
-} from '@/components/ui/dialog';
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetDescription,
+    SheetFooter,
+    SheetClose
+} from '@/components/ui/sheet';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useCachedImage } from '@/hooks/useCachedImage';
 import { Badge } from '@/components/ui/badge';
@@ -83,7 +83,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
     const queryClient = useQueryClient();
     const { theme, setTheme } = useTheme();
 
-    const [profilePictureFile, setProfilePictureFile] = useState(null);
+    const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
     const [profilePictureError, setProfilePictureError] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
@@ -94,7 +94,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
     const [crop, setCrop] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
     const [rotation, setRotation] = useState(0);
-    const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
 
     const userAvatarUrl = profileData?.avatar_url;
     const cachedAvatarUrl = useCachedImage(userAvatarUrl);
@@ -104,7 +104,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
         setCroppedAreaPixels(croppedPixels);
     }, []);
 
-    const handleFileChange = (e) => {
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setProfilePictureError('');
         setProfilePictureFile(null);
         setImageSrc(null);
@@ -172,7 +172,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
             setUploadProgress(100);
             toast.success('Profile picture uploaded successfully!');
             return data.secure_url;
-        } catch (uploadError) {
+        } catch (uploadError: any) {
             console.error('Cloudinary Upload Error:', uploadError);
             setIsUploading(false);
             setUploadProgress(0);
@@ -183,7 +183,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
     };
 
     const updateAvatarUrlMutation = useMutation({
-        mutationFn: async (newAvatarUrl) => {
+        mutationFn: async (newAvatarUrl: string) => {
             if (!user?.id) throw new Error('User not authenticated.');
             const { data, error } = await supabase
                 .from('profiles')
@@ -197,7 +197,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
             queryClient.invalidateQueries({ queryKey: ['profileDropdownProfile', user.id] });
             resetDialogState();
         },
-        onError: (err) => {
+        onError: (err: any) => {
             toast.error(`Failed to update profile: ${err.message}`);
         },
     });
@@ -217,7 +217,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
             toast.success('Profile picture deleted successfully!');
             resetDialogState();
         },
-        onError: (err) => {
+        onError: (err: any) => {
             toast.error(`Failed to delete profile picture: ${err.message}`);
         },
     });
@@ -233,7 +233,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
         setCroppedAreaPixels(null);
     };
 
-    const handleSubmitProfilePicture = async (e) => {
+    const handleSubmitProfilePicture = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!imageSrc || !croppedAreaPixels) {
             setProfilePictureError('Please select and crop an image.');
@@ -281,38 +281,50 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                     </Avatar>
                 </div>
             ) : (
-                <div className="relative w-20 h-20 rounded-full overflow-hidden border-[3px] border-white/30 shadow-lg group cursor-pointer" onClick={() => setShowAvatarEditDialog(true)}>
-                    <Avatar className="w-full h-full">
-                        <AvatarImage src={cachedAvatarUrl || undefined} alt="Profile Avatar" className="w-full h-full object-cover transition-all duration-300" />
-                        <AvatarFallback className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white text-2xl font-bold">
-                            {displayName.substring(0, 1).toUpperCase()}
-                        </AvatarFallback>
-                    </Avatar>
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <Pencil className="h-5 w-5 text-white" />
+                <div className="relative w-24 h-24 mx-auto mb-2 group cursor-pointer" onClick={() => setShowAvatarEditDialog(true)}>
+                    <div className="w-full h-full rounded-full overflow-hidden border-4 border-blue-400 dark:border-blue-600 shadow-md">
+                        <Avatar className="w-full h-full">
+                            <AvatarImage src={cachedAvatarUrl || undefined} alt="Profile Avatar" className="w-full h-full object-cover transition-all duration-300" />
+                            <AvatarFallback className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white text-3xl font-bold">
+                                {displayName.substring(0, 1).toUpperCase()}
+                            </AvatarFallback>
+                        </Avatar>
                     </div>
+
+                    {/* Pencil Edit Icon Badge on Bottom-Right */}
+                    <button
+                        type="button"
+                        className="absolute bottom-0 right-0 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-2 shadow-lg border-2 border-white dark:border-gray-900 transition-all duration-200 hover:scale-110 flex items-center justify-center"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setShowAvatarEditDialog(true);
+                        }}
+                        aria-label="Edit profile picture"
+                    >
+                        <Pencil className="h-3.5 w-3.5" />
+                    </button>
                 </div>
             )}
 
-            {/* Profile Picture Edit Dialog — Overhauled */}
-            <Dialog open={showAvatarEditDialog} onOpenChange={(open) => { if (!open) resetDialogState(); else setShowAvatarEditDialog(true); }}>
-                <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
+            {/* Profile Picture Edit Bottom Sheet */}
+            <Sheet open={showAvatarEditDialog} onOpenChange={(open) => { if (!open) resetDialogState(); else setShowAvatarEditDialog(true); }}>
+                <SheetContent side="bottom" className="rounded-t-3xl max-h-[85vh] overflow-y-auto px-6 pt-6 pb-8 max-w-lg mx-auto border-t border-border shadow-2xl">
+                    <SheetHeader className="text-left mb-2">
+                        <SheetTitle className="flex items-center gap-2 text-xl font-bold">
                             <ImageIcon className="h-5 w-5 text-primary" /> Edit Profile Picture
-                        </DialogTitle>
-                        <DialogDescription>
+                        </SheetTitle>
+                        <SheetDescription>
                             Upload and crop your photo to a perfect square.
-                        </DialogDescription>
-                    </DialogHeader>
+                        </SheetDescription>
+                    </SheetHeader>
 
                     <div className="flex flex-col items-center gap-4 py-2">
                         {/* Current avatar — large preview */}
                         {!imageSrc && (
-                            <div className="relative w-48 h-48 rounded-2xl overflow-hidden border-2 border-border shadow-md bg-muted">
+                            <div className="relative w-44 h-44 rounded-2xl overflow-hidden border-2 border-border shadow-md bg-muted">
                                 <Avatar className="w-full h-full rounded-none">
                                     <AvatarImage src={cachedAvatarUrl || undefined} alt="Current Avatar" className="w-full h-full object-cover" />
-                                    <AvatarFallback className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white text-6xl font-bold rounded-none">
+                                    <AvatarFallback className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white text-5xl font-bold rounded-none">
                                         {displayName.substring(0, 1).toUpperCase()}
                                     </AvatarFallback>
                                 </Avatar>
@@ -322,7 +334,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                         {/* 1:1 Cropper */}
                         {imageSrc && (
                             <div className="w-full flex flex-col gap-3">
-                                <div className="relative w-full aspect-square rounded-2xl overflow-hidden bg-black">
+                                <div className="relative w-full aspect-square max-h-[300px] rounded-2xl overflow-hidden bg-black mx-auto">
                                     <Cropper
                                         image={imageSrc}
                                         crop={crop}
@@ -365,7 +377,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                                     type="file"
                                     accept="image/jpeg,image/png,image/webp"
                                     onChange={handleFileChange}
-                                    className="flex-1 text-xs file:text-xs bg-muted/50 border-border"
+                                    className="flex-1 text-xs file:text-xs bg-muted/50 border-border cursor-pointer"
                                 />
                                 {userAvatarUrl && !imageSrc && (
                                     <Button
@@ -395,14 +407,14 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                         </div>
                     </div>
 
-                    <DialogFooter className="gap-2 sm:gap-0">
-                        <DialogClose asChild>
-                            <Button variant="outline" size="sm">Cancel</Button>
-                        </DialogClose>
+                    <SheetFooter className="flex-col sm:flex-row gap-2 mt-2">
+                        <SheetClose asChild>
+                            <Button variant="outline" className="w-full sm:w-auto">Cancel</Button>
+                        </SheetClose>
                         <Button
-                            size="sm"
                             onClick={handleSubmitProfilePicture}
                             disabled={isUploading || updateAvatarUrlMutation.isPending || !imageSrc || !croppedAreaPixels || !!profilePictureError}
+                            className="w-full sm:w-auto"
                         >
                             {isUploading || updateAvatarUrlMutation.isPending ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -411,9 +423,9 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                             )}
                             {isUploading ? `Uploading ${uploadProgress.toFixed(0)}%` : 'Save'}
                         </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                    </SheetFooter>
+                </SheetContent>
+            </Sheet>
         </>
     );
 };
