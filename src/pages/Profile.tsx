@@ -307,7 +307,7 @@ const Profile = () => {
                         <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medmacs" className="h-6 w-6" />
                         <span className="text-sm font-extrabold text-foreground tracking-tight">My Profile</span>
                     </div>
-                    <ProfileAvatar user={user} profileData={profileData} displayName={displayName} rawUserPlan={rawUserPlan} userPlanDisplayName={userPlanDisplayName} planColors={planColors} isHeader={true} />
+                    <div className="w-9" />
                 </div>
             </header>
 
@@ -374,26 +374,29 @@ const Profile = () => {
                                                 Your Referral Code
                                             </span>
                                         </div>
-                                        <div className="mt-3 flex items-center gap-3">
-                                            <button
-                                                type="button"
-                                                onClick={copyReferralCode}
-                                                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm border-2 border-white/20 transition-colors hover:bg-white/20 active:scale-95"
-                                            >
-                                                {copiedReferral ? (
-                                                    <CheckCircle2 className="h-5 w-5 text-emerald-300" />
-                                                ) : (
-                                                    <Copy className="h-5 w-5 text-white" />
-                                                )}
-                                            </button>
-                                            <div className="flex-1 rounded-2xl bg-white/10 backdrop-blur-sm px-4 py-3 border border-white/15">
-                                                <span className="text-xl font-black tracking-[0.3em] select-all sm:text-2xl">
-                                                    {profileData.referral_code}
-                                                </span>
+                                        <div className="mt-3 flex flex-col gap-2.5">
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={copyReferralCode}
+                                                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm border-2 border-white/20 transition-colors hover:bg-white/20 active:scale-95"
+                                                >
+                                                    {copiedReferral ? (
+                                                        <CheckCircle2 className="h-5 w-5 text-emerald-300" />
+                                                    ) : (
+                                                        <Copy className="h-5 w-5 text-white" />
+                                                    )}
+                                                </button>
+                                                <div className="flex-1 rounded-2xl bg-white/10 backdrop-blur-sm px-4 py-2.5 border border-white/15 min-w-0 text-center">
+                                                    <span className="text-lg font-black tracking-[0.25em] select-all sm:text-2xl truncate block">
+                                                        {profileData.referral_code}
+                                                    </span>
+                                                </div>
                                             </div>
+
                                             <Link
                                                 to="/referrals"
-                                                className="flex h-12 shrink-0 items-center gap-1.5 rounded-2xl bg-white/10 backdrop-blur-sm border-2 border-white/20 px-3.5 text-xs font-extrabold uppercase tracking-widest text-white transition-colors hover:bg-white/20"
+                                                className="flex h-10 w-full items-center justify-center gap-1.5 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/20 text-xs font-extrabold uppercase tracking-widest text-white transition-colors hover:bg-white/25 active:scale-[0.99]"
                                             >
                                                 Details
                                                 <ExternalLink className="h-3.5 w-3.5" />
