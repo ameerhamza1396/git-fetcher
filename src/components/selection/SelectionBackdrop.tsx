@@ -21,15 +21,15 @@ interface SelectionBackdropProps {
 export const SelectionBackdrop = ({ active = false, accent = 'teal' }: SelectionBackdropProps) => {
   const reduceMotion = useReducedMotion();
   const from = accent === 'amber'
-    ? 'from-amber-500/[0.07] dark:from-amber-500/[0.10]'
-    : 'from-primary/[0.07] dark:from-primary/[0.10]';
+    ? 'from-amber-500/[0.09] dark:from-amber-500/[0.12]'
+    : 'from-teal-500/[0.09] dark:from-teal-500/[0.12]';
 
   return (
     <motion.div
       aria-hidden="true"
-      className={`pointer-events-none fixed inset-x-0 top-0 z-0 h-64 bg-gradient-to-b to-transparent ${from}`}
+      className={`pointer-events-none fixed inset-x-0 top-0 z-0 h-72 bg-gradient-to-b to-transparent ${from}`}
       initial={false}
-      animate={reduceMotion ? undefined : { opacity: active ? 1 : 0.75, height: active ? 320 : 256 }}
+      animate={reduceMotion ? undefined : { opacity: active ? 1 : 0.8, height: active ? 360 : 288 }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
     />
   );

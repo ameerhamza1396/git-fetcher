@@ -1,11 +1,13 @@
+import type { ComponentType } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { DashboardTabId } from '../types';
 
 export type DashboardNavigationItem = {
   id: DashboardTabId;
   label: string;
-  icon: LucideIcon;
+  icon: ComponentType<{ filled?: boolean; className?: string }>;
   badge?: number | null;
+  avatarUrl?: string | null;
 };
 
 type DashboardBottomNavigationProps = {
@@ -15,10 +17,12 @@ type DashboardBottomNavigationProps = {
 };
 
 export function DashboardBottomNavigation({ activeTab, items, onTabChange }: DashboardBottomNavigationProps) {
+  const gridCols = items.length === 4 ? 'grid-cols-4' : 'grid-cols-5';
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 pb-[env(safe-area-inset-bottom)]" aria-label="Dashboard">
       <div className="mx-5 mb-2.5 overflow-hidden rounded-full border border-black/10 bg-white/70 backdrop-blur-2xl shadow-2xl shadow-black/10 dark:border-white/5 dark:bg-white/5 dark:shadow-black/30">
-        <div className="grid h-[56px] grid-cols-5 items-center px-1">
+        <div className={`grid h-[56px] ${gridCols} items-center px-1`}>
           {items.map((item) => {
             const isActive = activeTab === item.id;
             return (
@@ -30,19 +34,23 @@ export function DashboardBottomNavigation({ activeTab, items, onTabChange }: Das
                 className="relative flex h-full min-w-0 items-center justify-center focus:outline-none focus-visible:outline-none"
               >
                 <div className="relative flex items-center justify-center transition-all duration-200 ease-out">
-                  <div className="relative">
-                    <item.icon className={`block transition-colors duration-200 ${isActive ? 'w-6 h-6 text-primary' : 'w-[22px] h-[22px] text-foreground/60 dark:text-muted-foreground/70'}`} strokeWidth={isActive ? 2.2 : 1.8} />
+                  <div className={`relative flex items-center justify-center transition-all duration-200 ${isActive ? 'text-primary scale-110' : 'text-foreground/60 dark:text-muted-foreground/70'}`}>
+                    {item.id === 'profile' && item.avatarUrl ? (
+                      <div className={`w-6 h-6 rounded-full overflow-hidden shrink-0 border transition-colors ${isActive ? 'border-primary ring-2 ring-primary/30' : 'border-border/50'}`}>
+                        <img src={item.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <item.icon
+                        filled={isActive}
+                        className={`block transition-all duration-200 ${isActive ? 'w-6 h-6' : 'w-[22px] h-[22px]'}`}
+                      />
+                    )}
                     {!!item.badge && !isActive && (
                       <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-destructive text-destructive-foreground text-[8px] font-bold rounded-full flex items-center justify-center shadow-sm">
                         {item.badge > 9 ? '9+' : item.badge}
                       </span>
                     )}
                   </div>
-                  {isActive && (
-                    <span className="animate-in fade-in duration-150 ml-1.5 whitespace-nowrap text-[10px] font-bold leading-none tracking-[-0.01em] text-primary">
-                      {item.label}
-                    </span>
-                  )}
                 </div>
               </button>
             );
@@ -52,3 +60,4 @@ export function DashboardBottomNavigation({ activeTab, items, onTabChange }: Das
     </nav>
   );
 }
+

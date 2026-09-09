@@ -1,17 +1,18 @@
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { XCircle, BellRing, Calendar, ScrollText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { XCircle, BellRing, Calendar, ScrollText, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'; // Import useMutation and useQueryClient
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-import Seo from '@/components/Seo'; // Import the Seo component
-
+import Seo from '@/components/Seo';
 
 const AnnouncementsPage = () => {
     const { user } = useAuth();
-    const queryClient = useQueryClient(); // Initialize query client
-
+    const navigate = useNavigate();
+    const queryClient = useQueryClient();
 
     type ProfileType = { role: string; plan: string } | null;
 
@@ -33,8 +34,6 @@ const AnnouncementsPage = () => {
         },
         enabled: !!user?.id
     });
-
-    const rawUserPlan = profile?.plan?.toLowerCase?.() || 'Loading';
 
     // Fetch announcements from Supabase
     const { data: announcements, isLoading, isError, error } = useQuery({
@@ -58,7 +57,7 @@ const AnnouncementsPage = () => {
     });
 
     // Fetch user's read announcements
-    const { data: readAnnouncements, isLoading: isLoadingReadAnnouncements } = useQuery({
+    const { data: readAnnouncements } = useQuery({
         queryKey: ['readAnnouncements', user?.id],
         queryFn: async () => {
             if (!user?.id) return [];
@@ -74,7 +73,7 @@ const AnnouncementsPage = () => {
             return data.map(item => item.announcement_id);
         },
         enabled: !!user?.id,
-        staleTime: 0, // Always refetch when this page is accessed to get accurate unread count
+        staleTime: 0,
     });
 
     // Mutation to mark announcements as read
@@ -87,7 +86,6 @@ const AnnouncementsPage = () => {
                 announcement_id: id,
             }));
 
-            // Use upsert to avoid duplicate key errors if an announcement was already marked read
             const { error } = await supabase
                 .from('user_announcements')
                 .upsert(recordsToInsert, { onConflict: 'user_id, announcement_id' });
@@ -98,7 +96,6 @@ const AnnouncementsPage = () => {
             }
         },
         onSuccess: () => {
-            // Invalidate readAnnouncements query to refetch updated data
             queryClient.invalidateQueries({ queryKey: ['readAnnouncements', user?.id] });
             queryClient.invalidateQueries({ queryKey: ['profileDropdownProfile', user?.id] });
         },
@@ -107,38 +104,53 @@ const AnnouncementsPage = () => {
         }
     });
 
-    // Calculate unread announcements count
-    const unreadAnnouncementsCount = (announcements && readAnnouncements)
-        ? announcements.filter(announcement => !readAnnouncements.includes(announcement.id)).length
-        : 0;
-
     // Mark all current announcements as read when component mounts (or announcements/user change)
     useEffect(() => {
-        if (user && announcements && announcements.length > 0 && !isLoadingReadAnnouncements) {
-            const announcementIds = announcements.map(announcement => announcement.id);
-            markAsReadMutation.mutate(announcementIds);
+        if (user?.id && announcements && announcements.length > 0 && readAnnouncements) {
+            const unreadIds = announcements
+                .filter(announcement => !readAnnouncements.includes(announcement.id))
+                .map(announcement => announcement.id);
+
+            if (unreadIds.length > 0) {
+                markAsReadMutation.mutate(unreadIds);
+            }
         }
-    }, [user, announcements, isLoadingReadAnnouncements]); // Depend on user, announcements, and read status loading
+    }, [user?.id, announcements, readAnnouncements]);
 
     return (
-        <div className="min-h-screen w-full bg-white dark:bg-gray-900">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
             <Seo
-            title="Announcements"
-            description="Stay updated with the latest news, updates, and important announcements from Medistics App."
-            canonical="https://medmacs.app/announcements"
+                title="Announcements - GitFetcher"
+                description="Latest news, updates, and release notes from GitFetcher."
             />
 
-            <div className="container mx-auto px-4 lg:px-8 py-8 max-w-7xl pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-                <div className="text-center mb-8 animate-fade-in">
-                    <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4 pt-[calc(45px+env(safe-area-inset-top))] overscroll-y-contain">
-                        📢 Latest Medmacs Announcements
-                    </h1>
-                    <p className="text-lg md:text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-                        Stay updated with important news, updates, and notifications from Medmacs.
-                    </p>
+            {/* Header with Back Button */}
+            <div className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
+                <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => navigate('/dashboard')}
+                            className="rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                            aria-label="Back to Dashboard"
+                        >
+                            <ArrowLeft className="h-5 w-5" />
+                        </Button>
+                        <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <BellRing className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            Announcements
+                        </h1>
+                    </div>
                 </div>
+            </div>
 
-                <div className="max-w-4xl mx-auto space-y-6">
+            <div className="max-w-4xl mx-auto px-4 py-8">
+                <p className="text-gray-600 dark:text-gray-400 text-center mb-8">
+                    Stay updated with the latest features, releases, and platform updates.
+                </p>
+
+                <div className="space-y-6">
                     {isLoading && (
                         <div className="text-center text-blue-500 dark:text-blue-400 mt-8 flex flex-col items-center justify-center">
                             <BellRing className="h-8 w-8 animate-bounce mb-3" />
@@ -207,7 +219,6 @@ const AnnouncementsPage = () => {
                     ))}
                 </div>
             </div>
-            
         </div>
     );
 };

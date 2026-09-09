@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
@@ -21,6 +22,9 @@ import { MCQProgressWidget } from '@/components/dashboard/MCQProgressWidget';
 import { DashboardActionCard } from './DashboardActionCard';
 import { DashboardAnnouncementCard } from './DashboardAnnouncementCard';
 import { InstituteDetailCard } from './InstituteDetailCard';
+import { HmacsProductModal } from './HmacsProductModal';
+import medisticsLogo from '@/assets/hmacs/medistics_icon.svg';
+import medizenLogo from '@/assets/hmacs/medizen_icon.svg';
 import type {
   AiUsageSummary,
   CaseOfDay,
@@ -29,6 +33,7 @@ import type {
   DashboardInstitute,
   DashboardProfile,
   DashboardPromotion,
+  HmacsProduct,
   TermOfDay,
   UserStats,
 } from '../types';
@@ -59,6 +64,7 @@ type HomeDashboardTabProps = {
   personalizationActions: DashboardAction[];
   premiumPerks: DashboardAction[];
   promotions: DashboardPromotion[];
+  hmacsProducts?: HmacsProduct[];
   onOpenCollaborate: () => void;
 };
 
@@ -88,9 +94,67 @@ export function HomeDashboardTab({
   personalizationActions,
   premiumPerks,
   promotions,
+  hmacsProducts = [],
   onOpenCollaborate,
 }: HomeDashboardTabProps) {
+  const [selectedProduct, setSelectedProduct] = useState<HmacsProduct | null>(null);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+
   const userPlanDisplayName = rawUserPlan.charAt(0).toUpperCase() + rawUserPlan.slice(1) + ' Plan';
+
+  const defaultHmacsProducts: HmacsProduct[] = [
+    {
+      id: 'medistics-default',
+      sr_no: 1,
+      icon: medisticsLogo,
+      project_name: 'Medistics.App',
+      description: "Pakistan's Most Advanced AI Powered MDCAT Learning App",
+      long_description: `Medistics.App is Pakistan's premier AI-powered learning and prep platform built specifically for medical aspirants preparing for the MDCAT. Featuring thousands of high-yield questions, detailed explanations, instant AI tutoring support, smart analytics, and interactive mock tests designed to maximize your exam score and secure your medical college admission.`,
+      status: 'Available',
+      link: 'https://play.google.com/store/apps/details?id=com.hmacs.medistics',
+      buttons: [
+        { label: 'Visit Medistics Web', link: 'https://medistics.app' },
+        { label: 'Get from Playstore', link: 'https://play.google.com/store/apps/details?id=com.hmacs.medistics' }
+      ],
+      is_published: true,
+    },
+    {
+      id: 'medizen-default',
+      sr_no: 2,
+      icon: medizenLogo,
+      project_name: 'Medizen.App',
+      description: "Pakistan's Most Advanced AI Powered Clinic Management Tool - Coming Out Q4 2026",
+      long_description: `Medizen.App is a revolutionary AI-driven clinic management and digital health records (EHR) ecosystem designed for modern doctors, clinics, and medical centers in Pakistan. Streamline patient appointments, digital prescriptions, inventory, automated billing, and patient follow-ups with intelligent AI analytics.`,
+      status: 'Coming Soon',
+      link: null,
+      buttons: [
+        { label: 'Learn More & Register Interest', link: 'https://medmacs.app' }
+      ],
+      is_published: true,
+    },
+  ];
+
+  const displayProducts = hmacsProducts.length > 0 ? hmacsProducts : defaultHmacsProducts;
+
+  const handleProductClick = (product: HmacsProduct) => {
+    setSelectedProduct(product);
+    setIsProductModalOpen(true);
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Available':
+        return 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
+      case 'In-Beta Stage':
+        return 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30';
+      case 'In-development':
+        return 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30';
+      case 'Coming Soon':
+      default:
+        return 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30';
+    }
+  };
+
   return (
     <div>
       <div className="mb-5">
@@ -187,7 +251,9 @@ export function HomeDashboardTab({
               <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Term of the Day</span>
             </div>
             <h4 className="text-sm font-black text-foreground mb-1">{termOfDay?.term || 'Term of the Day'}</h4>
-            <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{termOfDay?.definition || 'Loading latest term...'}</p>
+            <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+              {termLoading ? 'Loading latest term...' : (termOfDay?.definition || 'No term available today')}
+            </p>
           </motion.button>
           {termLoading && <div className="absolute inset-0 rounded-2xl border border-border/40 bg-muted/30 animate-pulse pointer-events-none" />}
         </div>
@@ -207,7 +273,9 @@ export function HomeDashboardTab({
             <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Case of the Day</span>
           </div>
           <h4 className="text-sm font-black text-foreground mb-1">{caseOfDay?.headline || 'Case of the Day'}</h4>
-          <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{caseOfDay?.details || 'Loading latest case...'}</p>
+          <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+            {caseLoading ? 'Loading latest case...' : (caseOfDay?.details || 'No case available today')}
+          </p>
         </motion.button>
         {caseLoading && <div className="absolute inset-0 w-full rounded-2xl border border-border/40 bg-muted/30 animate-pulse pointer-events-none" />}
       </div>
@@ -329,6 +397,65 @@ export function HomeDashboardTab({
           </div>
         </div>
       )}
+
+      {displayProducts.length > 0 && (
+        <div className="mb-6 border-t border-border/30 pt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="w-4 h-4 text-amber-500" />
+            <h2 className="text-sm font-bold text-foreground">From the Family of HMACS Studios</h2>
+          </div>
+          <div className="space-y-3">
+            {displayProducts.map((product) => {
+              return (
+                <button
+                  key={product.id || product.sr_no}
+                  type="button"
+                  onClick={() => handleProductClick(product)}
+                  className="block w-full text-left focus:outline-none"
+                >
+                  <div className="relative overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-br from-card/80 via-card to-accent/20 p-4 text-left shadow-sm backdrop-blur-sm transition-all active:scale-[0.98] hover:border-primary/30">
+                    <div className="flex items-start gap-3">
+                      {product.icon ? (
+                        <div className="h-10 w-10 shrink-0 rounded-xl bg-primary/10 p-1.5 border border-primary/20 flex items-center justify-center overflow-hidden">
+                          <img
+                            src={product.icon}
+                            alt=""
+                            className="h-full w-full object-contain"
+                            loading="lazy"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary font-black border border-primary/20">
+                          {product.project_name.charAt(0)}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <h3 className="truncate text-sm font-bold text-foreground">{product.project_name}</h3>
+                          <Badge variant="outline" className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${getStatusBadge(product.status)}`}>
+                            {product.status}
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] font-medium text-muted-foreground leading-relaxed line-clamp-2">{product.description}</p>
+                      </div>
+                      <ArrowRight className="ml-1 h-4 w-4 shrink-0 text-muted-foreground/60 self-center" />
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <HmacsProductModal
+        product={selectedProduct}
+        open={isProductModalOpen}
+        onOpenChange={setIsProductModalOpen}
+      />
 
       <div className="text-center pt-2 pb-16">
         <p className="text-[10px] text-muted-foreground font-medium">A Project by Hmacs Studios.</p>

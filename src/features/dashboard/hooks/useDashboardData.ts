@@ -15,6 +15,7 @@ import type {
   DashboardAnnouncement,
   DashboardPromotion,
   DashboardProfile,
+  HmacsProduct,
   TermOfDay,
   UserStats,
   WhatsNewItem,
@@ -172,28 +173,32 @@ export function useDashboardData({
   });
 
   const userYear = profileQuery.data?.year || null;
-  const termQuery = useQuery<TermOfDay>({
+  const termQuery = useQuery<TermOfDay | null>({
     queryKey: ['termOfDay', userYear],
     queryFn: async () => {
       let query = supabase.from('term_of_day').select('*').order('created_at', { ascending: false }).limit(1);
       if (userYear) query = query.eq('year', userYear);
-      const { data, error } = await query.single();
+      const { data, error } = await query.maybeSingle();
       if (error) throw error;
-      return data;
+      return data as TermOfDay | null;
     },
     enabled: loadSecondaryData && !isOfflineMode,
+    staleTime: 1000 * 60 * 15,
+    retry: 1,
   });
 
-  const caseQuery = useQuery<CaseOfDay>({
+  const caseQuery = useQuery<CaseOfDay | null>({
     queryKey: ['caseOfDay', userYear],
     queryFn: async () => {
       let query = supabase.from('case_of_day').select('*').order('created_at', { ascending: false }).limit(1);
       if (userYear) query = query.eq('year', userYear);
-      const { data, error } = await query.single();
+      const { data, error } = await query.maybeSingle();
       if (error) throw error;
-      return data as CaseOfDay;
+      return data as CaseOfDay | null;
     },
     enabled: loadSecondaryData && !isOfflineMode,
+    staleTime: 1000 * 60 * 15,
+    retry: 1,
   });
 
   const instituteQuery = useQuery({
@@ -221,6 +226,21 @@ export function useDashboardData({
         matchesDashboardTarget(announcement.institutes, profileQuery.data?.institute)
         && matchesDashboardTarget(announcement.years, profileQuery.data?.year),
       );
+    },
+    enabled: !!userId && loadSecondaryData && !isOfflineMode,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const hmacsProductsQuery = useQuery<HmacsProduct[]>({
+    queryKey: ['hmacs-products'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('hmacs_products')
+        .select('*')
+        .eq('is_published', true)
+        .order('sr_no', { ascending: true });
+      if (error) return [];
+      return (data || []) as HmacsProduct[];
     },
     enabled: !!userId && loadSecondaryData && !isOfflineMode,
     staleTime: 1000 * 60 * 5,
@@ -272,6 +292,7 @@ export function useDashboardData({
     instituteQuery,
     dashboardAnnouncementsQuery,
     dashboardPromotionsQuery,
+    hmacsProductsQuery,
     markAnnouncementsRead,
   };
 }

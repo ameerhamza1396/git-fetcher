@@ -1,6 +1,12 @@
-
 import { useAuth } from '@/hooks/useAuth';
-import { BarChart3, Home, Megaphone, Trophy, User } from 'lucide-react';
+import {
+  BellNavIcon,
+  ChartDonutNavIcon,
+  HomeNavIcon,
+  TrophyNavIcon,
+  UserNavIcon,
+} from '@/components/ui/TabIcons';
+import { Home, Megaphone, PieChart, Trophy, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/integrations/supabase/client';
@@ -117,6 +123,7 @@ const Dashboard = () => {
     instituteQuery: { data: instituteData, isLoading: instituteDataLoading },
     dashboardAnnouncementsQuery: { data: dashboardAnnouncements = [] },
     dashboardPromotionsQuery: { data: dashboardPromotions = [] },
+    hmacsProductsQuery: { data: hmacsProducts = [] },
     markAnnouncementsRead,
   } = useDashboardData({
     userId: user?.id,
@@ -144,8 +151,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (isNavigating || !user) return;
-    const timer = window.setTimeout(() => setLoadSecondaryData(true), 200);
-    return () => window.clearTimeout(timer);
+    setLoadSecondaryData(true);
   }, [isNavigating, user]);
 
   useEffect(() => {
@@ -288,11 +294,10 @@ const Dashboard = () => {
     ? announcements.filter(a => !readAnnouncements.includes(a.id)).length : 0;
 
   const tabs: DashboardNavigationItem[] = [
-    { id: 'announcements', label: 'News', icon: Megaphone, badge: unreadCount > 0 ? unreadCount : null },
-    { id: 'leaderboard', label: 'Ranks', icon: Trophy },
-    { id: 'home', label: 'Home', icon: Home },
-    { id: 'analytics', label: 'Stats', icon: BarChart3 },
-    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'home', label: 'Home', icon: HomeNavIcon as any },
+    { id: 'leaderboard', label: 'Ranks', icon: TrophyNavIcon as any },
+    { id: 'analytics', label: 'Stats', icon: ChartDonutNavIcon as any },
+    { id: 'profile', label: 'Profile', icon: UserNavIcon as any, avatarUrl: cachedAvatarUrl },
   ];
 
   const handleLogout = async () => {
@@ -389,6 +394,7 @@ const Dashboard = () => {
             personalizationActions={personalizationActions}
             premiumPerks={premiumPerks}
             promotions={dashboardPromotions}
+            hmacsProducts={hmacsProducts}
             onOpenCollaborate={() => setShowCollaborateModal(true)}
           />
         );
@@ -400,12 +406,13 @@ const Dashboard = () => {
       <Seo title="Dashboard" description="Your personalized Medmacs App dashboard." canonical="https://medmacs.app/dashboard" />
       <VersionGuard />
 
-      {/* Minimal top bar with avatar */}
+      {/* Minimal top bar with announcement icon */}
       <DashboardHeader
         displayName={displayName}
         userPlanDisplayName={userPlanDisplayName}
         cachedAvatarUrl={cachedAvatarUrl}
-        onOpenProfile={() => setActiveTab('profile')}
+        unreadCount={unreadCount}
+        onOpenAnnouncements={() => navigate('/announcements')}
       />
       {/* Content */}
       <div className="px-5 mt-[var(--header-height)]">

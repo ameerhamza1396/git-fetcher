@@ -1,16 +1,14 @@
 import {
   BookOpen,
   Bookmark,
-  Brain,
   FileText,
   FlaskConical,
   Microscope,
   ScrollText,
-  Sparkles,
   Swords,
   Target,
-  Zap,
 } from 'lucide-react';
+import { CardsIcon, DrAhroidIcon, TestGeneratorIcon } from '@/components/ui/TabIcons';
 import type { DashboardAction, DashboardComponents } from './types';
 
 export const getQuickActions = (): DashboardAction[] => [
@@ -26,9 +24,9 @@ export const getPersonalizationActions = (): DashboardAction[] => [
 ];
 
 export const getPremiumActions = (): DashboardAction[] => [
-  { title: 'Ask Dr Ahroid', description: 'Instant AI tutor', icon: Zap, link: '/ai/chatbot', gradient: 'from-amber-400 to-orange-500', iconColor: 'text-yellow-100' },
-  { title: 'AI Test Attempt', description: 'Custom tests with AI', icon: Brain, link: '/ai/test-generator', gradient: 'from-cyan-500 to-blue-600', iconColor: 'text-cyan-100' },
-  { title: 'AI Flashcards', description: 'AI flashcards by chapter', icon: Sparkles, link: '/learn-with-ai', gradient: 'from-violet-500 to-fuchsia-600', iconColor: 'text-violet-100' },
+  { title: 'Ask Dr Ahroid', description: 'Instant AI tutor', icon: DrAhroidIcon, link: '/ai/chatbot', gradient: 'from-amber-400 to-orange-500', iconColor: 'text-yellow-100' },
+  { title: 'AI Test Attempt', description: 'Custom tests with AI', icon: TestGeneratorIcon, link: '/ai/test-generator', gradient: 'from-cyan-500 to-blue-600', iconColor: 'text-cyan-100' },
+  { title: 'AI Flashcards', description: 'AI flashcards by chapter', icon: CardsIcon, link: '/learn-with-ai', gradient: 'from-violet-500 to-fuchsia-600', iconColor: 'text-violet-100' },
 ];
 
 export const getInstituteActions = (components: DashboardComponents): DashboardAction[] => [

@@ -72,16 +72,13 @@ export const SelectionRow = ({
     : 'group-hover:text-primary/90';
   const accentBar = isAmber ? 'bg-amber-500' : 'bg-primary';
   const accentTint = isAmber ? 'bg-amber-500/[0.06]' : 'bg-primary/[0.05]';
-  const accentSweep = isAmber
-    ? 'from-amber-500/[0.07] via-amber-500/[0.02]'
-    : 'from-primary/[0.06] via-primary/[0.015]';
   const accentRing = isAmber ? 'focus-visible:ring-amber-500/40' : 'focus-visible:ring-primary/40';
 
   const interactive = !disabled;
   const clampedProgress = progress == null ? null : Math.max(0, Math.min(1, progress));
 
   const containerClass = cn(
-    'group relative flex w-full items-center gap-3.5 py-4 pl-4 pr-3 text-left transition-colors duration-200 sm:gap-4',
+    'group relative flex w-full items-center gap-3.5 border-0 py-[1.1rem] pl-4 pr-3 text-left transition-colors duration-200 sm:gap-4',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset',
     accentRing,
     disabled ? 'cursor-not-allowed opacity-45' : 'cursor-pointer',
@@ -107,13 +104,13 @@ export const SelectionRow = ({
         )
       )}
 
-      {/* Directional hover sweep — reads as light catching the row. */}
+      {/* Keep interaction feedback flat so the divider remains the visual structure. */}
       {interactive && !selected && (
         <span
           aria-hidden="true"
           className={cn(
-            'pointer-events-none absolute inset-0 bg-gradient-to-r to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100',
-            accentSweep,
+            'pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100',
+            accentTint,
           )}
         />
       )}

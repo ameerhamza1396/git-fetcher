@@ -7,7 +7,7 @@ import { fetchChaptersBySubject, fetchSubjectById, Subject, Chapter } from '@/ut
 import { MCQPageLayout } from './MCQPageLayout';
 import { SelectionBackdrop } from '@/components/selection/SelectionBackdrop';
 import { SelectionRow } from '@/components/selection/SelectionRow';
-import { rowEntrance, titleSlide, iconBounce, floatDecor } from '@/components/selection/motion';
+import { rowEntrance, titleSlide, iconBounce } from '@/components/selection/motion';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { CollaborateModal } from '@/components/CollaborateModal';
@@ -317,21 +317,6 @@ const MCQChapterSelectionPage = () => {
   return (
     <MCQPageLayout backTo="/mcqs" showHeader={false} showBackButton={false} scrollable>
       <SelectionBackdrop active={Boolean(selectedChapter)} />
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        <motion.div
-          className="absolute -right-8 top-16 h-20 w-20 rounded-full bg-primary/[0.04] blur-2xl"
-          variants={reduceMotion ? undefined : floatDecor(0.2)}
-          initial="hidden"
-          animate="visible"
-        />
-        <motion.div
-          className="absolute -left-6 top-48 h-14 w-14 rounded-full bg-primary/[0.03] blur-xl"
-          variants={reduceMotion ? undefined : floatDecor(0.4)}
-          initial="hidden"
-          animate="visible"
-        />
-      </div>
-
       {/* Glassmorphic Header */}
       <header className="absolute inset-x-0 top-0 z-50 px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+10px)] backdrop-blur-2xl border-b border-border/60 bg-background/88">
         <div className="mx-auto flex items-center justify-between gap-3 max-w-4xl">
@@ -371,13 +356,13 @@ const MCQChapterSelectionPage = () => {
                 {subject?.name}
               </motion.p>
               <motion.h2
-                className="font-['Syne'] mt-1.5 text-2xl font-bold leading-none tracking-[-0.03em] text-foreground sm:text-[1.75rem]"
+                 className="font-['Syne'] mt-1.5 text-2xl font-bold uppercase italic leading-none tracking-[-0.03em] text-foreground sm:text-[1.75rem]"
                 variants={reduceMotion ? undefined : titleSlide}
                 initial="hidden"
                 animate="visible"
                 transition={{ delay: 0.15 }}
               >
-                Select <span className="live-gradient-text">Chapter</span>
+                 Select <span className="text-primary">Chapter</span>
               </motion.h2>
               <motion.p
                 className="mt-2 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60"
@@ -598,7 +583,7 @@ const MCQChapterSelectionPage = () => {
             <div className="pointer-events-auto w-full max-w-2xl">
               <Button
                 onClick={handleContinue}
-                className="group h-12 w-full rounded-full bg-primary text-xs font-bold uppercase tracking-[0.18em] text-primary-foreground transition-all duration-200 active:scale-[0.98]"
+                 className="group h-12 w-full rounded-md bg-teal-600 text-xs font-bold uppercase tracking-[0.18em] text-white transition-all duration-200 hover:bg-teal-700 active:scale-[0.98]"
                 size="lg"
               >
                 <span className="truncate">Start · {selectedChapter.name}</span>

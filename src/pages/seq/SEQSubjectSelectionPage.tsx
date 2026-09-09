@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Lock } from 'lucide-react';
+import { ArrowRight, Lock, RefreshCw, WifiOff } from 'lucide-react';
 import { fetchSEQSubjects, SEQSubject } from '@/utils/mcqData';
 import { useAuth } from '@/hooks/useAuth';
 import { MCQPageLayout } from '@/pages/mcq/MCQPageLayout';
@@ -38,6 +38,8 @@ const SEQSubjectSelectionPage = () => {
 
   const [subjects, setSubjects] = useState<SEQSubject[]>([]);
   const [loadingSubjects, setLoadingSubjects] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [selectedSubject, setSelectedSubject] = useState<SEQSubject | null>(null);
   const [showCollaborateModal, setShowCollaborateModal] = useState(false);
 
@@ -60,14 +62,20 @@ const SEQSubjectSelectionPage = () => {
   useEffect(() => {
     const loadSubjects = async () => {
       setLoadingSubjects(true);
-      const data = await fetchSEQSubjects();
-      setSubjects(data);
+      setLoadError(false);
+      try {
+        const data = await fetchSEQSubjects();
+        setSubjects(data);
+      } catch (error) {
+        console.error('Unable to load SEQ subjects:', error);
+        setLoadError(true);
+      }
       setLoadingSubjects(false);
     };
     if (!profileLoading && user) {
       loadSubjects();
     }
-  }, [profileLoading, user]);
+  }, [profileLoading, retryKey, user]);
 
   const handleContinue = () => {
     if (selectedSubject) {
@@ -106,8 +114,8 @@ const SEQSubjectSelectionPage = () => {
       <div className="relative z-10 mx-auto w-full max-w-2xl px-4 sm:px-0">
         <div className="py-5">
           <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-amber-600/90 dark:text-amber-500/90">SEQ Practice</p>
-          <h2 className="font-['Syne'] mt-1.5 text-2xl font-bold leading-none tracking-[-0.03em] text-foreground sm:text-[1.75rem]">
-            Select <span className="live-gradient-text">Subject</span>
+          <h2 className="font-['Syne'] mt-1.5 text-2xl font-bold uppercase italic leading-none tracking-[-0.03em] text-foreground sm:text-[1.75rem]">
+            Select <span className="text-amber-600 dark:text-amber-500">Subject</span>
           </h2>
         </div>
 
@@ -117,6 +125,16 @@ const SEQSubjectSelectionPage = () => {
           {loadingSubjects ? (
             <div className="divide-y divide-border/50 border-b border-border/50">
               {Array.from({ length: 5 }).map((_, i) => <SubjectRowSkeleton key={i} />)}
+            </div>
+          ) : loadError ? (
+            <div className="border-y border-border/50 px-4 py-14 text-center">
+              <WifiOff className="mx-auto h-7 w-7 text-muted-foreground/50" />
+              <h3 className="mt-4 text-sm font-bold text-foreground">Connection failure</h3>
+              <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-muted-foreground">We could not connect to the content server. Check your connection and try again.</p>
+              <Button type="button" variant="outline" className="mt-5 rounded-md" onClick={() => setRetryKey(value => value + 1)}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Try again
+              </Button>
             </div>
           ) : subjects.length === 0 ? (
             <div className="border-b border-border/50 px-4 py-14 text-center">
@@ -176,7 +194,7 @@ const SEQSubjectSelectionPage = () => {
             <div className="pointer-events-auto w-full max-w-2xl">
               <Button
                 onClick={handleContinue}
-                className="group h-12 w-full rounded-full bg-amber-500 text-xs font-bold uppercase tracking-[0.18em] text-white transition-all duration-200 hover:bg-amber-600 active:scale-[0.98]"
+                 className="group h-12 w-full rounded-md bg-amber-500 text-xs font-bold uppercase tracking-[0.18em] text-white transition-all duration-200 hover:bg-amber-600 active:scale-[0.98]"
                 size="lg"
               >
                 <span className="truncate">Continue · {selectedSubject.name}</span>

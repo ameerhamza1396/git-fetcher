@@ -7,7 +7,7 @@ import {
   BookmarkCheck, Crown, LogOut, AlertTriangle, MoreVertical, Flag, BotOff,
   Moon, Sun, Zap, Sparkles, BookOpen, ChevronLeft, Loader2, Star, Award,
   TrendingUp, Brain, Target, Shield, ShieldAlert, Trash2, Menu, Lock, RotateCcw, WifiOff,
-  ThumbsUp, ThumbsDown, MessageCircle
+  ThumbsUp, ThumbsDown, MessageCircle, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
@@ -538,6 +538,12 @@ const ReferenceModal = ({
   const hasConfirmed = Array.isArray(confirmedIndexes);
   const hasSummary = Boolean(summary?.summary);
   const policyError = error && isAiPolicyNotice(error);
+  const [expandedCardKey, setExpandedCardKey] = useState<string | null>(null);
+
+  const toggleCardExpanded = (key: string) => {
+    setExpandedCardKey(prev => (prev === key ? null : key));
+  };
+
   const visibleReferences = Array.isArray(references)
     ? hasConfirmed
       ? confirmedIndexes.map(index => references[index]).filter(Boolean)
@@ -546,19 +552,19 @@ const ReferenceModal = ({
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <SheetContent side="bottom" className="mx-auto max-h-[88dvh] overflow-y-auto rounded-t-[2rem] border-x border-t border-primary/20 bg-background/95 p-0 pb-[calc(1.5rem+env(safe-area-inset-bottom))] backdrop-blur-2xl sm:max-w-lg z-[300]" overlayClassName="z-[300]">
-        <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-muted" aria-hidden="true" />
-        <SheetHeader className="px-5 py-4 text-left sm:text-left">
+      <SheetContent side="bottom" className="mx-auto flex h-[85dvh] max-h-[85dvh] flex-col overflow-hidden rounded-t-[2rem] border-x border-t border-primary/20 bg-background/95 p-0 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-2xl sm:max-w-lg z-[300]" overlayClassName="z-[300]">
+        <div className="mx-auto mt-3 h-1.5 w-12 shrink-0 rounded-full bg-muted" aria-hidden="true" />
+        <SheetHeader className="shrink-0 px-5 pt-3 pb-2 text-left sm:text-left border-b border-border/40">
           <SheetTitle className="flex items-center gap-2 text-lg font-black">
             <CheckCircle className="h-5 w-5 text-primary" />
             Question Verification
           </SheetTitle>
-          <SheetDescription className="mt-1 text-xs">
+          <SheetDescription className="mt-0.5 text-xs">
             Dr Ahroid verifies the question first. Summary is optional.
           </SheetDescription>
         </SheetHeader>
 
-        <motion.div layout className="flex-1 overflow-y-auto px-5 py-4">
+        <motion.div layout className="flex-1 overflow-y-auto px-5 py-4 min-h-0 space-y-4">
             {offlineMessage ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-center text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
                 <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/15">
@@ -608,7 +614,7 @@ const ReferenceModal = ({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.22, ease: 'easeOut' }}
-                  className={`mb-4 min-h-[156px] rounded-2xl border p-4 text-sm ${display.border}`}
+                  className={`mb-4 rounded-2xl border p-4 text-sm ${display.border}`}
                 >
                   <div className="flex items-center gap-3">
                     <VerificationStatusIcon icon={display.icon} className={`h-7 w-7 ${display.tone}`} />
@@ -668,7 +674,7 @@ const ReferenceModal = ({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.22, ease: 'easeOut' }}
-                className="mb-4 min-h-[132px] rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm"
+                className="mb-4 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm"
               >
                 <div className="font-black text-primary">AI Summary</div>
                 <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{summary.summary}</p>
@@ -706,15 +712,38 @@ const ReferenceModal = ({
             )}
 
             {!offlineMessage && !isConfirming && isLoading && !verification && !isSummarizing && !summary && !error && (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-zinc-950">
-                <Skeleton className="h-4 w-40" />
-                <Skeleton className="mt-3 h-3 w-full" />
-                <Skeleton className="mt-2 h-3 w-8/12" />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <Skeleton className="h-4 w-32 rounded-lg" />
+                  <Skeleton className="h-4 w-8 rounded-full" />
+                </div>
+                {[1, 2].map((i) => (
+                  <div key={i} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-zinc-950/80">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-40 rounded-lg" />
+                        <Skeleton className="h-3 w-20 rounded-md" />
+                      </div>
+                      <div className="min-w-[130px] space-y-1.5">
+                        <div className="flex justify-between">
+                          <Skeleton className="h-3 w-16" />
+                          <Skeleton className="h-3 w-8" />
+                        </div>
+                        <Skeleton className="h-2 w-full rounded-full" />
+                      </div>
+                    </div>
+                    <div className="mt-3 rounded-xl border border-slate-200/50 bg-slate-100/50 p-3 dark:border-slate-800/50 dark:bg-slate-900/50 space-y-2">
+                      <Skeleton className="h-3 w-24" />
+                      <Skeleton className="h-3 w-full" />
+                      <Skeleton className="h-3 w-4/5" />
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
             {!offlineMessage && !isConfirming && !isLoading && !summary && visibleReferences.length > 0 && (
-              <div className="mt-4 space-y-3">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
                     Book References
@@ -729,40 +758,51 @@ const ReferenceModal = ({
                   const contextScore = typeof reference.score === 'number'
                     ? Math.max(0, Math.min(100, Math.round(reference.score <= 1 ? reference.score * 100 : reference.score)))
                     : null;
+                  const cardKey = `${reference.book || 'Reference'}-${reference.page || index}-${index}`;
+                  const isExpanded = expandedCardKey === cardKey;
 
                   return (
                     <div
-                      key={`${reference.book || 'Reference'}-${reference.page || index}-${index}`}
-                      className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-zinc-950/80"
+                      key={cardKey}
+                      onClick={() => toggleCardExpanded(cardKey)}
+                      className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50/80 p-4 transition-all hover:border-primary/30 dark:border-slate-800 dark:bg-zinc-950/80"
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                          <p className="text-sm font-black text-slate-900 dark:text-slate-100">
+                          <p className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                             {reference.book || 'Reference'}
                           </p>
                           <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                             {reference.page ? `Page ${reference.page}` : 'Page not listed'}
                           </p>
                         </div>
-                        <div className="min-w-[150px]">
-                          <div className="mb-1 flex items-center justify-between gap-3">
-                            <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                              AI Confidence
-                            </span>
-                            <span className="text-[10px] font-black text-primary">
-                              {contextScore === null ? 'N/A' : `${contextScore}%`}
-                            </span>
+                        <div className="flex items-center gap-3">
+                          <div className="min-w-[130px]">
+                            <div className="mb-1 flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                                AI Confidence
+                              </span>
+                              <span className="text-[10px] font-black text-primary">
+                                {contextScore === null ? 'N/A' : `${contextScore}%`}
+                              </span>
+                            </div>
+                            <Progress value={contextScore ?? 0} className="h-2" />
                           </div>
-                          <Progress value={contextScore ?? 0} className="h-2" />
+                          <div className="text-muted-foreground hover:text-foreground">
+                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </div>
                         </div>
                       </div>
 
                       {shouldShowText && reference.content && (
                         <div className="mt-3 rounded-xl border border-primary/10 bg-primary/5 p-3">
-                          <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-primary">
-                            Extracted Text
+                          <p className="mb-1.5 text-[10px] font-black uppercase tracking-wider text-primary flex items-center justify-between">
+                            <span>Reference Citation</span>
+                            <span className="text-[9px] font-bold text-muted-foreground">
+                              {isExpanded ? 'Tap to collapse' : 'Tap to expand'}
+                            </span>
                           </p>
-                          <p className="whitespace-pre-wrap text-xs font-medium leading-relaxed text-slate-700 dark:text-slate-300">
+                          <p className={`whitespace-pre-wrap text-xs font-medium leading-relaxed text-slate-700 dark:text-slate-300 ${isExpanded ? '' : 'line-clamp-2'}`}>
                             {reference.content}
                           </p>
                         </div>
@@ -775,22 +815,22 @@ const ReferenceModal = ({
             )}
           </motion.div>
 
-          <div className="border-t border-slate-200 px-5 py-4 dark:border-slate-800">
-            <div className="mb-3 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 text-[11px] font-medium leading-relaxed text-muted-foreground dark:border-slate-800 dark:bg-slate-900/40">
+          <div className="shrink-0 border-t border-slate-200 px-5 py-3 dark:border-slate-800 bg-background">
+            <div className="mb-2.5 rounded-xl border border-slate-200/80 bg-slate-50/70 p-2.5 text-[10px] font-medium leading-relaxed text-muted-foreground dark:border-slate-800 dark:bg-slate-900/40">
               <p>
-                <span className="font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">DCMA Disclaimer: </span>
-                References are provided for educational verification and study support. If you believe any referenced
+                <span className="font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">DMCA Disclaimer: </span>
+                Citations are brief excerpts provided solely for academic verification and study support under Fair Use. If you believe any referenced
                 material infringes your rights, review our{' '}
-                <a href="/dcma" className="font-bold text-slate-600 underline underline-offset-4 hover:text-primary dark:text-slate-300">
-                  DCMA Page
+                <a href="/dmca" className="font-bold text-slate-600 underline underline-offset-4 hover:text-primary dark:text-slate-300">
+                  DMCA Policy Page
                 </a>{' '}
-                or contact{' '}
+                or contact our designated agent at{' '}
                 <a href="mailto:legal@medmacs.app" className="font-bold text-slate-600 underline underline-offset-4 hover:text-primary dark:text-slate-300">
                   legal@medmacs.app
                 </a>.
               </p>
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-2.5 sm:flex-row">
               <Button
                 variant="outline"
                 onClick={onSummarize}

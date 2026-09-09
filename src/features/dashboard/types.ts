@@ -1,4 +1,4 @@
-import type { LucideIcon } from 'lucide-react';
+import type { ComponentType } from 'react';
 import type { Institute } from '@/utils/institutes';
 
 export type DashboardTabId = 'announcements' | 'leaderboard' | 'home' | 'analytics' | 'profile';
@@ -78,6 +78,25 @@ export type DashboardAnnouncement = {
   years?: string[] | null;
 };
 
+export type HmacsProductButton = {
+  label: string;
+  link: string;
+};
+
+export type HmacsProduct = {
+  id: string;
+  sr_no: number;
+  icon?: string | null;
+  project_name: string;
+  description: string;
+  long_description?: string | null;
+  status: 'In-development' | 'In-Beta Stage' | 'Coming Soon' | 'Available';
+  link?: string | null;
+  buttons?: HmacsProductButton[] | string | null;
+  cta_buttons?: HmacsProductButton[] | string | null;
+  is_published?: boolean;
+};
+
 export type DashboardPromotion = {
   id: string;
   title: string;
@@ -91,7 +110,7 @@ export type DashboardPromotion = {
 export type DashboardAction = {
   title: string;
   description: string;
-  icon: LucideIcon;
+  icon: ComponentType<any>;
   link?: string;
   onClick?: () => void;
   gradient: string;

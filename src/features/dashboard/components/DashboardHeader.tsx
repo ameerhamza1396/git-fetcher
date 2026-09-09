@@ -1,16 +1,21 @@
+import { BellNavIcon } from '@/components/ui/TabIcons';
 import { Badge } from '@/components/ui/badge';
 
 type DashboardHeaderProps = {
   displayName: string;
   userPlanDisplayName: string;
   cachedAvatarUrl?: string | null;
-  onOpenProfile: () => void;
+  unreadCount?: number;
+  onOpenAnnouncements: () => void;
+  onOpenProfile?: () => void;
 };
 
 export function DashboardHeader({
   displayName,
   userPlanDisplayName,
   cachedAvatarUrl,
+  unreadCount = 0,
+  onOpenAnnouncements,
   onOpenProfile,
 }: DashboardHeaderProps) {
   return (
@@ -31,17 +36,22 @@ export function DashboardHeader({
           <Badge className="text-[10px] font-bold bg-primary/10 text-primary border-0 px-2.5">
             {userPlanDisplayName}
           </Badge>
-          <button type="button" onClick={onOpenProfile} aria-label="Open profile tab" className="shrink-0">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center overflow-hidden ring-1 ring-primary/20">
-              {cachedAvatarUrl ? (
-                <img src={cachedAvatarUrl} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-primary-foreground font-bold text-[10px]">{displayName.substring(0, 2).toUpperCase()}</span>
-              )}
-            </div>
+          <button
+            type="button"
+            onClick={onOpenAnnouncements}
+            aria-label="Open announcements"
+            className="relative shrink-0 flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+          >
+            <BellNavIcon className="w-5 h-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
           </button>
         </div>
       </div>
     </header>
   );
 }
+

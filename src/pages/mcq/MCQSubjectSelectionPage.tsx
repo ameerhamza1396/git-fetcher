@@ -25,30 +25,7 @@ import {
 import { SelectionBackdrop } from '@/components/selection/SelectionBackdrop';
 import { SelectionRow } from '@/components/selection/SelectionRow';
 import { StatStrip } from '@/components/selection/StatStrip';
-import { rowEntrance, iconBounce, floatDecor } from '@/components/selection/motion';
-
-const FloatingDecor = ({ reduceMotion }: { reduceMotion: boolean }) => (
-  <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-    <motion.div
-      className="absolute -right-8 top-12 h-24 w-24 rounded-full bg-primary/[0.04] blur-2xl"
-      variants={reduceMotion ? undefined : floatDecor(0.2)}
-      initial="hidden"
-      animate="visible"
-    />
-    <motion.div
-      className="absolute -left-6 top-40 h-16 w-16 rounded-full bg-primary/[0.03] blur-xl"
-      variants={reduceMotion ? undefined : floatDecor(0.4)}
-      initial="hidden"
-      animate="visible"
-    />
-    <motion.div
-      className="absolute right-12 top-64 h-12 w-12 rounded-full bg-emerald-500/[0.03] blur-lg"
-      variants={reduceMotion ? undefined : floatDecor(0.6)}
-      initial="hidden"
-      animate="visible"
-    />
-  </div>
-);
+import { rowEntrance, iconBounce } from '@/components/selection/motion';
 
 const SubjectRowSkeleton = () => (
   <div className="flex animate-pulse items-center gap-4 py-4 pl-4 pr-3">
@@ -260,7 +237,6 @@ const MCQSubjectSelectionPage = () => {
       scrollRef={pageScrollRef}
     >
       <SelectionBackdrop active={Boolean(selectedSubject)} />
-      <FloatingDecor reduceMotion={reduceMotion} />
       <Seo title="MCQs Practice" description="Practice thousands of MCQs for MDCAT and other medical entrance exams with Medmacs App." canonical="https://medmacs.app/mcqs" />
 
       {/* Glassmorphic Header */}
@@ -310,8 +286,8 @@ const MCQSubjectSelectionPage = () => {
         <div className="mx-auto w-full max-w-2xl px-4 sm:px-0">
           <div className="text-center mb-8 px-4">
             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-3 block">Step 1 of 3</span>
-            <h2 className="px-1 text-3xl sm:text-5xl font-black tracking-normal text-foreground uppercase italic leading-[1.08] text-center">
-              Select <span className="live-gradient-text">Subject&nbsp;</span>
+            <h2 className="font-['Syne'] px-1 text-3xl font-black uppercase italic leading-[1.08] tracking-tight text-foreground sm:text-5xl">
+              Select <span className="text-primary">Subject&nbsp;</span>
             </h2>
             <p className="text-muted-foreground text-sm font-medium mt-3 max-w-lg mx-auto text-center">
               Choose a subject to begin your practice. Each subject contains comprehensive chapters and high-yield MCQs.
@@ -426,7 +402,7 @@ const MCQSubjectSelectionPage = () => {
             <div className="pointer-events-auto w-full max-w-2xl">
               <Button
                 onClick={handleContinue}
-                className="group h-12 w-full rounded-full bg-primary text-xs font-bold uppercase tracking-[0.18em] text-primary-foreground transition-all duration-200 active:scale-[0.98]"
+                 className="group h-12 w-full rounded-md bg-teal-600 text-xs font-bold uppercase tracking-[0.18em] text-white transition-all duration-200 hover:bg-teal-700 active:scale-[0.98]"
                 size="lg"
               >
                 <span className="truncate">Continue · {selectedSubject.name}</span>

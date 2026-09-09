@@ -101,8 +101,8 @@ const ForgotPassword = () => {
           <ArrowLeft className="w-5 h-5" />
           <span className="text-sm font-medium">Back</span>
         </Link>
-        <div className="flex items-center space-x-2">
-          <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-7 h-7" />
+         <div className="flex items-center space-x-2">
+           <img src="/assets/brand/medmacs-logo.png" alt="Medmacs" className="h-9 w-9 object-contain" onError={(event) => { event.currentTarget.src = "/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png"; }} />
           <span className="text-white font-bold text-lg tracking-tight">Medmacs</span>
         </div>
       </div>
@@ -118,7 +118,7 @@ const ForgotPassword = () => {
             <p className="text-white/50 text-sm mt-2">Enter your email to receive a password reset link.</p>
           </div>
 
-          <Card className="bg-white/[0.07] backdrop-blur-2xl rounded-3xl border border-white/10 shadow-2xl text-white">
+           <Card className="rounded-[2rem] border border-white/15 bg-white/[0.08] text-white shadow-[0_24px_90px_rgba(0,0,0,.35)] backdrop-blur-2xl">
             <CardHeader>
               <CardTitle className="text-white">Reset Your Password</CardTitle>
               <CardDescription className="text-white/50">
@@ -171,10 +171,11 @@ const ForgotPassword = () => {
                 </p>
               </div>
             </CardContent>
-          </Card>
-        </div>
-      </main>
-    </div>
+           </Card>
+         </div>
+       </main>
+       <p className="relative z-10 border-t border-white/10 pb-[max(10px,env(safe-area-inset-bottom))] pt-3 text-center text-xs text-white/35">A project by <span className="font-semibold text-white/60">HMACS Studios</span></p>
+     </div>
   );
 };
 

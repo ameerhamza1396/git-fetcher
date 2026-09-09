@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle, XCircle, ArrowLeft } from 'lucide-react';
 
 const UpdatePassword = () => {
   type PasswordErrors = {
@@ -139,14 +139,16 @@ const UpdatePassword = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
+    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_12%_12%,#f0abfc_0%,transparent_32%),radial-gradient(circle_at_90%_85%,#fbcfe8_0%,transparent_35%),linear-gradient(135deg,#faf5ff_0%,#fff_50%,#fdf2f8_100%)] px-5 pb-[max(16px,env(safe-area-inset-bottom))] pt-[max(16px,env(safe-area-inset-top))]">
+      <Link to="/login" className="absolute left-5 top-[max(16px,env(safe-area-inset-top))] flex items-center gap-2 text-sm font-semibold text-purple-700/70 transition-colors hover:text-purple-900"><ArrowLeft className="h-4 w-4" /> Back to login</Link>
       <div className="w-full max-w-md space-y-6 animate-fade-in">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Set New Password</h1>
-          <p className="text-gray-600 dark:text-gray-300">Enter and confirm your new password below.</p>
+          <img src="/assets/brand/medmacs-logo.png" alt="Medmacs" className="mx-auto mb-6 h-14 w-14 object-contain" onError={(event) => { event.currentTarget.src = "/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png"; }} />
+          <h1 className="font-['Syne'] text-3xl font-extrabold tracking-tight text-gray-900">Set New Password</h1>
+          <p className="mt-2 text-gray-600">Enter and confirm your new password below.</p>
         </div>
 
-        <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-purple-200 dark:border-purple-800">
+        <Card className="rounded-[2rem] border-purple-200/80 bg-white/80 shadow-[0_24px_70px_rgba(168,85,247,.16)] backdrop-blur-xl">
           <CardHeader>
             <CardTitle>Update Your Password</CardTitle>
             <CardDescription>

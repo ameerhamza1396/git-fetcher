@@ -47,7 +47,7 @@ const Login = () => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.28, ease: "easeOut" }}
-      className="fixed inset-0 flex flex-col overflow-hidden overscroll-none bg-white text-slate-950"
+         className="fixed inset-0 flex flex-col overflow-hidden overscroll-none bg-[radial-gradient(circle_at_50%_-20%,#d9fbf7_0%,transparent_42%),linear-gradient(180deg,#ffffff_0%,#f8fbfc_100%)] text-slate-950"
     >
       <Seo
         title="Login"
@@ -69,7 +69,7 @@ const Login = () => {
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
           <span className="text-sm font-medium">Back</span>
         </Link>
-        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="h-9 w-9 object-contain" />
+         <img src="/assets/brand/medmacs-logo.png" alt="Medmacs" className="h-10 w-10 object-contain" onError={(event) => { event.currentTarget.src = "/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png"; }} />
       </motion.div>
 
       {/* Main content */}
@@ -78,7 +78,7 @@ const Login = () => {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="w-full max-w-md"
+           className="w-full max-w-md rounded-[2rem] border border-white/80 bg-white/75 px-5 py-7 shadow-[0_24px_80px_rgba(14,165,233,.09)] backdrop-blur-xl sm:px-8"
         >
           {/* Welcome text */}
           <div className="text-center mb-8">
@@ -92,7 +92,7 @@ const Login = () => {
               </motion.span>
               <span className="text-slate-950">.app</span>
             </h1>
-            <p className="mt-2 text-sm font-bold uppercase tracking-widest text-slate-400">Welcome back</p>
+             <p className="mt-2 font-['Plus_Jakarta_Sans'] text-sm font-bold uppercase tracking-[.22em] text-slate-400">Welcome back</p>
           </div>
 
           <div className="px-1">
@@ -164,7 +164,7 @@ const Login = () => {
           </div>
         </motion.div>
       </div>
-      <p className="relative z-10 pb-[max(8px,env(safe-area-inset-bottom))] text-center text-xs text-slate-400">
+       <p className="relative z-10 border-t border-slate-200/60 bg-white/30 pb-[max(8px,env(safe-area-inset-bottom))] pt-3 text-center text-xs text-slate-400">
         A project by <span className="font-semibold text-slate-600">HMACS Studios</span>
       </p>
     </motion.div>

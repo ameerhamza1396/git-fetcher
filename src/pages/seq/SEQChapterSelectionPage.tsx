@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, RefreshCw, WifiOff } from 'lucide-react';
 import { fetchSEQChaptersBySubject, fetchSEQSubjectById, SEQChapter, SEQSubject } from '@/utils/mcqData';
 import { MCQPageLayout } from '@/pages/mcq/MCQPageLayout';
 import AppTransitionScreen from '@/components/AppTransitionScreen';
@@ -38,6 +38,8 @@ const SEQChapterSelectionPage = () => {
   const [allChapters, setAllChapters] = useState<SEQChapter[]>([]);
   const [loadingChapters, setLoadingChapters] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [selectedChapter, setSelectedChapter] = useState<SEQChapter | null>(null);
   const [subject, setSubject] = useState<SEQSubject | null>(null);
   const [showCollaborateModal, setShowCollaborateModal] = useState(false);
@@ -58,24 +60,31 @@ const SEQChapterSelectionPage = () => {
       if (!subjectId || profileLoading) return;
 
       setLoadingChapters(true);
+      setLoadError(false);
 
-      const [subjectData, chapters] = await Promise.all([
-        fetchSEQSubjectById(subjectId),
-        fetchSEQChaptersBySubject(subjectId)
-      ]);
+      try {
+        const [subjectData, chapters] = await Promise.all([
+          fetchSEQSubjectById(subjectId),
+          fetchSEQChaptersBySubject(subjectId)
+        ]);
 
-      if (subjectData) {
-        setSubject(subjectData);
+        if (subjectData) {
+          setSubject(subjectData);
+        }
+        setAllChapters(chapters);
+      } catch (error) {
+        console.error('Unable to load SEQ chapters:', error);
+        setLoadError(true);
+      } finally {
+        setLoadingChapters(false);
+        setLoading(false);
       }
-      setAllChapters(chapters);
-      setLoadingChapters(false);
-      setLoading(false);
     };
 
     if (!profileLoading) {
       loadData();
     }
-  }, [subjectId, profileLoading]);
+  }, [profileLoading, retryKey, subjectId]);
 
   const handleContinue = () => {
     if (selectedChapter && subjectId) {
@@ -112,8 +121,8 @@ const SEQChapterSelectionPage = () => {
       <div className="relative z-10 mx-auto w-full max-w-2xl px-4 sm:px-0">
         <div className="py-5">
           <p className="truncate text-[10px] font-bold uppercase tracking-[0.25em] text-amber-600/90 dark:text-amber-500/90">{subject?.name}</p>
-          <h2 className="font-['Syne'] mt-1.5 text-2xl font-bold leading-none tracking-[-0.03em] text-foreground sm:text-[1.75rem]">
-            Select <span className="live-gradient-text">Chapter</span>
+          <h2 className="font-['Syne'] mt-1.5 text-2xl font-bold uppercase italic leading-none tracking-[-0.03em] text-foreground sm:text-[1.75rem]">
+            Select <span className="text-amber-600 dark:text-amber-500">Chapter</span>
           </h2>
           <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60">
             {profile?.plan === 'free' ? 'Free daily limits apply' : 'Unlimited premium access'}
@@ -124,6 +133,16 @@ const SEQChapterSelectionPage = () => {
           {loadingChapters ? (
             <div className="divide-y divide-border/50 border-y border-border/50">
               {Array.from({ length: 8 }).map((_, i) => <ChapterRowSkeleton key={i} />)}
+            </div>
+          ) : loadError ? (
+            <div className="border-y border-border/50 px-4 py-14 text-center">
+              <WifiOff className="mx-auto h-7 w-7 text-muted-foreground/50" />
+              <h3 className="mt-4 text-sm font-bold text-foreground">Connection failure</h3>
+              <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-muted-foreground">We could not connect to the content server. Check your connection and try again.</p>
+              <Button type="button" variant="outline" className="mt-5 rounded-md" onClick={() => setRetryKey(value => value + 1)}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Try again
+              </Button>
             </div>
           ) : allChapters.length === 0 ? (
             <div className="border-y border-border/50 px-4 py-14 text-center">
@@ -198,7 +217,7 @@ const SEQChapterSelectionPage = () => {
             <div className="pointer-events-auto w-full max-w-2xl">
               <Button
                 onClick={handleContinue}
-                className="group h-12 w-full rounded-full bg-amber-500 text-xs font-bold uppercase tracking-[0.18em] text-white transition-all duration-200 hover:bg-amber-600 active:scale-[0.98]"
+                 className="group h-12 w-full rounded-md bg-amber-500 text-xs font-bold uppercase tracking-[0.18em] text-white transition-all duration-200 hover:bg-amber-600 active:scale-[0.98]"
                 size="lg"
               >
                 <span className="truncate">Start · {selectedChapter.name}</span>

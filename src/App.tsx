@@ -51,7 +51,7 @@ const Pricing = lazy(() => import('@/pages/Pricing'));
 const TermsAndConditions = lazy(() => import('@/pages/TermsAndConditions'));
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
 const RefundPolicy = lazy(() => import('@/pages/RefundPolicy'));
-const DCMAPolicy = lazy(() => import('@/pages/DCMAPolicy'));
+const DMCAPolicy = lazy(() => import('@/pages/DMCAPolicy'));
 const Checkout = lazy(() => import('@/pages/Checkout'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 const ChangePassword = lazy(() => import('@/pages/ChangePassword'));
@@ -282,7 +282,8 @@ function App() {
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/privacypolicy" element={<PrivacyPolicy />} />
                 <Route path="/refund-policy" element={<RefundPolicy />} />
-                <Route path="/dcma" element={<DCMAPolicy />} />
+                <Route path="/dcma" element={<DMCAPolicy />} />
+                <Route path="/dmca" element={<DMCAPolicy />} />
                 <Route path="/mock-test" element={<MockTest />} />
                 <Route path="/test-completed" element={<TestCompletionPage />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
