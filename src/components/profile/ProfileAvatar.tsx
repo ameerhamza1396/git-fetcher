@@ -197,24 +197,20 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
 
     const handleOpenCameraRoll = () => {
         if (permissionGranted) {
-            // Permission already granted: trigger device media selection directly
             customFileInputRef.current?.click();
         } else {
-            // Permission not granted: open permission bottom sheet modal
             setShowMediaPickerModal(true);
-            setPermissionStatus('requesting');
         }
     };
 
     const handleGrantPermission = () => {
         setPermissionGranted(true);
-        setPermissionStatus('granted');
         localStorage.setItem('android_media_permission', 'granted');
-        toast.success('Android Media Permission Granted!');
-        // Trigger media file selection immediately
+        setShowMediaPickerModal(false);
+        toast.success('Media Permission Granted!');
         setTimeout(() => {
             customFileInputRef.current?.click();
-        }, 300);
+        }, 150);
     };
 
     const handleSelectSamplePhoto = async (photoUrl: string) => {
