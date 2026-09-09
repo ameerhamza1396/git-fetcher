@@ -81,8 +81,8 @@ const Login = () => {
            className="w-full max-w-md rounded-[2rem] border border-white/80 bg-white/75 px-5 py-7 shadow-[0_24px_80px_rgba(14,165,233,.09)] backdrop-blur-xl sm:px-8"
         >
           {/* Welcome text */}
-          <div className="text-center mb-8">
-            <h1 className="whitespace-nowrap font-['Syne'] text-[clamp(2rem,8vw,2.55rem)] font-extrabold tracking-[-.055em]">
+          <div className="text-center mb-8 flex flex-col items-center justify-center">
+            <h1 className="whitespace-nowrap font-['Syne'] text-[clamp(2rem,8vw,2.55rem)] font-extrabold tracking-[-.055em] flex items-center justify-center">
               <motion.span
                 className="inline-block bg-[linear-gradient(90deg,#2dd4bf,#0ea5e9,#22d3ee,#2dd4bf)] bg-[length:220%_100%] bg-clip-text text-transparent"
                 animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
@@ -92,7 +92,7 @@ const Login = () => {
               </motion.span>
               <span className="text-slate-950">.app</span>
             </h1>
-             <p className="mt-2 font-['Plus_Jakarta_Sans'] text-sm font-bold uppercase tracking-[.22em] text-slate-400">Welcome back</p>
+            <p className="mt-2 font-['Plus_Jakarta_Sans'] text-sm font-bold uppercase tracking-[.22em] text-slate-400 text-center">Welcome back</p>
           </div>
 
           <div className="px-1">

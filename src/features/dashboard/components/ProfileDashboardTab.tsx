@@ -48,7 +48,6 @@ type ProfileDashboardTabProps = {
 };
 
 const mainSettings = [
-  { label: 'Edit Profile', icon: User, link: '/profile' },
   { label: 'Devices & Sessions', icon: MonitorSmartphone, link: '/profile/devices' },
 ] as const;
 
@@ -84,25 +83,28 @@ export function ProfileDashboardTab({
 }: ProfileDashboardTabProps) {
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-br from-primary/10 to-accent border border-border/40 shadow-sm">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center overflow-hidden shrink-0 shadow-md">
-          {cachedAvatarUrl ? (
-            <img src={cachedAvatarUrl} alt={`${displayName}'s avatar`} className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-primary-foreground font-bold text-lg">{displayName.substring(0, 2).toUpperCase()}</span>
-          )}
+      <Link to="/profile" className="flex items-center justify-between p-5 rounded-2xl bg-gradient-to-br from-primary/10 to-accent border border-border/40 shadow-sm hover:opacity-95 active:scale-[0.99] transition-all group">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center overflow-hidden shrink-0 shadow-md">
+            {cachedAvatarUrl ? (
+              <img src={cachedAvatarUrl} alt={`${displayName}'s avatar`} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-primary-foreground font-bold text-lg">{displayName.substring(0, 2).toUpperCase()}</span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold text-foreground truncate">{displayName}</h2>
+            <p className="text-xs text-muted-foreground truncate">{email}</p>
+            <Badge className="mt-1.5 text-[10px] bg-primary/15 text-primary border-0 font-semibold">{userPlanDisplayName}</Badge>
+            {!isOfflineMode && (
+              <p className="mt-1 text-[10px] font-bold text-muted-foreground">
+                {aiUsageSummaryLoading ? 'Checking AI usage...' : aiUsageSummary?.label}
+              </p>
+            )}
+          </div>
         </div>
-        <div className="min-w-0">
-          <h2 className="text-lg font-bold text-foreground truncate">{displayName}</h2>
-          <p className="text-xs text-muted-foreground truncate">{email}</p>
-          <Badge className="mt-1.5 text-[10px] bg-primary/15 text-primary border-0 font-semibold">{userPlanDisplayName}</Badge>
-          {!isOfflineMode && (
-            <p className="mt-1 text-[10px] font-bold text-muted-foreground">
-              {aiUsageSummaryLoading ? 'Checking AI usage...' : aiUsageSummary?.label}
-            </p>
-          )}
-        </div>
-      </div>
+        <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:translate-x-1 transition-transform shrink-0 ml-2" />
+      </Link>
 
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-4">
