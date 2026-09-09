@@ -191,21 +191,23 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
 
     const handleOpenCamera = async () => {
         try {
-            const { Camera: CapCamera, CameraResultType, CameraSource } = await import('@capacitor/camera');
-            const photo = await CapCamera.getPhoto({
-                quality: 90,
-                allowEditing: true,
-                resultType: CameraResultType.DataUrl,
-                source: CameraSource.Camera,
-            });
+            const win = window as any;
+            if (win.Capacitor?.isPluginAvailable?.('Camera') && win.Capacitor?.Plugins?.Camera) {
+                const photo = await win.Capacitor.Plugins.Camera.getPhoto({
+                    quality: 90,
+                    allowEditing: true,
+                    resultType: 'dataUrl',
+                    source: 'CAMERA',
+                });
 
-            if (photo.dataUrl) {
-                setImageSrc(photo.dataUrl);
-                setCrop({ x: 0, y: 0 });
-                setZoom(1);
-                setRotation(0);
-                setShowMediaPickerModal(false);
-                return;
+                if (photo?.dataUrl) {
+                    setImageSrc(photo.dataUrl);
+                    setCrop({ x: 0, y: 0 });
+                    setZoom(1);
+                    setRotation(0);
+                    setShowMediaPickerModal(false);
+                    return;
+                }
             }
         } catch (err) {
             console.warn('Capacitor camera error/cancellation, falling back to input:', err);
