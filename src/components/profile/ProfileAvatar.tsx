@@ -1,7 +1,5 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,6 +15,12 @@ import {
     ZoomIn,
     ZoomOut,
     RotateCw,
+    Camera,
+    FolderImage,
+    Lock,
+    Check,
+    Grid,
+    Folder,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import {
@@ -36,6 +40,40 @@ import Cropper from 'react-easy-crop';
 
 const CLOUDINARY_CLOUD_NAME = 'dsrzawwej';
 const CLOUDINARY_UPLOAD_PRESET = 'profiles_pictures';
+
+// Mock sample pictures for in-app custom media picker (grouped by album)
+const SAMPLE_MEDIA_ALBUMS = [
+    {
+        id: 'recent',
+        name: 'Recent Photos',
+        photos: [
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
+            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80',
+            'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=600&q=80',
+            'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&q=80',
+            'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80',
+            'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=600&q=80',
+        ]
+    },
+    {
+        id: 'camera',
+        name: 'Camera',
+        photos: [
+            'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=600&q=80',
+            'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?auto=format&fit=crop&w=600&q=80',
+            'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=600&q=80',
+        ]
+    },
+    {
+        id: 'avatars',
+        name: 'Avatars & Art',
+        photos: [
+            'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=600&q=80',
+            'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=600&q=80',
+            'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=600&q=80',
+        ]
+    }
+];
 
 // Helper to create a cropped image blob from canvas
 const createCroppedImage = async (imageSrc: string, pixelCrop: any): Promise<Blob> => {
@@ -79,15 +117,23 @@ const createCroppedImage = async (imageSrc: string, pixelCrop: any): Promise<Blo
     });
 };
 
-const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDisplayName, planColors, isHeader }) => {
+const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDisplayName, planColors, isHeader }: any) => {
     const queryClient = useQueryClient();
     const { theme, setTheme } = useTheme();
 
-    const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
     const [profilePictureError, setProfilePictureError] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
+
+    // Modal Visibility states
     const [showAvatarEditDialog, setShowAvatarEditDialog] = useState(false);
+    const [showMediaPickerModal, setShowMediaPickerModal] = useState(false);
+    const [permissionStatus, setPermissionStatus] = useState<'idle' | 'requesting' | 'granted'>('idle');
+    const [selectedAlbum, setSelectedAlbum] = useState('recent');
+
+    // Hidden file inputs for web/device fallbacks
+    const cameraInputRef = useRef<HTMLInputElement>(null);
+    const customFileInputRef = useRef<HTMLInputElement>(null);
 
     // Cropper state
     const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -104,40 +150,65 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
         setCroppedAreaPixels(croppedPixels);
     }, []);
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileSelect = (file: File) => {
         setProfilePictureError('');
-        setProfilePictureFile(null);
-        setImageSrc(null);
-        setCrop({ x: 0, y: 0 });
-        setZoom(1);
-        setRotation(0);
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        const maxSizeMB = 5;
+        const maxSizeBytes = maxSizeMB * 1024 * 1024;
 
+        if (!allowedTypes.includes(file.type)) {
+            setProfilePictureError('Invalid file type. Please upload a JPEG, PNG, or WEBP image.');
+            return;
+        }
+
+        if (file.size > maxSizeBytes) {
+            setProfilePictureError(`File size exceeds ${maxSizeMB}MB limit.`);
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            setImageSrc(reader.result as string);
+            setCrop({ x: 0, y: 0 });
+            setZoom(1);
+            setRotation(0);
+            setShowMediaPickerModal(false);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleNativeFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
-            const file = e.target.files[0];
-            const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-            const maxSizeMB = 2;
-            const maxSizeBytes = maxSizeMB * 1024 * 1024;
+            handleFileSelect(e.target.files[0]);
+        }
+    };
 
-            if (!allowedTypes.includes(file.type)) {
-                setProfilePictureError('Invalid file type. Please upload a JPEG, PNG, or WEBP image.');
-                e.target.value = '';
-                return;
-            }
+    const handleOpenCamera = () => {
+        if (cameraInputRef.current) {
+            cameraInputRef.current.click();
+        }
+    };
 
-            if (file.size > maxSizeBytes) {
-                setProfilePictureError(`File size exceeds ${maxSizeMB}MB limit.`);
-                e.target.value = '';
-                return;
-            }
+    const handleOpenCameraRoll = () => {
+        setShowMediaPickerModal(true);
+        if (permissionStatus === 'idle') {
+            setPermissionStatus('requesting');
+        }
+    };
 
-            setProfilePictureFile(file);
+    const handleGrantPermission = () => {
+        setPermissionStatus('granted');
+        toast.success('Android Media Permission Granted!');
+    };
 
-            // Read file for cropper
-            const reader = new FileReader();
-            reader.onload = () => {
-                setImageSrc(reader.result as string);
-            };
-            reader.readAsDataURL(file);
+    const handleSelectSamplePhoto = async (photoUrl: string) => {
+        try {
+            const res = await fetch(photoUrl);
+            const blob = await res.blob();
+            const file = new File([blob], 'selected_photo.jpg', { type: 'image/jpeg' });
+            handleFileSelect(file);
+        } catch (err) {
+            toast.error('Failed to load selected photo.');
         }
     };
 
@@ -170,7 +241,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
             const data = await response.json();
             setIsUploading(false);
             setUploadProgress(100);
-            toast.success('Profile picture uploaded successfully!');
+            toast.success('Profile picture updated successfully!');
             return data.secure_url;
         } catch (uploadError: any) {
             console.error('Cloudinary Upload Error:', uploadError);
@@ -224,7 +295,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
 
     const resetDialogState = () => {
         setShowAvatarEditDialog(false);
-        setProfilePictureFile(null);
+        setShowMediaPickerModal(false);
         setProfilePictureError('');
         setImageSrc(null);
         setCrop({ x: 0, y: 0 });
@@ -240,7 +311,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
             return;
         }
         if (profilePictureError) {
-            toast.error('Please fix the file upload error before saving.');
+            toast.error('Please fix the error before saving.');
             return;
         }
 
@@ -260,8 +331,27 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
         deleteAvatarMutation.mutate(undefined);
     };
 
+    const currentAlbumData = SAMPLE_MEDIA_ALBUMS.find(a => a.id === selectedAlbum) || SAMPLE_MEDIA_ALBUMS[0];
+
     return (
         <>
+            {/* Hidden File Inputs */}
+            <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleNativeFileChange}
+            />
+            <input
+                ref={customFileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handleNativeFileChange}
+            />
+
             {isHeader ? (
                 <div className="flex items-center space-x-3">
                     <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-9 h-9 p-0 hover:scale-110 transition-transform duration-200">
@@ -282,10 +372,11 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                 </div>
             ) : (
                 <div className="relative w-24 h-24 mx-auto mb-2 group cursor-pointer" onClick={() => setShowAvatarEditDialog(true)}>
+                    {/* Circle Avatar */}
                     <div className="w-full h-full rounded-full overflow-hidden border-4 border-blue-400 dark:border-blue-600 shadow-md">
-                        <Avatar className="w-full h-full">
-                            <AvatarImage src={cachedAvatarUrl || undefined} alt="Profile Avatar" className="w-full h-full object-cover transition-all duration-300" />
-                            <AvatarFallback className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white text-3xl font-bold">
+                        <Avatar className="w-full h-full rounded-full">
+                            <AvatarImage src={cachedAvatarUrl || undefined} alt="Profile Avatar" className="w-full h-full object-cover transition-all duration-300 rounded-full" />
+                            <AvatarFallback className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white text-3xl font-bold rounded-full">
                                 {displayName.substring(0, 1).toUpperCase()}
                             </AvatarFallback>
                         </Avatar>
@@ -306,35 +397,35 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                 </div>
             )}
 
-            {/* Profile Picture Edit Bottom Sheet */}
+            {/* Main Profile Picture Edit Bottom Sheet */}
             <Sheet open={showAvatarEditDialog} onOpenChange={(open) => { if (!open) resetDialogState(); else setShowAvatarEditDialog(true); }}>
                 <SheetContent side="bottom" className="rounded-t-3xl max-h-[85vh] overflow-y-auto px-6 pt-6 pb-8 max-w-lg mx-auto border-t border-border shadow-2xl">
-                    <SheetHeader className="text-left mb-2">
-                        <SheetTitle className="flex items-center gap-2 text-xl font-bold">
+                    <SheetHeader className="text-left mb-3">
+                        <SheetTitle className="flex items-center gap-2 text-xl font-bold font-syne">
                             <ImageIcon className="h-5 w-5 text-primary" /> Edit Profile Picture
                         </SheetTitle>
                         <SheetDescription>
-                            Upload and crop your photo to a perfect square.
+                            Update your profile photo. Preview is shown in a clean circle.
                         </SheetDescription>
                     </SheetHeader>
 
-                    <div className="flex flex-col items-center gap-4 py-2">
-                        {/* Current avatar — large preview */}
+                    <div className="flex flex-col items-center gap-5 py-2">
+                        {/* Circle Avatar Preview (matching original circle shape) */}
                         {!imageSrc && (
-                            <div className="relative w-44 h-44 rounded-2xl overflow-hidden border-2 border-border shadow-md bg-muted">
-                                <Avatar className="w-full h-full rounded-none">
-                                    <AvatarImage src={cachedAvatarUrl || undefined} alt="Current Avatar" className="w-full h-full object-cover" />
-                                    <AvatarFallback className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white text-5xl font-bold rounded-none">
+                            <div className="relative w-44 h-44 rounded-full overflow-hidden border-4 border-primary/30 shadow-xl bg-muted">
+                                <Avatar className="w-full h-full rounded-full">
+                                    <AvatarImage src={cachedAvatarUrl || undefined} alt="Current Avatar" className="w-full h-full object-cover rounded-full" />
+                                    <AvatarFallback className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white text-5xl font-bold rounded-full">
                                         {displayName.substring(0, 1).toUpperCase()}
                                     </AvatarFallback>
                                 </Avatar>
                             </div>
                         )}
 
-                        {/* 1:1 Cropper */}
+                        {/* 1:1 Circle Cropper */}
                         {imageSrc && (
                             <div className="w-full flex flex-col gap-3">
-                                <div className="relative w-full aspect-square max-h-[300px] rounded-2xl overflow-hidden bg-black mx-auto">
+                                <div className="relative w-full aspect-square max-h-[280px] rounded-full overflow-hidden bg-black mx-auto border-4 border-primary/30 shadow-inner">
                                     <Cropper
                                         image={imageSrc}
                                         crop={crop}
@@ -350,7 +441,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                                     />
                                 </div>
                                 {/* Zoom & Rotate controls */}
-                                <div className="flex items-center gap-3 px-1">
+                                <div className="flex items-center gap-3 px-2">
                                     <ZoomOut className="h-4 w-4 text-muted-foreground shrink-0" />
                                     <Slider
                                         value={[zoom]}
@@ -368,39 +459,45 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                             </div>
                         )}
 
-                        {/* File picker + Delete row */}
+                        {/* Two Main Option Buttons: Take a Picture & Camera Roll */}
                         <div className="w-full space-y-3">
-                            <div className="flex items-center gap-2">
-                                <Label htmlFor="dialogProfilePictureUpload" className="sr-only">Upload image</Label>
-                                <Input
-                                    id="dialogProfilePictureUpload"
-                                    type="file"
-                                    accept="image/jpeg,image/png,image/webp"
-                                    onChange={handleFileChange}
-                                    className="flex-1 text-xs file:text-xs bg-muted/50 border-border cursor-pointer"
-                                />
-                                {userAvatarUrl && !imageSrc && (
-                                    <Button
-                                        variant="destructive"
-                                        size="icon"
-                                        onClick={handleDeleteAvatar}
-                                        disabled={deleteAvatarMutation.isPending}
-                                        className="h-9 w-9 shrink-0"
-                                        title="Delete current picture"
-                                    >
-                                        {deleteAvatarMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                                    </Button>
-                                )}
-                            </div>
-                            <p className="text-[11px] text-muted-foreground">JPEG, PNG or WEBP · Max 2 MB</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={handleOpenCamera}
+                                    className="h-14 flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-primary/20 hover:border-primary hover:bg-primary/5 transition-all"
+                                >
+                                    <Camera className="h-5 w-5 text-primary" />
+                                    <span className="text-xs font-semibold">Take a Picture</span>
+                                </Button>
 
-                            {profilePictureFile && !profilePictureError && (
-                                <p className="text-xs text-muted-foreground">
-                                    Selected: {profilePictureFile.name} ({(profilePictureFile.size / 1024 / 1024).toFixed(2)} MB)
-                                </p>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={handleOpenCameraRoll}
+                                    className="h-14 flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-primary/20 hover:border-primary hover:bg-primary/5 transition-all"
+                                >
+                                    <FolderImage className="h-5 w-5 text-primary" />
+                                    <span className="text-xs font-semibold">Camera Roll</span>
+                                </Button>
+                            </div>
+
+                            {/* Delete current avatar option */}
+                            {userAvatarUrl && !imageSrc && (
+                                <Button
+                                    variant="ghost"
+                                    onClick={handleDeleteAvatar}
+                                    disabled={deleteAvatarMutation.isPending}
+                                    className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 text-xs gap-2"
+                                >
+                                    {deleteAvatarMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                    Remove Current Picture
+                                </Button>
                             )}
+
                             {profilePictureError && (
-                                <p className="text-destructive text-xs flex items-center gap-1">
+                                <p className="text-destructive text-xs flex items-center gap-1 justify-center">
                                     <XCircle className="h-3.5 w-3.5" /> {profilePictureError}
                                 </p>
                             )}
@@ -411,18 +508,110 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                         <SheetClose asChild>
                             <Button variant="outline" className="w-full sm:w-auto">Cancel</Button>
                         </SheetClose>
-                        <Button
-                            onClick={handleSubmitProfilePicture}
-                            disabled={isUploading || updateAvatarUrlMutation.isPending || !imageSrc || !croppedAreaPixels || !!profilePictureError}
-                            className="w-full sm:w-auto"
-                        >
-                            {isUploading || updateAvatarUrlMutation.isPending ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                                <UploadCloud className="mr-2 h-4 w-4" />
-                            )}
-                            {isUploading ? `Uploading ${uploadProgress.toFixed(0)}%` : 'Save'}
-                        </Button>
+                        {imageSrc && (
+                            <Button
+                                onClick={handleSubmitProfilePicture}
+                                disabled={isUploading || updateAvatarUrlMutation.isPending || !imageSrc || !croppedAreaPixels || !!profilePictureError}
+                                className="w-full sm:w-auto"
+                            >
+                                {isUploading || updateAvatarUrlMutation.isPending ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <UploadCloud className="mr-2 h-4 w-4" />
+                                )}
+                                {isUploading ? `Uploading ${uploadProgress.toFixed(0)}%` : 'Save Picture'}
+                            </Button>
+                        )}
+                    </SheetFooter>
+                </SheetContent>
+            </Sheet>
+
+            {/* Custom Android In-App Camera Roll & Permission Sheet Modal */}
+            <Sheet open={showMediaPickerModal} onOpenChange={setShowMediaPickerModal}>
+                <SheetContent side="bottom" className="rounded-t-3xl max-h-[85vh] overflow-y-auto px-6 pt-6 pb-8 max-w-lg mx-auto border-t border-border shadow-2xl">
+                    <SheetHeader className="text-left mb-3">
+                        <SheetTitle className="text-2xl font-bold font-syne text-foreground tracking-tight">
+                            Select A Picture
+                        </SheetTitle>
+                        <SheetDescription>
+                            Browse your photos & albums to choose a new profile picture.
+                        </SheetDescription>
+                    </SheetHeader>
+
+                    {/* Android Permission Prompt Screen */}
+                    {permissionStatus === 'requesting' && (
+                        <div className="flex flex-col items-center justify-center p-6 text-center space-y-4 bg-muted/30 rounded-2xl border border-border">
+                            <div className="p-4 bg-primary/10 rounded-full text-primary">
+                                <Lock className="h-8 w-8" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-base font-syne">Android Permission Required</h3>
+                                <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+                                    Medmacs requires permission to access your device photos and media library.
+                                </p>
+                            </div>
+                            <Button onClick={handleGrantPermission} className="w-full max-w-xs font-semibold gap-2">
+                                <Check className="h-4 w-4" /> Allow Access
+                            </Button>
+                        </div>
+                    )}
+
+                    {/* Custom Media Gallery UI once Permission Granted */}
+                    {permissionStatus !== 'requesting' && (
+                        <div className="space-y-4 py-2">
+                            {/* Album Selector Tabs */}
+                            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                                {SAMPLE_MEDIA_ALBUMS.map((album) => (
+                                    <button
+                                        key={album.id}
+                                        type="button"
+                                        onClick={() => setSelectedAlbum(album.id)}
+                                        className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                                            selectedAlbum === album.id
+                                                ? 'bg-primary text-primary-foreground font-semibold shadow-sm'
+                                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                                        }`}
+                                    >
+                                        <Folder className="h-3.5 w-3.5" />
+                                        {album.name}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Photo Grid */}
+                            <div className="grid grid-cols-3 gap-2 max-h-[320px] overflow-y-auto p-1 bg-muted/20 rounded-2xl border border-border">
+                                {currentAlbumData.photos.map((url, idx) => (
+                                    <button
+                                        key={idx}
+                                        type="button"
+                                        onClick={() => handleSelectSamplePhoto(url)}
+                                        className="relative aspect-square rounded-xl overflow-hidden group hover:ring-2 hover:ring-primary transition-all border border-border/50"
+                                    >
+                                        <img src={url} alt={`Media ${idx}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+                                        <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <Check className="h-5 w-5 text-white drop-shadow" />
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Option to browse native storage directly */}
+                            <div className="pt-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => customFileInputRef.current?.click()}
+                                    className="w-full text-xs gap-2 rounded-xl"
+                                >
+                                    <Grid className="h-4 w-4 text-primary" /> Browse Local Files
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    <SheetFooter className="mt-4">
+                        <SheetClose asChild>
+                            <Button variant="outline" className="w-full">Cancel</Button>
+                        </SheetClose>
                     </SheetFooter>
                 </SheetContent>
             </Sheet>
