@@ -19,7 +19,7 @@ export const getQuickActions = (): DashboardAction[] => [
 ];
 
 export const getPersonalizationActions = (): DashboardAction[] => [
-  { title: 'Mistake Book', description: 'Review wrong MCQs', icon: Target, link: '/mistake-book', gradient: 'from-rose-500 to-red-600', iconColor: 'text-rose-100', flatIconColor: 'text-rose-500' },
+  { title: 'Mistake Book', description: 'Review wrong MCQs', icon: Target, link: '/mistake-book', gradient: 'from-rose-500 to-red-600', iconColor: 'text-rose-100', flatIconColor: 'text-rose-500', tag: 'New!', tagColor: 'bg-red-500 text-white animate-pulse' },
   { title: 'Smart Deck', description: 'Repair weakest chapter', icon: FlaskConical, link: '/smart-deck', gradient: 'from-violet-500 to-fuchsia-600', iconColor: 'text-violet-100', flatIconColor: 'text-violet-500' },
 ];
 
