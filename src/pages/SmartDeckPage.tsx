@@ -83,10 +83,53 @@ const SmartDeckPage = () => {
           </h3>
         </div>
 
-        {/* Scrollable List Area */}
-        <div className="flex-1 overflow-y-auto pr-1 space-y-4">
           {isLoading ? (
-            <div className="h-48 animate-pulse rounded-3xl border border-border/30 bg-muted/20" />
+            <div className="space-y-4 animate-fade-in">
+              {/* Weakest chapter skeleton card */}
+              <div className="rounded-3xl border border-border/40 bg-card/60 p-5 space-y-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 shrink-0 animate-pulse rounded-2xl bg-muted/70" />
+                  <div className="space-y-2 min-w-0 flex-1">
+                    <div className="h-3 w-28 animate-pulse rounded-md bg-muted/70" />
+                    <div className="h-5 w-48 animate-pulse rounded-md bg-muted/80" />
+                  </div>
+                  <div className="h-6 w-20 animate-pulse rounded-full bg-muted/70" />
+                </div>
+
+                <div className="space-y-2 rounded-2xl bg-muted/30 p-3.5 border border-border/20">
+                  <div className="h-3 w-3/4 animate-pulse rounded bg-muted/60" />
+                  <div className="h-3 w-1/2 animate-pulse rounded bg-muted/60" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="h-11 animate-pulse rounded-2xl bg-muted/70" />
+                  <div className="h-11 animate-pulse rounded-2xl bg-muted/70" />
+                </div>
+              </div>
+
+              {/* Upcoming chapters list skeleton */}
+              <div className="rounded-3xl border border-border/40 bg-card/60 overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between border-b border-border/40 bg-muted/30 px-4 py-3">
+                  <div className="space-y-1.5">
+                    <div className="h-4 w-36 animate-pulse rounded bg-muted/70" />
+                    <div className="h-3 w-44 animate-pulse rounded bg-muted/50" />
+                  </div>
+                  <div className="h-5 w-5 animate-pulse rounded bg-muted/60" />
+                </div>
+                <div className="divide-y divide-border/30 p-1">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-3 px-4 py-3.5">
+                      <div className="h-8 w-8 shrink-0 animate-pulse rounded-xl bg-muted/70" />
+                      <div className="space-y-1.5 min-w-0 flex-1">
+                        <div className="h-4 w-40 animate-pulse rounded bg-muted/80" />
+                        <div className="h-3 w-56 animate-pulse rounded bg-muted/50" />
+                      </div>
+                      <div className="h-4 w-4 shrink-0 animate-pulse rounded bg-muted/60" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           ) : wrongAttempts.length === 0 || !weakestChapter ? (
             <Card className="border-border/40 bg-card/80">
               <CardContent className="p-5 text-center">
