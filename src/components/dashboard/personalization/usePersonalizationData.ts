@@ -50,24 +50,49 @@ export const usePersonalizationData = () => {
           .eq('correction_mode', true),
       ]);
 
-      if (wrongResult.error) throw wrongResult.error;
-      if (correctedResult.error) throw correctedResult.error;
+      if (wrongResult.error) {
+        console.error('[MistakeBook usePersonalizationData] wrongResult error:', wrongResult.error);
+        throw wrongResult.error;
+      }
+      if (correctedResult.error) {
+        console.error('[MistakeBook usePersonalizationData] correctedResult error:', correctedResult.error);
+        throw correctedResult.error;
+      }
+
+      console.log('[MistakeBook usePersonalizationData] Raw wrong attempts fetched from DB:', wrongResult.data?.length, wrongResult.data);
+      console.log('[MistakeBook usePersonalizationData] Corrected mode answers count:', correctedResult.data?.length);
 
       const correctedMcqIds = new Set((correctedResult.data || []).map(row => row.mcq_id).filter(Boolean));
-      const userSubjects = await fetchCloudContent<Subject[]>('mcq-subjects').catch(() => null) ?? [];
+      const userSubjects = await fetchCloudContent<Subject[]>('mcq-subjects').catch((err) => {
+        console.error('[MistakeBook usePersonalizationData] Error fetching mcq-subjects:', err);
+        return null;
+      }) ?? [];
+      console.log('[MistakeBook usePersonalizationData] Available userSubjects fetched:', userSubjects?.length, userSubjects);
       const availableSubjectIds = new Set(userSubjects.map((s: Subject) => s.id));
       const seenWrongMcqIds = new Set<string>();
 
-      return normalizeWrongAttempts(wrongResult.data || []).filter(attempt => {
-        if (correctedMcqIds.has(attempt.mcq.id)) return false;
-        if (seenWrongMcqIds.has(attempt.mcq.id)) return false;
+      const normalized = normalizeWrongAttempts(wrongResult.data || []);
+      console.log('[MistakeBook usePersonalizationData] Normalized wrong attempts count:', normalized?.length, normalized);
+
+      const filtered = normalized.filter(attempt => {
+        if (correctedMcqIds.has(attempt.mcq.id)) {
+          console.log('[MistakeBook] Excluding corrected MCQ:', attempt.mcq.id);
+          return false;
+        }
+        if (seenWrongMcqIds.has(attempt.mcq.id)) {
+          return false;
+        }
         // Check that attempt belongs to one of user's available subjects/chapters
         if (availableSubjectIds.size > 0 && attempt.mcq.subjectId && !availableSubjectIds.has(attempt.mcq.subjectId)) {
+          console.log('[MistakeBook] Excluding attempt due to subject filter not in availableSubjectIds:', attempt.mcq.subjectId, attempt.mcq);
           return false;
         }
         seenWrongMcqIds.add(attempt.mcq.id);
         return true;
       });
+
+      console.log('[MistakeBook usePersonalizationData] Final filtered wrong attempts count:', filtered?.length, filtered);
+      return filtered;
     },
     enabled: !!user?.id,
   });

@@ -48,6 +48,7 @@ export const fetchCloudContent = async <T>(
   options: { throwOnFailure?: boolean } = {},
 ): Promise<T | null> => {
   try {
+    console.log(`[fetchCloudContent] Requesting resource: ${resource}`, { params, CONTENT_API_URL });
     let sessionTimeoutId: ReturnType<typeof setTimeout> | undefined;
     const sessionResult = await Promise.race([
       supabase.auth.getSession(),
@@ -58,8 +59,10 @@ export const fetchCloudContent = async <T>(
     if (sessionTimeoutId) clearTimeout(sessionTimeoutId);
 
     const token = sessionResult?.data.session?.access_token;
+    console.log(`[fetchCloudContent] Auth token present: ${!!token}`);
 
     if (!token) {
+      console.warn(`[fetchCloudContent] No access token available for resource: ${resource}`);
       if (options.throwOnFailure) throw new Error('Content session unavailable');
       return null;
     }
@@ -74,6 +77,7 @@ export const fetchCloudContent = async <T>(
     });
 
     const requestKey = url.toString();
+    console.log(`[fetchCloudContent] Full URL: ${requestKey}`);
     let request = inFlightContentRequests.get(requestKey);
     if (!request) {
       request = (async () => {
@@ -92,17 +96,29 @@ export const fetchCloudContent = async <T>(
               cache: 'no-store',
               signal: controller.signal,
             });
+            console.log(`[fetchCloudContent] Response status for ${resource}: ${response.status}`);
             if (response.ok || response.status < 500) break;
           } catch (error) {
+            console.error(`[fetchCloudContent] Fetch attempt ${attempt + 1} failed:`, error);
             lastError = error;
           } finally {
             clearTimeout(timeoutId);
           }
         }
 
-        if (!response) throw lastError ?? new Error('Content server unavailable');
-        if (!response.ok) throw new Error(`Content request failed (${response.status})`);
-        return extractContentPayload(await response.json());
+        if (!response) {
+          console.error(`[fetchCloudContent] No response received for ${resource}`);
+          throw lastError ?? new Error('Content server unavailable');
+        }
+        if (!response.ok) {
+          const errText = await response.text().catch(() => '');
+          console.error(`[fetchCloudContent] Response not OK (${response.status}): ${errText}`);
+          throw new Error(`Content request failed (${response.status})`);
+        }
+        const json = await response.json();
+        const extracted = extractContentPayload<T>(json);
+        console.log(`[fetchCloudContent] Extracted payload for ${resource}:`, { raw: json, extracted });
+        return extracted;
       })().finally(() => {
         inFlightContentRequests.delete(requestKey);
       });
@@ -111,6 +127,7 @@ export const fetchCloudContent = async <T>(
 
     return await request as T | null;
   } catch (error) {
+    console.error(`[fetchCloudContent] Caught error fetching ${resource}:`, error);
     if (options.throwOnFailure) throw error;
     return null;
   }

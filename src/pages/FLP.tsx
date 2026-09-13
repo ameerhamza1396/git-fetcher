@@ -261,29 +261,36 @@ const FLP = () => {
         return;
       }
 
+      console.log("[FLP handleStartTest] Starting MCQ fetch:", { bypassSubject, selectedSubject, selectedMcqCount });
       let mcqsData: MCQ[] = [];
       let subjectName = '';
 
       if (bypassSubject || !selectedSubject) {
         subjectName = 'All Subjects';
         const params: Record<string, string | number> = { limit: selectedMcqCount };
+        console.log("[FLP handleStartTest] Fetching flp-questions for All Subjects:", params);
         mcqsData = (await fetchCloudContent<MCQ[]>('flp-questions', params)) || [];
       } else {
         const selectedSubjectRecord = subjects.find(subject => subject.id === selectedSubject);
         subjectName = selectedSubjectRecord?.name || '';
         const params: Record<string, string | number> = { subjectId: selectedSubject!, limit: selectedMcqCount };
+        console.log("[FLP handleStartTest] Fetching flp-questions for specific subject:", params);
         mcqsData = (await fetchCloudContent<MCQ[]>('flp-questions', params)) || [];
       }
 
-      if (!mcqsData || mcqsData.length === 0) { toast({ title: "No MCQs Found" }); setIsFetchingMcqs(false); return; }
-      if (mcqsData.length < selectedMcqCount) { toast({ title: "Not Enough Questions", description: `Only ${mcqsData.length} available.` }); setIsFetchingMcqs(false); return; }
+      console.log("[FLP handleStartTest] MCQs returned count:", mcqsData?.length, mcqsData);
+
+      if (!mcqsData || mcqsData.length === 0) { console.warn("[FLP handleStartTest] No MCQs found"); toast({ title: "No MCQs Found" }); setIsFetchingMcqs(false); return; }
+      if (mcqsData.length < selectedMcqCount) { console.warn(`[FLP handleStartTest] Not enough questions: got ${mcqsData.length}, needed ${selectedMcqCount}`); toast({ title: "Not Enough Questions", description: `Only ${mcqsData.length} available.` }); setIsFetchingMcqs(false); return; }
       
       const selectedMcqs = bypassSubject
         ? selectBalancedMcqs(mcqsData as MCQ[], selectedMcqCount)
         : shuffleArray(mcqsData as MCQ[]).slice(0, selectedMcqCount);
 
+      console.log("[FLP handleStartTest] Selected balanced MCQs:", selectedMcqs?.length);
       navigate('/flp/test', { state: { mcqs: selectedMcqs, subjectName, sessionId: result?.session_id } });
     } catch (err) {
+      console.error("[FLP handleStartTest] Error preparing test:", err);
       toast({ title: "Error", description: (err as any)?.message || "Failed to prepare test.", variant: "destructive" });
     } finally { setIsFetchingMcqs(false); }
   };
