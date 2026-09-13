@@ -302,19 +302,19 @@ const Checkout = () => {
                     {/* Order Summary Card */}
                     <motion.div 
                         variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } } }}
-                        className="rounded-[2rem] border border-border/40 bg-card/80 backdrop-blur-xl overflow-hidden mb-6"
+                        className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl overflow-hidden mb-5 shadow-sm"
                     >
                         <div className="p-6">
-                            <h2 className="text-lg font-black uppercase tracking-tight text-foreground mb-4">Order Summary</h2>
+                            <h2 className="text-sm font-black uppercase tracking-widest text-primary mb-4">Order Summary</h2>
                             <div className="flex justify-between items-start mb-3">
                                 <div>
-                                    <p className="text-sm font-bold text-foreground">{planName} Plan</p>
-                                    <span className="text-[10px] mt-1 inline-block px-2 py-0.5 bg-primary/10 text-primary rounded-full font-bold uppercase">{validityDisplay}</span>
+                                    <p className="text-base font-bold text-foreground">{planName} Plan</p>
+                                    <span className="text-[10px] mt-1 inline-block px-2.5 py-0.5 bg-primary/10 text-primary rounded-full font-bold uppercase tracking-wider">{validityDisplay}</span>
                                 </div>
                                 <span className="font-bold text-foreground">PKR {basePrice.toFixed(2)}</span>
                             </div>
 
-                            <div className="py-2.5 my-2.5 border-t border-border/30 text-xs text-muted-foreground">
+                            <div className="py-2.5 my-2.5 border-t border-border/40 text-xs text-muted-foreground">
                                 <div className="flex justify-between items-center">
                                     <span>Processing Fees</span>
                                     <span className="font-medium text-foreground">PKR {processingFee.toFixed(2)}</span>
@@ -327,7 +327,7 @@ const Checkout = () => {
                                     <span>- PKR {(basePrice - priceAfterPromo).toFixed(2)}</span>
                                 </div>
                             )}
-                            <div className="pt-4 border-t border-border/40 flex justify-between items-center">
+                            <div className="pt-4 border-t border-border/50 flex justify-between items-center">
                                 <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Grand Total</span>
                                 <span className="text-3xl font-black text-foreground">PKR {grandTotal.toFixed(2)}</span>
                             </div>
@@ -337,7 +337,7 @@ const Checkout = () => {
                     {/* Promo Code Card */}
                     <motion.div 
                         variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } } }}
-                        className="rounded-[2rem] border border-border/40 bg-card/80 backdrop-blur-xl overflow-hidden mb-6"
+                        className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl overflow-hidden mb-5 shadow-sm"
                     >
                         <div className="p-5">
                             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Promo Code</p>
@@ -354,15 +354,15 @@ const Checkout = () => {
                     {/* Payment Methods */}
                     <motion.div 
                         variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } } }}
-                        className="mb-6"
+                        className="mb-5"
                     >
                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Payment Method</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
                             <motion.div 
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
+                                whileHover={{ scale: 1.01 }}
+                                whileTap={{ scale: 0.99 }}
                                 onClick={() => setPaymentMethod('easypaisa')}
-                                className={`rounded-[2rem] p-5 cursor-pointer transition-all duration-300 border flex flex-col ${paymentMethod === 'easypaisa' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border/40 bg-card/80 backdrop-blur-xl'}`}
+                                className={`rounded-xl p-5 cursor-pointer transition-all duration-200 border flex flex-col ${paymentMethod === 'easypaisa' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border/60 bg-card/90 backdrop-blur-xl'}`}
                             >
                                 <div className="flex items-center gap-3">
                                     <svg className={`w-5 h-5 shrink-0 ${paymentMethod === 'easypaisa' ? 'text-primary' : 'text-muted-foreground'}`} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -377,10 +377,10 @@ const Checkout = () => {
                             </motion.div>
 
                             <motion.div 
-                                whileHover={{ scale: !isPayFastDisabled ? 1.02 : 1 }}
-                                whileTap={{ scale: !isPayFastDisabled ? 0.98 : 1 }}
+                                whileHover={{ scale: !isPayFastDisabled ? 1.01 : 1 }}
+                                whileTap={{ scale: !isPayFastDisabled ? 0.99 : 1 }}
                                 onClick={() => !isPayFastDisabled && setPaymentMethod('payfast')}
-                                className={`rounded-[2rem] p-5 transition-all duration-300 border flex flex-col ${isPayFastDisabled ? 'opacity-40 grayscale cursor-not-allowed border-border/40 bg-card/50' : 'cursor-pointer'} ${paymentMethod === 'payfast' ? 'border-primary bg-primary/5 ring-1 ring-primary' : (!isPayFastDisabled ? 'border-border/40 bg-card/80 backdrop-blur-xl' : '')}`}
+                                className={`rounded-xl p-5 transition-all duration-200 border flex flex-col ${isPayFastDisabled ? 'opacity-40 grayscale cursor-not-allowed border-border/40 bg-card/50' : 'cursor-pointer'} ${paymentMethod === 'payfast' ? 'border-primary bg-primary/5 ring-1 ring-primary' : (!isPayFastDisabled ? 'border-border/60 bg-card/90 backdrop-blur-xl' : '')}`}
                             >
                                 <div className="flex items-center gap-3">
                                     <svg className={`w-5 h-5 shrink-0 ${paymentMethod === 'payfast' ? 'text-primary' : isPayFastDisabled ? 'text-muted-foreground/50' : 'text-muted-foreground'}`} viewBox="0 0 244.683 244.683" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -401,7 +401,7 @@ const Checkout = () => {
                             <motion.div 
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="mt-4 rounded-[2rem] border border-border/40 bg-card/80 backdrop-blur-xl p-5"
+                                className="mt-4 rounded-xl border border-border/60 bg-card/90 backdrop-blur-xl p-5"
                             >
                                 <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Mobile Account Number</label>
                                 <Input placeholder="03XXXXXXXXX" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))} maxLength={11} className="rounded-xl h-11 mt-1" />
@@ -412,7 +412,7 @@ const Checkout = () => {
                             <motion.div 
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="mt-4 rounded-[2rem] border border-border/40 bg-card/80 backdrop-blur-xl p-5"
+                                className="mt-4 rounded-xl border border-border/60 bg-card/90 backdrop-blur-xl p-5"
                             >
                                 <p className="text-xs text-muted-foreground leading-relaxed">
                                     Your payment will be processed securely by our payment partner. You will be redirected to complete the transaction.
@@ -443,9 +443,9 @@ const Checkout = () => {
                             </motion.p>
                         )}
 
-                        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                        <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
                             <Button 
-                                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-2xl h-14 text-lg font-black uppercase tracking-widest shadow-lg transition-all duration-300" 
+                                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl h-12 text-base font-black uppercase tracking-widest shadow-md transition-all duration-200" 
                                 onClick={processPayment} 
                                 disabled={isLoading || isRedirecting}
                             >
