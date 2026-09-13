@@ -70,6 +70,22 @@ const SetupWizard = () => {
   const [saving, setSaving] = useState(false);
   const [institutes, setInstitutes] = useState<Institute[]>([]);
   const [selectionCategory, setSelectionCategory] = useState<SetupSelectionCategory>('institute');
+  const [showFcpsFreeBadge, setShowFcpsFreeBadge] = useState(false);
+
+  useEffect(() => {
+    let hideTimer: NodeJS.Timeout;
+    const interval = setInterval(() => {
+      setShowFcpsFreeBadge(true);
+      hideTimer = setTimeout(() => {
+        setShowFcpsFreeBadge(false);
+      }, 10000);
+    }, 16000);
+
+    return () => {
+      clearInterval(interval);
+      if (hideTimer) clearTimeout(hideTimer);
+    };
+  }, []);
 
   const [username, setUsername] = useState('');
   const [institute, setInstitute] = useState('');
@@ -781,7 +797,7 @@ const SetupWizard = () => {
                       </div>
                       {selected && <CheckCircle2 className="h-5 w-5 text-cyan-300" />}
                     </div>
-                    <p className="font-['Syne'] text-lg font-extrabold tracking-[-.035em] text-white">{option.label}</p>
+                    <p className="text-base font-bold text-white">{option.label}</p>
                     <p className="mt-1 text-xs font-semibold text-white/50">{option.description}</p>
                   </button>
                 );
@@ -955,7 +971,7 @@ const SetupWizard = () => {
               </div>
             </div>
             <div className={`transition-all duration-300 ${studyOverlayOpen ? 'pointer-events-none blur-[2px] opacity-55' : ''}`}>
-            <Tabs value={selectionCategory} onValueChange={handleSelectionCategoryChange} className="mb-4">
+            <Tabs value={selectionCategory} onValueChange={handleSelectionCategoryChange} className="mb-4 relative">
               <TabsList className="grid h-auto w-full grid-cols-2 rounded-none border-b border-white/10 bg-transparent p-0">
                 <TabsTrigger value="institute" className="rounded-none border-b-2 border-transparent bg-transparent px-2 pb-3 pt-1 text-xs font-black text-white/50 shadow-none transition-all data-[state=active]:border-cyan-400 data-[state=active]:bg-transparent data-[state=active]:!text-cyan-300 data-[state=active]:shadow-none">
                   Institutes
@@ -964,6 +980,14 @@ const SetupWizard = () => {
                   Specialized Tests
                 </TabsTrigger>
               </TabsList>
+              {showFcpsFreeBadge && selectionCategory !== 'specialized_test' && (
+                <div className="absolute right-0 top-full mt-1.5 z-50 animate-bounce flex flex-col items-center w-1/2 pointer-events-none">
+                  <div className="w-0 h-0 border-l-[6px] border-r-[6px] border-b-[6px] border-l-transparent border-r-transparent border-b-red-600" />
+                  <div className="rounded-full bg-red-600 px-3 py-1 text-[11px] font-black text-white shadow-xl whitespace-nowrap tracking-wide">
+                    FCPS Part 1 is totally free! 🚀
+                  </div>
+                </div>
+              )}
             </Tabs>
             <div className="space-y-3 max-h-[40vh] overflow-y-auto px-1 overscroll-contain">
               {sortedGroupNames.map((groupName) => (
@@ -1076,7 +1100,7 @@ const SetupWizard = () => {
                       </span>
                       {selected && <CheckCircle2 className="h-5 w-5 text-cyan-300" />}
                     </div>
-                    <p className="font-['Syne'] text-sm font-extrabold leading-tight tracking-[-.025em] text-white">{option.label}</p>
+                    <p className="text-sm font-bold leading-tight text-white">{option.label}</p>
                   </button>
                 );
               })}

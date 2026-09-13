@@ -9,6 +9,7 @@ import { ProfileDropdown } from '@/components/ProfileDropdown';
 import { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
+import { paymentApi, type PaymentOrder, type PayFastSession } from '@/services/paymentsApi';
 import Seo from '@/components/Seo';
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -17,8 +18,6 @@ import { Browser } from '@capacitor/browser';
 import { useConsent } from '@/components/consent/ConsentProvider';
 import { trackMetaAddPaymentInfo, trackMetaInitiatedCheckout, trackMetaPurchase } from '@/utils/metaAppEvents';
 import { trackGoogleAddPaymentInfo, trackGoogleBeginCheckout, trackGooglePurchase } from '@/utils/googleAnalytics';
-
-const EASYPAISA_API_URL = "https://medmacs.app/api/pay-easypaisa";
 
 const Checkout = () => {
     const { user } = useAuth();
@@ -168,69 +167,44 @@ const Checkout = () => {
         void trackMetaAddPaymentInfo({ ...commerceDetails, paymentMethod: 'easypaisa' });
         trackGoogleAddPaymentInfo({ ...commerceDetails, paymentMethod: 'easypaisa', analyticsConsent: measurementAllowed });
         setError(null); setIsLoading(true); setModalState('processing');
-        const orderRefNum = `EP-${Date.now()}`;
-        const amountFormatted = grandTotal.toFixed(2);
-        const { data: { session } } = await supabase.auth.getSession();
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000);
         try {
-            const response = await fetch(EASYPAISA_API_URL, { method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` }, body: JSON.stringify({ amount: amountFormatted, mobileNo: mobileNumber, orderRefNum, email: user?.email || 'customer@medmacs.app', userId: user?.id, validity, planName }) });
-            clearTimeout(timeoutId);
-            if (!response.ok && response.status !== 202) { const errorData = await response.json().catch(() => ({ message: "Server error occurred." })); throw new Error(errorData.message || "Gateway unreachable."); }
-        } catch (err) { if (err.name === 'AbortError') return; setError(err.message || "An unexpected error occurred."); setModalState('failure'); setIsLoading(false); }
+            const order = await paymentApi<PaymentOrder>('/v1/orders', {
+                method: 'POST',
+                body: { provider: 'easypaisa', planId, validity, currency, promoCode: isPromoApplied ? promoCode : undefined, paymentContext: 'subscription' },
+            });
+            await paymentApi('/v1/easypaisa/initiate', { method: 'POST', body: { orderId: order.orderId, mobileNo: mobileNumber } });
+        } catch (err: any) { console.error("Easypaisa Error:", err); setError(err.message || "An unexpected error occurred."); setModalState('failure'); setIsLoading(false); }
     };
 
     const handlePayFastPayment = async () => {
         void trackMetaAddPaymentInfo({ ...commerceDetails, paymentMethod: 'payfast' });
         trackGoogleAddPaymentInfo({ ...commerceDetails, paymentMethod: 'payfast', analyticsConsent: measurementAllowed });
         setIsLoading(true); setError(null);
-        const basketId = `ORD-${Date.now()}`;
-        const finalAmount = grandTotal.toFixed(2);
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const { error: insertError } = await supabase.from('pending_payments').insert([{ user_id: user?.id, amount: finalAmount, order_id: basketId, status: 'initiated', validity, email: user?.email, plan_name: planName }]);
-            if (insertError) throw new Error("Could not initialize transaction.");
+            const { Capacitor } = await import('@capacitor/core');
+            const isNative = Capacitor.isNativePlatform();
 
-            const response = await fetch('https://medmacs.app/api/checkout', {
+            const order = await paymentApi<PaymentOrder>('/v1/orders', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': session?.access_token ? `Bearer ${session.access_token}` : ''
+                body: {
+                    provider: 'payfast',
+                    planId,
+                    validity,
+                    currency,
+                    promoCode: isPromoApplied ? promoCode : undefined,
+                    paymentContext: 'subscription',
+                    callbackOrigin: isNative ? 'https://com.hmacs.medmacs' : undefined,
                 },
-                body: JSON.stringify({ amount: finalAmount, basketId })
+            });
+            const session = await paymentApi<PayFastSession>('/v1/payfast/session', {
+                method: 'POST',
+                body: { orderId: order.orderId },
             });
 
-            const text = await response.text();
-            let data; try { data = text ? JSON.parse(text) : null; } catch { throw new Error(`Server returned non-JSON response (${response.status}).`); }
-            if (!response.ok || !data?.ACCESS_TOKEN) throw new Error(data?.message || `Gateway error (${response.status})`);
-
-            // On Android, SUCCESS/FAILURE URLs must point to the Capacitor local server
-            // so PayFast redirects back INTO the app (not to the external website).
-            // On web, use the real domain.
-            const { Capacitor } = await import('@capacitor/core');
-            const callbackBase = Capacitor.isNativePlatform()
-                ? 'https://com.hmacs.medmacs'
-                : 'https://medmacs.app';
-
-            const fields = {
-                MERCHANT_ID: "248744", Merchant_Name: "MEDMACS Pakistan", MERCHANT_USERAGENT: navigator.userAgent,
-                TOKEN: data.ACCESS_TOKEN, PROCCODE: "00", TXNAMT: finalAmount,
-                CUSTOMER_MOBILE_NO: mobileNumber || "03000000000",
-                CUSTOMER_EMAIL_ADDRESS: user?.email || "",
-                SUCCESS_URL: `${callbackBase}/payment-success?plan=${encodeURIComponent(planName)}&validity=${validity}&basket_id=${basketId}`,
-                FAILURE_URL: `${callbackBase}/payment-failure`,
-                CHECKOUT_URL: `https://medmacs.app/api/payment-webhook`,
-                BASKET_ID: basketId, ORDER_DATE: new Date().toISOString().slice(0, 10),
-                SIGNATURE: "PAYMENT_REQ", VERSION: "V1.2",
-                TXNDESC: `Upgrade to ${planName} (${duration})`, CURRENCY_CODE: "PKR",
-                P1: user?.id || "", P2: planName, P3: duration
-            };
-
-            if (Capacitor.isNativePlatform()) {
+            if (isNative) {
+                // Reuse the hosted redirect page to auto-submit the gateway form inside the in-app browser
                 const params = new URLSearchParams();
-                Object.entries(fields).forEach(([key, value]) => {
-                    params.append(key, value as string);
-                });
+                Object.entries(session.fields).forEach(([key, value]) => params.append(key, value as string));
                 const redirectUrl = `https://medmacs.app/payfast-redirect.html?${params.toString()}`;
                 const { Browser } = await import('@capacitor/browser');
                 await Browser.open({ url: redirectUrl });
@@ -238,8 +212,8 @@ const Checkout = () => {
             } else {
                 const form = document.createElement("form");
                 form.method = "POST";
-                form.action = "https://ipg1.apps.net.pk/Ecommerce/api/Transaction/PostTransaction";
-                Object.entries(fields).forEach(([key, value]) => {
+                form.action = session.gatewayUrl;
+                Object.entries(session.fields).forEach(([key, value]) => {
                     const input = document.createElement("input");
                     input.type = "hidden"; input.name = key; input.value = value as string;
                     form.appendChild(input);

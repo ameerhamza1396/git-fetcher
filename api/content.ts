@@ -516,6 +516,61 @@ export default async function handler(req: ContentRequest, res: ContentResponse)
         return res.status(200).json({ data: normalizeMcqs(data) });
       }
 
+      case 'flp-questions': {
+        const limitStr = getStringQuery(req.query.limit);
+        const limit = Math.min(Math.max(parseInt(limitStr || '100', 10), 1), 200);
+
+        // Retrieve scoped/visible subjects for the user profile
+        const allScopedSubjects = await fetchScopedSubjects(client, 'subjects') as SubjectRow[];
+        let targetSubjects = allScopedSubjects;
+
+        if (subjectId) {
+          targetSubjects = allScopedSubjects.filter(subj => subj.id === subjectId);
+        }
+
+        if (targetSubjects.length === 0) {
+          // If no institute-scoped subjects found or profile.year is null (like FCPS Part 1),
+          // query all available subjects for FCPS Part 1 or general subjects.
+          const { data: fallbackSubjects } = await client.from('subjects').select('id, name, institutes');
+          targetSubjects = (fallbackSubjects || []) as SubjectRow[];
+        }
+
+        if (targetSubjects.length === 0) {
+          return res.status(200).json({ data: [] });
+        }
+
+        // Get chapters for these subjects
+        const { data: chapters, error: chaptersError } = await client
+          .from('chapters')
+          .select('id, subject_id')
+          .in('subject_id', targetSubjects.map(s => s.id));
+        if (chaptersError) throw chaptersError;
+
+        // Also resolve shared chapters
+        const allSharedChaptersPromises = targetSubjects.map(subj => resolveSharedChapters(client, subj, true));
+        const sharedChaptersArrays = await Promise.all(allSharedChaptersPromises);
+        const sharedChapters = sharedChaptersArrays.flat();
+
+        const chapterIds = [...new Set([
+          ...(chapters || []).map((chapter: any) => chapter.id),
+          ...sharedChapters.map(chapter => chapter.id),
+        ])];
+
+        if (chapterIds.length === 0) {
+          return res.status(200).json({ data: [] });
+        }
+
+        const { data, error } = await client
+          .from('mcqs')
+          .select('*')
+          .in('chapter_id', chapterIds)
+          .limit(limit * 2); // Fetch extra for client-side random balancing
+
+        if (error) throw error;
+
+        return res.status(200).json({ data: normalizeMcqs(data) });
+      }
+
       case 'mcqs-by-subjects': {
         const subjectIdsStr = getStringQuery(req.query.subjectIds);
         if (!subjectIdsStr) return res.status(400).json({ error: 'subjectIds is required' });

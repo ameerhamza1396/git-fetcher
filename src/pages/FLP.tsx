@@ -9,6 +9,7 @@ import UpgradeAccountModal from "@/components/UpgradeAccountModal";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { fetchMCQsBySubject, fetchMCQsBySubjects, fetchSubjects } from "@/utils/mcqData";
+import { fetchCloudContent } from "@/utils/cloudContent";
 import { CollaborateModal } from "@/components/CollaborateModal";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -265,10 +266,8 @@ const FLP = () => {
 
       if (bypassSubject) {
         subjectName = 'All Subjects';
-        const subjectsList = await fetchSubjects();
-        if (subjectsList && subjectsList.length > 0) {
-          mcqsData = await fetchMCQsBySubjects(subjectsList.map(subj => subj.id));
-        }
+        const params: Record<string, string | number> = { limit: selectedMcqCount };
+        mcqsData = (await fetchCloudContent<MCQ[]>('flp-questions', params)) || [];
       } else {
         const selectedSubjectRecord = subjects.find(subject => subject.id === selectedSubject);
         subjectName = selectedSubjectRecord?.name || '';
