@@ -8,7 +8,7 @@ import Seo from "@/components/Seo";
 import UpgradeAccountModal from "@/components/UpgradeAccountModal";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { fetchMCQsBySubject, fetchMCQsBySubjects, fetchSubjects } from "@/utils/mcqData";
+import { fetchSubjects } from "@/utils/mcqData";
 import { fetchCloudContent } from "@/utils/cloudContent";
 import { CollaborateModal } from "@/components/CollaborateModal";
 import { supabase } from "@/integrations/supabase/client";
@@ -264,14 +264,15 @@ const FLP = () => {
       let mcqsData: MCQ[] = [];
       let subjectName = '';
 
-      if (bypassSubject) {
+      if (bypassSubject || !selectedSubject) {
         subjectName = 'All Subjects';
         const params: Record<string, string | number> = { limit: selectedMcqCount };
         mcqsData = (await fetchCloudContent<MCQ[]>('flp-questions', params)) || [];
       } else {
         const selectedSubjectRecord = subjects.find(subject => subject.id === selectedSubject);
         subjectName = selectedSubjectRecord?.name || '';
-        mcqsData = await fetchMCQsBySubject(selectedSubject!);
+        const params: Record<string, string | number> = { subjectId: selectedSubject!, limit: selectedMcqCount };
+        mcqsData = (await fetchCloudContent<MCQ[]>('flp-questions', params)) || [];
       }
 
       if (!mcqsData || mcqsData.length === 0) { toast({ title: "No MCQs Found" }); setIsFetchingMcqs(false); return; }
