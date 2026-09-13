@@ -51,7 +51,7 @@ export function DashboardActionCard({
           </span>
         )}
         {action.tag && (
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mb-1 ${flat ? 'bg-primary/10 text-primary' : action.tagColor || 'bg-white/20 text-white'}`}>
+          <span className={`absolute top-3 right-3 text-[10px] font-bold px-2 py-0.5 rounded-full z-20 ${flat ? 'bg-primary/10 text-primary' : action.tagColor || 'bg-white/20 text-white'}`}>
             {action.tag}
           </span>
         )}
