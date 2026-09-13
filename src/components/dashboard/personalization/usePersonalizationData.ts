@@ -28,7 +28,6 @@ export const usePersonalizationData = () => {
               correct_answer,
               explanation,
               chapter_id,
-              subject,
               chapters(
                 id,
                 name,
