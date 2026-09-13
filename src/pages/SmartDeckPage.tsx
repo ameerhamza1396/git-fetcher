@@ -81,8 +81,8 @@ const SmartDeckPage = () => {
           <h3 className="text-xl sm:text-2xl font-black tracking-tight text-foreground uppercase italic leading-none">
             Weakest Chapter
           </h3>
-        </div>
-
+        {/* Scrollable List Area */}
+        <div className="flex-1 overflow-y-auto pr-1 space-y-4">
           {isLoading ? (
             <div className="space-y-4 animate-fade-in">
               {/* Weakest chapter skeleton card */}
