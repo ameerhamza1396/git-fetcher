@@ -193,11 +193,11 @@ export function HomeDashboardTab({
         <button
           type="button"
           onClick={onOpenUsageLimits}
-          className="rounded-2xl border border-border/40 bg-gradient-to-br from-primary/10 to-accent/40 backdrop-blur-sm p-4 text-left active:scale-[0.97] transition-all min-h-[120px] w-full dark:from-primary/15 dark:to-accent/20"
+          className="rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-500/10 via-purple-500/5 to-indigo-500/10 backdrop-blur-sm p-4 text-left active:scale-[0.97] transition-all min-h-[120px] w-full dark:from-violet-500/15 dark:via-purple-500/10 dark:to-indigo-500/15"
         >
           <div className="flex items-center gap-1.5 mb-2">
-            <Gauge className="w-3.5 h-3.5 text-primary" />
-            <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Usage Limits</span>
+            <Gauge className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
+            <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">Usage Limits</span>
           </div>
           <p className="text-sm font-black text-foreground mb-1">{userPlanDisplayName || 'Free Plan'}</p>
           <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
