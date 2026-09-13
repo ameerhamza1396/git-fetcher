@@ -49,7 +49,16 @@ const Checkout = () => {
     const basePrice = basePriceStr ? parseFloat(String(basePriceStr).replace(/,/g, '')) : 0;
     const validityDisplay = validity?.toLowerCase() === 'yearly' ? 'Validity: 365 Days' : 'Validity: 30 Days';
     const priceAfterPromo = discountedPrice !== null ? discountedPrice : basePrice;
-    const grandTotal = priceAfterPromo;
+
+    // Processing Fee: 0% for Easypaisa, 2.5% for PayFast (rounded to nearest .00 / 2 decimal places)
+    const processingFeeRate = paymentMethod === 'payfast' ? 0.025 : 0;
+    const processingFee = Math.round(priceAfterPromo * processingFeeRate * 100) / 100;
+
+    // GST: 0% by default, 18% only on base payment of 50,000+
+    const gstRate = priceAfterPromo >= 50000 ? 0.18 : 0;
+    const gstAmount = Math.round(priceAfterPromo * gstRate * 100) / 100;
+
+    const grandTotal = priceAfterPromo + processingFee + gstAmount;
     const isPayFastDisabled = grandTotal < 20;
     const commerceDetails = {
         planId,
@@ -303,6 +312,18 @@ const Checkout = () => {
                                 </div>
                                 <span className="font-bold text-foreground">PKR {basePrice.toFixed(2)}</span>
                             </div>
+
+                            <div className="py-2.5 my-2.5 border-t border-border/30 space-y-1.5 text-xs text-muted-foreground">
+                                <div className="flex justify-between items-center">
+                                    <span>Processing Fees ({paymentMethod === 'easypaisa' ? '0% - Easypaisa' : '2.5% - PayFast'})</span>
+                                    <span className="font-medium text-foreground">PKR {processingFee.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span>GST ({gstRate > 0 ? '18%' : '0%'})</span>
+                                    <span className="font-medium text-foreground">PKR {gstAmount.toFixed(2)}</span>
+                                </div>
+                            </div>
+
                             {isPromoApplied && (
                                 <div className="flex justify-between text-emerald-500 text-sm font-medium mb-3">
                                     <span className="flex items-center"><BadgePercent className="mr-1.5 h-4 w-4" /> {promoDiscountDisplay}</span>
