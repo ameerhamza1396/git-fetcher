@@ -24,7 +24,7 @@ export const usePersonalizationData = () => {
             id,
             selected_answer,
             created_at,
-            mcqs!inner(
+            mcqs(
               id,
               question,
               options,
