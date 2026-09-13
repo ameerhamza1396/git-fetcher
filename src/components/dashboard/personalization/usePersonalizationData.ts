@@ -15,7 +15,7 @@ export const usePersonalizationData = () => {
       const [profileResult, wrongResult, correctedResult] = await Promise.all([
         supabase
           .from('profiles')
-          .select('year')
+          .select('year, institute')
           .eq('id', user.id)
           .maybeSingle(),
         supabase
@@ -37,7 +37,7 @@ export const usePersonalizationData = () => {
                 name,
                 chapter_number,
                 subject_id,
-                subjects(id, name, icon, year)
+                subjects(id, name, icon, year, institutes)
               )
             )
           `)
@@ -57,12 +57,26 @@ export const usePersonalizationData = () => {
       if (wrongResult.error) throw wrongResult.error;
       if (correctedResult.error) throw correctedResult.error;
 
-      const userYear = profileResult.data?.year || null;
+      const userYear = profileResult.data?.year ? String(profileResult.data.year).trim().toLowerCase() : null;
+      const userInstitute = profileResult.data?.institute ? String(profileResult.data.institute).trim().toLowerCase() : null;
       const correctedMcqIds = new Set((correctedResult.data || []).map(row => row.mcq_id).filter(Boolean));
       const seenWrongMcqIds = new Set<string>();
 
       return normalizeWrongAttempts(wrongResult.data || []).filter(attempt => {
-        if (userYear && attempt.mcq.year && attempt.mcq.year !== userYear) return false;
+        // Strictly scope year: if user has an active year, reject items from other years
+        if (userYear && attempt.mcq.year) {
+          const attemptYear = String(attempt.mcq.year).trim().toLowerCase();
+          if (attemptYear !== userYear) return false;
+        }
+
+        // Strictly scope institute: if subject defines explicit institutes, reject items not matching current institute
+        if (userInstitute && attempt.mcq.institutes && Array.isArray(attempt.mcq.institutes) && attempt.mcq.institutes.length > 0) {
+          const normalizedInstitutes = attempt.mcq.institutes.map((i: string) => String(i).trim().toLowerCase());
+          if (!normalizedInstitutes.includes('all') && !normalizedInstitutes.includes('any') && !normalizedInstitutes.includes(userInstitute)) {
+            return false;
+          }
+        }
+
         if (correctedMcqIds.has(attempt.mcq.id)) return false;
         if (seenWrongMcqIds.has(attempt.mcq.id)) return false;
         seenWrongMcqIds.add(attempt.mcq.id);

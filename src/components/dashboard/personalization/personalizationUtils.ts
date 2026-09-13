@@ -34,6 +34,7 @@ export const normalizeWrongAttempts = (rows: any[]): WrongAttempt[] => {
         subjectName: row.mcqs.chapters?.subjects?.name || row.mcqs.subject || 'Unknown Subject',
         subjectIcon: row.mcqs.chapters?.subjects?.icon,
         year: row.mcqs.chapters?.subjects?.year || null,
+        institutes: row.mcqs.chapters?.subjects?.institutes || null,
       },
     }));
 };
