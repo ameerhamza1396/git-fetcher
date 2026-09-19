@@ -2028,9 +2028,16 @@ export const MCQDisplay = ({
 
     let cancelled = false;
     if (currentMCQ?.id) {
+      setIsConfirmingReferences(true);
       readCachedVerification().then(cached => {
-        if (!cancelled && cached) {
+        if (cancelled) return;
+        if (cached) {
           setReferenceVerification(cached);
+          setIsConfirmingReferences(false);
+        } else if (isOnline) {
+          handleConfirmReferences([]);
+        } else {
+          setIsConfirmingReferences(false);
         }
       });
     }
@@ -2038,7 +2045,7 @@ export const MCQDisplay = ({
     return () => {
       cancelled = true;
     };
-  }, [currentQuestionIndex, currentMCQ?.id, setReferenceData]);
+  }, [currentQuestionIndex, currentMCQ?.id, isOnline, setReferenceData]);
 
   useEffect(() => {
     if (!user?.id || mcqs.length === 0) {
