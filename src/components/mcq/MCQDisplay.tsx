@@ -1582,9 +1582,26 @@ export const MCQDisplay = ({
         return;
       }
 
+      const actualCorrectAnswerText = (() => {
+        const raw = currentMCQ.correct_answer;
+        const options = currentMCQ.shuffledOptions || currentMCQ.options || [];
+        if (!raw) return '';
+        // If raw is option text
+        if (options.includes(raw)) return raw;
+        // If raw is letter like "A", "B", "C" or number "1", "2"
+        const markerMatch = String(raw).trim().match(/^([A-Z]|\d+)$/i)?.[1];
+        if (markerMatch) {
+          const idx = /^\d+$/.test(markerMatch) ? Number(markerMatch) - 1 : markerMatch.toUpperCase().charCodeAt(0) - 65;
+          if (idx >= 0 && idx < (currentMCQ.options || []).length) {
+            return currentMCQ.options[idx];
+          }
+        }
+        return raw;
+      })();
+
       const parsed = await aiApiJson<any>('reference-verify', {
         question: currentMCQ.question,
-        correctAnswer: currentMCQ.correct_answer,
+        correctAnswer: actualCorrectAnswerText,
         options: currentMCQ.shuffledOptions || currentMCQ.options || [],
         explanation: currentMCQ.explanation || '',
       }, {});
