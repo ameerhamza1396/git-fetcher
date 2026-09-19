@@ -6,7 +6,7 @@ import {
   Clock, CheckCircle, XCircle, Timer, Bot, MessageSquare, X, Bookmark,
   BookmarkCheck, Crown, LogOut, AlertTriangle, MoreVertical, Flag, BotOff,
   Moon, Sun, Zap, Sparkles, BookOpen, ChevronLeft, Loader2, Star, Award,
-  TrendingUp, Brain, Target, Shield, ShieldAlert, Trash2, Menu, Lock, RotateCcw, WifiOff,
+  TrendingUp, Brain, Target, Shield, ShieldAlert, ShieldCheck, Trash2, Menu, Lock, RotateCcw, WifiOff,
   ThumbsUp, ThumbsDown, MessageCircle, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -433,6 +433,149 @@ const ReportMCQModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
         </div>
       </ModalContent>
     </DialogPrimitive.Root>
+  );
+};
+
+const DrAhroidUnconfirmedInfoModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => (
+  <Sheet open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <SheetContent
+      side="bottom"
+      className="mx-auto max-h-[88dvh] overflow-y-auto rounded-t-[2rem] border-x border-t border-slate-200 dark:border-slate-800 bg-background/95 p-6 pb-[calc(1.75rem+env(safe-area-inset-bottom))] backdrop-blur-2xl max-w-lg w-full z-[300]"
+      overlayClassName="z-[300]"
+    >
+      <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full mx-auto mb-4" aria-hidden="true" />
+      <div className="flex flex-col items-center text-center">
+        <div className="mb-4 w-14 h-14 rounded-2xl bg-slate-500/10 dark:bg-slate-500/20 flex items-center justify-center text-slate-600 dark:text-slate-300">
+          <Bot className="w-7 h-7 opacity-80" />
+        </div>
+        <SheetHeader className="text-center sm:text-center">
+          <SheetTitle className="text-xl font-extrabold tracking-tight font-syne text-foreground">
+            Question Verification Info
+          </SheetTitle>
+          <SheetDescription className="text-sm font-medium text-muted-foreground mt-2 leading-relaxed">
+            It does not mean this question itself is incorrect. Medmacs is currently trained on a limited number of medical textbooks; more will be added in future updates.
+          </SheetDescription>
+        </SheetHeader>
+        <div className="w-full mt-6">
+          <Button
+            onClick={onClose}
+            className="w-full rounded-2xl h-12 font-bold bg-slate-800 hover:bg-slate-900 text-white dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white shadow-sm"
+          >
+            Got it
+          </Button>
+        </div>
+      </div>
+    </SheetContent>
+  </Sheet>
+);
+
+interface DrAhroidVerificationBarProps {
+  isVerifying: boolean;
+  verification: any;
+  verifiedBooksCount: number;
+  onOpenReferences: () => void;
+  onOpenChat: () => void;
+  onOpenUnconfirmedInfo: () => void;
+}
+
+const DrAhroidVerificationBar = ({
+  isVerifying,
+  verification,
+  verifiedBooksCount,
+  onOpenReferences,
+  onOpenChat,
+  onOpenUnconfirmedInfo,
+}: DrAhroidVerificationBarProps) => {
+  const verdict = verification?.verdict || (isVerifying ? 'loading' : 'unconfirmed');
+
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={verdict + (isVerifying ? '-verifying' : '-done')}
+        initial={{ opacity: 0, y: -10, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -6, scale: 0.98 }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
+        className="w-full px-3 pt-3 sm:px-6"
+      >
+        {isVerifying ? (
+          <div className="relative overflow-hidden rounded-xl border border-slate-200/80 bg-slate-100/70 dark:border-slate-800/80 dark:bg-slate-900/60 px-3.5 py-2.5 shadow-sm backdrop-blur-sm">
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 dark:via-slate-700/20 to-transparent"
+              initial={{ x: '-100%' }}
+              animate={{ x: '100%' }}
+              transition={{ repeat: Infinity, duration: 2.8, ease: 'easeInOut' }}
+            />
+            <div className="relative z-10 flex items-center gap-2.5">
+              <Bot className="h-4 w-4 shrink-0 text-slate-500/80 dark:text-slate-400/80" />
+              <span className="text-xs font-medium tracking-tight text-slate-600 dark:text-slate-400">
+                Dr Ahroid is verifying this question...
+              </span>
+            </div>
+          </div>
+        ) : verdict === 'verified' ? (
+          <button
+            type="button"
+            onClick={onOpenReferences}
+            className="w-full text-left relative overflow-hidden rounded-xl border border-teal-500/25 bg-teal-500/[0.08] dark:border-teal-500/30 dark:bg-teal-950/25 px-3.5 py-2.5 shadow-sm backdrop-blur-sm transition-all hover:bg-teal-500/[0.12] dark:hover:bg-teal-950/35 active:scale-[0.99]"
+          >
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-teal-200/30 dark:via-teal-400/10 to-transparent"
+              initial={{ x: '-100%' }}
+              animate={{ x: '100%' }}
+              transition={{ duration: 2.2, ease: 'easeInOut' }}
+            />
+            <div className="relative z-10 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-teal-600/90 dark:text-teal-400/90" />
+                <span className="text-xs font-medium tracking-tight text-teal-800 dark:text-teal-200 truncate">
+                  Dr Ahroid confirms this question is correct. <span className="font-semibold">{verifiedBooksCount} book reference{verifiedBooksCount === 1 ? '' : 's'} found.</span>
+                </span>
+              </div>
+              <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-300 underline underline-offset-2">
+                View
+              </span>
+            </div>
+          </button>
+        ) : verdict === 'incorrect' ? (
+          <button
+            type="button"
+            onClick={onOpenChat}
+            className="w-full text-left relative overflow-hidden rounded-xl border border-rose-500/25 bg-rose-500/[0.08] dark:border-rose-500/30 dark:bg-rose-950/25 px-3.5 py-2.5 shadow-sm backdrop-blur-sm transition-all hover:bg-rose-500/[0.12] dark:hover:bg-rose-950/35 active:scale-[0.99]"
+          >
+            <div className="relative z-10 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <ShieldAlert className="h-4 w-4 shrink-0 text-rose-600/90 dark:text-rose-400/90" />
+                <span className="text-xs font-medium tracking-tight text-rose-800 dark:text-rose-200 truncate">
+                  Dr Ahroid has found this question contraindicated to book syllabus.
+                </span>
+              </div>
+              <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300 underline underline-offset-2">
+                Ask Dr Ahroid?
+              </span>
+            </div>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onOpenUnconfirmedInfo}
+            className="w-full text-left relative overflow-hidden rounded-xl border border-slate-300/40 bg-slate-100/50 dark:border-slate-800/60 dark:bg-slate-900/40 px-3.5 py-2.5 shadow-sm backdrop-blur-sm transition-all hover:bg-slate-200/50 dark:hover:bg-slate-800/40 active:scale-[0.99]"
+          >
+            <div className="relative z-10 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <BotOff className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
+                <span className="text-xs font-medium tracking-tight text-slate-700 dark:text-slate-300 truncate">
+                  Dr Ahroid couldn't verify this question.
+                </span>
+              </div>
+              <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 underline underline-offset-2">
+                Learn More
+              </span>
+            </div>
+          </button>
+        )}
+      </motion.div>
+    </AnimatePresence>
   );
 };
 
@@ -938,6 +1081,7 @@ export const MCQDisplay = ({
   const [lastSubmissionResetDate, setLastSubmissionResetDate] = useState<string | null>(null);
   const [upgradeModalMessage, setUpgradeModalMessage] = useState("Upgrade to premium for unlimited access!");
   const [isReferenceModalOpen, setIsReferenceModalOpen] = useState(false);
+  const [isUnconfirmedModalOpen, setIsUnconfirmedModalOpen] = useState(false);
   const [offlineReferenceMessage, setOfflineReferenceMessage] = useState('');
   const [selectedReferenceIndex, setSelectedReferenceIndex] = useState<number | null>(null);
   const [confirmedReferenceIndexes, setConfirmedReferenceIndexes] = useState<number[] | null>(null);
@@ -1874,6 +2018,7 @@ export const MCQDisplay = ({
   useEffect(() => {
     setReferenceData(null);
     setIsReferenceModalOpen(false);
+    setIsUnconfirmedModalOpen(false);
     setSelectedReferenceIndex(null);
     setConfirmedReferenceIndexes(null);
     setOfflineReferenceMessage('');
@@ -2095,6 +2240,19 @@ export const MCQDisplay = ({
       {/* Main Content */}
       <div ref={contentRef} className="relative z-10 mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-y-auto overscroll-contain">
         <div key={currentMCQ?.id} className="flex flex-1 flex-col">
+            {/* Dr Ahroid Verification State Bar */}
+            <DrAhroidVerificationBar
+              isVerifying={isConfirmingReferences}
+              verification={referenceVerification}
+              verifiedBooksCount={verifiedAgainstBooks.length || (referenceVerification?.citations?.length || 1)}
+              onOpenReferences={handleSearchReference}
+              onOpenChat={() => {
+                setChatPrefillPrompt("Dr Ahroid, why is this question marked contraindicated or incorrect according to the medical book syllabus?");
+                setIsChatbotOpen(true);
+              }}
+              onOpenUnconfirmedInfo={() => setIsUnconfirmedModalOpen(true)}
+            />
+
             {/* Question Section */}
             <section className="mx-3 mt-3 rounded-2xl border border-border/50 bg-card/80 px-4 py-5 shadow-sm backdrop-blur-sm sm:mx-6 sm:px-6 sm:py-6">
               <p className="mb-2.5 text-[11px] font-black uppercase tracking-[0.16em] text-primary">{mistakeMode ? 'Mistake correction' : 'Question'} {currentQuestionIndex + 1}</p>
@@ -2338,6 +2496,12 @@ export const MCQDisplay = ({
         canUseAiSummary={canUseAiSummary}
         offlineMessage={offlineReferenceMessage}
       />}
+      {isUnconfirmedModalOpen && (
+        <DrAhroidUnconfirmedInfoModal
+          isOpen={isUnconfirmedModalOpen}
+          onClose={() => setIsUnconfirmedModalOpen(false)}
+        />
+      )}
       <MCQQuestionMapDrawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
         <QuestionMapGrid />
       </MCQQuestionMapDrawer>
