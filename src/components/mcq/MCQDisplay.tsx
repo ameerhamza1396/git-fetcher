@@ -2017,12 +2017,28 @@ export const MCQDisplay = ({
 
   useEffect(() => {
     setReferenceData(null);
+    setReferenceVerification(null);
+    setReferenceSummary(null);
+    setReferenceActionError('');
     setIsReferenceModalOpen(false);
     setIsUnconfirmedModalOpen(false);
     setSelectedReferenceIndex(null);
     setConfirmedReferenceIndexes(null);
     setOfflineReferenceMessage('');
-  }, [currentQuestionIndex, setReferenceData]);
+
+    let cancelled = false;
+    if (currentMCQ?.id) {
+      readCachedVerification().then(cached => {
+        if (!cancelled && cached) {
+          setReferenceVerification(cached);
+        }
+      });
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentQuestionIndex, currentMCQ?.id, setReferenceData]);
 
   useEffect(() => {
     if (!user?.id || mcqs.length === 0) {
