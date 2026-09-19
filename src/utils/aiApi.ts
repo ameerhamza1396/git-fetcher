@@ -60,7 +60,15 @@ export const aiApiFetch = async (path: string, init: RequestInit = {}) => {
   if (!headers.has('Content-Type') && init.body) headers.set('Content-Type', 'application/json');
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
-  const response = await fetch(aiApiUrl(path), { ...init, headers });
+  let response = await fetch(aiApiUrl(path), { ...init, headers });
+  
+  if (!response.ok && response.status === 401 && path.startsWith('reference')) {
+    response = await fetch(`/api/${path.replace(/^\/+/, '')}`, {
+      ...init,
+      headers: init.headers || { 'Content-Type': 'application/json' },
+    });
+  }
+
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
     const error = new AiApiError(
