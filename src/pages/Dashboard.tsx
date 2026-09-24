@@ -1,4 +1,5 @@
 import { useAuth } from '@/hooks/useAuth';
+import { SignOutConfirmModal } from '@/components/auth/SignOutConfirmModal';
 import {
   BellNavIcon,
   ChartDonutNavIcon,
@@ -88,7 +89,7 @@ const LazyTabFallback = ({ className = 'h-32' }: { className?: string }) => (
 );
 
 const Dashboard = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
@@ -99,6 +100,8 @@ const Dashboard = () => {
   const [showCaseOfDay, setShowCaseOfDay] = useState(false);
   const [showCollaborateModal, setShowCollaborateModal] = useState(false);
   const [showUsageLimits, setShowUsageLimits] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [selectedDashboardAnnouncement, setSelectedDashboardAnnouncement] = useState<DashboardAnnouncement | null>(null);
   const dashboardModalOpen = showWhatsNew || showTermOfDay || showCaseOfDay || showCollaborateModal || !!selectedDashboardAnnouncement;
   const appVersion = DASHBOARD_APP_VERSION;
@@ -137,6 +140,33 @@ const Dashboard = () => {
   );
   const dashboardComponents = instituteData?.dashboard_components || { mcqs: true, seqs: false, viva: false };
 
+
+  useEffect(() => {
+    (window as any).__currentDashboardTab = activeTab;
+    document.body.dataset.dashboardTab = activeTab;
+  }, [activeTab]);
+
+  useEffect(() => {
+    const handleSwitchTab = (e: CustomEvent) => {
+      if (e.detail) setActiveTab(e.detail as DashboardTabId);
+    };
+    const handleCloseModals = () => {
+      setShowUsageLimits(false);
+      setShowCaseOfDay(false);
+      setShowTermOfDay(false);
+      setShowWhatsNew(false);
+      setShowCollaborateModal(false);
+      setSelectedDashboardAnnouncement(null);
+    };
+
+    window.addEventListener('switch-dashboard-tab', handleSwitchTab as EventListener);
+    window.addEventListener('close-dashboard-modals', handleCloseModals);
+
+    return () => {
+      window.removeEventListener('switch-dashboard-tab', handleSwitchTab as EventListener);
+      window.removeEventListener('close-dashboard-modals', handleCloseModals);
+    };
+  }, []);
 
   useEffect(() => {
     const updateOnlineState = () => setIsOfflineMode(!navigator.onLine);
@@ -300,9 +330,18 @@ const Dashboard = () => {
     { id: 'profile', label: 'Profile', icon: UserNavIcon as any, avatarUrl: cachedAvatarUrl },
   ];
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
+  const handleLogout = () => {
+    setShowSignOutConfirm(true);
+  };
+
+  const handleConfirmSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      await signOut();
+    } finally {
+      setIsSigningOut(false);
+      setShowSignOutConfirm(false);
+    }
   };
 
   const renderTabContent = () => {
@@ -457,6 +496,13 @@ const Dashboard = () => {
         userId={user?.id}
         rawUserPlan={rawUserPlan}
         userPlanDisplayName={userPlanDisplayName}
+      />
+
+      <SignOutConfirmModal
+        open={showSignOutConfirm}
+        onOpenChange={setShowSignOutConfirm}
+        onConfirm={handleConfirmSignOut}
+        isSigningOut={isSigningOut}
       />
 
     </div>

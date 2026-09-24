@@ -5,6 +5,8 @@ import { useToast } from '@/hooks/use-toast';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { markCurrentDeviceSignedOut } from '@/utils/deviceSessions';
+import { clearCachedMCQData } from '@/utils/mcqContentCache';
+import { clearAllOfflineChapters } from '@/utils/offlineChapters';
 
 const MEDMACS_NOTIFICATION_CHANNEL_ID = 'medmacs_updates';
 const PRODUCTION_ORIGIN = 'https://medmacs.app';
@@ -100,6 +102,11 @@ export const useAuth = () => {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         setLoading(false);
+
+        if (event === 'SIGNED_OUT') {
+          clearCachedMCQData();
+          clearAllOfflineChapters();
+        }
 
         // If user logs in, trigger push registration
         if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && currentSession?.user) {
@@ -245,6 +252,8 @@ export const useAuth = () => {
       if (user) {
         await markCurrentDeviceSignedOut(user.id);
       }
+      clearCachedMCQData();
+      clearAllOfflineChapters();
       const { error } = await supabase.auth.signOut({ scope: 'local' });
       if (error) throw error;
       window.location.href = '/';

@@ -34,8 +34,23 @@ export default function BackButtonHandler() {
                 return;
             }
 
+            // 1. Check for open modals/sheets: Usage Limits, Case of the Day, Term of the Day
+            const usageLimitsSheet = document.querySelector('[data-usage-limits-sheet="true"]');
+            const caseOfDayModal = document.querySelector('[data-case-of-day-modal="true"]');
+            const termOfDayModal = document.querySelector('[data-term-of-day-modal="true"]');
+
+            if (usageLimitsSheet || caseOfDayModal || termOfDayModal) {
+                window.dispatchEvent(new CustomEvent("close-dashboard-modals"));
+                return;
+            }
+
             // MCQ Quiz Routes: let the MCQDisplay component handle the back button (shows leave modal)
             if (pathname.startsWith("/mcqs/quiz")) {
+                return;
+            }
+
+            // AI Test Generator Route: let AITestGenerator component handle the back button (shows exit modal)
+            if (pathname.startsWith("/ai/test-generator")) {
                 return;
             }
 
@@ -84,8 +99,17 @@ export default function BackButtonHandler() {
                 return;
             }
 
-            // DASHBOARD: double-tap to exit
+            // DASHBOARD ROUTE
             if (pathname === "/dashboard") {
+                const currentTab = (window as any).__currentDashboardTab || document.body.dataset.dashboardTab || "home";
+
+                // If on any tab other than 'home' -> navigate back to 'home' tab
+                if (currentTab !== "home") {
+                    window.dispatchEvent(new CustomEvent("switch-dashboard-tab", { detail: "home" }));
+                    return;
+                }
+
+                // If on 'home' tab -> double-tap exit logic
                 const now = Date.now();
                 if (now - lastTapTime.current < EXIT_WINDOW) {
                     console.log("[BackHandler] Second tap -> Exiting app");

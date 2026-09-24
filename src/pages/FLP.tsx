@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Loader2, ChevronLeft, RotateCcw, History } from "lucide-react";
+import { ArrowRight, Loader2, ChevronLeft, RotateCcw, History, Clock, BookOpen, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import Seo from "@/components/Seo";
@@ -12,6 +12,9 @@ import { fetchSubjects } from "@/utils/mcqData";
 import { fetchCloudContent } from "@/utils/cloudContent";
 import { CollaborateModal } from "@/components/CollaborateModal";
 import { supabase } from "@/integrations/supabase/client";
+import bookAnimationData from '../../public/animations/Book.json';
+import { LottiePlayer } from "@/components/LottiePlayer";
+import { Badge } from "@/components/ui/badge";
 
 interface MCQ {
   id: string;
@@ -150,12 +153,16 @@ const FLP = () => {
     const loadSubjects = async () => {
       setLoadingSubjects(true);
       try {
-        setSubjects(await fetchSubjects());
-      } catch { setSubjects([]); }
-      finally { setLoadingSubjects(false); }
+        const data = await fetchSubjects();
+        setSubjects(data);
+      } catch (err) {
+        toast({ title: "Failed to load subjects", variant: "destructive" });
+      } finally {
+        setLoadingSubjects(false);
+      }
     };
     loadSubjects();
-  }, [wizardStep, user, bypassSubject]);
+  }, [wizardStep, user, toast, bypassSubject]);
 
   const shuffleArray = <T,>(array: T[]): T[] => {
     const shuffled = [...array];
@@ -166,75 +173,52 @@ const FLP = () => {
     return shuffled;
   };
 
-  const formatTime = (count: number) => {
-    if (count === 100) return "2 hours";
-    if (count === 50) return "1 hour";
-    if (count === 30) return "45 minutes";
-    return `${count} min`;
+  const selectBalancedMcqs = (allMcqs: MCQ[], targetCount: number): MCQ[] => {
+    if (allMcqs.length <= targetCount) return shuffleArray(allMcqs);
+    const byChapter: Record<string, MCQ[]> = {};
+    allMcqs.forEach(m => {
+      if (!byChapter[m.chapter_id]) byChapter[m.chapter_id] = [];
+      byChapter[m.chapter_id].push(m);
+    });
+    const chapters = Object.keys(byChapter);
+    const perChapter = Math.max(1, Math.floor(targetCount / chapters.length));
+    let selected: MCQ[] = [];
+    const remainingPool: MCQ[] = [];
+
+    chapters.forEach(ch => {
+      const shuffledCh = shuffleArray(byChapter[ch]);
+      selected.push(...shuffledCh.slice(0, perChapter));
+      remainingPool.push(...shuffledCh.slice(perChapter));
+    });
+
+    if (selected.length < targetCount) {
+      const extraNeeded = targetCount - selected.length;
+      selected.push(...shuffleArray(remainingPool).slice(0, extraNeeded));
+    }
+
+    return shuffleArray(selected).slice(0, targetCount);
   };
 
   const handleResumeSession = () => {
     if (!savedSession) return;
     setShowResumeDialog(false);
-    navigate('/flp/test');
+    navigate('/flp/test', {
+      state: {
+        mcqs: savedSession.shuffledMcqs,
+        subjectName: savedSession.subjectName,
+        sessionId: savedSession.sessionId,
+      }
+    });
   };
 
   const handleStartFresh = () => {
     try {
       localStorage.removeItem(FLP_STORAGE_KEY);
-    } catch {
-      // Storage can be unavailable in privacy-restricted browser contexts.
+    } catch (e) {
+      console.error("Failed to clear FLP session", e);
     }
     setSavedSession(null);
     setShowResumeDialog(false);
-    setWizardStep(1);
-  };
-
-  const selectBalancedMcqs = (mcqs: MCQ[], targetCount: number): MCQ[] => {
-    if (mcqs.length <= targetCount) return shuffleArray(mcqs);
-
-    const mcqsByChapter = new Map<string, MCQ[]>();
-    for (const mcq of mcqs) {
-      if (!mcq.chapter_id) continue;
-      const list = mcqsByChapter.get(mcq.chapter_id) || [];
-      list.push(mcq);
-      mcqsByChapter.set(mcq.chapter_id, list);
-    }
-
-    for (const [chapterId, list] of mcqsByChapter.entries()) {
-      mcqsByChapter.set(chapterId, shuffleArray(list));
-    }
-
-    const chapterIds = shuffleArray(Array.from(mcqsByChapter.keys()));
-    const selected: MCQ[] = [];
-    const chapterIndices = new Map<string, number>();
-
-    for (const cid of chapterIds) {
-      chapterIndices.set(cid, 0);
-    }
-
-    let attempts = 0;
-    const maxAttempts = mcqs.length * 2;
-
-    while (selected.length < targetCount && attempts < maxAttempts) {
-      let addedInRound = false;
-      for (const cid of chapterIds) {
-        if (selected.length >= targetCount) break;
-
-        const list = mcqsByChapter.get(cid) || [];
-        const index = chapterIndices.get(cid) || 0;
-
-        if (index < list.length) {
-          selected.push(list[index]);
-          chapterIndices.set(cid, index + 1);
-          addedInRound = true;
-        }
-      }
-      attempts++;
-      if (!addedInRound) break;
-    }
-
-    return shuffleArray(selected);
   };
 
   const handleStartTest = async () => {
@@ -298,16 +282,18 @@ const FLP = () => {
   if (isAuthLoading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
-        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Loading" className="w-32 h-32 object-contain animate-pulse" />
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-10 h-10 animate-spin text-primary" />
+          <p className="text-sm font-medium text-muted-foreground">Loading FLP...</p>
+        </div>
       </div>
     );
   }
 
-  const TOTAL_STEPS = user ? (bypassSubject ? 2 : 3) : 1;
-
   return (
-    <div className="fixed inset-0 overflow-hidden overscroll-none bg-white dark:bg-slate-950 text-slate-950 dark:text-white">
-      <Seo title="Full-Length Papers (FLP)" description="Attempt full-length papers on Medmacs App." canonical="https://medmacs.app/flp" />
+    <div className="relative min-h-screen w-full overflow-x-hidden bg-slate-50 dark:bg-slate-950 font-['Inter']">
+      <Seo title="Full-Length Papers (FLP)" description="Take comprehensive timed exams matching your syllabus." canonical="https://medmacs.app/flp" />
+
       <UpgradeAccountModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} onUpgradeClick={() => { setShowUpgradeModal(false); navigate("/pricing"); }} />
 
       <Sheet open={showResumeDialog} onOpenChange={setShowResumeDialog}>
@@ -315,19 +301,8 @@ const FLP = () => {
           <SheetHeader className="text-left">
             <SheetTitle className="text-2xl font-black italic tracking-tight text-slate-950 dark:text-white">Resume <span className="text-teal-500">Session?</span></SheetTitle>
             <SheetDescription className="text-muted-foreground font-medium py-2">
-              You have an unfinished test session. Would you like to continue where you left off?
+              You have an active FLP test session saved from earlier ({savedSession?.shuffledMcqs?.length || 0} questions). Would you like to resume where you left off or start fresh?
             </SheetDescription>
-            {savedSession && (
-              <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
-                <p className="text-sm font-medium text-slate-900 dark:text-white">
-                  <span className="font-bold">{savedSession.shuffledMcqs.length}</span> MCQs - {savedSession.subjectName || 'Subject'}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Question {savedSession.currentQuestionIndex + 1} of {savedSession.shuffledMcqs.length} |
-                  Time remaining: {Math.floor(savedSession.totalTimeLeft / 60)}:{String(savedSession.totalTimeLeft % 60).padStart(2, '0')}
-                </p>
-              </div>
-            )}
           </SheetHeader>
           <div className="flex gap-3 mt-6">
             <Button onClick={handleStartFresh} variant="outline" className="flex-1 rounded-2xl h-12 font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white border-transparent uppercase text-xs tracking-widest">
@@ -340,30 +315,71 @@ const FLP = () => {
         </SheetContent>
       </Sheet>
 
-      {/* Fetching overlay */}
+      {/* Fetching overlay - Bottom Pinned Sheet Modal */}
       <AnimatePresence>
         {isFetchingMcqs && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/85 backdrop-blur-xl"
-          >
-            <motion.img
-              src="/mascots/Mascot1.png" alt="Mascot"
-              className="w-40 h-40 object-contain mb-6"
-              animate={{ y: [0, -12, 0] }}
-              transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-            />
-            <Loader2 className="h-10 w-10 animate-spin text-[#2dd4bf] mb-4" />
-            <p className="text-white/80 text-lg font-semibold text-center px-8">{fetchMessages[msgIdx]}</p>
-          </motion.div>
+          <Sheet open={true} onOpenChange={() => {}}>
+            <SheetContent side="bottom" className="flex max-h-[85dvh] flex-col overflow-hidden rounded-t-[2.5rem] border-x border-t border-primary/20 bg-background/95 p-6 pb-[calc(2rem+env(safe-area-inset-bottom))] backdrop-blur-2xl z-[100] [&>button]:hidden animate-in slide-in-from-bottom duration-300">
+              <SheetHeader className="mx-auto w-full max-w-md text-center">
+                <div className="mx-auto mb-2 flex h-24 w-24 items-center justify-center">
+                  <LottiePlayer
+                    animationData={bookAnimationData}
+                    loop={true}
+                    autoplay={true}
+                    className="w-full h-full"
+                  />
+                </div>
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                  </span>
+                  <p className="text-[11px] font-black uppercase tracking-[0.24em] text-primary">Generating Exam</p>
+                </div>
+                <SheetTitle className="text-2xl font-extrabold tracking-tight brand-syne">
+                  {fetchMessages[msgIdx]}
+                </SheetTitle>
+                <SheetDescription className="text-xs text-muted-foreground">
+                  Setting up your Full-Length Paper questions, timer, and options.
+                </SheetDescription>
+              </SheetHeader>
+
+              {/* Full FLP Details Card */}
+              <div className="mx-auto mt-5 w-full max-w-md rounded-2xl border border-border/40 bg-muted/40 p-4 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-border/30">
+                  <span className="text-xs font-semibold text-muted-foreground">Test Type</span>
+                  <Badge variant="secondary" className="bg-primary/10 text-primary border-0 font-bold text-[11px]">
+                    Full-Length Paper
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                  <div className="rounded-xl bg-background/80 p-2.5 border border-border/30">
+                    <FileText className="w-4 h-4 mx-auto mb-1 text-primary" />
+                    <p className="text-xs font-black text-foreground">{selectedMcqCount || 0}</p>
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Questions</p>
+                  </div>
+                  <div className="rounded-xl bg-background/80 p-2.5 border border-border/30">
+                    <Clock className="w-4 h-4 mx-auto mb-1 text-primary" />
+                    <p className="text-xs font-black text-foreground">{selectedMcqCount ? selectedMcqCount : 0} min</p>
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Duration</p>
+                  </div>
+                  <div className="rounded-xl bg-background/80 p-2.5 border border-border/30">
+                    <BookOpen className="w-4 h-4 mx-auto mb-1 text-primary" />
+                    <p className="text-xs font-black text-foreground truncate">{selectedSubject ? (subjects.find(s => s.id === selectedSubject)?.name || 'Subject') : 'All Subjects'}</p>
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Scope</p>
+                  </div>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
         )}
       </AnimatePresence>
 
       <main
-        className="relative z-10 mx-auto flex h-full w-full max-w-md flex-col px-5 pt-[max(18px,env(safe-area-inset-top))]"
-        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom, 0px))' }}
+        className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-5 pt-[max(18px,env(safe-area-inset-top))]"
       >
-        <header className="flex items-center justify-between w-full">
+        <header className="flex items-center justify-between w-full shrink-0 mb-2">
           <div className="flex items-center gap-2.5">
             <span className="font-['Syne'] text-lg font-extrabold tracking-[-.045em]">
               <span className="bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] bg-clip-text text-transparent">Medmacs</span>
@@ -391,8 +407,8 @@ const FLP = () => {
           >
             {/* STEP 0: Intro */}
             {wizardStep === 0 && (
-              <div className="relative flex min-w-0 flex-1 flex-col items-center text-center">
-                <div className="mx-auto max-w-sm px-2 pt-7 text-center">
+              <div className="relative flex min-w-0 flex-1 flex-col items-center text-center pb-36">
+                <div className="mx-auto max-w-sm px-2 pt-4 text-center">
                   <motion.h1
                     initial={{ opacity: 0, y: 18, filter: "blur(8px)" }}
                     animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
@@ -409,193 +425,207 @@ const FLP = () => {
                   </motion.p>
                 </div>
 
-                <div className="relative mx-auto mt-2 min-h-0 w-full max-w-sm flex-1 overflow-hidden flex items-center justify-center">
+                <div className="relative mx-auto mt-4 min-h-0 w-full max-w-sm flex-1 overflow-hidden flex items-center justify-center">
                   <img
                     src="/mascots/Mascot1.png"
                     alt="Dr Ahroid Intro"
-                    className="h-56 w-auto object-contain drop-shadow-2xl animate-[float_4s_ease-in-out_infinite]"
+                    className="h-52 sm:h-60 w-auto object-contain drop-shadow-2xl animate-[float_4s_ease-in-out_infinite]"
                   />
                 </div>
 
-                {user ? (
-                  <div className="mt-auto w-full flex flex-col gap-3">
-                    <button
-                      onClick={() => navigate('/flp-result')}
-                      className="w-full cursor-pointer rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-4 text-sm font-bold text-slate-700 dark:text-slate-300 shadow-sm transition-transform active:scale-95 flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800"
-                    >
-                      <History className="w-4 h-4 text-slate-500" /> View Past Attempts
-                    </button>
-                    <button
-                      onClick={() => setWizardStep(1)}
-                      className="w-full cursor-pointer rounded-2xl bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] px-10 py-4 text-base font-extrabold text-white shadow-[0_12px_32px_rgba(14,165,233,.25)] transition-transform hover:scale-[1.01] active:scale-95 focus-visible:outline-none"
-                    >
-                      Get Started
-                    </button>
-                  </div>
-                ) : (
-                  <div className="mt-auto w-full flex flex-col gap-3">
-                    <button
-                      onClick={() => setShowUpgradeModal(true)}
-                      className="w-full py-4 bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-transform"
-                    >
-                      Upgrade Plan
-                    </button>
-                    <button
-                      onClick={() => navigate("/dashboard")}
-                      className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-4 text-sm font-semibold text-slate-950 dark:text-white shadow-sm transition-transform active:scale-95"
-                    >
-                      Dashboard
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* STEP 1: MCQ Count */}
-            {wizardStep === 1 && (
-              <div className="relative flex min-w-0 flex-1 flex-col items-center text-center">
-                <div className="mx-auto max-w-sm px-2 pt-7 text-center">
-                  <h1 className="font-['Syne'] text-[clamp(1.7rem,6.4vw,2.2rem)] font-extrabold leading-[1.02] tracking-[-.05em] text-slate-950 dark:text-white">
-                    How Many MCQs?
-                  </h1>
-                  <p className="mx-auto mt-3 max-w-xs text-sm leading-6 text-slate-500 dark:text-slate-400">
-                    {selectedMcqCount ? (
-                      <>Your allotted time is <span className="font-bold text-teal-500">{formatTime(selectedMcqCount)}</span></>
-                    ) : (
-                      "Select your desired number of MCQs"
-                    )}
-                  </p>
-                </div>
-
-                <div className="relative mx-auto mt-2 min-h-0 w-full max-w-sm flex-1 overflow-hidden flex flex-col items-center justify-end pb-4">
-                  <div className={`grid ${customMcqCounts.length === 1 ? 'grid-cols-1 max-w-[150px]' : customMcqCounts.length === 2 ? 'grid-cols-2 w-full max-w-xs' : 'grid-cols-3 w-full'} gap-3 mb-6`}>
-                    {customMcqCounts.map((count) => {
-                      const isSelected = selectedMcqCount === count;
-                      return (
-                        <motion.button
-                          key={count}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => setSelectedMcqCount(count)}
-                          className={`flex flex-col items-center justify-center py-5 rounded-2xl border transition-all ${
-                            isSelected
-                              ? "border-teal-500 bg-teal-50/50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400 font-extrabold shadow-sm scale-105"
-                              : "border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-900"
-                          }`}
-                        >
-                          <span className="text-3xl font-black">{count}</span>
-                          <span className="text-[10px] mt-1 font-bold uppercase tracking-wider">MCQs</span>
-                        </motion.button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <button
-                  onClick={bypassSubject ? () => handleStartTest() : () => setWizardStep(2)}
-                  disabled={selectedMcqCount === null}
-                  className="mt-auto w-full cursor-pointer rounded-2xl bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] px-10 py-4 text-base font-extrabold text-white shadow-[0_12px_32px_rgba(14,165,233,.25)] transition-transform hover:scale-[1.01] active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
+                <div
+                  className="fixed bottom-0 left-0 right-0 z-20 bg-background/95 backdrop-blur-xl border-t border-border/40 px-5 pt-3"
+                  style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))' }}
                 >
-                  {bypassSubject ? "Start Test" : "Choose Subject"}
-                </button>
+                  <div className="max-w-md mx-auto flex flex-col gap-2.5">
+                    {user ? (
+                      <>
+                        <button
+                          onClick={() => navigate('/flp-result')}
+                          className="w-full cursor-pointer rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-3.5 text-sm font-bold text-slate-700 dark:text-slate-300 shadow-sm transition-transform active:scale-95 flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800"
+                        >
+                          <History className="w-4 h-4 text-slate-500" /> View Past Attempts
+                        </button>
+                        <button
+                          onClick={() => setWizardStep(1)}
+                          className="w-full cursor-pointer rounded-2xl bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] px-10 py-3.5 text-base font-extrabold text-white shadow-[0_12px_32px_rgba(14,165,233,.25)] transition-transform hover:scale-[1.01] active:scale-95 focus-visible:outline-none"
+                        >
+                          Get Started
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setShowUpgradeModal(true)}
+                          className="w-full py-3.5 bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-transform text-base"
+                        >
+                          Upgrade Plan
+                        </button>
+                        <button
+                          onClick={() => navigate("/dashboard")}
+                          className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-3.5 text-sm font-semibold text-slate-950 dark:text-white shadow-sm transition-transform active:scale-95"
+                        >
+                          Dashboard
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* STEP 2: Subject */}
-            {wizardStep === 2 && !bypassSubject && (
-              <div className="relative flex min-w-0 flex-1 flex-col items-center text-center">
-                <div className="mx-auto max-w-sm px-2 pt-7 text-center">
-                  <h1 className="font-['Syne'] text-[clamp(1.7rem,6.4vw,2.2rem)] font-extrabold leading-[1.02] tracking-[-.05em] text-slate-950 dark:text-white">
-                    Pick a Subject
-                  </h1>
-                  <p className="mx-auto mt-3 max-w-xs text-sm leading-6 text-slate-500 dark:text-slate-400">
-                    {selectedMcqCount} MCQs · {formatTime(selectedMcqCount!)}
-                  </p>
-                </div>
+            {/* STEP 1: Choose Question Count */}
+            {wizardStep === 1 && (
+              <div className="relative flex min-w-0 flex-1 flex-col pt-4 pb-12">
+                <button
+                  onClick={() => setWizardStep(0)}
+                  className="mb-4 flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-slate-900 dark:hover:text-white w-fit"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Back
+                </button>
+                <h2 className="font-['Syne'] text-2xl font-extrabold text-slate-950 dark:text-white tracking-tight">
+                  Choose Question Count
+                </h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  Select how many questions you want in this full-length exam.
+                </p>
 
-                <div className="relative mx-auto mt-2 min-h-0 w-full max-w-sm flex-1 overflow-hidden flex flex-col justify-end pb-4">
-                  {loadingSubjects ? (
-                    <div className="py-8">
-                      <Loader2 className="mx-auto h-8 w-8 animate-spin text-teal-500" />
-                      <p className="text-slate-400 mt-3 text-sm">Loading subjects...</p>
-                    </div>
-                  ) : subjects.length === 0 ? (
-                    <div className="py-8 text-center px-4">
-                      <p className="text-slate-800 dark:text-slate-200 text-sm font-bold">We are not fully available in your institute yet.</p>
-                      <p className="text-slate-400 mt-2 mb-4 text-xs">Help us bring Medmacs to your campus.</p>
-                      <div className="flex flex-col gap-2 max-w-xs mx-auto">
-                        <Button onClick={() => setShowCollaborateModal(true)} variant="outline" className="border-slate-200 dark:border-slate-800 text-slate-800 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-900 rounded-xl">
-                          Request campus collaboration
-                        </Button>
-                      </div>
-                      <CollaborateModal open={showCollaborateModal} onOpenChange={setShowCollaborateModal} />
+                <div className="mt-6 flex flex-col gap-3.5">
+                  {loadingConfig ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-[#2dd4bf]" />
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-3 my-4 max-h-[30vh] overflow-y-auto pr-1">
-                      {subjects.map((subj) => {
-                        const isActive = selectedSubject === subj.id;
-                        return (
-                          <motion.button
-                            key={subj.id}
-                            whileTap={{ scale: 0.96 }}
-                            onClick={() => setSelectedSubject(subj.id)}
-                            className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all ${
-                              isActive
-                                ? "border-teal-500 bg-teal-50/50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400 font-extrabold shadow-sm scale-105"
-                                : "border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-900"
-                            }`}
-                          >
-                            <span className="text-2xl mb-1">{subj.icon || "📘"}</span>
-                            <span className="font-bold text-xs truncate max-w-full">{subj.name}</span>
-                          </motion.button>
-                        );
-                      })}
-                    </div>
+                    customMcqCounts.map((count) => (
+                      <motion.button
+                        key={count}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          setSelectedMcqCount(count);
+                          if (bypassSubject) {
+                            // If institute bypasses subject step, start test immediately
+                            handleStartTest();
+                          } else {
+                            setWizardStep(2);
+                          }
+                        }}
+                        className={`w-full cursor-pointer rounded-2xl border p-5 text-left transition-all flex items-center justify-between shadow-sm ${
+                          selectedMcqCount === count
+                            ? 'border-[#2dd4bf] bg-[#2dd4bf]/10 shadow-md ring-2 ring-[#2dd4bf]/30'
+                            : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
+                        }`}
+                      >
+                        <div>
+                          <p className="text-lg font-black text-slate-950 dark:text-white">{count} MCQs</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">~{count} minutes allocated</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-[#2dd4bf]">Select</span>
+                          <ArrowRight className="w-5 h-5 text-[#2dd4bf]" />
+                        </div>
+                      </motion.button>
+                    ))
                   )}
                 </div>
+              </div>
+            )}
 
+            {/* STEP 2: Choose Subject */}
+            {wizardStep === 2 && !bypassSubject && (
+              <div className="relative flex min-w-0 flex-1 flex-col pt-6 pb-28">
                 <button
-                  onClick={handleStartTest}
-                  disabled={!selectedSubject}
-                  className="mt-auto w-full cursor-pointer rounded-2xl bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] px-10 py-4 text-base font-extrabold text-white shadow-[0_12px_32px_rgba(14,165,233,.25)] transition-transform hover:scale-[1.01] active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
+                  onClick={() => setWizardStep(1)}
+                  className="mb-4 flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 >
-                  Start Test
+                  <ChevronLeft className="w-4 h-4" /> Back
                 </button>
+                <h2 className="font-['Syne'] text-2xl font-extrabold text-slate-950 dark:text-white tracking-tight">
+                  Select Subject
+                </h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  Pick a specific subject or choose All Subjects for a mixed paper.
+                </p>
+
+                <div className="mt-6 flex flex-col gap-3 overflow-y-auto max-h-[calc(100vh-280px)] pr-1">
+                  {/* All Subjects Option */}
+                  <motion.button
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      setSelectedSubject(null);
+                      setSelectedSubjectName('All Subjects');
+                    }}
+                    className={`w-full cursor-pointer rounded-2xl border p-4 text-left transition-all flex items-center justify-between ${
+                      selectedSubject === null
+                        ? 'border-[#2dd4bf] bg-[#2dd4bf]/10 shadow-md'
+                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300'
+                    }`}
+                  >
+                    <div>
+                      <p className="text-base font-extrabold text-slate-950 dark:text-white">All Subjects (Mixed)</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Comprehensive paper covering full syllabus</p>
+                    </div>
+                  </motion.button>
+
+                  {loadingSubjects ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-[#2dd4bf]" />
+                    </div>
+                  ) : (
+                    subjects.map((subj) => (
+                      <motion.button
+                        key={subj.id}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          setSelectedSubject(subj.id);
+                          setSelectedSubjectName(subj.name);
+                        }}
+                        className={`w-full cursor-pointer rounded-2xl border p-4 text-left transition-all flex items-center justify-between ${
+                          selectedSubject === subj.id
+                            ? 'border-[#2dd4bf] bg-[#2dd4bf]/10 shadow-md'
+                            : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300'
+                        }`}
+                      >
+                        <p className="text-sm font-bold text-slate-950 dark:text-white">{subj.name}</p>
+                      </motion.button>
+                    ))
+                  )}
+
+                  {/* Collaborator CTA */}
+                  <div className="mt-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900/50 p-4 text-center">
+                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">Want to add subjects or contribute questions?</p>
+                    <Button onClick={() => setShowCollaborateModal(true)} variant="outline" className="border-slate-200 dark:border-slate-800 text-slate-800 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-900 rounded-xl">
+                      Become a Collaborator
+                    </Button>
+                  </div>
+                  <CollaborateModal open={showCollaborateModal} onOpenChange={setShowCollaborateModal} />
+                </div>
+
+                <div
+                  className="fixed bottom-0 left-0 right-0 z-20 bg-background/95 backdrop-blur-xl border-t border-border/40 px-5 pt-3"
+                  style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))' }}
+                >
+                  <div className="max-w-md mx-auto">
+                    <motion.button
+                      whileTap={{ scale: 0.96 }}
+                      onClick={handleStartTest}
+                      disabled={isFetchingMcqs}
+                      className="w-full cursor-pointer rounded-2xl bg-gradient-to-r from-[#2dd4bf] to-[#0ea5e9] py-4 text-base font-extrabold text-white shadow-lg active:scale-95 disabled:opacity-50"
+                    >
+                      {isFetchingMcqs ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <Loader2 className="w-5 h-5 animate-spin" /> Starting...
+                        </span>
+                      ) : (
+                        "Start FLP Test"
+                      )}
+                    </motion.button>
+                  </div>
+                </div>
               </div>
             )}
           </motion.section>
         </AnimatePresence>
-
-        {/* Step dots */}
-        {user && (
-          <div className="flex justify-center gap-2.5 mt-4">
-            {Array.from({ length: TOTAL_STEPS }).map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => {
-                  if (idx <= wizardStep) {
-                    setWizardStep(idx);
-                    if (idx < 2) setSelectedSubject(null);
-                  }
-                }}
-                className={`cursor-pointer rounded-full transition-all duration-300 ${
-                  idx === wizardStep
-                    ? "h-3.5 w-3.5 bg-teal-500"
-                    : idx < wizardStep
-                      ? "h-2.5 w-2.5 bg-teal-300 hover:bg-teal-400"
-                      : "h-2.5 w-2.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300"
-                }`}
-              />
-            ))}
-          </div>
-        )}
       </main>
-
-      <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-12px); }
-        }
-      `}</style>
     </div>
   );
 };

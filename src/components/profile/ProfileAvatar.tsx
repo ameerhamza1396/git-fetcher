@@ -191,6 +191,30 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
 
     const handleOpenCamera = async () => {
         try {
+            const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
+            const photo = await Camera.getPhoto({
+                quality: 90,
+                allowEditing: true,
+                resultType: CameraResultType.DataUrl,
+                source: CameraSource.Camera,
+            });
+
+            if (photo?.dataUrl) {
+                setImageSrc(photo.dataUrl);
+                setCrop({ x: 0, y: 0 });
+                setZoom(1);
+                setRotation(0);
+                setShowMediaPickerModal(false);
+                return;
+            }
+        } catch (err: any) {
+            console.warn('Capacitor camera error/cancellation:', err);
+            if (err?.message?.includes?.('cancel') || err === 'User cancelled photos app') {
+                return;
+            }
+        }
+
+        try {
             const win = window as any;
             if (win.Capacitor?.isPluginAvailable?.('Camera') && win.Capacitor?.Plugins?.Camera) {
                 const photo = await win.Capacitor.Plugins.Camera.getPhoto({
@@ -210,7 +234,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                 }
             }
         } catch (err) {
-            console.warn('Capacitor camera error/cancellation, falling back to input:', err);
+            console.warn('Capacitor window camera fallback error:', err);
         }
 
         if (cameraInputRef.current) {
@@ -461,7 +485,7 @@ const ProfileAvatar = ({ user, profileData, displayName, rawUserPlan, userPlanDi
                         {/* 1:1 Circle Cropper */}
                         {imageSrc && (
                             <div className="w-full flex flex-col gap-3">
-                                <div className="relative w-full aspect-square max-h-[280px] rounded-full overflow-hidden bg-black mx-auto border-4 border-primary/30 shadow-inner">
+                                <div className="relative w-full aspect-square max-h-[280px] rounded-2xl overflow-hidden bg-black mx-auto border border-border/40 shadow-inner">
                                     <Cropper
                                         image={imageSrc}
                                         crop={crop}

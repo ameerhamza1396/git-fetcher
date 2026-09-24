@@ -374,3 +374,18 @@ export const getOfflineMCQsByChapter = async (chapterId: string) => {
     return [];
   }
 };
+
+export const clearAllOfflineChapters = async () => {
+  if (typeof window === 'undefined') return;
+  try {
+    const db = await openDb();
+    const transaction = db.transaction([CHAPTER_STORE, KEY_STORE], 'readwrite');
+    transaction.objectStore(CHAPTER_STORE).clear();
+    transaction.objectStore(KEY_STORE).clear();
+    await transactionDone(transaction);
+    emitOfflineChange();
+  } catch (err) {
+    console.warn('Unable to clear offline encrypted chapters store on sign out:', err);
+  }
+};
+

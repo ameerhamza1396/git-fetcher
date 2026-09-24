@@ -127,3 +127,31 @@ export const cacheChapterMCQs = async (chapterId: string, mcqs: MCQ[]) => {
     // A failed cache write must never prevent a quiz from starting.
   }
 };
+
+export const clearCachedMCQData = async () => {
+  if (typeof window === 'undefined') return;
+  try {
+    // Clear localStorage subject cache and all subject chapter caches
+    localStorage.removeItem('medmacs_mcq_subjects_cache');
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(CHAPTERS_CACHE_PREFIX)) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+
+    // Clear IndexedDB MCQ content store
+    try {
+      const db = await openDb();
+      const transaction = db.transaction(MCQ_STORE, 'readwrite');
+      transaction.objectStore(MCQ_STORE).clear();
+      await transactionDone(transaction);
+    } catch (e) {
+      logMCQDiagnostic('content_cache_clear_failed', {}, 'warn');
+    }
+  } catch (err) {
+    console.error('Failed to invalidate MCQ content cache:', err);
+  }
+};

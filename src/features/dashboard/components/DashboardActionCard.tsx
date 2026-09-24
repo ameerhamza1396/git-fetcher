@@ -50,12 +50,14 @@ export function DashboardActionCard({
             Offline
           </span>
         )}
-        {action.tag && (
-          <span className={`absolute top-3 right-3 text-[10px] font-bold px-2 py-0.5 rounded-full z-20 ${action.tagColor || (flat ? 'bg-primary/10 text-primary' : 'bg-white/20 text-white')}`}>
-            {action.tag}
-          </span>
-        )}
         <h3 className={`text-[15px] font-bold leading-tight ${flat ? 'text-foreground' : 'text-white'}`}>{action.title}</h3>
+        {action.tag && (
+          <div className="mt-1">
+            <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${action.tagColor || (flat ? 'bg-primary/10 text-primary' : 'bg-white/20 text-white')}`}>
+              {action.tag}
+            </span>
+          </div>
+        )}
         <p className={`text-[11px] mt-0.5 font-medium ${flat ? 'text-muted-foreground' : 'text-white/60'}`}>{action.description}</p>
       </div>
     </div>

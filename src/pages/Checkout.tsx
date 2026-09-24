@@ -1,3 +1,7 @@
+import LottiePlayer from '@/components/LottiePlayer';
+import paymentProcessingAnim from '../../public/animations/Bank.json';
+import paymentSuccessAnim from '../../public/animations/Payment Success.json';
+import paymentFailAnim from '../../public/animations/Close.json';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -61,12 +65,18 @@ const Checkout = () => {
     const exactTotal = priceAfterPromo + processingFee + gstAmount;
     const grandTotal = Math.ceil(exactTotal);
     const isPayFastDisabled = grandTotal < 20;
-    const commerceDetails = {
-        planId,
+    const commerceDetails: any = {
         planName,
+        planId,
+        validity,
+        currency,
+        basePrice,
         price: grandTotal,
-        billingPeriod: validity?.toLowerCase() === 'yearly' ? 'yearly' as const : 'monthly' as const,
-        marketingConsent: measurementAllowed,
+        billingPeriod: validity || 'monthly',
+        marketingConsent: true,
+        finalPrice: grandTotal,
+        discountApplied: isPromoApplied,
+        promoCode: isPromoApplied ? promoCode : undefined,
     };
 
     useEffect(() => {
@@ -92,59 +102,70 @@ const Checkout = () => {
     }, []);
 
     const checkPaymentStatus = async () => {
-        if (!user) return;
+        if (!user) return false;
         try {
-            const { data } = await supabase.from('pending_payments').select('status, error_message, order_id, amount, plan_name').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1).single();
+            const { data } = await supabase
+                .from('pending_payments')
+                .select('status, error_message')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+
             if (data) {
                 if (data.status === 'success') {
-                    void trackMetaPurchase({ ...commerceDetails, price: Number(data.amount) || grandTotal, planName: data.plan_name || planName, orderId: data.order_id, paymentMethod });
-                    trackGooglePurchase({ ...commerceDetails, price: Number(data.amount) || grandTotal, planName: data.plan_name || planName, orderId: data.order_id, paymentMethod, analyticsConsent: measurementAllowed });
                     setModalState('success');
-                    setShowPayFastModal(false); // Close WebView on success
                     setIsLoading(false);
                     return true;
-                }
-                else if (data.status === 'failed') {
+                } else if (data.status === 'failed') {
                     setError(data.error_message || "Transaction failed.");
                     setModalState('failure');
-                    setShowPayFastModal(false); // Close WebView on failure
                     setIsLoading(false);
                     return true;
                 }
             }
-        } catch (e) { console.error("Status check failed", e); }
+        } catch (e) {
+            console.error("Status check failed", e);
+        }
         return false;
     };
+
+    useEffect(() => {
+        if (modalState === 'success') {
+            void trackMetaPurchase(commerceDetails);
+            trackGooglePurchase({ ...commerceDetails, analyticsConsent: measurementAllowed });
+        }
+    }, [modalState, measurementAllowed]);
 
     useEffect(() => {
         if (!user) return;
         const channel = supabase
             .channel('payment-tracking')
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pending_payments', filter: `user_id=eq.${user.id}` },
-                (payload) => {
-                    if (payload.new.status === 'success') {
-                        void trackMetaPurchase({ ...commerceDetails, price: Number(payload.new.amount) || grandTotal, planName: payload.new.plan_name || planName, orderId: payload.new.order_id, paymentMethod });
-                        trackGooglePurchase({ ...commerceDetails, price: Number(payload.new.amount) || grandTotal, planName: payload.new.plan_name || planName, orderId: payload.new.order_id, paymentMethod, analyticsConsent: measurementAllowed });
-                        setModalState('success');
-                        setIsLoading(false);
-                        Browser.close().catch(() => {});
-                    }
-                    else if (payload.new.status === 'failed') {
-                        setError(payload.new.error_message || "Transaction failed.");
-                        setModalState('failure');
-                        setIsLoading(false);
-                        Browser.close().catch(() => {});
-                    }
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pending_payments', filter: `user_id=eq.${user.id}` }, (payload) => {
+                if (payload.new.status === 'success') {
+                    setModalState('success');
+                    setIsLoading(false);
+                } else if (payload.new.status === 'failed') {
+                    setError(payload.new.error_message || "Transaction failed.");
+                    setModalState('failure');
+                    setIsLoading(false);
                 }
-            ).subscribe();
+            })
+            .subscribe();
 
-        // When user closes the browser tab, do a manual status check
+        let pollInterval: NodeJS.Timeout;
+        if (modalState === 'processing') {
+            pollInterval = setInterval(() => {
+                void checkPaymentStatus();
+            }, 4000);
+        }
+
         const browserListener = Browser.addListener('browserFinished', () => {
-            checkPaymentStatus();
+            if (modalState === 'processing') {
+                void checkPaymentStatus();
+            }
         });
 
-        let pollInterval;
-        if (modalState === 'processing') { pollInterval = setInterval(() => { checkPaymentStatus(); }, 4000); }
         return () => {
             supabase.removeChannel(channel);
             if (pollInterval) clearInterval(pollInterval);
@@ -183,7 +204,21 @@ const Checkout = () => {
                 body: { provider: 'easypaisa', planId, validity, currency, promoCode: isPromoApplied ? promoCode : undefined, paymentContext: 'subscription' },
             });
             await paymentApi('/v1/easypaisa/initiate', { method: 'POST', body: { orderId: order.orderId, mobileNo: mobileNumber } });
-        } catch (err: any) { console.error("Easypaisa Error:", err); setError(err.message || "An unexpected error occurred."); setModalState('failure'); setIsLoading(false); }
+        } catch (err: any) { 
+            console.error("Easypaisa Error:", err);
+            const isNetworkDrop = err?.name === 'AbortError' || 
+                err?.message?.includes('Failed to fetch') || 
+                err?.message?.includes('Unable to resolve host') ||
+                err?.message?.includes('NetworkError');
+
+            if (isNetworkDrop) {
+                console.warn("Initiate call dropped or timed out; remaining in processing mode to poll for IPN completion.");
+                return;
+            }
+            setError(err.message || "An unexpected error occurred."); 
+            setModalState('failure'); 
+            setIsLoading(false); 
+        }
     };
 
     const handlePayFastPayment = async () => {
@@ -212,7 +247,6 @@ const Checkout = () => {
             });
 
             if (isNative) {
-                // Reuse the hosted redirect page to auto-submit the gateway form inside the in-app browser
                 const params = new URLSearchParams();
                 Object.entries(session.fields).forEach(([key, value]) => params.append(key, value as string));
                 const redirectUrl = `https://medmacs.app/payfast-redirect.html?${params.toString()}`;
@@ -232,7 +266,7 @@ const Checkout = () => {
                 form.submit();
                 setIsLoading(false);
             }
-        } catch (err) { setError(err.message || "An error occurred."); setIsLoading(false); }
+        } catch (err: any) { setError(err.message || "An error occurred."); setIsLoading(false); }
     };
 
     const processPayment = () => {
@@ -248,22 +282,15 @@ const Checkout = () => {
 
     return (
         <div className="min-h-screen w-full bg-background">
-            <Seo title="Checkout | Medmacs" />
-
-            <div className={`fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
-                <div className="container mx-auto px-4 py-4 flex justify-between items-center max-w-7xl">
-                    <Link to="/pricing">
-                        <Button variant="ghost" size="sm" className="w-9 h-9 p-0 hover:scale-110">
-                            <ArrowLeft className="h-5 w-5" />
-                        </Button>
+            <Seo title="Checkout - Medmacs" description="Complete your subscription purchase." canonical="https://medmacs.app/checkout" />
+            <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border transition-transform duration-300">
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+                    <Link to="/pricing" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                        <ArrowLeft className="w-4 h-4 mr-2" /> Back to Plans
                     </Link>
-                    <div className="flex items-center gap-2">
-                        <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Logo" className="w-8 h-8" />
-                        <span className="text-xl font-bold text-foreground">Checkout</span>
-                    </div>
                     <ProfileDropdown />
                 </div>
-            </div>
+            </header>
 
             <main className="container mx-auto px-4 lg:px-8 py-12 lg:py-16 max-w-4xl">
                 <div className="text-center mb-12 mt-[var(--header-height)]">
@@ -474,34 +501,77 @@ const Checkout = () => {
             </Dialog>
 
             <Dialog open={modalState !== 'idle' && !showPayFastModal} onOpenChange={(open) => !open && setModalState('idle')}>
-                <DialogContent className={cn("sm:max-w-md bg-card border-border transition-all duration-300", "max-sm:fixed max-sm:bottom-0 max-sm:top-auto max-sm:translate-y-0 max-sm:rounded-t-2xl max-sm:rounded-b-none max-sm:max-w-full max-sm:border-x-0 max-sm:border-b-0")}>
-                    <div className="flex flex-col items-center justify-center py-6 text-center">
+                <DialogContent className={cn(
+                    "sm:max-w-md bg-card border-t sm:border border-border transition-all duration-300 overflow-hidden shadow-2xl",
+                    "fixed bottom-0 top-auto translate-y-0 rounded-t-3xl rounded-b-none max-w-full sm:max-w-md border-x-0 border-b-0 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+                )}>
+                    {/* Visual Sheet Handle Bar */}
+                    <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full mx-auto mt-1 mb-2" />
+
+                    <div className="flex flex-col items-center justify-center text-center px-4 pb-2">
                         {modalState === 'processing' && (
-                            <>
-                                <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
-                                <DialogTitle className="text-foreground">Authorizing Payment</DialogTitle>
-                                <DialogDescription className="mt-2 text-muted-foreground px-4">Please approve the request on your Easypaisa app or enter your PIN on the mobile prompt.</DialogDescription>
-                                <Button variant="ghost" size="sm" className="mt-4 text-xs text-muted-foreground hover:text-primary" onClick={checkPaymentStatus}><RefreshCw className="mr-2 h-3 w-3" /> Still waiting? Click to check status</Button>
-                            </>
+                            <div className="flex flex-col items-center justify-center space-y-3 animate-in fade-in zoom-in-95 duration-200 w-full">
+                                <div className="w-36 h-36 flex items-center justify-center my-[-10px]">
+                                    <LottiePlayer 
+                                        animationData={paymentProcessingAnim} 
+                                        loop={true} 
+                                        autoplay={true} 
+                                        style={{ width: 140, height: 140 }}
+                                    />
+                                </div>
+                                <DialogTitle className="text-xl font-bold text-foreground">Authorizing Payment</DialogTitle>
+                                <DialogDescription className="text-sm text-muted-foreground px-2 leading-relaxed">
+                                    Please approve the request on your mobile phone or enter your PIN in your Easypaisa app.
+                                </DialogDescription>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="mt-3 text-xs border-border text-foreground hover:bg-accent rounded-full px-5 py-2 shadow-sm"
+                                    onClick={checkPaymentStatus}
+                                >
+                                    <RefreshCw className="mr-2 h-3.5 w-3.5" /> Still waiting? Click to check status
+                                </Button>
+                            </div>
                         )}
                         {modalState === 'success' && (
-                            <>
-                                <CheckCircle className="h-16 w-16 text-emerald-500 mb-4" />
-                                <DialogTitle className="text-foreground">Payment Successful!</DialogTitle>
-                                <DialogDescription className="mt-2 text-muted-foreground">Your account has been upgraded.</DialogDescription>
-                                <Button className="mt-6 w-full" onClick={() => window.location.href = '/dashboard'}>Continue to Dashboard</Button>
-                            </>
+                            <div className="flex flex-col items-center justify-center space-y-3 animate-in fade-in zoom-in-95 duration-300 w-full">
+                                <div className="w-40 h-40 flex items-center justify-center my-[-15px]">
+                                    <LottiePlayer 
+                                        animationData={paymentSuccessAnim} 
+                                        loop={true} 
+                                        autoplay={true} 
+                                        style={{ width: 160, height: 160 }}
+                                    />
+                                </div>
+                                <DialogTitle className="text-2xl font-black text-foreground">Payment Successful!</DialogTitle>
+                                <DialogDescription className="text-sm text-muted-foreground max-w-xs">
+                                    Your account has been upgraded successfully.
+                                </DialogDescription>
+                                <Button 
+                                    className="mt-4 w-full bg-primary text-primary-foreground font-bold h-12 shadow-lg rounded-xl text-base" 
+                                    onClick={() => window.location.href = '/dashboard'}
+                                >
+                                    Continue to Dashboard
+                                </Button>
+                            </div>
                         )}
                         {modalState === 'failure' && (
-                            <>
-                                <XCircle className="h-16 w-16 text-destructive mb-4" />
-                                <DialogTitle className="text-foreground">Transaction Failed</DialogTitle>
-                                <DialogDescription className="mt-2 text-destructive px-4">{error || "Something went wrong."}</DialogDescription>
-                                <div className="flex gap-2 w-full mt-6">
-                                    <Button variant="outline" className="flex-1" onClick={() => setModalState('idle')}>Try Again</Button>
-                                    <Button variant="secondary" className="flex-1" onClick={checkPaymentStatus}>Check Again</Button>
+                            <div className="flex flex-col items-center justify-center space-y-3 animate-in fade-in zoom-in-95 duration-300 w-full py-2">
+                                <div className="w-36 h-36 flex items-center justify-center my-[-10px]">
+                                    <LottiePlayer 
+                                        animationData={paymentFailAnim} 
+                                        loop={false} 
+                                        autoplay={true} 
+                                        style={{ width: 140, height: 140 }}
+                                    />
                                 </div>
-                            </>
+                                <DialogTitle className="text-xl font-bold text-foreground">Transaction Failed</DialogTitle>
+                                <DialogDescription className="text-sm text-destructive px-4 font-medium text-center">{error || "Something went wrong."}</DialogDescription>
+                                <div className="flex gap-3 w-full mt-4">
+                                    <Button variant="outline" className="flex-1 rounded-xl h-11" onClick={() => setModalState('idle')}>Try Again</Button>
+                                    <Button variant="secondary" className="flex-1 rounded-xl h-11" onClick={checkPaymentStatus}>Check Again</Button>
+                                </div>
+                            </div>
                         )}
                     </div>
                 </DialogContent>

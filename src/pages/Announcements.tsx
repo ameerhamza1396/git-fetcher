@@ -106,6 +106,13 @@ const AnnouncementsPage = () => {
 
     // Mark all current announcements as read when component mounts (or announcements/user change)
     useEffect(() => {
+        if (announcements && announcements.length > 0) {
+            try {
+                localStorage.setItem('last_seen_announcement_id', announcements[0].id);
+            } catch (e) {
+                console.error('Error saving last_seen_announcement_id:', e);
+            }
+        }
         if (user?.id && announcements && announcements.length > 0 && readAnnouncements) {
             const unreadIds = announcements
                 .filter(announcement => !readAnnouncements.includes(announcement.id))
@@ -125,7 +132,7 @@ const AnnouncementsPage = () => {
             />
 
             {/* Header with Back Button */}
-            <div className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
+            <div className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 pt-[env(safe-area-inset-top)]">
                 <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <Button

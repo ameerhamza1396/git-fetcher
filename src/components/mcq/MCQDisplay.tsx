@@ -1564,7 +1564,7 @@ export const MCQDisplay = ({
     return true;
   };
 
-  const handleConfirmReferences = async (localReferences = referenceResults) => {
+  const handleConfirmReferences = async (localReferences = referenceResults, skipCacheCheck = false) => {
     if (!currentMCQ || isConfirmingReferences) return;
     if (!isOnline) {
       showOfflineFeatureToast('AI reference verification');
@@ -1574,12 +1574,14 @@ export const MCQDisplay = ({
     setIsConfirmingReferences(true);
     setReferenceActionError('');
     try {
-      const cachedVerification = await readCachedVerification();
-      if (cachedVerification) {
-        setReferenceVerification(cachedVerification);
-        setConfirmedReferenceIndexes([]);
-        toast({ title: "Verification loaded", description: "Using saved Dr Ahroid verification for this question." });
-        return;
+      if (!skipCacheCheck) {
+        const cachedVerification = await readCachedVerification();
+        if (cachedVerification) {
+          setReferenceVerification(cachedVerification);
+          setConfirmedReferenceIndexes([]);
+          toast({ title: "Verification loaded", description: "Using saved Dr Ahroid verification for this question." });
+          return;
+        }
       }
 
       const actualCorrectAnswerText = (() => {
@@ -2052,7 +2054,8 @@ export const MCQDisplay = ({
           setReferenceVerification(cached);
           setIsConfirmingReferences(false);
         } else if (isOnline) {
-          handleConfirmReferences([]);
+          setIsConfirmingReferences(false);
+          handleConfirmReferences([], true);
         } else {
           setIsConfirmingReferences(false);
         }

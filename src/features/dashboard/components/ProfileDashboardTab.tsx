@@ -166,7 +166,13 @@ export function ProfileDashboardTab({
                 <div className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center">
                   <item.icon className="w-4 h-4 text-muted-foreground" />
                 </div>
-                <span className="text-sm font-medium text-foreground">{item.label}</span>
+                <span className="text-sm font-medium text-foreground">
+                  {item.label === 'Subscription' ? (
+                    <>Your Plan: <span className="font-bold text-primary">{userPlanDisplayName.replace(' Plan', '')}</span></>
+                  ) : (
+                    item.label
+                  )}
+                </span>
               </div>
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
             </Link>

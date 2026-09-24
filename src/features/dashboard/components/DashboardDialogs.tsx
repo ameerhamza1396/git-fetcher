@@ -103,7 +103,7 @@ export function DashboardDialogs({
       </Dialog>
 
       <Dialog open={showTermOfDay} onOpenChange={onShowTermOfDayChange}>
-        <DialogContent className="w-full sm:max-w-[420px] p-0 overflow-hidden border-0 bg-transparent shadow-2xl [&>button]:hidden data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom !top-auto !bottom-0 !left-1/2 !-translate-x-1/2 !translate-y-0">
+        <DialogContent data-term-of-day-modal="true" className="w-full sm:max-w-[420px] p-0 overflow-hidden border-0 bg-transparent shadow-2xl [&>button]:hidden data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom !top-auto !bottom-0 !left-1/2 !-translate-x-1/2 !translate-y-0">
           <DialogHeader>
             <DialogTitle className="sr-only">Term of the Day</DialogTitle>
             <DialogDescription className="sr-only">{termOfDay?.term}</DialogDescription>
@@ -224,7 +224,7 @@ export function DashboardDialogs({
       </Dialog>
 
       <Dialog open={showCaseOfDay} onOpenChange={onShowCaseOfDayChange}>
-        <DialogContent className="w-full sm:max-w-[450px] p-0 overflow-hidden border-0 bg-transparent shadow-2xl [&>button]:hidden data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom !top-auto !bottom-0 !left-1/2 !-translate-x-1/2 !translate-y-0">
+        <DialogContent data-case-of-day-modal="true" className="w-full sm:max-w-[450px] p-0 overflow-hidden border-0 bg-transparent shadow-2xl [&>button]:hidden data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom !top-auto !bottom-0 !left-1/2 !-translate-x-1/2 !translate-y-0">
           <DialogHeader>
             <DialogTitle className="sr-only">Case of the Day</DialogTitle>
             <DialogDescription className="sr-only">{caseOfDay?.case_name}</DialogDescription>

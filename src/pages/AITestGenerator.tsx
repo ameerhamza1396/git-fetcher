@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { ArrowRight, X, Sparkles, CheckCircle, XCircle, PanelLeft } from 'lucide-react';
+import { ArrowRight, X, Sparkles, CheckCircle, XCircle, PanelLeft, AlertTriangle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
@@ -15,6 +15,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { motion, AnimatePresence } from 'framer-motion';
 import { aiApiJson } from '@/utils/aiApi';
 import { isAiLimitError } from '@/components/dashboard/personalization/FlashcardLimitModal';
+import { LottiePlayer } from '@/components/LottiePlayer';
+import openerLoadingAnimationData from '../../public/animations/Opener Loading.json';
+import { fetchSubjects, fetchChaptersBySubject, Subject, Chapter } from '@/utils/mcqData';
 
 interface Question {
     question: string;
@@ -23,15 +26,32 @@ interface Question {
     explanation: string;
 }
 
-const topicMapping = (subjectCode: string): string => {
+const topicMapping = (subjectNameOrCode?: string, subjectId?: string): string => {
+    if (!subjectNameOrCode && !subjectId) return 'Foundation';
+    const key = (subjectNameOrCode || subjectId || '').trim();
     const map: { [key: string]: string } = {
-        "FND1": "Foundation", "HEM1": "Hematology", "LCM1": "Locomotion", "RSP1": "Respiratory System", "CVS1": "Cardiovascular System",
-        "NEU1": "Neurosciences", "HNN1": "Head, Neck, and Special Senses", "END1": "Endocrinology", "GIL1": "Gastrointestinal Tract (GIT)", "EXC1": "Renal and Excretory System", "REP1": "Reproductive System",
-        "FND2": "Foundation II", "IDD1": "Infectious Diseases", "HEM2": "Hematology II", "RSP2": "Respiratory System II", "CVS2": "Cardiovascular System II", "GIL2": "GIT and Liver II", "END2": "Endocrinology II", "EXC2": "Renal and Excretory System II",
-        "ORT2": "Orthopedics, Rheumatology, Trauma", "PMR": "Physical Medicine & Rehabilitation", "DPS": "Dermatology, Plastic Surgery/Burns", "GEN": "Genetics", "REP2": "Reproductive System II", "NEU2": "Neurosciences and Psychiatry", "ENT": "ENT (Otorhinolaryngology)", "OPH": "Ophthalmology",
+        "FND1": "Foundation", "Foundation": "Foundation", "Foundation Module": "Foundation",
+        "HEM1": "Hematology", "Hematology": "Hematology", "Blood": "Hematology",
+        "LCM1": "Locomotion", "Locomotion": "Locomotion", "Musculoskeletal": "Locomotion",
+        "RSP1": "Respiratory System", "Respiratory System": "Respiratory System", "Respiratory": "Respiratory System",
+        "CVS1": "Cardiovascular System", "Cardiovascular System": "Cardiovascular System", "CVS": "Cardiovascular System",
+        "NEU1": "Neurosciences", "Neurosciences": "Neurosciences", "Neuroanatomy": "Neurosciences",
+        "HNN1": "Head, Neck, and Special Senses", "Head, Neck, and Special Senses": "Head, Neck, and Special Senses",
+        "END1": "Endocrinology", "Endocrinology": "Endocrinology",
+        "GIL1": "Gastrointestinal Tract (GIT)", "Gastrointestinal Tract (GIT)": "Gastrointestinal Tract (GIT)", "GIT": "Gastrointestinal Tract (GIT)",
+        "EXC1": "Renal and Excretory System", "Renal and Excretory System": "Renal and Excretory System", "Renal": "Renal and Excretory System",
+        "REP1": "Reproductive System", "Reproductive System": "Reproductive System",
+        "FND2": "Foundation II", "IDD1": "Infectious Diseases", "HEM2": "Hematology II", "RSP2": "Respiratory System II",
+        "CVS2": "Cardiovascular System II", "GIL2": "GIT and Liver II", "END2": "Endocrinology II", "EXC2": "Renal and Excretory System II",
+        "ORT2": "Orthopedics, Rheumatology, Trauma", "PMR": "Physical Medicine & Rehabilitation", "DPS": "Dermatology, Plastic Surgery/Burns",
+        "GEN": "Genetics", "REP2": "Reproductive System II", "NEU2": "Neurosciences and Psychiatry", "ENT": "ENT (Otorhinolaryngology)", "OPH": "Ophthalmology",
         "MED": "Medicine Rotation", "SUR": "Surgery Rotation", "GYO": "Gynecology and Obstetrics Rotation", "PAE": "Pediatrics Rotation",
+        "Anatomy": "Foundation", "Physiology": "Foundation", "Biochemistry": "Foundation",
+        "Pharmacology": "Foundation II", "Pathology": "Foundation II", "Microbiology": "Infectious Diseases", "Forensic Medicine": "Foundation II",
+        "Community Medicine": "Foundation II", "Ophthalmology": "Ophthalmology", "Otorhinolaryngology": "ENT (Otorhinolaryngology)",
+        "Medicine": "Medicine Rotation", "Surgery": "Surgery Rotation", "Obstetrics & Gynaecology": "Gynecology and Obstetrics Rotation", "Paediatrics": "Pediatrics Rotation"
     };
-    return map[subjectCode] || subjectCode;
+    return map[key] || "Foundation";
 };
 
 const AITestGenerator: React.FC = () => {
@@ -69,93 +89,148 @@ const AITestGenerator: React.FC = () => {
     const batchTimerRef = useRef<NodeJS.Timeout | null>(null);
     const [showExitConfirm, setShowExitConfirm] = useState(false);
 
-    // Backend subjects from Supabase
-    const [aiSubjects, setAiSubjects] = useState<{ id: string; subject_code: string; subject_name: string; year: string }[]>([]);
+    // MCQ subjects & chapters state (same source as MCQ section)
+    const [subjects, setSubjects] = useState<Subject[]>([]);
     const [loadingSubjects, setLoadingSubjects] = useState(true);
+    const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+    const [chapters, setChapters] = useState<Chapter[]>([]);
+    const [loadingChapters, setLoadingChapters] = useState(false);
+    const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
+
+    const currentStepRef = useRef(currentStep);
+    const submittedRef = useRef(submitted);
+    const showExitConfirmRef = useRef(showExitConfirm);
+    const isDrawerOpenRef = useRef(isDrawerOpen);
+    const loadingRef = useRef(loading);
+
+    useEffect(() => { currentStepRef.current = currentStep; }, [currentStep]);
+    useEffect(() => { submittedRef.current = submitted; }, [submitted]);
+    useEffect(() => { showExitConfirmRef.current = showExitConfirm; }, [showExitConfirm]);
+    useEffect(() => { isDrawerOpenRef.current = isDrawerOpen; }, [isDrawerOpen]);
+    useEffect(() => { loadingRef.current = loading; }, [loading]);
 
     // Fixed Capacitor back button handler
     useEffect(() => {
-        let isMounted = true;
+        let removeNativeListener: (() => void) | null = null;
 
         const setupBackHandler = async () => {
             try {
-                // Dynamic import only when needed
                 const { Capacitor } = await import('@capacitor/core');
-                if (Capacitor.isNativePlatform() && isMounted) {
+                if (Capacitor.isNativePlatform()) {
                     const { App } = await import('@capacitor/app');
-                    const backListener = App.addListener('backButton', () => {
-                        // Show exit confirmation if any progress has been made
-                        if (currentStep === 4 && !submitted) {
+                    const backListener = await App.addListener('backButton', () => {
+                        if (showExitConfirmRef.current) {
+                            setShowExitConfirm(false);
+                            return;
+                        }
+                        if (isDrawerOpenRef.current) {
+                            setIsDrawerOpen(false);
+                            return;
+                        }
+                        if (currentStepRef.current > 1 && !submittedRef.current) {
                             setShowExitConfirm(true);
                             return;
                         }
-                        if (currentStep === 1 && selectedChapters.length > 0) {
-                            setShowExitConfirm(true);
+                        if (currentStepRef.current === 1) {
+                            window.history.back();
                             return;
                         }
-                        if (currentStep === 2 && totalQ > 0) {
-                            setShowExitConfirm(true);
-                            return;
-                        }
-                        if (currentStep === 3 && (customPrompt || loading > 0)) {
-                            setShowExitConfirm(true);
-                            return;
-                        }
-                        // Default behavior for other steps
                         window.history.back();
                     });
-
-                    // Cleanup function
-                    return () => {
-                        backListener.then(listener => listener.remove());
-                    };
+                    removeNativeListener = () => backListener.remove();
                 }
             } catch (err) {
-                // Capacitor not available in web environment - ignore
                 console.debug('Capacitor not available, using web back button behavior');
             }
-            return () => { };
         };
 
-        const cleanup = setupBackHandler();
+        void setupBackHandler();
         return () => {
-            isMounted = false;
-            cleanup.then(fn => fn && fn());
+            if (removeNativeListener) removeNativeListener();
         };
-    }, [currentStep, submitted]);
+    }, []);
 
-    // Load AI test subjects from Supabase
+    // Load MCQ subjects (exact same as MCQ section)
     useEffect(() => {
-        const loadSubjects = async () => {
+        let isMounted = true;
+        const loadSubjectsData = async () => {
             setLoadingSubjects(true);
-            const { data, error } = await supabase
-                .from('ai_test_subjects')
-                .select('id, subject_code, subject_name, year')
-                .eq('is_active', true)
-                .eq('year', userYear)
-                .order('subject_name');
-
-            if (!error && data) {
-                setAiSubjects(data);
+            try {
+                const data = await fetchSubjects();
+                if (isMounted && data && data.length > 0) {
+                    setSubjects(data);
+                }
+            } catch (err) {
+                console.error('Failed to load MCQ subjects for AI Test Generator:', err);
+            } finally {
+                if (isMounted) setLoadingSubjects(false);
             }
-            setLoadingSubjects(false);
         };
-        if (userYear) loadSubjects();
+        if (userYear) loadSubjectsData();
+        return () => { isMounted = false; };
     }, [userYear]);
 
-    const handleChapterToggle = (chapter: string) => { setSelectedChapters(prev => prev.includes(chapter) ? [] : [chapter]); setError(null); };
-    const handleConfirmChapters = () => { if (selectedChapters.length === 1) { setCurrentStep(2); setError(null); } else setError('Please select exactly one subject.'); };
-    const handleConfirmQuestions = () => { if (totalQ > 0 && totalQ <= 100) setCurrentStep(3); else setError('Please enter 1-100 questions.'); };
+    const handleSubjectSelect = async (subj: Subject) => {
+        if (selectedSubject?.id === subj.id) {
+            setSelectedSubject(null);
+            setChapters([]);
+            setSelectedChapter(null);
+            setSelectedChapters([]);
+            return;
+        }
+        setSelectedSubject(subj);
+        setSelectedChapter(null);
+        setSelectedChapters([subj.name]);
+        setError(null);
+        setLoadingChapters(true);
+        try {
+            const chapterData = await fetchChaptersBySubject(subj.id);
+            // Skip chapters labelled as Past Papers
+            const filteredChapters = (chapterData || []).filter(ch => ch.content_type !== 'past_paper');
+            setChapters(filteredChapters);
+        } catch (err) {
+            console.error('Failed to load chapters:', err);
+            setChapters([]);
+        } finally {
+            setLoadingChapters(false);
+        }
+    };
+
+    const handleChapterSelect = (chap: Chapter | null) => {
+        setSelectedChapter(chap);
+        if (chap) {
+            setSelectedChapters([chap.name]);
+        } else if (selectedSubject) {
+            setSelectedChapters([selectedSubject.name]);
+        }
+        setError(null);
+    };
+
+    const handleConfirmChapters = () => {
+        if (selectedChapters.length === 1) {
+            setCurrentStep(2);
+            setError(null);
+        } else {
+            setError('Please select a subject or chapter.');
+        }
+    };
+
+    const handleConfirmQuestions = () => {
+        if (totalQ > 0 && totalQ <= 100) setCurrentStep(3);
+        else setError('Please enter 1-100 questions.');
+    };
 
     const fetchBatch = async (batchSize: number, batchNumber: number, totalBatches: number) => {
-        const apiTopic = topicMapping(selectedChapters[0]);
-        const data = await aiApiJson<{ questions: Question[] }>('ai/generate-test', {
+        const apiTopic = topicMapping(selectedSubject?.name, selectedSubject?.id);
+        const specificDetail = selectedChapter ? `Chapter: ${selectedChapter.name}` : (selectedSubject ? `Subject: ${selectedSubject.name}` : selectedChapters[0] || '');
+        const data = await aiApiJson<any>('ai/generate-test', {
             topic: apiTopic,
             difficulty: 'medium',
             count: batchNumber === totalBatches ? (totalQ % 10 === 0 ? 10 : totalQ % 10) : batchSize,
-            prompt: `Strictly adhere to the syllabus for ${userYear} year and module: ${apiTopic}. Batch ${batchNumber} of ${totalBatches}. ${customPrompt}`
+            prompt: `Strictly adhere to the syllabus for ${userYear} year and specific topic/module/chapter: "${specificDetail}". Provide exactly 5 options (A, B, C, D, E) for each question. Batch ${batchNumber} of ${totalBatches}. ${customPrompt}`
         }, {});
-        return data.questions;
+        const rawQuestions = data?.questions || data?.Questions || (Array.isArray(data) ? data : []);
+        return rawQuestions as Question[];
     };
 
     const fetchAll = async () => {
@@ -173,7 +248,6 @@ const AITestGenerator: React.FC = () => {
         if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
         timerRef.current = setInterval(() => setLoadTime(t => t + 1), 1000);
 
-        const apiTopic = topicMapping(selectedChapters[0]);
         const BATCH_SIZE = 10;
         const totalBatches = Math.ceil(totalQ / BATCH_SIZE);
 
@@ -186,7 +260,15 @@ const AITestGenerator: React.FC = () => {
 
             try {
                 const newQuestions = await fetchBatch(BATCH_SIZE, batchNumber, totalBatches);
-                const trimmedQuestions = newQuestions.slice(0, batchNumber === totalBatches ? (totalQ % 10 === 0 ? 10 : totalQ % 10) : BATCH_SIZE);
+                // Ensure every question has 5 options (A, B, C, D, E)
+                const sanitizedQuestions = newQuestions.map(q => {
+                    const opts = Array.isArray(q.options) ? [...q.options] : [];
+                    while (opts.length < 5) {
+                        opts.push(`None of the above`);
+                    }
+                    return { ...q, options: opts.slice(0, 5) };
+                });
+                const trimmedQuestions = sanitizedQuestions.slice(0, batchNumber === totalBatches ? (totalQ % 10 === 0 ? 10 : totalQ % 10) : BATCH_SIZE);
 
                 setQuestions(prev => {
                     const combined = [...prev, ...trimmedQuestions];
@@ -289,6 +371,8 @@ const AITestGenerator: React.FC = () => {
         setFetchedCount(0);
         setCustomPrompt('');
         setSelectedChapters([]);
+        setSelectedSubject(null);
+        setSelectedChapter(null);
         setError(null);
         setShowExitConfirm(false);
         setLoading(0);
@@ -349,14 +433,14 @@ const AITestGenerator: React.FC = () => {
                                             Select <span className="heading-glyph-safe text-amber-500">Subject&nbsp;</span>
                                         </h2>
                                         <p className="text-muted-foreground text-sm font-medium mt-2 max-w-lg mx-auto text-center">
-                                            Choose a subject to generate your AI-powered test
+                                            Choose a subject or chapter to generate your AI-powered test
                                         </p>
                                     </div>
                                 </div>
                                 <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
                             </div>
 
-                            <div className="max-w-4xl mx-auto px-4 sm:px-0 pb-32 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="max-w-4xl mx-auto px-4 sm:px-0 pb-32 flex flex-col gap-4 mt-4">
                                 {loadingSubjects ? (
                                     Array.from({ length: 4 }).map((_, i) => (
                                         <div key={i} className="relative overflow-hidden rounded-3xl bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl p-6 animate-pulse border border-border/40">
@@ -369,54 +453,115 @@ const AITestGenerator: React.FC = () => {
                                             </div>
                                         </div>
                                     ))
+                                ) : subjects.length === 0 ? (
+                                    <div className="p-8 text-center text-muted-foreground bg-white/5 rounded-3xl border border-border/40">
+                                        <p className="font-bold text-sm">No subjects found for your profile year.</p>
+                                        <p className="text-xs mt-1">Make sure your MBBS year is selected in your profile.</p>
+                                    </div>
                                 ) : (
-                                    aiSubjects.map((subject, index) => {
-                                        const isSelected = selectedChapters.includes(subject.subject_code);
+                                    subjects.map((subject, index) => {
+                                        const isSubjectSelected = selectedSubject?.id === subject.id;
                                         return (
-                                            <motion.div
-                                                key={subject.id}
-                                                initial={{ opacity: 0, scale: 0.95 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                transition={{ delay: index * 0.05 }}
-                                                whileHover={{ scale: 1.02, y: -4 }}
-                                                whileTap={{ scale: 0.98 }}
-                                                onClick={() => handleChapterToggle(subject.subject_code)}
-                                                className={`group cursor-pointer relative overflow-hidden rounded-3xl border-2 p-6 transition-all duration-300 ${isSelected
-                                                    ? 'border-amber-500 bg-amber-500/5 shadow-2xl shadow-amber-500/10'
-                                                    : 'border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl hover:border-amber-500/30 hover:bg-amber-500/5'
-                                                    }`}
-                                            >
-                                                {isSelected && (
-                                                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/20 blur-[60px] -mr-16 -mt-16 pointer-events-none" />
-                                                )}
+                                            <div key={subject.id} className="flex flex-col gap-2">
+                                                <motion.div
+                                                    initial={{ opacity: 0, scale: 0.98 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    transition={{ delay: index * 0.04 }}
+                                                    whileHover={{ scale: 1.01, y: -2 }}
+                                                    whileTap={{ scale: 0.99 }}
+                                                    onClick={() => handleSubjectSelect(subject)}
+                                                    className={`group cursor-pointer relative overflow-hidden rounded-3xl border-2 p-5 transition-all duration-300 ${isSubjectSelected
+                                                        ? 'border-amber-500 bg-amber-500/5 shadow-xl shadow-amber-500/10'
+                                                        : 'border-border/40 bg-white/5 dark:bg-white/[0.035] backdrop-blur-xl hover:border-amber-500/30 hover:bg-amber-500/5'
+                                                        }`}
+                                                >
+                                                    {isSubjectSelected && (
+                                                        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/20 blur-[60px] -mr-16 -mt-16 pointer-events-none" />
+                                                    )}
 
-                                                <div className="flex items-center gap-5 relative z-10">
-                                                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-xl transition-transform duration-300 group-hover:scale-110 ${isSelected ? 'bg-amber-500 text-white' : 'bg-muted/50 text-foreground/70'
-                                                        }`}>
-                                                        📚
-                                                    </div>
-
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <h3 className={`text-xl font-black uppercase italic tracking-normal leading-snug transition-colors ${isSelected ? 'text-amber-500' : 'text-foreground'
-                                                                }`}>
-                                                                {subject.subject_name}
-                                                            </h3>
-                                                            {isSelected && (
-                                                                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                                                            )}
+                                                    <div className="flex items-center gap-4 relative z-10">
+                                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-lg transition-transform duration-300 group-hover:scale-110 ${isSubjectSelected ? 'bg-amber-500 text-white' : 'bg-muted/50 text-foreground/70'
+                                                            }`}>
+                                                            {subject.icon || '📚'}
                                                         </div>
-                                                        <p className="text-muted-foreground text-xs font-medium leading-relaxed line-clamp-2">
-                                                            {subject.subject_code} • AI Generated Test
-                                                        </p>
-                                                    </div>
 
-                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isSelected ? 'bg-amber-500 text-white' : 'bg-muted opacity-0 group-hover:opacity-100'
-                                                        }`}>
-                                                        <ArrowRight className="w-4 h-4" />
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 mb-0.5">
+                                                                <h3 className={`text-lg font-black uppercase italic tracking-normal leading-snug transition-colors ${isSubjectSelected ? 'text-amber-500' : 'text-foreground'
+                                                                    }`}>
+                                                                    {subject.name}
+                                                                </h3>
+                                                                {isSubjectSelected && (
+                                                                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                                                                )}
+                                                            </div>
+                                                            <p className="text-muted-foreground text-xs font-medium leading-relaxed">
+                                                                {subject.year ? `${subject.year} Year` : 'MBBS Subject'} • Tap to select or pick chapter
+                                                            </p>
+                                                        </div>
+
+                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isSubjectSelected ? 'bg-amber-500 text-white' : 'bg-muted opacity-60 group-hover:opacity-100'
+                                                            }`}>
+                                                            <ArrowRight className={`w-4 h-4 transition-transform ${isSubjectSelected ? 'rotate-90' : ''}`} />
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </motion.div>
+                                                </motion.div>
+
+                                                {/* Expanded Chapter Selection */}
+                                                <AnimatePresence>
+                                                    {isSubjectSelected && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, height: 0 }}
+                                                            animate={{ opacity: 1, height: 'auto' }}
+                                                            exit={{ opacity: 0, height: 0 }}
+                                                            className="overflow-hidden pl-4 pr-1 py-2 space-y-2 border-l-2 border-amber-500/40 ml-6"
+                                                        >
+                                                            <p className="text-[10px] font-black uppercase tracking-widest text-amber-500 mb-2">
+                                                                Select Test Scope for {subject.name}:
+                                                            </p>
+                                                            
+                                                            {/* All Chapters Option */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleChapterSelect(null)}
+                                                                className={`w-full text-left p-3 rounded-2xl border transition-all text-xs font-bold flex items-center justify-between ${!selectedChapter
+                                                                    ? 'border-amber-500 bg-amber-500/15 text-amber-600 dark:text-amber-400 font-extrabold shadow-sm'
+                                                                    : 'border-border/30 bg-background/50 hover:bg-muted/40 text-foreground'
+                                                                    }`}
+                                                            >
+                                                                <span>All Chapters (Full {subject.name})</span>
+                                                                {!selectedChapter && <CheckCircle className="w-4 h-4 text-amber-500" />}
+                                                            </button>
+
+                                                            {loadingChapters ? (
+                                                                <div className="py-4 text-center text-xs text-muted-foreground animate-pulse">
+                                                                    Loading chapters...
+                                                                </div>
+                                                            ) : chapters.length === 0 ? (
+                                                                <p className="text-xs text-muted-foreground p-2 italic">Full subject test selected</p>
+                                                            ) : (
+                                                                chapters.map(chap => {
+                                                                    const isChapSelected = selectedChapter?.id === chap.id;
+                                                                    return (
+                                                                        <button
+                                                                            key={chap.id}
+                                                                            type="button"
+                                                                            onClick={() => handleChapterSelect(chap)}
+                                                                            className={`w-full text-left p-3 rounded-2xl border transition-all text-xs font-semibold flex items-center justify-between ${isChapSelected
+                                                                                ? 'border-amber-500 bg-amber-500/15 text-amber-600 dark:text-amber-400 font-extrabold shadow-sm'
+                                                                                : 'border-border/30 bg-background/40 hover:bg-muted/30 text-foreground/80'
+                                                                                }`}
+                                                                        >
+                                                                            <span className="truncate pr-2">{chap.name}</span>
+                                                                            {isChapSelected && <CheckCircle className="w-4 h-4 text-amber-500 shrink-0" />}
+                                                                        </button>
+                                                                    );
+                                                                })
+                                                            )}
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
                                         );
                                     })
                                 )}
@@ -470,47 +615,51 @@ const AITestGenerator: React.FC = () => {
                                 <div className="max-w-4xl mx-auto">
                                     <div className="pb-3">
                                         <h2 className="px-1 text-3xl sm:text-5xl font-black tracking-normal text-foreground uppercase italic leading-[1.08] text-center">
-                                            Select <span className="text-amber-500">Questions</span>
-                                        </h2>
-                                        <div className="mt-2 flex flex-col items-center gap-1">
-                                            <p className="text-muted-foreground text-sm font-bold uppercase tracking-widest">{topicMapping(selectedChapters[0])}</p>
-                                            <p className="text-muted-foreground/60 text-[10px] font-medium uppercase tracking-[0.2em]">
-                                                {profile?.plan === 'free' ? 'Free daily limits apply' : 'Unlimited Premium Access'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
-                            </div>
+                                             Number of <span className="text-amber-500">Questions</span>
+                                         </h2>
+                                         <div className="mt-2 flex flex-col items-center gap-1">
+                                             <p className="text-muted-foreground text-sm font-bold uppercase tracking-widest">
+                                                 {selectedChapter ? `${selectedSubject?.name || 'Subject'} • ${selectedChapter.name}` : selectedSubject?.name || selectedChapters[0] || 'Selected Subject'}
+                                             </p>
+                                             <p className="text-muted-foreground/60 text-[10px] font-medium uppercase tracking-[0.2em]">
+                                                 {profile?.plan === 'free' ? 'Free daily limits apply' : 'Unlimited Premium Access'}
+                                             </p>
+                                         </div>
+                                     </div>
+                                 </div>
+                                 <div className="h-4 bg-gradient-to-b from-background/40 dark:from-background/10 to-transparent pointer-events-none" />
+                             </div>
 
-                            <div className="max-w-4xl mx-auto px-4 sm:px-0">
-                                {/* Subject Preview Card */}
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ delay: 0.05 }}
-                                    className="relative overflow-hidden rounded-3xl border-2 border-amber-500/20 bg-amber-500/5 p-5 mb-8"
-                                >
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-[60px] -mr-16 -mt-16 pointer-events-none" />
-                                    <div className="flex items-center gap-5 relative z-10">
-                                        <div className="w-16 h-16 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-xl shadow-amber-500/30 text-2xl">
-                                            🧠
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-1">Ready to Start</p>
-                                            <h3 className="text-xl font-black uppercase italic tracking-normal leading-snug text-foreground">{topicMapping(selectedChapters[0])}</h3>
-                                            <p className="text-muted-foreground text-xs font-medium leading-snug break-words">
-                                                AI Generated Test
-                                            </p>
-                                        </div>
-                                        <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0">
-                                            <ArrowRight className="w-4 h-4" />
-                                        </div>
-                                    </div>
-                                </motion.div>
+                             <div className="max-w-4xl mx-auto px-4 sm:px-0">
+                                 {/* Subject Preview Card */}
+                                 <motion.div
+                                     initial={{ opacity: 0, scale: 0.95 }}
+                                     animate={{ opacity: 1, scale: 1 }}
+                                     transition={{ delay: 0.05 }}
+                                     className="relative overflow-hidden rounded-3xl border-2 border-amber-500/20 bg-amber-500/5 p-5 mb-8"
+                                 >
+                                     <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-[60px] -mr-16 -mt-16 pointer-events-none" />
+                                     <div className="flex items-center gap-5 relative z-10">
+                                         <div className="w-16 h-16 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-xl shadow-amber-500/30 text-2xl">
+                                             {selectedSubject?.icon || '🧠'}
+                                         </div>
+                                         <div className="flex-1 min-w-0">
+                                             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-1">Selected Scope</p>
+                                             <h3 className="text-xl font-black uppercase italic tracking-normal leading-snug text-foreground">
+                                                 {selectedSubject?.name || selectedChapters[0] || 'Selected Subject'}
+                                             </h3>
+                                             <p className="text-muted-foreground text-xs font-medium leading-snug break-words">
+                                                 {selectedChapter ? `Chapter: ${selectedChapter.name}` : 'Full Subject Practice'}
+                                             </p>
+                                         </div>
+                                         <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0">
+                                             <ArrowRight className="w-4 h-4" />
+                                         </div>
+                                     </div>
+                                 </motion.div>
 
-                                {/* Question Count Options */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                 {/* Question Count Options - Stacking single column */}
+                                 <div className="grid grid-cols-1 gap-3 mb-6">
                                     {[
                                         { num: 5, label: 'Quick Review', desc: 'Fast practice session' },
                                         { num: 10, label: 'Short Test', desc: 'Brief assessment' },
@@ -638,9 +787,11 @@ const AITestGenerator: React.FC = () => {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-1">Generating Test</p>
-                                        <h3 className="text-xl font-black uppercase italic tracking-normal leading-snug text-foreground">{topicMapping(selectedChapters[0])}</h3>
+                                        <h3 className="text-xl font-black uppercase italic tracking-normal leading-snug text-foreground">
+                                            {selectedSubject?.name || selectedChapters[0] || 'Selected Subject'}
+                                        </h3>
                                         <p className="text-muted-foreground text-xs font-medium leading-snug break-words">
-                                            {totalQ} AI Generated Questions
+                                            {selectedChapter ? `Chapter: ${selectedChapter.name} • ${totalQ} Questions` : `${totalQ} AI Generated Questions`}
                                         </p>
                                     </div>
                                     <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0">
@@ -669,7 +820,6 @@ const AITestGenerator: React.FC = () => {
                                 />
                             </motion.div>
 
-                            {loading > 0 && <Progress value={loading} className="h-2 mb-4 rounded-full" />}
                             {error && <p className="text-destructive text-sm text-center mb-4">{error}</p>}
 
                             <AnimatePresence>
@@ -682,7 +832,7 @@ const AITestGenerator: React.FC = () => {
                                     <div className="w-full max-w-md pointer-events-auto flex gap-3">
                                         <Button onClick={() => setCurrentStep(2)} variant="outline" className="flex-1 rounded-2xl h-16 font-black uppercase text-sm tracking-[0.2em]">Back</Button>
                                         <Button onClick={fetchAll} disabled={loading > 0} className="flex-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-2xl h-16 font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-amber-500/30 group transition-all">
-                                            {loading > 0 ? `Generating (${loadTime}s)…` : 'Start Test'}
+                                            Start Test
                                             <motion.div
                                                 animate={{ x: [0, 5, 0] }}
                                                 transition={{ duration: 1.5, repeat: Infinity }}
@@ -693,6 +843,74 @@ const AITestGenerator: React.FC = () => {
                                     </div>
                                 </motion.div>
                             </AnimatePresence>
+
+                            {/* Bottom Pinned Generating Test / Error Modal */}
+                            <Sheet open={loading > 0 || (currentStep === 3 && !!error)} onOpenChange={(open) => { if (!open && !loading) setError(null); }}>
+                                <SheetContent side="bottom" className={`rounded-t-[2.5rem] border-t backdrop-blur-2xl p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] z-[110] outline-none [&>button]:hidden transition-colors ${
+                                    error ? 'border-destructive/40 bg-background/95' : 'border-amber-500/30 bg-background/95'
+                                }`}>
+                                    {error ? (
+                                        <div className="flex flex-col items-center justify-center text-center space-y-4 py-2">
+                                            <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center text-destructive">
+                                                <AlertTriangle className="w-8 h-8" />
+                                            </div>
+                                            <SheetHeader className="text-center space-y-1">
+                                                <SheetTitle className="text-xl font-black uppercase italic tracking-tight text-destructive">
+                                                    Generation Failed
+                                                </SheetTitle>
+                                                <SheetDescription className="text-xs text-muted-foreground font-medium max-w-sm mx-auto">
+                                                    {error}
+                                                </SheetDescription>
+                                            </SheetHeader>
+                                            <div className="flex gap-3 w-full max-w-xs pt-2">
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => setError(null)}
+                                                    className="flex-1 rounded-2xl h-12 font-bold uppercase tracking-wider text-xs"
+                                                >
+                                                    Dismiss
+                                                </Button>
+                                                <Button
+                                                    onClick={() => {
+                                                        setError(null);
+                                                        fetchAll();
+                                                    }}
+                                                    className="flex-1 rounded-2xl h-12 font-black uppercase tracking-wider text-xs bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/20"
+                                                >
+                                                    Try Again
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <SheetHeader className="text-center space-y-1">
+                                                <SheetTitle className="text-xl font-black uppercase italic tracking-tight text-foreground">
+                                                    Generating <span className="text-amber-500">Your Test</span>
+                                                </SheetTitle>
+                                                <SheetDescription className="text-xs text-muted-foreground font-medium">
+                                                    Please wait while AI prepares your custom practice test
+                                                </SheetDescription>
+                                            </SheetHeader>
+                                            <div className="flex flex-col items-center justify-center py-4 space-y-3">
+                                                <div className="w-40 h-40 flex items-center justify-center">
+                                                    <LottiePlayer
+                                                        animationData={openerLoadingAnimationData}
+                                                        loop={true}
+                                                        autoplay={true}
+                                                        className="w-full h-full"
+                                                    />
+                                                </div>
+                                                <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 px-4 py-1.5 rounded-full">
+                                                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                                                    <span className="text-xs font-black uppercase tracking-widest text-amber-500">
+                                                        {selectedChapter ? selectedChapter.name : selectedSubject?.name || 'Medical Test'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                </SheetContent>
+                            </Sheet>
                         </div>
                     )}
 
@@ -773,10 +991,10 @@ const AITestGenerator: React.FC = () => {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" size="icon" onClick={() => setIsDrawerOpen(true)} className="w-10 h-10 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground">
+                                            <Button variant="ghost" size="icon" onClick={() => setIsDrawerOpen(true)} className="w-10 h-10 rounded-xl bg-slate-200/90 dark:bg-slate-800/90 hover:bg-slate-300 dark:hover:bg-slate-700 text-foreground border border-border/50 shadow-sm">
                                                 <PanelLeft className="w-5 h-5" />
                                             </Button>
-                                            <Button variant="ghost" size="icon" onClick={() => setShowExitConfirm(true)} className="w-10 h-10 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground">
+                                            <Button variant="ghost" size="icon" onClick={() => setShowExitConfirm(true)} className="w-10 h-10 rounded-xl bg-slate-200/90 dark:bg-slate-800/90 hover:bg-slate-300 dark:hover:bg-slate-700 text-foreground border border-border/50 shadow-sm">
                                                 <X className="w-5 h-5" />
                                             </Button>
                                         </div>
@@ -802,7 +1020,6 @@ const AITestGenerator: React.FC = () => {
                                                 state = 'selected';
                                             }
 
-                                            // Bounce if correct, shake if selected and wrong
                                             let animation: { scale?: number[]; x?: number[]; transition?: { duration?: number } } = {};
                                             if (isRevealed) {
                                                 if (isCorrectOption) {
@@ -860,7 +1077,7 @@ const AITestGenerator: React.FC = () => {
                                         <motion.div
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
-                                            className="mb-8 p-6 rounded-[2rem] bg-muted/20 border border-border/40 backdrop-blur-md"
+                                            className="mb-28 p-6 rounded-[2rem] bg-muted/20 border border-border/40 backdrop-blur-md shadow-sm"
                                         >
                                             <div className="flex items-center gap-2 mb-3">
                                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center ${answers[idx] === questions[idx].answer ? 'bg-emerald-500/10' : 'bg-destructive/10'}`}>
@@ -876,7 +1093,7 @@ const AITestGenerator: React.FC = () => {
                                         </motion.div>
                                     )}
 
-                                    {/* Best of Luck Wish - Hide when current question is selected or answered */}
+                                    {/* Best of Luck Wish */}
                                     {!answers[idx] && !revealed[idx] && (
                                         <div className="mt-12 text-center space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-1000">
                                             <h3 className="text-2xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500">
@@ -890,7 +1107,7 @@ const AITestGenerator: React.FC = () => {
                                 </motion.div>
                             </AnimatePresence>
 
-                            {/* Floating Buttons - Outside AnimatePresence */}
+                            {/* Floating Buttons */}
                             <div className="fixed bottom-0 left-0 right-0 px-6 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] z-50 flex justify-center pointer-events-none">
                                 <div className="w-full max-w-md pointer-events-auto flex gap-3">
                                     {answers[idx] && !revealed[idx] ? (
@@ -986,19 +1203,27 @@ const AITestGenerator: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Exit Modal */}
-                    {showExitConfirm && (
-                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                            <div className="bg-background rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
-                                <h3 className="text-lg font-black text-foreground">Confirm Exit</h3>
-                                <p className="text-sm text-muted-foreground">Your progress will be lost. Are you sure?</p>
-                                <div className="flex gap-3">
-                                    <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setShowExitConfirm(false)}>Cancel</Button>
-                                    <Button className="flex-1 rounded-xl bg-destructive text-destructive-foreground" onClick={startNewTest}>Exit Test</Button>
+                    {/* Exit Confirmation Bottom Sheet (Forked from MCQs) */}
+                    <Sheet open={showExitConfirm} onOpenChange={(open) => { if (!open) setShowExitConfirm(false); }}>
+                        <SheetContent side="bottom" className="mx-auto max-h-[88dvh] overflow-y-auto rounded-t-[2rem] border-x border-t border-red-200 dark:border-red-900 bg-background/95 p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] backdrop-blur-2xl max-w-lg w-full z-[300]" overlayClassName="z-[300]">
+                            <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full mx-auto mb-4" aria-hidden="true" />
+                            <div className="flex flex-col items-center text-center">
+                                <div className="mb-4 w-16 h-16 rounded-full bg-red-100 dark:bg-red-950 flex items-center justify-center shadow-inner">
+                                    <AlertTriangle className="w-8 h-8 text-red-500" />
+                                </div>
+                                <SheetHeader className="text-center sm:text-center">
+                                    <SheetTitle className="text-xl font-bold font-syne">Leave Session?</SheetTitle>
+                                    <SheetDescription className="text-sm text-zinc-500 dark:text-zinc-400">
+                                        Your progress will be lost if you leave this session.
+                                    </SheetDescription>
+                                </SheetHeader>
+                                <div className="flex flex-col-reverse sm:flex-row gap-3 w-full mt-6">
+                                    <Button onClick={() => setShowExitConfirm(false)} variant="outline" className="flex-1 rounded-2xl h-12 font-bold uppercase tracking-wider text-xs">Cancel</Button>
+                                    <Button onClick={startNewTest} className="flex-1 rounded-2xl h-12 font-black uppercase tracking-wider text-xs bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/20">Leave Test</Button>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        </SheetContent>
+                    </Sheet>
                 </div>
             </main>
         </div>

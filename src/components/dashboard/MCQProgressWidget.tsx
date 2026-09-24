@@ -52,7 +52,7 @@ const GET_SAVED_SESSIONS = async (userId: string): Promise<SavedMCQSession[]> =>
         if (!mergedByChapter.has(session.chapterId)) mergedByChapter.set(session.chapterId, session);
       });
 
-    return Array.from(mergedByChapter.values()).slice(0, 5);
+    return Array.from(mergedByChapter.values()).slice(0, 15);
   } catch {
     const localData = localStorage.getItem('mcq_saved_sessions');
     return localData ? JSON.parse(localData) : [];
@@ -246,7 +246,8 @@ export const MCQProgressWidget = () => {
           percentage
         };
       }).filter((s): s is NonNullable<typeof s> => Boolean(s))
-        .filter(s => s.completedMCQs > 0 && s.completedMCQs < s.totalMCQs); // Only show incomplete ones with at least 1 attempted
+        .filter(s => s.completedMCQs < s.totalMCQs) // Show incomplete sessions
+        .slice(0, 5); // Display 5 items in Dashboard
     },
     enabled: sessions.length > 0 && !!userData?.id && !profileLoading,
     staleTime: 1000 * 60 * 5,

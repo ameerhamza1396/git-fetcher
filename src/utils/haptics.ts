@@ -3,10 +3,35 @@ export const triggerHaptic = async (pattern: number | number[] = 10) => {
   if (typeof window === 'undefined') return;
 
   try {
+    // @ts-ignore
+    const { Haptics, ImpactStyle, NotificationType } = await import('@capacitor/haptics');
+    if (Haptics) {
+      if (Array.isArray(pattern)) {
+        if (NotificationType) {
+          const type = pattern[0] > 30 ? NotificationType.Error : NotificationType.Success;
+          await Haptics.notification({ type });
+        } else if (ImpactStyle) {
+          await Haptics.impact({ style: ImpactStyle.Medium || ImpactStyle.Light });
+        }
+      } else if (ImpactStyle) {
+        await Haptics.impact({ style: ImpactStyle.Light });
+      } else {
+        await Haptics.selectionStart();
+      }
+      return;
+    }
+  } catch {
+    // Ignore and proceed to fallback
+  }
+
+  try {
     const win = window as any;
-    // Check if Capacitor native plugins exist at runtime
     if (win.Capacitor?.isPluginAvailable?.('Haptics') && win.Capacitor?.Plugins?.Haptics) {
-      await win.Capacitor.Plugins.Haptics.impact({ style: 'LIGHT' });
+      if (Array.isArray(pattern)) {
+        await win.Capacitor.Plugins.Haptics.notification({ type: 'SUCCESS' });
+      } else {
+        await win.Capacitor.Plugins.Haptics.impact({ style: 'LIGHT' });
+      }
       return;
     }
   } catch {
@@ -14,7 +39,7 @@ export const triggerHaptic = async (pattern: number | number[] = 10) => {
   }
 
   // Fallback to Web Vibration API for browsers/webviews
-  if ('vibrate' in navigator) {
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
     try {
       navigator.vibrate(pattern);
     } catch {
@@ -22,3 +47,5 @@ export const triggerHaptic = async (pattern: number | number[] = 10) => {
     }
   }
 };
+
+export default triggerHaptic;

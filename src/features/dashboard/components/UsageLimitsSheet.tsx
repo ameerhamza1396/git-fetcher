@@ -91,7 +91,7 @@ export function UsageLimitsSheet({ open, onOpenChange, userId, rawUserPlan, user
   ];
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="flex max-h-[88dvh] flex-col overflow-hidden rounded-t-[2rem] border-x border-t border-primary/20 bg-background/95 pb-[calc(1.5rem+env(safe-area-inset-bottom))] backdrop-blur-2xl">
+      <SheetContent data-usage-limits-sheet="true" side="bottom" className="flex max-h-[88dvh] flex-col overflow-hidden rounded-t-[2rem] border-x border-t border-primary/20 bg-background/95 pb-[calc(1.5rem+env(safe-area-inset-bottom))] backdrop-blur-2xl">
         <SheetHeader className="mx-auto w-full max-w-lg text-left">
           <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25"><Gauge className="h-6 w-6" /></div>
           <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary">Account usage</p>
@@ -104,7 +104,27 @@ export function UsageLimitsSheet({ open, onOpenChange, userId, rawUserPlan, user
             <Badge className="bg-primary/15 text-primary">{userPlanDisplayName}</Badge>
           </div>
           {usageLoading ? (
-            <div className="h-32 animate-pulse rounded-2xl bg-muted/50" />
+            <div className="space-y-4 animate-pulse">
+              <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted/40 p-1">
+                <div className="h-9 rounded-xl bg-muted/60" />
+                <div className="h-9 rounded-xl bg-muted/60" />
+              </div>
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="rounded-2xl border border-border/40 bg-card p-4 space-y-3 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1.5 w-1/2">
+                        <div className="h-4 w-3/4 rounded-md bg-muted/70" />
+                        <div className="h-3 w-1/2 rounded-md bg-muted/40" />
+                      </div>
+                      <div className="h-4 w-14 rounded-md bg-muted/70" />
+                    </div>
+                    <div className="h-2.5 w-full rounded-full bg-muted/50" />
+                    <div className="h-3 w-16 ml-auto rounded-md bg-muted/40" />
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : usageLimits ? (
             <>
               <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted/50 p-1">
